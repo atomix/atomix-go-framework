@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/binary"
 	"errors"
+	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	"io"
 )
@@ -73,7 +74,7 @@ func (s *SimpleService) Command(bytes []byte, callback func([]byte, error)) {
 	}
 }
 
-func (s *SimpleService) CommandStream(bytes []byte, stream Stream, callback func(error)) {
+func (s *SimpleService) CommandStream(bytes []byte, stream stream.Stream, callback func(error)) {
 	command := &CommandRequest{}
 	if err := proto.Unmarshal(bytes, command); err != nil {
 		callback(err)
@@ -113,7 +114,7 @@ func (s *SimpleService) Query(bytes []byte, callback func([]byte, error)) {
 	}
 }
 
-func (s *SimpleService) QueryStream(bytes []byte, stream Stream, callback func(error)) {
+func (s *SimpleService) QueryStream(bytes []byte, stream stream.Stream, callback func(error)) {
 	query := &QueryRequest{}
 	if err := proto.Unmarshal(bytes, query); err != nil {
 		callback(err)

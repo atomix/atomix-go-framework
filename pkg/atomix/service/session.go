@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	"io"
 	"math"
@@ -18,7 +19,17 @@ type SessionizedService struct {
 	executor  Executor
 	ctx       Context
 	sessions  map[uint64]*Session
-	Session   *Session
+	session   *Session
+}
+
+// Session returns the currently active session
+func (s *SessionizedService) Session() *Session {
+	return s.session
+}
+
+// Sessions returns a map of currently active sessions
+func (s *SessionizedService) Sessions() map[uint64]*Session {
+	return s.sessions
 }
 
 func (s *SessionizedService) Snapshot(writer io.Writer) error {
@@ -226,7 +237,7 @@ func (s *SessionizedService) applySessionCommand(request *SessionCommandRequest,
 	if !ok {
 		callback(nil, errors.New(fmt.Sprintf("unknown session %d", request.Context.SessionId)))
 	} else {
-		s.Session = session
+		s.session = session
 
 		// Create stream contexts prior to executing the command to ensure we're
 		// sending the stream state prior to this command.
@@ -329,7 +340,7 @@ func (s *SessionizedService) applyCloseSession(request *CloseSessionRequest, cal
 	}
 }
 
-func (s *SessionizedService) CommandStream(bytes []byte, stream Stream, callback func(error)) {
+func (s *SessionizedService) CommandStream(bytes []byte, stream stream.Stream, callback func(error)) {
 	request := &SessionRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		callback(err)
@@ -341,7 +352,7 @@ func (s *SessionizedService) CommandStream(bytes []byte, stream Stream, callback
 	}
 }
 
-func (s *SessionizedService) applySequenceCommandStream(request *SessionCommandRequest, stream Stream, callback func(error)) {
+func (s *SessionizedService) applySequenceCommandStream(request *SessionCommandRequest, stream stream.Stream, callback func(error)) {
 	session, ok := s.sessions[request.Context.SessionId]
 	if !ok {
 		stream.Fail(errors.New(fmt.Sprintf("unknown session %d", request.Context.SessionId)))
@@ -370,9 +381,9 @@ func (s *SessionizedService) applySequenceCommandStream(request *SessionCommandR
 	}
 }
 
-func (s *SessionizedService) applySessionCommandStream(request *SessionCommandRequest, session *Session, stream Stream, callback func(error)) {
+func (s *SessionizedService) applySessionCommandStream(request *SessionCommandRequest, session *Session, stream stream.Stream, callback func(error)) {
 	// Set the current session for usage in the service
-	s.Session = session
+	s.session = session
 
 	sequenceNumber := request.Context.SequenceNumber
 
@@ -468,7 +479,7 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 	})
 }
 
-func (s *SessionizedService) QueryStream(bytes []byte, stream Stream, callback func(error)) {
+func (s *SessionizedService) QueryStream(bytes []byte, stream stream.Stream, callback func(error)) {
 	request := &SessionRequest{}
 	err := proto.Unmarshal(bytes, request)
 	if err != nil {
@@ -485,7 +496,7 @@ func (s *SessionizedService) QueryStream(bytes []byte, stream Stream, callback f
 	}
 }
 
-func (s *SessionizedService) sequenceQueryStream(query *SessionQueryRequest, stream Stream, callback func(error)) {
+func (s *SessionizedService) sequenceQueryStream(query *SessionQueryRequest, stream stream.Stream, callback func(error)) {
 	session, ok := s.sessions[query.Context.SessionId]
 	if !ok {
 		callback(errors.New(fmt.Sprintf("unknown session %d", query.Context.SessionId)))
@@ -501,7 +512,7 @@ func (s *SessionizedService) sequenceQueryStream(query *SessionQueryRequest, str
 	}
 }
 
-func (s *SessionizedService) applyQueryStream(query *SessionQueryRequest, session *Session, stream Stream, callback func(error)) {
+func (s *SessionizedService) applyQueryStream(query *SessionQueryRequest, session *Session, stream stream.Stream, callback func(error)) {
 	s.executor.Execute(query.Name, query.Input, func(result []byte, err error) {
 		callback(err)
 	})
@@ -573,7 +584,6 @@ type Session struct {
 	sequenceQueries  map[uint64]*list.List
 	results          map[uint64]*resultFuture
 	idStreams        map[uint64]*sessionStream
-	typeStreams      map[string]map[uint64]*sessionStream
 }
 
 func (s *Session) timedOut(time time.Time) bool {
@@ -588,13 +598,27 @@ func (s *Session) addStream(index uint64, op string) *sessionStream {
 		ctx:    s.ctx,
 	}
 	s.idStreams[stream.Id] = stream
-	typeStreams, ok := s.typeStreams[stream.Type]
-	if !ok {
-		typeStreams = make(map[uint64]*sessionStream)
-		s.typeStreams[stream.Type] = typeStreams
-	}
-	typeStreams[stream.Id] = stream
 	return stream
+}
+
+// Streams returns a slice of streams active for the session
+func (s *Session) Streams() []stream.Stream {
+	streams := make([]stream.Stream, 0, len(s.idStreams))
+	for _, stream := range s.idStreams {
+		streams = append(streams, stream)
+	}
+	return streams
+}
+
+// StreamsOf returns a slice of streams of the given type
+func (s *Session) StreamsOf(streamType string) []stream.Stream {
+	streams := make([]stream.Stream, 0, len(s.idStreams))
+	for _, stream := range s.idStreams {
+		if stream.Type == streamType {
+			streams = append(streams, stream)
+		}
+	}
+	return streams
 }
 
 func (s *Session) getStream(sequenceNumber uint64) *sessionStream {
@@ -670,7 +694,7 @@ func (s *Session) close() {
 }
 
 type sessionStream struct {
-	Stream
+	stream.Stream
 	Id               uint64
 	Type             string
 	closed           bool
@@ -680,7 +704,7 @@ type sessionStream struct {
 	lastIndex        uint64
 	events           *list.List
 	ctx              Context
-	stream           Stream
+	stream           stream.Stream
 }
 
 type sessionStreamEvent struct {

@@ -11,13 +11,21 @@ type Scheduler interface {
 	Execute(f func())
 
 	// ScheduleOnce schedules a function to be run once after the given delay
-	ScheduleOnce(delay time.Duration, f func())
+	ScheduleOnce(delay time.Duration, f func()) Timer
 
 	// ScheduleRepeat schedules a function to run repeatedly every interval starting after the given delay
-	ScheduleRepeat(delay time.Duration, interval time.Duration, f func())
+	ScheduleRepeat(delay time.Duration, interval time.Duration, f func()) Timer
 
 	// ScheduleIndex schedules a function to run at a specific index
 	ScheduleIndex(index uint64, f func())
+}
+
+// Timer is a cancellable timer
+type Timer interface {
+
+	// Cancel cancels the timer, preventing it from running in the future
+	Cancel()
+
 }
 
 func newScheduler() *scheduler {
@@ -41,22 +49,26 @@ func (s *scheduler) Execute(f func()) {
 	s.tasks.PushBack(f)
 }
 
-func (s *scheduler) ScheduleOnce(delay time.Duration, f func()) {
-	s.scheduledTasks.PushBack(&task{
+func (s *scheduler) ScheduleOnce(delay time.Duration, f func()) Timer {
+	task := &task{
 		scheduler: s,
 		time: time.Now().Add(delay),
 		interval: 0,
 		callback: f,
-	})
+	}
+	s.scheduledTasks.PushBack(task)
+	return task
 }
 
-func (s *scheduler) ScheduleRepeat(delay time.Duration, interval time.Duration, f func()) {
-	s.scheduledTasks.PushBack(&task{
+func (s *scheduler) ScheduleRepeat(delay time.Duration, interval time.Duration, f func()) Timer {
+	task := &task{
 		scheduler: s,
 		time: time.Now().Add(delay),
 		interval: interval,
 		callback: f,
-	})
+	}
+	s.scheduledTasks.PushBack(task)
+	return task
 }
 
 func (s *scheduler) ScheduleIndex(index uint64, f func()) {
@@ -141,6 +153,7 @@ func (s *scheduler) schedule(t *task) {
 
 // Scheduler task
 type task struct {
+	Timer
 	scheduler *scheduler
 	interval time.Duration
 	callback func()
@@ -156,7 +169,7 @@ func (t *task) run() {
 	t.callback()
 }
 
-func (t *task) cancel() {
+func (t *task) Cancel() {
 	if t.element != nil {
 		t.scheduler.scheduledTasks.Remove(t.element)
 	}
