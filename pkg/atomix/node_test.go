@@ -1,7 +1,13 @@
 package atomix
 
 import (
+	"context"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
+	"github.com/atomix/atomix-go-node/proto/atomix/primitive"
+	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/test/bufconn"
+	"net"
 	"testing"
 	"time"
 )
@@ -131,5 +137,21 @@ func (c *TestClient) ReadStream(bytes []byte, stream service.Stream) (error) {
 }
 
 func TestNode(t *testing.T) {
+	lis := bufconn.Listen(1024 * 1024)
+	node := NewNode(NewTestProtocol(), withLocal(lis))
+	go node.Start()
 
+	f := func(c context.Context, s string) (net.Conn, error) {
+		return lis.Dial()
+	}
+
+	conn, err := grpc.Dial("test", grpc.WithContextDialer(f), grpc.WithInsecure())
+	assert.NoError(t, err)
+
+	client := primitive.NewPrimitiveServiceClient(conn)
+	response, err := client.GetPrimitives(context.Background(), &primitive.GetPrimitivesRequest{})
+	assert.NoError(t, err)
+	assert.Len(t, response.Primitives, 0)
+
+	node.Stop()
 }

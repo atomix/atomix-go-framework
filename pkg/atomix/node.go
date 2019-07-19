@@ -43,6 +43,20 @@ type defaultOption struct{}
 
 func (o *defaultOption) apply(node *Node) {
 	node.port = 5678
+	node.listener = tcpListener{}
+}
+
+// withLocal sets the node to local mode for testing
+func withLocal(lis net.Listener) NodeOption {
+	return &localOption{lis}
+}
+
+type localOption struct {
+	listener net.Listener
+}
+
+func (o *localOption) apply(node *Node) {
+	node.listener = localListener{o.listener}
 }
 
 // WithPort sets the port on the node
@@ -62,6 +76,8 @@ func (o *portOption) apply(node *Node) {
 type Node struct {
 	protocol Protocol
 	port     int
+	listener listener
+	server   *grpc.Server
 }
 
 // Start starts the node
@@ -70,22 +86,41 @@ func (n *Node) Start() error {
 		return err
 	}
 
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", n.port))
+	lis, err := n.listener.listen(n)
 	if err != nil {
 		return err
 	}
 
-	server := grpc.NewServer()
-	registerServers(server, n.protocol)
-	return server.Serve(lis)
+	n.server = grpc.NewServer()
+	registerServers(n.server, n.protocol)
+	return n.server.Serve(lis)
 }
 
 // Stop stops the node
 func (n *Node) Stop() error {
+	n.server.Stop()
 	if err := n.protocol.Stop(); err != nil {
 		return err
 	}
 	return nil
+}
+
+type listener interface {
+	listen(*Node) (net.Listener, error)
+}
+
+type tcpListener struct{}
+
+func (l tcpListener) listen(node *Node) (net.Listener, error) {
+	return net.Listen("tcp", fmt.Sprintf(":%d", node.port))
+}
+
+type localListener struct {
+	listener net.Listener
+}
+
+func (l localListener) listen(node *Node) (net.Listener, error) {
+	return l.listener, nil
 }
 
 // registerServers registers all primitive servers on the given gRPC server
