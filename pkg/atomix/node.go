@@ -13,7 +13,7 @@ import (
 // Protocol
 type Protocol interface {
 	// Start starts the protocol
-	Start(registry *service.ServiceRegistry) error
+	Start(cluster Cluster, registry *service.ServiceRegistry) error
 
 	// Client returns the protocol client
 	Client() service.Client
@@ -87,7 +87,21 @@ type Node struct {
 
 // Start starts the node
 func (n *Node) Start() error {
-	if err := n.protocol.Start(getServiceRegistry()); err != nil {
+	members := make(map[string]Member)
+	for _, member := range n.config.Members {
+		members[member.Id] = Member{
+			ID:   member.Id,
+			Host: member.Host,
+			Port: int(member.Port),
+		}
+	}
+
+	cluster := Cluster{
+		MemberID: n.Id,
+		Members:  members,
+	}
+
+	if err := n.protocol.Start(cluster, getServiceRegistry()); err != nil {
 		return err
 	}
 
