@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-const versionEmpty = -1
-
 // RegisterMapService registers the map service in the given service registry
 func RegisterMapService(registry *service.ServiceRegistry) {
 	registry.Register("map", newMapService)
@@ -83,7 +81,7 @@ func (m *MapService) Put(value []byte) ([]byte, error) {
 	} else {
 		// If the version is -1 then reject the request.
 		// If the version is positive then compare the version to the current version.
-		if request.Version == versionEmpty || (request.Version > 0 && request.Version != oldValue.version) {
+		if request.IfEmpty || (request.Version > 0 && request.Version != oldValue.version) {
 			return proto.Marshal(&PutResponse{
 				Status:          UpdateStatus_PRECONDITION_FAILED,
 				PreviousValue:   oldValue.value,

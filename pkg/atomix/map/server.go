@@ -115,6 +115,7 @@ func (m *mapServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRes
 		Value:   request.Value,
 		Version: uint64(request.Version),
 		Ttl:     request.Ttl,
+		IfEmpty: request.Version == -1,
 	})
 	if err != nil {
 		return nil, err

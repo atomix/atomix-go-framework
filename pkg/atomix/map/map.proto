@@ -13,7 +13,7 @@
 // limitations under the License.
 syntax = "proto3";
 
-package atomix.service;
+package atomix.map;
 
 // Map snapshot
 message MapSnapshot {
@@ -75,6 +75,7 @@ message PutRequest {
     bytes value = 2;
     uint64 version = 3;
     int64 ttl = 4;
+    bool if_empty = 5;
 }
 
 message PutResponse {

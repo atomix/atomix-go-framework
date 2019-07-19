@@ -2,6 +2,7 @@ package atomix
 
 import (
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
+	"testing"
 	"time"
 )
 
@@ -127,4 +128,8 @@ func (c *TestClient) ReadStream(bytes []byte, stream service.Stream) (error) {
 	case e := <-errResult:
 		return e
 	}
+}
+
+func TestNode(t *testing.T) {
+
 }
