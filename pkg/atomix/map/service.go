@@ -1,34 +1,44 @@
-package service
+package _map
 
 import (
 	"bytes"
+	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/golang/protobuf/proto"
 	"time"
 )
 
 const versionEmpty = -1
 
+// RegisterMapService registers the map service in the given service registry
+func RegisterMapService(registry *service.ServiceRegistry) {
+	registry.Register("map", newMapService)
+}
+
 // newMapService returns a new MapService
-func newMapService(scheduler Scheduler, executor Executor, ctx Context) Service {
+func newMapService(scheduler service.Scheduler, executor service.Executor, ctx service.Context) service.Service {
 	service := &MapService{
-		SessionizedService: &SessionizedService{
-			scheduler: scheduler,
-			executor:  executor,
-			ctx:       ctx,
+		SessionizedService: &service.SessionizedService{
+			Scheduler: scheduler,
+			Executor:  executor,
+			Context:   ctx,
 		},
 		entries: make(map[string]*mapValue),
-		timers:  make(map[string]Timer),
+		timers:  make(map[string]service.Timer),
 	}
-	executor.Register("put", service.Put)
-	executor.Register("get", service.Get)
 	return service
 }
 
 // MapService is a state machine for a map primitive
 type MapService struct {
-	*SessionizedService
+	*service.SessionizedService
 	entries map[string]*mapValue
-	timers  map[string]Timer
+	timers  map[string]service.Timer
+}
+
+// init initializes the map service
+func (m *MapService) init() {
+	m.Executor.Register("put", m.Put)
+	m.Executor.Register("get", m.Get)
 }
 
 // Put puts a key/value pair in the map
@@ -50,9 +60,9 @@ func (m *MapService) Put(value []byte) ([]byte, error) {
 		// Create a new entry value and set it in the map.
 		newValue := &mapValue{
 			value:   request.Value,
-			version: m.ctx.Index(),
+			version: m.Context.Index(),
 			ttl:     request.Ttl * int64(time.Millisecond),
-			created: m.ctx.Timestamp().UnixNano(),
+			created: m.Context.Timestamp().UnixNano(),
 		}
 		m.entries[request.Key] = newValue
 
@@ -94,9 +104,9 @@ func (m *MapService) Put(value []byte) ([]byte, error) {
 	// Create a new entry value and set it in the map.
 	newValue := &mapValue{
 		value:   request.Value,
-		version: m.ctx.Index(),
+		version: m.Context.Index(),
 		ttl:     request.Ttl * int64(time.Millisecond),
-		created: m.ctx.Timestamp().UnixNano(),
+		created: m.Context.Timestamp().UnixNano(),
 	}
 	m.entries[request.Key] = newValue
 
@@ -140,7 +150,7 @@ func (m *MapService) Get(bytes []byte) ([]byte, error) {
 func (m *MapService) scheduleTtl(key string, value *mapValue) {
 	m.cancelTtl(key)
 	if value.ttl > 0 {
-		m.timers[key] = m.scheduler.ScheduleOnce(time.Duration(value.ttl-(m.ctx.Timestamp().UnixNano()-value.created)), func() {
+		m.timers[key] = m.Scheduler.ScheduleOnce(time.Duration(value.ttl-(m.Context.Timestamp().UnixNano()-value.created)), func() {
 			delete(m.entries, key)
 			m.sendEvent(&ListenResponse{
 				Type:       ListenResponse_REMOVED,
@@ -174,8 +184,4 @@ type mapValue struct {
 	version uint64
 	created int64
 	ttl     int64
-}
-
-func init() {
-	registry.Register("map", newMapService)
 }

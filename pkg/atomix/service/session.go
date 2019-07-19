@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	"io"
 	"math"
@@ -15,9 +14,9 @@ import (
 // SessionizedService is a Service implementation for primitives that support sessions
 type SessionizedService struct {
 	Service
-	scheduler Scheduler
-	executor  Executor
-	ctx       Context
+	Scheduler Scheduler
+	Executor  Executor
+	Context   Context
 	sessions  map[uint64]*Session
 	session   *Session
 }
@@ -150,7 +149,6 @@ func (s *SessionizedService) installSessions(reader io.Reader) error {
 			LastUpdated:     time.Unix(0, int64(session.Timestamp)),
 			commandSequence: session.CommandSequence,
 			idStreams:       idStreams,
-			typeStreams:     typeStreams,
 		}
 	}
 	return nil
@@ -191,8 +189,8 @@ func (s *SessionizedService) Command(bytes []byte, callback func([]byte, error))
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		callback(nil, err)
 	} else {
-		scheduler := s.scheduler.(*scheduler)
-		scheduler.runScheduledTasks(s.ctx.Timestamp())
+		scheduler := s.Scheduler.(*scheduler)
+		scheduler.runScheduledTasks(s.Context.Timestamp())
 
 		switch r := request.Request.(type) {
 		case *SessionRequest_Command:
@@ -251,7 +249,7 @@ func (s *SessionizedService) applySessionCommand(request *SessionCommandRequest,
 		}
 
 		future := session.registerResultCallback(request.Context.SequenceNumber, callback)
-		s.executor.Execute(request.Name, request.Input, func(result []byte, err error) {
+		s.Executor.Execute(request.Name, request.Input, func(result []byte, err error) {
 			if err != nil {
 				future.complete(nil, err)
 			} else {
@@ -259,7 +257,7 @@ func (s *SessionizedService) applySessionCommand(request *SessionCommandRequest,
 					Response: &SessionResponse_Command{
 						Command: &SessionCommandResponse{
 							Context: &SessionResponseContext{
-								Index:    s.ctx.Index(),
+								Index:    s.Context.Index(),
 								Sequence: request.Context.SequenceNumber,
 								Streams:  streams,
 							},
@@ -274,7 +272,7 @@ func (s *SessionizedService) applySessionCommand(request *SessionCommandRequest,
 }
 
 func (s *SessionizedService) applyOpenSession(request *OpenSessionRequest, callback func([]byte, error)) {
-	session := newSession(s.ctx, time.Duration(request.Timeout))
+	session := newSession(s.Context, time.Duration(request.Timeout))
 	s.sessions[session.Id] = session
 	s.OnOpen(session)
 	callback(proto.Marshal(&SessionResponse{
@@ -293,7 +291,7 @@ func (s *SessionizedService) applyKeepAlive(request *KeepAliveRequest, callback 
 		callback(nil, errors.New(fmt.Sprintf("unknown session %d", request.SessionId)))
 	} else {
 		// Update the session's last updated timestamp to prevent it from expiring
-		session.LastUpdated = s.ctx.Timestamp()
+		session.LastUpdated = s.Context.Timestamp()
 
 		// Clear the result futures that have been acknowledged by the client
 		session.clearResults(request.CommandSequence)
@@ -321,7 +319,7 @@ func (s *SessionizedService) applyKeepAlive(request *KeepAliveRequest, callback 
 // expireSessions expires sessions that have not been kept alive within their timeout
 func (s *SessionizedService) expireSessions() {
 	for id, session := range s.sessions {
-		if session.timedOut(s.ctx.Timestamp()) {
+		if session.timedOut(s.Context.Timestamp()) {
 			session.close()
 			delete(s.sessions, id)
 			s.OnExpire(session)
@@ -340,19 +338,19 @@ func (s *SessionizedService) applyCloseSession(request *CloseSessionRequest, cal
 	}
 }
 
-func (s *SessionizedService) CommandStream(bytes []byte, stream stream.Stream, callback func(error)) {
+func (s *SessionizedService) CommandStream(bytes []byte, stream Stream, callback func(error)) {
 	request := &SessionRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		callback(err)
 	} else {
-		scheduler := s.scheduler.(*scheduler)
-		scheduler.runScheduledTasks(s.ctx.Timestamp())
+		scheduler := s.Scheduler.(*scheduler)
+		scheduler.runScheduledTasks(s.Context.Timestamp())
 		s.applySequenceCommandStream(request.GetCommand(), stream, callback)
 		scheduler.runImmediateTasks()
 	}
 }
 
-func (s *SessionizedService) applySequenceCommandStream(request *SessionCommandRequest, stream stream.Stream, callback func(error)) {
+func (s *SessionizedService) applySequenceCommandStream(request *SessionCommandRequest, stream Stream, callback func(error)) {
 	session, ok := s.sessions[request.Context.SessionId]
 	if !ok {
 		stream.Fail(errors.New(fmt.Sprintf("unknown session %d", request.Context.SessionId)))
@@ -381,7 +379,7 @@ func (s *SessionizedService) applySequenceCommandStream(request *SessionCommandR
 	}
 }
 
-func (s *SessionizedService) applySessionCommandStream(request *SessionCommandRequest, session *Session, stream stream.Stream, callback func(error)) {
+func (s *SessionizedService) applySessionCommandStream(request *SessionCommandRequest, session *Session, stream Stream, callback func(error)) {
 	// Set the current session for usage in the service
 	s.session = session
 
@@ -392,8 +390,8 @@ func (s *SessionizedService) applySessionCommandStream(request *SessionCommandRe
 	// Prepend the stream to the list of streams so it's easily identifiable by the client.
 	streams := make([]*SessionStreamContext, 0, len(session.idStreams)+1)
 	streams[0] = &SessionStreamContext{
-		StreamId: s.ctx.Index(),
-		Index:    s.ctx.Index(),
+		StreamId: s.Context.Index(),
+		Index:    s.Context.Index(),
 	}
 	for _, stream := range session.idStreams {
 		streams = append(streams, &SessionStreamContext{
@@ -404,14 +402,14 @@ func (s *SessionizedService) applySessionCommandStream(request *SessionCommandRe
 	}
 
 	// Add the stream to the session and bind it to the provided stream
-	sessionStream := session.addStream(s.ctx.Index(), request.Name)
+	sessionStream := session.addStream(s.Context.Index(), request.Name)
 	sessionStream.stream = stream
 
 	// Create a result future and execute the streaming operation
 	future := session.registerResultCallback(sequenceNumber, func(bytes []byte, err error) {
 		callback(err)
 	})
-	s.executor.ExecuteStream(request.Name, request.Input, sessionStream, func(err error) {
+	s.Executor.ExecuteStream(request.Name, request.Input, sessionStream, func(err error) {
 		future.complete(nil, err)
 	})
 	callback(nil)
@@ -424,8 +422,8 @@ func (s *SessionizedService) Query(bytes []byte, callback func([]byte, error)) {
 		callback(nil, err)
 	} else {
 		query := request.GetQuery()
-		if query.Context.LastIndex > s.ctx.Index() {
-			s.scheduler.(*scheduler).ScheduleIndex(query.Context.LastIndex, func() {
+		if query.Context.LastIndex > s.Context.Index() {
+			s.Scheduler.(*scheduler).ScheduleIndex(query.Context.LastIndex, func() {
 				s.sequenceQuery(query, callback)
 			})
 		} else {
@@ -451,7 +449,7 @@ func (s *SessionizedService) sequenceQuery(query *SessionQueryRequest, callback 
 }
 
 func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Session, callback func([]byte, error)) {
-	s.executor.Execute(query.Name, query.Input, func(result []byte, err error) {
+	s.Executor.Execute(query.Name, query.Input, func(result []byte, err error) {
 		if err != nil {
 			callback(nil, err)
 		} else {
@@ -467,7 +465,7 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 				Response: &SessionResponse_Command{
 					Command: &SessionCommandResponse{
 						Context: &SessionResponseContext{
-							Index:    s.ctx.Index(),
+							Index:    s.Context.Index(),
 							Sequence: session.commandSequence,
 							Streams:  streams,
 						},
@@ -479,15 +477,15 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 	})
 }
 
-func (s *SessionizedService) QueryStream(bytes []byte, stream stream.Stream, callback func(error)) {
+func (s *SessionizedService) QueryStream(bytes []byte, stream Stream, callback func(error)) {
 	request := &SessionRequest{}
 	err := proto.Unmarshal(bytes, request)
 	if err != nil {
 		callback(err)
 	} else {
 		query := request.GetQuery()
-		if query.Context.LastIndex > s.ctx.Index() {
-			s.scheduler.(*scheduler).ScheduleIndex(query.Context.LastIndex, func() {
+		if query.Context.LastIndex > s.Context.Index() {
+			s.Scheduler.(*scheduler).ScheduleIndex(query.Context.LastIndex, func() {
 				s.sequenceQueryStream(query, stream, callback)
 			})
 		} else {
@@ -496,7 +494,7 @@ func (s *SessionizedService) QueryStream(bytes []byte, stream stream.Stream, cal
 	}
 }
 
-func (s *SessionizedService) sequenceQueryStream(query *SessionQueryRequest, stream stream.Stream, callback func(error)) {
+func (s *SessionizedService) sequenceQueryStream(query *SessionQueryRequest, stream Stream, callback func(error)) {
 	session, ok := s.sessions[query.Context.SessionId]
 	if !ok {
 		callback(errors.New(fmt.Sprintf("unknown session %d", query.Context.SessionId)))
@@ -512,8 +510,8 @@ func (s *SessionizedService) sequenceQueryStream(query *SessionQueryRequest, str
 	}
 }
 
-func (s *SessionizedService) applyQueryStream(query *SessionQueryRequest, session *Session, stream stream.Stream, callback func(error)) {
-	s.executor.Execute(query.Name, query.Input, func(result []byte, err error) {
+func (s *SessionizedService) applyQueryStream(query *SessionQueryRequest, session *Session, stream Stream, callback func(error)) {
+	s.Executor.Execute(query.Name, query.Input, func(result []byte, err error) {
 		callback(err)
 	})
 }
@@ -540,7 +538,6 @@ func newSession(ctx Context, timeout time.Duration) *Session {
 		sequenceQueries:  make(map[uint64]*list.List),
 		results:          make(map[uint64]*resultFuture),
 		idStreams:        make(map[uint64]*sessionStream),
-		typeStreams:      make(map[string]map[uint64]*sessionStream),
 	}
 }
 
@@ -602,8 +599,8 @@ func (s *Session) addStream(index uint64, op string) *sessionStream {
 }
 
 // Streams returns a slice of streams active for the session
-func (s *Session) Streams() []stream.Stream {
-	streams := make([]stream.Stream, 0, len(s.idStreams))
+func (s *Session) Streams() []Stream {
+	streams := make([]Stream, 0, len(s.idStreams))
 	for _, stream := range s.idStreams {
 		streams = append(streams, stream)
 	}
@@ -611,8 +608,8 @@ func (s *Session) Streams() []stream.Stream {
 }
 
 // StreamsOf returns a slice of streams of the given type
-func (s *Session) StreamsOf(streamType string) []stream.Stream {
-	streams := make([]stream.Stream, 0, len(s.idStreams))
+func (s *Session) StreamsOf(streamType string) []Stream {
+	streams := make([]Stream, 0, len(s.idStreams))
 	for _, stream := range s.idStreams {
 		if stream.Type == streamType {
 			streams = append(streams, stream)
@@ -694,7 +691,7 @@ func (s *Session) close() {
 }
 
 type sessionStream struct {
-	stream.Stream
+	Stream
 	Id               uint64
 	Type             string
 	closed           bool
@@ -704,7 +701,7 @@ type sessionStream struct {
 	lastIndex        uint64
 	events           *list.List
 	ctx              Context
-	stream           stream.Stream
+	stream           Stream
 }
 
 type sessionStreamEvent struct {

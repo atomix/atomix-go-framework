@@ -6,7 +6,7 @@ package election
 import (
 	context "context"
 	fmt "fmt"
-	headers "github.com/atomix/atomix-go-client/proto/atomix/headers"
+	headers "github.com/atomix/atomix-go-node/proto/atomix/headers"
 	proto "github.com/golang/protobuf/proto"
 	duration "github.com/golang/protobuf/ptypes/duration"
 	grpc "google.golang.org/grpc"

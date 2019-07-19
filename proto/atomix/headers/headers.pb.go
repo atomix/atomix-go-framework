@@ -5,7 +5,7 @@ package headers
 
 import (
 	fmt "fmt"
-	primitive "github.com/atomix/atomix-go-client/proto/atomix/primitive"
+	primitive "github.com/atomix/atomix-go-node/proto/atomix/primitive"
 	proto "github.com/golang/protobuf/proto"
 	math "math"
 )
