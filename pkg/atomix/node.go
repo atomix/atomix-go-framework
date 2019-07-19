@@ -5,6 +5,7 @@ import (
 	map_ "github.com/atomix/atomix-go-node/pkg/atomix/map"
 	"github.com/atomix/atomix-go-node/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
+	"github.com/atomix/atomix-go-node/proto/atomix/controller"
 	"google.golang.org/grpc"
 	"net"
 )
@@ -22,8 +23,10 @@ type Protocol interface {
 }
 
 // NewNode creates a new node running the given protocol
-func NewNode(protocol Protocol, opts ...NodeOption) *Node {
+func NewNode(nodeID string, config controller.PartitionConfig, protocol Protocol, opts ...NodeOption) *Node {
 	node := &Node{
+		Id:       nodeID,
+		config:   config,
 		protocol: protocol,
 	}
 	(&defaultOption{}).apply(node)
@@ -74,6 +77,8 @@ func (o *portOption) apply(node *Node) {
 
 // Atomix node
 type Node struct {
+	Id       string
+	config   controller.PartitionConfig
 	protocol Protocol
 	port     int
 	listener listener
