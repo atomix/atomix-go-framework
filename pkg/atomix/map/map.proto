@@ -17,23 +17,15 @@ package atomix.map;
 
 // Map snapshot
 message MapSnapshot {
-    repeated string prepared_keys = 1;
-    map<string, MapEntryValue> entries = 2;
-    int64 version = 4;
+    map<string, MapEntryValue> entries = 1;
 }
 
 // Map entry value
 message MapEntryValue {
-    Type type = 1;
-    int64 version = 2;
-    bytes value = 3;
-    int64 created = 4;
-    int64 ttl = 5;
-
-    enum Type {
-        VALUE = 0;
-        TOMBSTONE = 1;
-    }
+    uint64 version = 1;
+    bytes value = 2;
+    int64 created = 3;
+    int64 ttl = 4;
 }
 
 message ContainsKeyRequest {

@@ -16,8 +16,8 @@ func RegisterMapService(registry *service.ServiceRegistry) {
 func newMapService(context service.Context) service.Service {
 	service := &MapService{
 		SessionizedService: service.NewSessionizedService(context),
-		entries: make(map[string]*mapValue),
-		timers:  make(map[string]service.Timer),
+		entries:            make(map[string]*MapEntryValue),
+		timers:             make(map[string]service.Timer),
 	}
 	service.init()
 	return service
@@ -26,7 +26,7 @@ func newMapService(context service.Context) service.Service {
 // MapService is a state machine for a map primitive
 type MapService struct {
 	*service.SessionizedService
-	entries map[string]*mapValue
+	entries map[string]*MapEntryValue
 	timers  map[string]service.Timer
 }
 
@@ -36,13 +36,31 @@ func (m *MapService) init() {
 	m.Executor.Register("get", m.Get)
 }
 
+// Backup backs up the map service
+func (m *MapService) Backup() ([]byte, error) {
+	snapshot := &MapSnapshot{
+		Entries: m.entries,
+	}
+	return proto.Marshal(snapshot)
+}
+
+// Restore restores the map service
+func (m *MapService) Restore(bytes []byte) error {
+	snapshot := &MapSnapshot{}
+	if err := proto.Unmarshal(bytes, snapshot); err != nil {
+		return err
+	}
+	m.entries = snapshot.Entries
+	return nil
+}
+
 // Put puts a key/value pair in the map
 func (m *MapService) Put(value []byte, ch chan<- *service.Result) {
 	defer close(ch)
 
 	request := &PutRequest{}
 	if err := proto.Unmarshal(value, request); err != nil {
-		ch <- service.Failure(err)
+		ch <- m.NewFailure(err)
 		return
 	}
 
@@ -50,18 +68,18 @@ func (m *MapService) Put(value []byte, ch chan<- *service.Result) {
 	if oldValue == nil {
 		// If the version is positive then reject the request.
 		if request.Version > 0 {
-			ch <- service.NewResult(proto.Marshal(&PutResponse{
+			ch <- m.NewResult(proto.Marshal(&PutResponse{
 				Status: UpdateStatus_PRECONDITION_FAILED,
 			}))
 			return
 		}
 
 		// Create a new entry value and set it in the map.
-		newValue := &mapValue{
-			value:   request.Value,
-			version: m.Context.Index(),
-			ttl:     request.Ttl * int64(time.Millisecond),
-			created: m.Context.Timestamp().UnixNano(),
+		newValue := &MapEntryValue{
+			Value:   request.Value,
+			Version: m.Context.Index(),
+			Ttl:     request.Ttl * int64(time.Millisecond),
+			Created: m.Context.Timestamp().UnixNano(),
 		}
 		m.entries[request.Key] = newValue
 
@@ -72,43 +90,43 @@ func (m *MapService) Put(value []byte, ch chan<- *service.Result) {
 		m.sendEvent(&ListenResponse{
 			Type:       ListenResponse_INSERTED,
 			Key:        request.Key,
-			NewValue:   newValue.value,
-			NewVersion: newValue.version,
+			NewValue:   newValue.Value,
+			NewVersion: newValue.Version,
 		})
 
-		ch <- service.NewResult(proto.Marshal(&PutResponse{
+		ch <- m.NewResult(proto.Marshal(&PutResponse{
 			Status: UpdateStatus_OK,
 		}))
 		return
 	} else {
 		// If the version is -1 then reject the request.
 		// If the version is positive then compare the version to the current version.
-		if request.IfEmpty || (request.Version > 0 && request.Version != oldValue.version) {
-			ch <- service.NewResult(proto.Marshal(&PutResponse{
+		if request.IfEmpty || (request.Version > 0 && request.Version != oldValue.Version) {
+			ch <- m.NewResult(proto.Marshal(&PutResponse{
 				Status:          UpdateStatus_PRECONDITION_FAILED,
-				PreviousValue:   oldValue.value,
-				PreviousVersion: oldValue.version,
+				PreviousValue:   oldValue.Value,
+				PreviousVersion: oldValue.Version,
 			}))
 			return
 		}
 	}
 
 	// If the value is equal to the current value, return a no-op.
-	if bytes.Equal(oldValue.value, request.Value) {
-		ch <- service.NewResult(proto.Marshal(&PutResponse{
+	if bytes.Equal(oldValue.Value, request.Value) {
+		ch <- m.NewResult(proto.Marshal(&PutResponse{
 			Status:          UpdateStatus_NOOP,
-			PreviousValue:   oldValue.value,
-			PreviousVersion: oldValue.version,
+			PreviousValue:   oldValue.Value,
+			PreviousVersion: oldValue.Version,
 		}))
 		return
 	}
 
 	// Create a new entry value and set it in the map.
-	newValue := &mapValue{
-		value:   request.Value,
-		version: m.Context.Index(),
-		ttl:     request.Ttl * int64(time.Millisecond),
-		created: m.Context.Timestamp().UnixNano(),
+	newValue := &MapEntryValue{
+		Value:   request.Value,
+		Version: m.Context.Index(),
+		Ttl:     request.Ttl * int64(time.Millisecond),
+		Created: m.Context.Timestamp().UnixNano(),
 	}
 	m.entries[request.Key] = newValue
 
@@ -119,16 +137,16 @@ func (m *MapService) Put(value []byte, ch chan<- *service.Result) {
 	m.sendEvent(&ListenResponse{
 		Type:       ListenResponse_UPDATED,
 		Key:        request.Key,
-		OldValue:   oldValue.value,
-		OldVersion: oldValue.version,
-		NewValue:   newValue.value,
-		NewVersion: newValue.version,
+		OldValue:   oldValue.Value,
+		OldVersion: oldValue.Version,
+		NewValue:   newValue.Value,
+		NewVersion: newValue.Version,
 	})
 
-	ch <- service.NewResult(proto.Marshal(&PutResponse{
+	ch <- m.NewResult(proto.Marshal(&PutResponse{
 		Status:          UpdateStatus_OK,
-		PreviousValue:   oldValue.value,
-		PreviousVersion: oldValue.version,
+		PreviousValue:   oldValue.Value,
+		PreviousVersion: oldValue.Version,
 	}))
 }
 
@@ -138,31 +156,31 @@ func (m *MapService) Get(bytes []byte, ch chan<- *service.Result) {
 
 	request := &GetRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- service.Failure(err)
+		ch <- m.NewFailure(err)
 		return
 	}
 
 	value, ok := m.entries[request.Key]
 	if !ok {
-		ch <- service.NewResult(proto.Marshal(&GetResponse{}))
+		ch <- m.NewResult(proto.Marshal(&GetResponse{}))
 	} else {
-		ch <- service.NewResult(proto.Marshal(&GetResponse{
-			Value:   value.value,
-			Version: value.version,
+		ch <- m.NewResult(proto.Marshal(&GetResponse{
+			Value:   value.Value,
+			Version: value.Version,
 		}))
 	}
 }
 
-func (m *MapService) scheduleTtl(key string, value *mapValue) {
+func (m *MapService) scheduleTtl(key string, value *MapEntryValue) {
 	m.cancelTtl(key)
-	if value.ttl > 0 {
-		m.timers[key] = m.Scheduler.ScheduleOnce(time.Duration(value.ttl-(m.Context.Timestamp().UnixNano()-value.created)), func() {
+	if value.Ttl > 0 {
+		m.timers[key] = m.Scheduler.ScheduleOnce(time.Duration(value.Ttl-(m.Context.Timestamp().UnixNano()-value.Created)), func() {
 			delete(m.entries, key)
 			m.sendEvent(&ListenResponse{
 				Type:       ListenResponse_REMOVED,
 				Key:        key,
-				OldValue:   value.value,
-				OldVersion: value.version,
+				OldValue:   value.Value,
+				OldVersion: uint64(value.Version),
 			})
 		})
 	}
@@ -178,8 +196,8 @@ func (m *MapService) cancelTtl(key string) {
 func (m *MapService) sendEvent(event *ListenResponse) {
 	bytes, _ := proto.Marshal(event)
 	for _, session := range m.Sessions() {
-		for _, stream := range session.Streams() {
-			stream.Next(bytes)
+		for _, ch := range session.Channels() {
+			ch <- m.NewSuccess(bytes)
 		}
 	}
 }
