@@ -171,43 +171,66 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- *Result) {
 	request := &ServiceRequest{}
 	err := proto.Unmarshal(bytes, request)
 	if err != nil {
-		ch <- s.newFailure(err)
+		if ch != nil {
+			ch <- s.newFailure(err)
+		}
 	} else {
 		switch r := request.Request.(type) {
 		case *ServiceRequest_Command:
 			service, ok := s.services[getServiceName(request.Id)]
 			if !ok {
-				ch <- s.newFailure(errors.New(fmt.Sprintf("unknown service %s", getServiceName(request.Id))))
+				if ch != nil {
+					ch <- s.newFailure(errors.New(fmt.Sprintf("unknown service %s", getServiceName(request.Id))))
+				}
 			} else {
 				// Create a channel for the raw service results
-				serviceCh := make(chan *Result)
-				service.Command(r.Command, serviceCh)
+				var serviceCh chan *Result
+				if ch != nil {
+					serviceCh = make(chan *Result)
 
-				// Start a goroutine to encode the raw service results in a ServiceResponse
-				go func() {
-					for result := range serviceCh {
-						if result.Failed() {
-							ch <- result
-						} else {
-							output, err := proto.Marshal(&ServiceResponse{
-								Response: &ServiceResponse_Command{
-									Command: result.Output,
-								},
-							})
-							ch <- result.mutateResult(output, err)
+					// Start a goroutine to encode the raw service results in a ServiceResponse
+					go func() {
+						for result := range serviceCh {
+							if result.Failed() {
+								ch <- result
+							} else {
+								output, err := proto.Marshal(&ServiceResponse{
+									Response: &ServiceResponse_Command{
+										Command: result.Output,
+									},
+								})
+								ch <- result.mutateResult(output, err)
+							}
 						}
-					}
-				}()
+					}()
+				}
+
+				// Execute the command on the service
+				service.Command(r.Command, serviceCh)
 			}
 		case *ServiceRequest_Create:
 			_, ok := s.services[getServiceName(request.Id)]
 			if !ok {
 				serviceType := s.registry.getType(request.Id.Type)
 				if serviceType == nil {
-					ch <- s.newFailure(errors.New(fmt.Sprintf("unknown service type %s", request.Id.Type)))
+					if ch != nil {
+						ch <- s.newFailure(errors.New(fmt.Sprintf("unknown service type %s", request.Id.Type)))
+					}
 				} else {
 					service := serviceType(s.ctx)
 					s.services[getServiceName(request.Id)] = newServiceStateMachine(request.Id.Type, service)
+
+					if ch != nil {
+						output, err := proto.Marshal(&ServiceResponse{
+							Response: &ServiceResponse_Create{
+								Create: &CreateResponse{},
+							},
+						})
+						ch <- &Result{s.ctx.Index(), output, err}
+					}
+				}
+			} else {
+				if ch != nil {
 					output, err := proto.Marshal(&ServiceResponse{
 						Response: &ServiceResponse_Create{
 							Create: &CreateResponse{},
@@ -215,22 +238,18 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- *Result) {
 					})
 					ch <- &Result{s.ctx.Index(), output, err}
 				}
-			} else {
+			}
+		case *ServiceRequest_Delete:
+			delete(s.services, getServiceName(request.Id))
+
+			if ch != nil {
 				output, err := proto.Marshal(&ServiceResponse{
-					Response: &ServiceResponse_Create{
-						Create: &CreateResponse{},
+					Response: &ServiceResponse_Delete{
+						Delete: &DeleteResponse{},
 					},
 				})
 				ch <- &Result{s.ctx.Index(), output, err}
 			}
-		case *ServiceRequest_Delete:
-			delete(s.services, getServiceName(request.Id))
-			output, err := proto.Marshal(&ServiceResponse{
-				Response: &ServiceResponse_Delete{
-					Delete: &DeleteResponse{},
-				},
-			})
-			ch <- &Result{s.ctx.Index(), output, err}
 		}
 	}
 }
@@ -243,33 +262,42 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- *Result) {
 	request := &ServiceRequest{}
 	err := proto.Unmarshal(bytes, request)
 	if err != nil {
-		ch <- s.newFailure(err)
+		if ch != nil {
+			ch <- s.newFailure(err)
+		}
 	} else {
 		switch r := request.Request.(type) {
 		case *ServiceRequest_Query:
 			service, ok := s.services[getServiceName(request.Id)]
 			if !ok {
-				ch <- s.newFailure(errors.New(fmt.Sprintf("unknown service %s", getServiceName(request.Id))))
+				if ch != nil {
+					ch <- s.newFailure(errors.New(fmt.Sprintf("unknown service %s", getServiceName(request.Id))))
+				}
 			} else {
 				// Create a channel for the raw service results
-				serviceCh := make(chan *Result)
-				service.Query(r.Query, serviceCh)
+				var serviceCh chan *Result
+				if ch != nil {
+					serviceCh := make(chan *Result)
 
-				// Start a goroutine to encode the raw service results in a ServiceResponse
-				go func() {
-					for result := range serviceCh {
-						if result.Failed() {
-							ch <- result
-						} else {
-							output, err := proto.Marshal(&ServiceResponse{
-								Response: &ServiceResponse_Query{
-									Query: result.Output,
-								},
-							})
-							ch <- result.mutateResult(output, err)
+					// Start a goroutine to encode the raw service results in a ServiceResponse
+					go func() {
+						for result := range serviceCh {
+							if result.Failed() {
+								ch <- result
+							} else {
+								output, err := proto.Marshal(&ServiceResponse{
+									Response: &ServiceResponse_Query{
+										Query: result.Output,
+									},
+								})
+								ch <- result.mutateResult(output, err)
+							}
 						}
-					}
-				}()
+					}()
+				}
+
+				// Execute the query on the service
+				service.Query(r.Query, serviceCh)
 			}
 		case *ServiceRequest_Metadata:
 			services := make([]*ServiceId, 0, len(s.services))
@@ -282,14 +310,17 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- *Result) {
 					})
 				}
 			}
-			output, err := proto.Marshal(&ServiceResponse{
-				Response: &ServiceResponse_Metadata{
-					Metadata: &MetadataResponse{
-						Services: services,
+
+			if ch != nil {
+				output, err := proto.Marshal(&ServiceResponse{
+					Response: &ServiceResponse_Metadata{
+						Metadata: &MetadataResponse{
+							Services: services,
+						},
 					},
-				},
-			})
-			ch <- &Result{s.ctx.Index(), output, err}
+				})
+				ch <- &Result{s.ctx.Index(), output, err}
+			}
 		}
 	}
 }

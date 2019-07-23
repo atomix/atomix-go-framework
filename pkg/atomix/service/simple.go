@@ -74,26 +74,34 @@ func (s *SimpleService) Command(bytes []byte, ch chan<- *Result) {
 	} else {
 		s.scheduler.runScheduledTasks(s.Context.Timestamp())
 
-		commandCh := make(chan *Result)
-		if err := s.Executor.Execute(command.Name, command.Command, commandCh); err != nil {
-			ch <- s.NewFailure(err)
-			return
+		// If the channel is non-nil, create a channel to pass to the service command and mutate the results.
+		var commandCh chan *Result
+		if ch != nil {
+			commandCh = make(chan *Result)
+			go func() {
+				for result := range commandCh {
+					if result.Failed() {
+						ch <- result
+					} else {
+						ch <- result.mutateResult(proto.Marshal(&CommandResponse{
+							Context: &ResponseContext{
+								Index: s.Context.Index(),
+							},
+							Output: result.Output,
+						}))
+					}
+				}
+				close(ch)
+			}()
 		}
 
-		go func() {
-			for result := range commandCh {
-				if result.Failed() {
-					ch <- result
-				} else {
-					ch <- result.mutateResult(proto.Marshal(&CommandResponse{
-						Context: &ResponseContext{
-							Index: s.Context.Index(),
-						},
-						Output: result.Output,
-					}))
-				}
+		if err := s.Executor.Execute(command.Name, command.Command, commandCh); err != nil {
+			if ch != nil {
+				ch <- s.NewFailure(err)
+				close(commandCh)
 			}
-		}()
+			return
+		}
 
 		s.scheduler.runImmediateTasks()
 		s.scheduler.runIndex(s.Context.Index())
@@ -103,38 +111,45 @@ func (s *SimpleService) Command(bytes []byte, ch chan<- *Result) {
 func (s *SimpleService) Query(bytes []byte, ch chan<- *Result) {
 	query := &QueryRequest{}
 	if err := proto.Unmarshal(bytes, query); err != nil {
-		ch <- s.NewFailure(err)
+		if ch != nil {
+			ch <- s.NewFailure(err)
+		}
 	} else {
-		queryCh := make(chan *Result)
+		// If the channel is non-nil, create a channel to pass to the service query and mutate the results.
+		var queryCh chan *Result
+		if ch != nil {
+			queryCh = make(chan *Result)
+			go func() {
+				for result := range queryCh {
+					if result.Failed() {
+						ch <- result
+					} else {
+						ch <- result.mutateResult(proto.Marshal(&QueryResponse{
+							Context: &ResponseContext{
+								Index: s.Context.Index(),
+							},
+							Output: result.Output,
+						}))
+					}
+				}
+				close(ch)
+			}()
+		}
 
 		if query.Context.Index > s.Context.Index() {
 			s.Scheduler.ScheduleIndex(query.Context.Index, func() {
 				s.context.setQuery()
 				if err := s.Executor.Execute(query.Name, query.Query, queryCh); err != nil {
 					ch <- s.NewFailure(err)
+					close(queryCh)
 				}
 			})
 		} else {
 			s.context.setQuery()
 			if err := s.Executor.Execute(query.Name, query.Query, queryCh); err != nil {
 				ch <- s.NewFailure(err)
-				return
+				close(queryCh)
 			}
 		}
-
-		go func() {
-			for result := range queryCh {
-				if result.Failed() {
-					ch <- result
-				} else {
-					ch <- result.mutateResult(proto.Marshal(&QueryResponse{
-						Context: &ResponseContext{
-							Index: s.Context.Index(),
-						},
-						Output: result.Output,
-					}))
-				}
-			}
-		}()
 	}
 }
