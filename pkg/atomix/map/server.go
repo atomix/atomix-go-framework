@@ -243,49 +243,69 @@ func (m *mapServer) Clear(ctx context.Context, request *pb.ClearRequest) (*pb.Cl
 	}, nil
 }
 
-func (m *mapServer) Events(request *pb.EventRequest, server pb.MapService_EventsServer) error {
+func (m *mapServer) Events(request *pb.EventRequest, srv pb.MapService_EventsServer) error {
 	in, err := proto.Marshal(&ListenRequest{})
 	if err != nil {
 		return err
 	}
 
-	return m.CommandStream("events", in, request.Header, func(out []byte, header *headers.ResponseHeader, e error) {
-		response := &ListenResponse{}
-		if err = proto.Unmarshal(out, response); err != nil {
-			server.Context().Done()
-		} else {
-			server.Send(&pb.EventResponse{
-				Header:     header,
-				Type:       getEventType(response.Type),
-				Key:        response.Key,
-				OldValue:   response.OldValue,
-				OldVersion: int64(response.OldVersion),
-				NewValue:   response.NewValue,
-				NewVersion: int64(response.NewVersion),
-			})
+	ch := make(chan *server.SessionResult)
+	if err := m.CommandStream("events", in, request.Header, ch); err != nil {
+		return err
+	} else {
+		for result := range ch {
+			if result.Failed() {
+				return result.Error
+			} else {
+				response := &ListenResponse{}
+				if err = proto.Unmarshal(result.Output, response); err != nil {
+					return err
+				} else {
+					srv.Send(&pb.EventResponse{
+						Header:     result.Header,
+						Type:       getEventType(response.Type),
+						Key:        response.Key,
+						OldValue:   response.OldValue,
+						OldVersion: int64(response.OldVersion),
+						NewValue:   response.NewValue,
+						NewVersion: int64(response.NewVersion),
+					})
+				}
+			}
 		}
-	})
+	}
+	return nil
 }
 
-func (m *mapServer) Entries(request *pb.EntriesRequest, server pb.MapService_EntriesServer) error {
+func (m *mapServer) Entries(request *pb.EntriesRequest, srv pb.MapService_EntriesServer) error {
 	in, err := proto.Marshal(&EntriesRequest{})
 	if err != nil {
 		return err
 	}
 
-	return m.CommandStream("entries", in, request.Header, func(out []byte, header *headers.ResponseHeader, e error) {
-		response := &EntriesResponse{}
-		if err = proto.Unmarshal(out, response); err != nil {
-			server.Context().Done()
-		} else {
-			server.Send(&pb.EntriesResponse{
-				Header:  header,
-				Key:     response.Key,
-				Value:   response.Value,
-				Version: int64(response.Version),
-			})
+	ch := make(chan *server.SessionResult)
+	if err := m.CommandStream("entries", in, request.Header, ch); err != nil {
+		return err
+	} else {
+		for result := range ch {
+			if result.Failed() {
+				return result.Error
+			} else {
+				response := &EntriesResponse{}
+				if err = proto.Unmarshal(result.Output, response); err != nil {
+					srv.Context().Done()
+				} else {
+					srv.Send(&pb.EntriesResponse{
+						Header:  result.Header,
+						Key:     response.Key,
+						Value:   response.Value,
+						Version: int64(response.Version),
+					})
+				}
+			}
 		}
-	})
+	}
+	return nil
 }
 
 func getResponseStatus(status UpdateStatus) pb.ResponseStatus {

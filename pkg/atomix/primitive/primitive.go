@@ -38,13 +38,16 @@ func (s *primitiveServer) GetPrimitives(ctx context.Context, request *pb.GetPrim
 		return nil, err
 	}
 
-	out, err := s.client.Read(in)
-	if err != nil {
-		return nil, err
+	ch := make(chan *service.Result)
+	s.client.Read(in, ch)
+
+	result := <- ch
+	if result.Failed() {
+		return nil, result.Error
 	}
 
 	response := &service.ServiceResponse{}
-	if err := proto.Unmarshal(out, response); err != nil {
+	if err := proto.Unmarshal(result.Output, response); err != nil {
 		return nil, err
 	}
 
