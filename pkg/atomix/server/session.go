@@ -37,7 +37,9 @@ func (s *SessionizedServer) Write(ctx context.Context, request []byte, header *h
 	ch := make(chan *service.Result)
 
 	// Write the request
-	s.Client.Write(bytes, ch)
+	if err := s.Client.Write(bytes, ch); err != nil {
+		return nil, err
+	}
 
 	// Wait for the result
 	result, ok := <-ch
@@ -77,7 +79,9 @@ func (s *SessionizedServer) WriteStream(request []byte, header *headers.RequestH
 	}
 
 	streamCh := make(chan *service.Result)
-	s.Client.Write(bytes, streamCh)
+	if err := s.Client.Write(bytes, streamCh); err != nil {
+		return err
+	}
 
 	// Create a goroutine to convert the results into raw form
 	go func() {
@@ -126,7 +130,9 @@ func (s *SessionizedServer) Read(ctx context.Context, request []byte, header *he
 	ch := make(chan *service.Result)
 
 	// Read the request
-	s.Client.Read(bytes, ch)
+	if err := s.Client.Read(bytes, ch); err != nil {
+		return nil, err
+	}
 
 	// Wait for the result
 	result, ok := <-ch
@@ -165,7 +171,9 @@ func (s *SessionizedServer) ReadStream(request []byte, header *headers.RequestHe
 	}
 
 	streamCh := make(chan *service.Result)
-	s.Client.Read(bytes, streamCh)
+	if err := s.Client.Read(bytes, streamCh); err != nil {
+		return err
+	}
 
 	// Create a goroutine to convert the results into raw form
 	go func() {
