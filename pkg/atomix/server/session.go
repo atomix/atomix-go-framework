@@ -34,7 +34,7 @@ func (s *SessionizedServer) Write(ctx context.Context, request []byte, header *h
 	}
 
 	// Create a write channel
-	ch := make(chan *service.Result)
+	ch := make(chan service.Output)
 
 	// Write the request
 	if err := s.Client.Write(bytes, ch); err != nil {
@@ -54,14 +54,14 @@ func (s *SessionizedServer) Write(ctx context.Context, request []byte, header *h
 
 	// Decode and return the response
 	serviceResponse := &service.ServiceResponse{}
-	err = proto.Unmarshal(result.Output, serviceResponse)
+	err = proto.Unmarshal(result.Value, serviceResponse)
 	if err != nil {
 		return nil, err
 	}
 	return serviceResponse.GetCommand(), nil
 }
 
-func (s *SessionizedServer) WriteStream(request []byte, header *headers.RequestHeader, ch chan<- *service.Result) error {
+func (s *SessionizedServer) WriteStream(request []byte, header *headers.RequestHeader, ch chan<- service.Output) error {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,
@@ -78,7 +78,7 @@ func (s *SessionizedServer) WriteStream(request []byte, header *headers.RequestH
 		return err
 	}
 
-	streamCh := make(chan *service.Result)
+	streamCh := make(chan service.Output)
 	if err := s.Client.Write(bytes, streamCh); err != nil {
 		return err
 	}
@@ -90,16 +90,14 @@ func (s *SessionizedServer) WriteStream(request []byte, header *headers.RequestH
 				ch <- result
 			} else {
 				serviceResponse := &service.ServiceResponse{}
-				err := proto.Unmarshal(result.Output, serviceResponse)
+				err := proto.Unmarshal(result.Value, serviceResponse)
 				if err != nil {
-					ch <- &service.Result{
-						Index: result.Index,
+					ch <- service.Output{
 						Error: err,
 					}
 				} else {
-					ch <- &service.Result{
-						Index:  result.Index,
-						Output: serviceResponse.GetCommand(),
+					ch <- service.Output{
+						Value: serviceResponse.GetCommand(),
 					}
 				}
 			}
@@ -127,7 +125,7 @@ func (s *SessionizedServer) Read(ctx context.Context, request []byte, header *he
 	}
 
 	// Create a read channel
-	ch := make(chan *service.Result)
+	ch := make(chan service.Output)
 
 	// Read the request
 	if err := s.Client.Read(bytes, ch); err != nil {
@@ -146,14 +144,14 @@ func (s *SessionizedServer) Read(ctx context.Context, request []byte, header *he
 	}
 
 	serviceResponse := &service.ServiceResponse{}
-	err = proto.Unmarshal(result.Output, serviceResponse)
+	err = proto.Unmarshal(result.Value, serviceResponse)
 	if err != nil {
 		return nil, err
 	}
 	return serviceResponse.GetQuery(), nil
 }
 
-func (s *SessionizedServer) ReadStream(request []byte, header *headers.RequestHeader, ch chan<- *service.Result) error {
+func (s *SessionizedServer) ReadStream(request []byte, header *headers.RequestHeader, ch chan<- service.Output) error {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,
@@ -170,7 +168,7 @@ func (s *SessionizedServer) ReadStream(request []byte, header *headers.RequestHe
 		return err
 	}
 
-	streamCh := make(chan *service.Result)
+	streamCh := make(chan service.Output)
 	if err := s.Client.Read(bytes, streamCh); err != nil {
 		return err
 	}
@@ -182,16 +180,14 @@ func (s *SessionizedServer) ReadStream(request []byte, header *headers.RequestHe
 				ch <- result
 			} else {
 				serviceResponse := &service.ServiceResponse{}
-				err := proto.Unmarshal(result.Output, serviceResponse)
+				err := proto.Unmarshal(result.Value, serviceResponse)
 				if err != nil {
-					ch <- &service.Result{
-						Index: result.Index,
+					ch <- service.Output{
 						Error: err,
 					}
 				} else {
-					ch <- &service.Result{
-						Index:  result.Index,
-						Output: serviceResponse.GetQuery(),
+					ch <- service.Output{
+						Value: serviceResponse.GetQuery(),
 					}
 				}
 			}
@@ -240,7 +236,7 @@ func (s *SessionizedServer) Command(ctx context.Context, name string, input []by
 	return commandResponse.Output, responseHeader, nil
 }
 
-func (s *SessionizedServer) CommandStream(name string, input []byte, header *headers.RequestHeader, ch chan<- *SessionResult) error {
+func (s *SessionizedServer) CommandStream(name string, input []byte, header *headers.RequestHeader, ch chan<- SessionOutput) error {
 	sessionRequest := &service.SessionRequest{
 		Request: &service.SessionRequest_Command{
 			Command: &service.SessionCommandRequest{
@@ -259,7 +255,7 @@ func (s *SessionizedServer) CommandStream(name string, input []byte, header *hea
 		return err
 	}
 
-	resultCh := make(chan *service.Result)
+	resultCh := make(chan service.Output)
 	if err = s.WriteStream(bytes, header, resultCh); err != nil {
 		return err
 	}
@@ -267,19 +263,15 @@ func (s *SessionizedServer) CommandStream(name string, input []byte, header *hea
 	go func() {
 		for result := range resultCh {
 			if result.Failed() {
-				ch <- &SessionResult{
-					Result: &service.Result{
-						Index: result.Index,
-						Error: result.Error,
-					},
+				ch <- SessionOutput{
+					Output: result,
 				}
 			} else {
 				sessionResponse := &service.SessionResponse{}
 				err = proto.Unmarshal(bytes, sessionResponse)
 				if err != nil {
-					ch <- &SessionResult{
-						Result: &service.Result{
-							Index: result.Index,
+					ch <- SessionOutput{
+						Output: service.Output{
 							Error: err,
 						},
 					}
@@ -290,12 +282,11 @@ func (s *SessionizedServer) CommandStream(name string, input []byte, header *hea
 						Index:          commandResponse.Context.Index,
 						SequenceNumber: commandResponse.Context.Sequence,
 					}
-					ch <- &SessionResult{
-						Result: &service.Result{
-							Index: result.Index,
-							Error: result.Error,
-						},
+					ch <- SessionOutput{
 						Header: responseHeader,
+						Output: service.Output{
+							Value: commandResponse.Output,
+						},
 					}
 				}
 			}
@@ -345,7 +336,7 @@ func (s *SessionizedServer) Query(ctx context.Context, name string, input []byte
 	return queryResponse.Output, responseHeader, nil
 }
 
-func (s *SessionizedServer) QueryStream(name string, input []byte, header *headers.RequestHeader, ch chan<- *SessionResult) error {
+func (s *SessionizedServer) QueryStream(name string, input []byte, header *headers.RequestHeader, ch chan<- SessionOutput) error {
 	sessionRequest := &service.SessionRequest{
 		Request: &service.SessionRequest_Query{
 			Query: &service.SessionQueryRequest{
@@ -365,7 +356,7 @@ func (s *SessionizedServer) QueryStream(name string, input []byte, header *heade
 		return err
 	}
 
-	resultCh := make(chan *service.Result)
+	resultCh := make(chan service.Output)
 	if err = s.ReadStream(bytes, header, resultCh); err != nil {
 		return err
 	}
@@ -373,19 +364,15 @@ func (s *SessionizedServer) QueryStream(name string, input []byte, header *heade
 	go func() {
 		for result := range resultCh {
 			if result.Failed() {
-				ch <- &SessionResult{
-					Result: &service.Result{
-						Index: result.Index,
-						Error: result.Error,
-					},
+				ch <- SessionOutput{
+					Output: result,
 				}
 			} else {
 				sessionResponse := &service.SessionResponse{}
 				err = proto.Unmarshal(bytes, sessionResponse)
 				if err != nil {
-					ch <- &SessionResult{
-						Result: &service.Result{
-							Index: result.Index,
+					ch <- SessionOutput{
+						Output: service.Output{
 							Error: err,
 						},
 					}
@@ -396,12 +383,11 @@ func (s *SessionizedServer) QueryStream(name string, input []byte, header *heade
 						Index:          queryResponse.Context.Index,
 						SequenceNumber: queryResponse.Context.Sequence,
 					}
-					ch <- &SessionResult{
-						Result: &service.Result{
-							Index: result.Index,
-							Error: result.Error,
-						},
+					ch <- SessionOutput{
 						Header: responseHeader,
+						Output: service.Output{
+							Value: queryResponse.Output,
+						},
 					}
 				}
 			}
@@ -492,8 +478,8 @@ func (s *SessionizedServer) CloseSession(ctx context.Context, header *headers.Re
 	return proto.Unmarshal(bytes, sessionResponse)
 }
 
-// SessionResult is a result for session-supporting servers containing session header information
-type SessionResult struct {
-	*service.Result
+// SessionOutput is a result for session-supporting servers containing session header information
+type SessionOutput struct {
+	service.Output
 	Header *headers.ResponseHeader
 }

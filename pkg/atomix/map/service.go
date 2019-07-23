@@ -55,7 +55,7 @@ func (m *MapService) Restore(bytes []byte) error {
 }
 
 // Put puts a key/value pair in the map
-func (m *MapService) Put(value []byte, ch chan<- *service.Result) {
+func (m *MapService) Put(value []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &PutRequest{}
@@ -151,7 +151,7 @@ func (m *MapService) Put(value []byte, ch chan<- *service.Result) {
 }
 
 // Get gets a value from the map
-func (m *MapService) Get(bytes []byte, ch chan<- *service.Result) {
+func (m *MapService) Get(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &GetRequest{}

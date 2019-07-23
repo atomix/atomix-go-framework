@@ -48,27 +48,33 @@ type service struct {
 }
 
 // NewResult returns a new result with the given output and error
-func (s *service) NewResult(output []byte, err error) *Result {
-	return &Result{
-		Index:  s.Context.Index(),
-		Output: output,
-		Error:  err,
+func (s *service) NewResult(value []byte, err error) Result {
+	return Result{
+		Index: s.Context.Index(),
+		Output: Output{
+			Value: value,
+			Error: err,
+		},
 	}
 }
 
 // NewSuccess returns a new successful result with the given output
-func (s *service) NewSuccess(output []byte) *Result {
-	return &Result{
-		Index:  s.Context.Index(),
-		Output: output,
+func (s *service) NewSuccess(value []byte) Result {
+	return Result{
+		Index: s.Context.Index(),
+		Output: Output{
+			Value: value,
+		},
 	}
 }
 
 // NewFailure returns a new failure result with the given error
-func (s *service) NewFailure(err error) *Result {
-	return &Result{
+func (s *service) NewFailure(err error) Result {
+	return Result{
 		Index: s.Context.Index(),
-		Error: err,
+		Output: Output{
+			Error: err,
+		},
 	}
 }
 

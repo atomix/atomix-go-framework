@@ -66,28 +66,28 @@ func (s *SimpleService) Install(reader io.Reader) error {
 	return s.Restore(bytes)
 }
 
-func (s *SimpleService) Command(bytes []byte, ch chan<- *Result) {
+func (s *SimpleService) Command(bytes []byte, ch chan<- Output) {
 	s.context.setCommand(s.parent.Timestamp())
 	command := &CommandRequest{}
 	if err := proto.Unmarshal(bytes, command); err != nil {
-		ch <- s.NewFailure(err)
+		ch <- newFailure(err)
 	} else {
 		s.scheduler.runScheduledTasks(s.Context.Timestamp())
 
 		// If the channel is non-nil, create a channel to pass to the service command and mutate the results.
-		var commandCh chan *Result
+		var commandCh chan Result
 		if ch != nil {
-			commandCh = make(chan *Result)
+			commandCh = make(chan Result)
 			go func() {
 				for result := range commandCh {
 					if result.Failed() {
-						ch <- result
+						ch <- result.Output
 					} else {
-						ch <- result.mutateResult(proto.Marshal(&CommandResponse{
+						ch <- newOutput(proto.Marshal(&CommandResponse{
 							Context: &ResponseContext{
 								Index: s.Context.Index(),
 							},
-							Output: result.Output,
+							Output: result.Value,
 						}))
 					}
 				}
@@ -97,7 +97,7 @@ func (s *SimpleService) Command(bytes []byte, ch chan<- *Result) {
 
 		if err := s.Executor.Execute(command.Name, command.Command, commandCh); err != nil {
 			if ch != nil {
-				ch <- s.NewFailure(err)
+				ch <- newFailure(err)
 				close(commandCh)
 			}
 			return
@@ -108,27 +108,27 @@ func (s *SimpleService) Command(bytes []byte, ch chan<- *Result) {
 	}
 }
 
-func (s *SimpleService) Query(bytes []byte, ch chan<- *Result) {
+func (s *SimpleService) Query(bytes []byte, ch chan<- Output) {
 	query := &QueryRequest{}
 	if err := proto.Unmarshal(bytes, query); err != nil {
 		if ch != nil {
-			ch <- s.NewFailure(err)
+			ch <- newFailure(err)
 		}
 	} else {
 		// If the channel is non-nil, create a channel to pass to the service query and mutate the results.
-		var queryCh chan *Result
+		var queryCh chan Result
 		if ch != nil {
-			queryCh = make(chan *Result)
+			queryCh = make(chan Result)
 			go func() {
 				for result := range queryCh {
 					if result.Failed() {
-						ch <- result
+						ch <- result.Output
 					} else {
-						ch <- result.mutateResult(proto.Marshal(&QueryResponse{
+						ch <- newOutput(proto.Marshal(&QueryResponse{
 							Context: &ResponseContext{
 								Index: s.Context.Index(),
 							},
-							Output: result.Output,
+							Output: result.Value,
 						}))
 					}
 				}
@@ -140,14 +140,14 @@ func (s *SimpleService) Query(bytes []byte, ch chan<- *Result) {
 			s.Scheduler.ScheduleIndex(query.Context.Index, func() {
 				s.context.setQuery()
 				if err := s.Executor.Execute(query.Name, query.Query, queryCh); err != nil {
-					ch <- s.NewFailure(err)
+					ch <- newFailure(err)
 					close(queryCh)
 				}
 			})
 		} else {
 			s.context.setQuery()
 			if err := s.Executor.Execute(query.Name, query.Query, queryCh); err != nil {
-				ch <- s.NewFailure(err)
+				ch <- newFailure(err)
 				close(queryCh)
 			}
 		}

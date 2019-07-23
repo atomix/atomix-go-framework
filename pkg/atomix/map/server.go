@@ -249,7 +249,7 @@ func (m *mapServer) Events(request *pb.EventRequest, srv pb.MapService_EventsSer
 		return err
 	}
 
-	ch := make(chan *server.SessionResult)
+	ch := make(chan server.SessionOutput)
 	if err := m.CommandStream("events", in, request.Header, ch); err != nil {
 		return err
 	} else {
@@ -258,7 +258,7 @@ func (m *mapServer) Events(request *pb.EventRequest, srv pb.MapService_EventsSer
 				return result.Error
 			} else {
 				response := &ListenResponse{}
-				if err = proto.Unmarshal(result.Output, response); err != nil {
+				if err = proto.Unmarshal(result.Value, response); err != nil {
 					return err
 				} else {
 					srv.Send(&pb.EventResponse{
@@ -283,7 +283,7 @@ func (m *mapServer) Entries(request *pb.EntriesRequest, srv pb.MapService_Entrie
 		return err
 	}
 
-	ch := make(chan *server.SessionResult)
+	ch := make(chan server.SessionOutput)
 	if err := m.CommandStream("entries", in, request.Header, ch); err != nil {
 		return err
 	} else {
@@ -292,7 +292,7 @@ func (m *mapServer) Entries(request *pb.EntriesRequest, srv pb.MapService_Entrie
 				return result.Error
 			} else {
 				response := &EntriesResponse{}
-				if err = proto.Unmarshal(result.Output, response); err != nil {
+				if err = proto.Unmarshal(result.Value, response); err != nil {
 					srv.Context().Done()
 				} else {
 					srv.Send(&pb.EntriesResponse{
