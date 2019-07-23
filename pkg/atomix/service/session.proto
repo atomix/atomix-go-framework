@@ -55,7 +55,6 @@ message SessionResponse {
         CloseSessionResponse close_session = 3;
         SessionCommandResponse command = 4;
         SessionQueryResponse query = 5;
-        SessionStreamResponse stream = 6;
     }
 }
 
@@ -118,20 +117,9 @@ message SessionQueryContext {
 }
 
 message SessionResponseContext {
-    uint64 index = 1;
-    uint64 sequence = 2;
-    repeated SessionStreamContext streams = 3;
-}
-
-message SessionStreamContext {
     uint64 stream_id = 1;
     uint64 index = 2;
     uint64 sequence = 3;
-}
-
-message SessionStreamResponse {
-    SessionStreamContext context = 1;
-    bytes value = 2;
 }
 
 message PrimitiveEvent {

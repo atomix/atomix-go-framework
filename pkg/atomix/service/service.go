@@ -1,5 +1,7 @@
 package service
 
+import "time"
+
 type OperationType string
 
 const (
@@ -20,20 +22,82 @@ type Service interface {
 
 // ServiceRegistry is a registry of service types
 type ServiceRegistry struct {
-	types map[string]func(scheduler Scheduler, executor Executor, ctx Context) Service
+	types map[string]func(ctx Context) Service
 }
 
 // Register registers a new primitive type
-func (r *ServiceRegistry) Register(name string, f func(scheduler Scheduler, executor Executor, ctx Context) Service) {
+func (r *ServiceRegistry) Register(name string, f func(ctx Context) Service) {
 	r.types[name] = f
 }
 
 // getType returns a service type by name
-func (r *ServiceRegistry) getType(name string) func(scheduler Scheduler, executor Executor, ctx Context) Service {
+func (r *ServiceRegistry) getType(name string) func(sctx Context) Service {
 	return r.types[name]
 }
 
 // NewServiceRegistry returns a new primitive type registry
 func NewServiceRegistry() *ServiceRegistry {
-	return &ServiceRegistry{types: make(map[string]func(scheduler Scheduler, executor Executor, ctx Context) Service)}
+	return &ServiceRegistry{types: make(map[string]func(ctx Context) Service)}
+}
+
+// service is an internal base for service implementations
+type service struct {
+	Scheduler Scheduler
+	Executor  Executor
+	Context   Context
+}
+
+// NewResult returns a new result with the given output and error
+func (s *service) NewResult(output []byte, err error) *Result {
+	return &Result{
+		Index:  s.Context.Index(),
+		Output: output,
+		Error:  err,
+	}
+}
+
+// NewSuccess returns a new successful result with the given output
+func (s *service) NewSuccess(output []byte) *Result {
+	return &Result{
+		Index:  s.Context.Index(),
+		Output: output,
+	}
+}
+
+// NewFailure returns a new failure result with the given error
+func (s *service) NewFailure(err error) *Result {
+	return &Result{
+		Index: s.Context.Index(),
+		Error: err,
+	}
+}
+
+// context is an internal context implementation which supports per-service indexes
+type context struct {
+	Context
+	index uint64
+	time  time.Time
+	op    OperationType
+}
+
+func (c *context) Index() uint64 {
+	return c.index
+}
+
+func (c *context) Timestamp() time.Time {
+	return c.time
+}
+
+func (c *context) OperationType() OperationType {
+	return c.op
+}
+
+func (c *context) setCommand(time time.Time) {
+	c.index = c.index + 1
+	c.time = time
+	c.op = OpTypeCommand
+}
+
+func (c *context) setQuery() {
+	c.op = OpTypeQuery
 }

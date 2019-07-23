@@ -13,16 +13,13 @@ func RegisterMapService(registry *service.ServiceRegistry) {
 }
 
 // newMapService returns a new MapService
-func newMapService(scheduler service.Scheduler, executor service.Executor, ctx service.Context) service.Service {
+func newMapService(context service.Context) service.Service {
 	service := &MapService{
-		SessionizedService: &service.SessionizedService{
-			Scheduler: scheduler,
-			Executor:  executor,
-			Context:   ctx,
-		},
+		SessionizedService: service.NewSessionizedService(context),
 		entries: make(map[string]*mapValue),
 		timers:  make(map[string]service.Timer),
 	}
+	service.init()
 	return service
 }
 
@@ -40,19 +37,23 @@ func (m *MapService) init() {
 }
 
 // Put puts a key/value pair in the map
-func (m *MapService) Put(value []byte) ([]byte, error) {
+func (m *MapService) Put(value []byte, ch chan<- *service.Result) {
+	defer close(ch)
+
 	request := &PutRequest{}
 	if err := proto.Unmarshal(value, request); err != nil {
-		return nil, err
+		ch <- service.Failure(err)
+		return
 	}
 
 	oldValue := m.entries[request.Key]
 	if oldValue == nil {
 		// If the version is positive then reject the request.
 		if request.Version > 0 {
-			return proto.Marshal(&PutResponse{
+			ch <- service.NewResult(proto.Marshal(&PutResponse{
 				Status: UpdateStatus_PRECONDITION_FAILED,
-			})
+			}))
+			return
 		}
 
 		// Create a new entry value and set it in the map.
@@ -75,28 +76,31 @@ func (m *MapService) Put(value []byte) ([]byte, error) {
 			NewVersion: newValue.version,
 		})
 
-		return proto.Marshal(&PutResponse{
+		ch <- service.NewResult(proto.Marshal(&PutResponse{
 			Status: UpdateStatus_OK,
-		})
+		}))
+		return
 	} else {
 		// If the version is -1 then reject the request.
 		// If the version is positive then compare the version to the current version.
 		if request.IfEmpty || (request.Version > 0 && request.Version != oldValue.version) {
-			return proto.Marshal(&PutResponse{
+			ch <- service.NewResult(proto.Marshal(&PutResponse{
 				Status:          UpdateStatus_PRECONDITION_FAILED,
 				PreviousValue:   oldValue.value,
 				PreviousVersion: oldValue.version,
-			})
+			}))
+			return
 		}
 	}
 
 	// If the value is equal to the current value, return a no-op.
 	if bytes.Equal(oldValue.value, request.Value) {
-		return proto.Marshal(&PutResponse{
+		ch <- service.NewResult(proto.Marshal(&PutResponse{
 			Status:          UpdateStatus_NOOP,
 			PreviousValue:   oldValue.value,
 			PreviousVersion: oldValue.version,
-		})
+		}))
+		return
 	}
 
 	// Create a new entry value and set it in the map.
@@ -121,28 +125,32 @@ func (m *MapService) Put(value []byte) ([]byte, error) {
 		NewVersion: newValue.version,
 	})
 
-	return proto.Marshal(&PutResponse{
+	ch <- service.NewResult(proto.Marshal(&PutResponse{
 		Status:          UpdateStatus_OK,
 		PreviousValue:   oldValue.value,
 		PreviousVersion: oldValue.version,
-	})
+	}))
 }
 
 // Get gets a value from the map
-func (m *MapService) Get(bytes []byte) ([]byte, error) {
+func (m *MapService) Get(bytes []byte, ch chan<- *service.Result) {
+	defer close(ch)
+
 	request := &GetRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		return nil, err
+		ch <- service.Failure(err)
+		return
 	}
 
 	value, ok := m.entries[request.Key]
 	if !ok {
-		return proto.Marshal(&GetResponse{})
+		ch <- service.NewResult(proto.Marshal(&GetResponse{}))
+	} else {
+		ch <- service.NewResult(proto.Marshal(&GetResponse{
+			Value:   value.value,
+			Version: value.version,
+		}))
 	}
-	return proto.Marshal(&GetResponse{
-		Value:   value.value,
-		Version: value.version,
-	})
 }
 
 func (m *MapService) scheduleTtl(key string, value *mapValue) {

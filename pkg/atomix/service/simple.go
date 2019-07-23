@@ -7,13 +7,30 @@ import (
 	"io"
 )
 
+// NewSimpleService returns a new simple primitive service
+func NewSimpleService(parent Context) *SimpleService {
+	scheduler := newScheduler()
+	ctx := &context{}
+	return &SimpleService{
+		Scheduler: newScheduler(),
+		scheduler: scheduler,
+		Executor:  newExecutor(),
+		Context:   ctx,
+		context:   ctx,
+		parent:    parent,
+	}
+}
+
 // SimpleService is a Service implementation for primitive that do not support sessions
 type SimpleService struct {
 	Service
-	scheduler    Scheduler
-	executor     Executor
-	ctx          Context
-	indexQueries map[uint64][]*QueryRequest
+	*service
+	Scheduler Scheduler
+	scheduler *scheduler
+	Executor  Executor
+	Context   Context
+	context   *context
+	parent    Context
 }
 
 func (s *SimpleService) Snapshot(writer io.Writer) error {
@@ -49,81 +66,75 @@ func (s *SimpleService) Install(reader io.Reader) error {
 	return s.Restore(bytes)
 }
 
-func (s *SimpleService) Command(bytes []byte, callback func([]byte, error)) {
+func (s *SimpleService) Command(bytes []byte, ch chan<- *Result) {
+	s.context.setCommand(s.parent.Timestamp())
 	command := &CommandRequest{}
 	if err := proto.Unmarshal(bytes, command); err != nil {
-		callback(nil, err)
+		ch <- s.NewFailure(err)
 	} else {
-		scheduler := s.scheduler.(*scheduler)
-		scheduler.runScheduledTasks(s.ctx.Timestamp())
-		s.executor.Execute(command.Name, command.Command, func(bytes []byte, err error) {
-			if err != nil {
-				callback(nil, err)
-			} else {
-				callback(proto.Marshal(&CommandResponse{
-					Context: &ResponseContext{
-						Index: s.ctx.Index(),
-					},
-					Output: bytes,
-				}))
+		s.scheduler.runScheduledTasks(s.Context.Timestamp())
+
+		commandCh := make(chan *Result)
+		if err := s.Executor.Execute(command.Name, command.Command, commandCh); err != nil {
+			ch <- s.NewFailure(err)
+			return
+		}
+
+		go func() {
+			for result := range commandCh {
+				if result.Failed() {
+					ch <- result
+				} else {
+					ch <- result.mutateResult(proto.Marshal(&CommandResponse{
+						Context: &ResponseContext{
+							Index: s.Context.Index(),
+						},
+						Output: result.Output,
+					}))
+				}
 			}
-		})
-		scheduler.runImmediateTasks()
-		scheduler.runIndex(s.ctx.Index())
+		}()
+
+		s.scheduler.runImmediateTasks()
+		s.scheduler.runIndex(s.Context.Index())
 	}
 }
 
-func (s *SimpleService) CommandStream(bytes []byte, stream Stream, callback func(error)) {
-	command := &CommandRequest{}
-	if err := proto.Unmarshal(bytes, command); err != nil {
-		callback(err)
-	} else {
-		scheduler := s.scheduler.(*scheduler)
-		scheduler.runScheduledTasks(s.ctx.Timestamp())
-		s.executor.ExecuteStream(command.Name, command.Command, stream, callback)
-		scheduler.runImmediateTasks()
-		scheduler.runIndex(s.ctx.Index())
-	}
-}
-
-func (s *SimpleService) Query(bytes []byte, callback func([]byte, error)) {
+func (s *SimpleService) Query(bytes []byte, ch chan<- *Result) {
 	query := &QueryRequest{}
 	if err := proto.Unmarshal(bytes, query); err != nil {
-		callback(nil, err)
+		ch <- s.NewFailure(err)
 	} else {
-		f := func(bytes []byte, err error) {
-			if err != nil {
-				callback(nil, err)
-			} else {
-				callback(proto.Marshal(&QueryResponse{
-					Context: &ResponseContext{
-						Index: s.ctx.Index(),
-					},
-					Output: bytes,
-				}))
+		queryCh := make(chan *Result)
+
+		if query.Context.Index > s.Context.Index() {
+			s.Scheduler.ScheduleIndex(query.Context.Index, func() {
+				s.context.setQuery()
+				if err := s.Executor.Execute(query.Name, query.Query, queryCh); err != nil {
+					ch <- s.NewFailure(err)
+				}
+			})
+		} else {
+			s.context.setQuery()
+			if err := s.Executor.Execute(query.Name, query.Query, queryCh); err != nil {
+				ch <- s.NewFailure(err)
+				return
 			}
 		}
-		if query.Context.Index > s.ctx.Index() {
-			s.scheduler.ScheduleIndex(query.Context.Index, func() {
-				s.executor.Execute(query.Name, query.Query, f)
-			})
-		} else {
-			s.executor.Execute(query.Name, query.Query, f)
-		}
-	}
-}
 
-func (s *SimpleService) QueryStream(bytes []byte, stream Stream, callback func(error)) {
-	query := &QueryRequest{}
-	if err := proto.Unmarshal(bytes, query); err != nil {
-		callback(err)
-	} else {
-		if query.Context.Index > s.ctx.Index() {
-			s.scheduler.ScheduleIndex(query.Context.Index, func() {
-				s.executor.ExecuteStream(query.Name, query.Query, stream, callback)
-			})
-		} else {
-			s.executor.ExecuteStream(query.Name, query.Query, stream, callback)
-		}
+		go func() {
+			for result := range queryCh {
+				if result.Failed() {
+					ch <- result
+				} else {
+					ch <- result.mutateResult(proto.Marshal(&QueryResponse{
+						Context: &ResponseContext{
+							Index: s.Context.Index(),
+						},
+						Output: result.Output,
+					}))
+				}
+			}
+		}()
 	}
 }
