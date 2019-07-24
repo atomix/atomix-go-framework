@@ -39,7 +39,7 @@ func (s *primitiveServer) GetPrimitives(ctx context.Context, request *pb.GetPrim
 	}
 
 	ch := make(chan service.Output)
-	if err := s.client.Read(in, ch); err != nil {
+	if err := s.client.Read(ctx, in, ch); err != nil {
 		return nil, err
 	}
 

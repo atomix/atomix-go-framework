@@ -10,7 +10,7 @@ import (
 // NewSimpleService returns a new simple primitive service
 func NewSimpleService(parent Context) *SimpleService {
 	scheduler := newScheduler()
-	ctx := &context{}
+	ctx := &mutableContext{}
 	return &SimpleService{
 		Scheduler: newScheduler(),
 		scheduler: scheduler,
@@ -29,7 +29,7 @@ type SimpleService struct {
 	scheduler *scheduler
 	Executor  Executor
 	Context   Context
-	context   *context
+	context   *mutableContext
 	parent    Context
 }
 

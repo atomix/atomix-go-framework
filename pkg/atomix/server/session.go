@@ -37,7 +37,7 @@ func (s *SessionizedServer) Write(ctx context.Context, request []byte, header *h
 	ch := make(chan service.Output)
 
 	// Write the request
-	if err := s.Client.Write(bytes, ch); err != nil {
+	if err := s.Client.Write(ctx, bytes, ch); err != nil {
 		return nil, err
 	}
 
@@ -79,7 +79,7 @@ func (s *SessionizedServer) WriteStream(request []byte, header *headers.RequestH
 	}
 
 	streamCh := make(chan service.Output)
-	if err := s.Client.Write(bytes, streamCh); err != nil {
+	if err := s.Client.Write(context.TODO(), bytes, streamCh); err != nil {
 		return err
 	}
 
@@ -128,7 +128,7 @@ func (s *SessionizedServer) Read(ctx context.Context, request []byte, header *he
 	ch := make(chan service.Output)
 
 	// Read the request
-	if err := s.Client.Read(bytes, ch); err != nil {
+	if err := s.Client.Read(ctx, bytes, ch); err != nil {
 		return nil, err
 	}
 
@@ -169,7 +169,7 @@ func (s *SessionizedServer) ReadStream(request []byte, header *headers.RequestHe
 	}
 
 	streamCh := make(chan service.Output)
-	if err := s.Client.Read(bytes, streamCh); err != nil {
+	if err := s.Client.Read(context.TODO(), bytes, streamCh); err != nil {
 		return err
 	}
 

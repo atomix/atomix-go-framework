@@ -13,7 +13,7 @@ import (
 
 // NewSessionizedService returns an initialized SessionizedService
 func NewSessionizedService(parent Context) *SessionizedService {
-	ctx := &context{}
+	ctx := &mutableContext{}
 	return &SessionizedService{
 		Scheduler: newScheduler(),
 		Executor:  newExecutor(),
@@ -31,7 +31,7 @@ type SessionizedService struct {
 	Scheduler Scheduler
 	Executor  Executor
 	Context   Context
-	context   *context
+	context   *mutableContext
 	parent    Context
 	sessions  map[uint64]*Session
 	session   *Session

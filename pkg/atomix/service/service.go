@@ -78,32 +78,32 @@ func (s *service) NewFailure(err error) Result {
 	}
 }
 
-// context is an internal context implementation which supports per-service indexes
-type context struct {
+// mutableContext is an internal context implementation which supports per-service indexes
+type mutableContext struct {
 	Context
 	index uint64
 	time  time.Time
 	op    OperationType
 }
 
-func (c *context) Index() uint64 {
+func (c *mutableContext) Index() uint64 {
 	return c.index
 }
 
-func (c *context) Timestamp() time.Time {
+func (c *mutableContext) Timestamp() time.Time {
 	return c.time
 }
 
-func (c *context) OperationType() OperationType {
+func (c *mutableContext) OperationType() OperationType {
 	return c.op
 }
 
-func (c *context) setCommand(time time.Time) {
+func (c *mutableContext) setCommand(time time.Time) {
 	c.index = c.index + 1
 	c.time = time
 	c.op = OpTypeCommand
 }
 
-func (c *context) setQuery() {
+func (c *mutableContext) setQuery() {
 	c.op = OpTypeQuery
 }
