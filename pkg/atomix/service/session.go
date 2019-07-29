@@ -64,8 +64,8 @@ func (s *SessionizedService) snapshotSessions(writer io.Writer) error {
 			streams = append(streams, &SessionStreamSnapshot{
 				StreamId:       stream.Id,
 				Type:           stream.Type,
-				SequenceNumber: stream.currentSequence,
-				LastCompleted:  stream.lastCompleted,
+				SequenceNumber: stream.eventID,
+				LastCompleted:  stream.completeID,
 			})
 		}
 		sessions = append(sessions, &SessionSnapshot{
@@ -149,10 +149,13 @@ func (s *SessionizedService) installSessions(reader io.Reader) error {
 		streams := make(map[uint64]*sessionStream)
 		for _, stream := range session.Streams {
 			s := &sessionStream{
-				Id:              stream.StreamId,
-				Type:            stream.Type,
-				currentSequence: stream.SequenceNumber,
-				lastCompleted:   stream.LastCompleted,
+				Id:         stream.StreamId,
+				Type:       stream.Type,
+				eventID:    stream.SequenceNumber,
+				completeID: stream.LastCompleted,
+				ctx:        s.Context,
+				inChan:     make(chan Result),
+				results:    list.New(),
 			}
 			streams[s.Id] = s
 		}
@@ -492,9 +495,10 @@ func (s *Session) addStream(sequence uint64, op string, outChan chan<- Output) c
 	stream := &sessionStream{
 		Id:      sequence,
 		Type:    op,
-		results: list.New(),
+		ctx:     s.ctx,
 		inChan:  make(chan Result),
 		outChan: outChan,
+		results: list.New(),
 	}
 	s.streams[sequence] = stream
 	go stream.process()
@@ -568,17 +572,16 @@ func (s *Session) close() {
 
 // sessionStream manages a single stream for a session
 type sessionStream struct {
-	Id               uint64
-	Type             string
-	closed           bool
-	currentSequence  uint64
-	completeSequence uint64
-	lastCompleted    uint64
-	lastIndex        uint64
-	ctx              Context
-	inChan           chan Result
-	outChan          chan<- Output
-	results          *list.List
+	Id         uint64
+	Type       string
+	closed     bool
+	eventID    uint64
+	completeID uint64
+	lastIndex  uint64
+	ctx        Context
+	inChan     chan Result
+	outChan    chan<- Output
+	results    *list.List
 }
 
 // sessionStreamResult contains a single stream result
@@ -601,8 +604,8 @@ func (s *sessionStream) process() {
 
 		// If the client acked a sequence number greater than the current event sequence number since we know the
 		// client must have received it from another server.
-		s.currentSequence++
-		if s.completeSequence > s.currentSequence {
+		s.eventID++
+		if s.completeID > s.eventID {
 			return
 		}
 
@@ -619,7 +622,7 @@ func (s *sessionStream) process() {
 							Context: &SessionResponseContext{
 								StreamId: s.Id,
 								Index:    inResult.Index,
-								Sequence: s.currentSequence,
+								Sequence: s.eventID,
 							},
 							Output: inResult.Value,
 						},
@@ -629,7 +632,7 @@ func (s *sessionStream) process() {
 		}
 
 		outResult := sessionStreamResult{
-			id:     s.currentSequence,
+			id:     s.eventID,
 			result: inResult,
 		}
 		s.results.PushBack(outResult)
@@ -667,12 +670,12 @@ func (s *sessionStream) LastIndex() uint64 {
 
 // ack acknowledges results up to the given ID
 func (s *sessionStream) ack(id uint64) {
-	if id > s.completeSequence {
+	if id > s.completeID {
 		event := s.results.Front()
 		for event != nil && event.Value.(*sessionStreamResult).id <= id {
 			next := event.Next()
 			s.results.Remove(event)
-			s.completeSequence = event.Value.(*sessionStreamResult).id
+			s.completeID = event.Value.(*sessionStreamResult).id
 			event = next
 		}
 	}
