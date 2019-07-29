@@ -399,7 +399,7 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 	// If the result channel is non-nil, create a channel for transforming results.
 	var queryCh chan Result
 	if ch != nil {
-		queryCh := make(chan Result)
+		queryCh = make(chan Result)
 		go func() {
 			for result := range queryCh {
 				if result.Failed() {

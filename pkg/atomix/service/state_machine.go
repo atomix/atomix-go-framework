@@ -258,7 +258,7 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
 				// Create a channel for the raw service results
 				var serviceCh chan Output
 				if ch != nil {
-					serviceCh := make(chan Output)
+					serviceCh = make(chan Output)
 
 					// Start a goroutine to encode the raw service results in a ServiceResponse
 					go func() {
