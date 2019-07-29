@@ -23,7 +23,7 @@ type Protocol interface {
 }
 
 // NewNode creates a new node running the given protocol
-func NewNode(nodeID string, config controller.PartitionConfig, protocol Protocol, opts ...NodeOption) *Node {
+func NewNode(nodeID string, config *controller.PartitionConfig, protocol Protocol, opts ...NodeOption) *Node {
 	node := &Node{
 		Id:       nodeID,
 		config:   config,
@@ -75,10 +75,10 @@ func (o *portOption) apply(node *Node) {
 	node.port = o.port
 }
 
-// Atomix node
+// Node is an Atomix node
 type Node struct {
 	Id       string
-	config   controller.PartitionConfig
+	config   *controller.PartitionConfig
 	protocol Protocol
 	port     int
 	listener listener
