@@ -12,10 +12,12 @@ func NewSimpleService(parent Context) *SimpleService {
 	scheduler := newScheduler()
 	ctx := &mutableContext{}
 	return &SimpleService{
-		Scheduler: newScheduler(),
+		service: &service{
+			Scheduler: newScheduler(),
+			Executor:  newExecutor(),
+			Context:   ctx,
+		},
 		scheduler: scheduler,
-		Executor:  newExecutor(),
-		Context:   ctx,
 		context:   ctx,
 		parent:    parent,
 	}
@@ -25,10 +27,7 @@ func NewSimpleService(parent Context) *SimpleService {
 type SimpleService struct {
 	Service
 	*service
-	Scheduler Scheduler
 	scheduler *scheduler
-	Executor  Executor
-	Context   Context
 	context   *mutableContext
 	parent    Context
 }

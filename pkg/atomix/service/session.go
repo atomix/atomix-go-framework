@@ -15,12 +15,14 @@ import (
 func NewSessionizedService(parent Context) *SessionizedService {
 	ctx := &mutableContext{}
 	return &SessionizedService{
-		Scheduler: newScheduler(),
-		Executor:  newExecutor(),
-		Context:   ctx,
-		context:   ctx,
-		parent:    parent,
-		sessions:  make(map[uint64]*Session),
+		service: &service{
+			Scheduler: newScheduler(),
+			Executor:  newExecutor(),
+			Context:   ctx,
+		},
+		context:  ctx,
+		parent:   parent,
+		sessions: make(map[uint64]*Session),
 	}
 }
 
@@ -28,13 +30,10 @@ func NewSessionizedService(parent Context) *SessionizedService {
 type SessionizedService struct {
 	Service
 	*service
-	Scheduler Scheduler
-	Executor  Executor
-	Context   Context
-	context   *mutableContext
-	parent    Context
-	sessions  map[uint64]*Session
-	session   *Session
+	context  *mutableContext
+	parent   Context
+	sessions map[uint64]*Session
+	session  *Session
 }
 
 // Session returns the currently active session
