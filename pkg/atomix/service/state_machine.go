@@ -154,36 +154,44 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 	} else {
 		switch r := request.Request.(type) {
 		case *ServiceRequest_Command:
+			// If the service doesn't exist, create it.
 			service, ok := s.services[getServiceName(request.Id)]
 			if !ok {
-				if ch != nil {
-					ch <- newFailure(errors.New(fmt.Sprintf("unknown service %s", getServiceName(request.Id))))
+				serviceType := s.registry.getType(request.Id.Type)
+				if serviceType == nil {
+					if ch != nil {
+						ch <- newFailure(errors.New(fmt.Sprintf("unknown service type %s", request.Id.Type)))
+						return
+					}
+				} else {
+					service = newServiceStateMachine(request.Id.Type, serviceType(s.ctx))
+					s.services[getServiceName(request.Id)] = service
 				}
-			} else {
-				// Create a channel for the raw service results
-				var serviceCh chan Output
-				if ch != nil {
-					serviceCh = make(chan Output)
-
-					// Start a goroutine to encode the raw service results in a ServiceResponse
-					go func() {
-						for result := range serviceCh {
-							if result.Failed() {
-								ch <- result
-							} else {
-								ch <- newOutput(proto.Marshal(&ServiceResponse{
-									Response: &ServiceResponse_Command{
-										Command: result.Value,
-									},
-								}))
-							}
-						}
-					}()
-				}
-
-				// Execute the command on the service
-				service.Command(r.Command, serviceCh)
 			}
+
+			// Create a channel for the raw service results
+			var serviceCh chan Output
+			if ch != nil {
+				serviceCh = make(chan Output)
+
+				// Start a goroutine to encode the raw service results in a ServiceResponse
+				go func() {
+					for result := range serviceCh {
+						if result.Failed() {
+							ch <- result
+						} else {
+							ch <- newOutput(proto.Marshal(&ServiceResponse{
+								Response: &ServiceResponse_Command{
+									Command: result.Value,
+								},
+							}))
+						}
+					}
+				}()
+			}
+
+			// Execute the command on the service
+			service.Command(r.Command, serviceCh)
 		case *ServiceRequest_Create:
 			_, ok := s.services[getServiceName(request.Id)]
 			if !ok {
