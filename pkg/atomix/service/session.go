@@ -655,7 +655,7 @@ func (s *sessionStream) close() {
 func (s *sessionStream) completeIndex() uint64 {
 	event := s.results.Front()
 	if event != nil {
-		return event.Value.(*sessionStreamResult).result.Index - 1
+		return event.Value.(sessionStreamResult).result.Index - 1
 	}
 	return s.ctx.Index()
 }
@@ -672,10 +672,10 @@ func (s *sessionStream) LastIndex() uint64 {
 func (s *sessionStream) ack(id uint64) {
 	if id > s.completeID {
 		event := s.results.Front()
-		for event != nil && event.Value.(*sessionStreamResult).id <= id {
+		for event != nil && event.Value.(sessionStreamResult).id <= id {
 			next := event.Next()
 			s.results.Remove(event)
-			s.completeID = event.Value.(*sessionStreamResult).id
+			s.completeID = event.Value.(sessionStreamResult).id
 			event = next
 		}
 	}
@@ -685,7 +685,7 @@ func (s *sessionStream) ack(id uint64) {
 func (s *sessionStream) replay(ch chan<- Output) {
 	result := s.results.Front()
 	for result != nil {
-		ch <- result.Value.(*sessionStreamResult).result.Output
+		ch <- result.Value.(sessionStreamResult).result.Output
 		result = result.Next()
 	}
 	s.outChan = ch
