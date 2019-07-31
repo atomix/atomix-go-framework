@@ -3,10 +3,11 @@ package atomix
 import (
 	"fmt"
 	map_ "github.com/atomix/atomix-go-node/pkg/atomix/map"
-	log "github.com/sirupsen/logrus"
 	"github.com/atomix/atomix-go-node/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
+	"github.com/atomix/atomix-go-node/pkg/atomix/util"
 	"github.com/atomix/atomix-go-node/proto/atomix/controller"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"net"
 )
@@ -103,12 +104,19 @@ func (n *Node) Start() error {
 	}
 
 	log.Info("Starting protocol")
-	go n.protocol.Start(cluster, getServiceRegistry())
+	err := n.protocol.Start(cluster, getServiceRegistry())
+	if err !=  nil {
+		return err
+	}
 
 	lis, err := n.listener.listen(n)
 	if err != nil {
 		return err
 	}
+
+	// Set the ready file to indicate startup of the protocol is complete.
+	ready := util.NewFileReady()
+	ready.Set()
 
 	log.Info("Starting gRPC server")
 	n.server = grpc.NewServer()
