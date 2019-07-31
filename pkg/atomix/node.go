@@ -3,6 +3,7 @@ package atomix
 import (
 	"fmt"
 	map_ "github.com/atomix/atomix-go-node/pkg/atomix/map"
+	log "github.com/sirupsen/logrus"
 	"github.com/atomix/atomix-go-node/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/atomix/atomix-go-node/proto/atomix/controller"
@@ -101,6 +102,7 @@ func (n *Node) Start() error {
 		Members:  members,
 	}
 
+	log.Info("Starting protocol")
 	go n.protocol.Start(cluster, getServiceRegistry())
 
 	lis, err := n.listener.listen(n)
@@ -108,6 +110,7 @@ func (n *Node) Start() error {
 		return err
 	}
 
+	log.Info("Starting gRPC server")
 	n.server = grpc.NewServer()
 	registerServers(n.server, n.protocol)
 	return n.server.Serve(lis)
@@ -129,6 +132,7 @@ type listener interface {
 type tcpListener struct{}
 
 func (l tcpListener) listen(node *Node) (net.Listener, error) {
+	log.Infof("Listening on port %d", node.port)
 	return net.Listen("tcp", fmt.Sprintf(":%d", node.port))
 }
 
