@@ -101,9 +101,7 @@ func (n *Node) Start() error {
 		Members:  members,
 	}
 
-	if err := n.protocol.Start(cluster, getServiceRegistry()); err != nil {
-		return err
-	}
+	go n.protocol.Start(cluster, getServiceRegistry())
 
 	lis, err := n.listener.listen(n)
 	if err != nil {
