@@ -555,7 +555,7 @@ func (s *Session) completeCommand(sequenceNumber uint64) {
 			delete(s.queryCallbacks, i)
 		}
 
-		command, ok := s.commandCallbacks[i]
+		command, ok := s.commandCallbacks[s.nextCommandSequence()]
 		if ok {
 			command()
 			delete(s.commandCallbacks, i)
