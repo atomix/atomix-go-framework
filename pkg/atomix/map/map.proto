@@ -29,7 +29,7 @@ message MapEntryValue {
 }
 
 message ContainsKeyRequest {
-    repeated string keys = 1;
+    string key = 1;
 }
 
 message ContainsKeyResponse {
@@ -59,7 +59,7 @@ message EntriesRequest {
 message EntriesResponse {
     string key = 1;
     bytes value = 2;
-    int64 version = 3;
+    uint64 version = 3;
 }
 
 message PutRequest {
@@ -74,7 +74,7 @@ message PutResponse {
     UpdateStatus status = 1;
     bytes previous_value = 2;
     uint64 previous_version = 3;
-    int64 new_version = 4;
+    uint64 new_version = 4;
 }
 
 message ReplaceRequest {
@@ -89,7 +89,7 @@ message ReplaceResponse {
     UpdateStatus status = 1;
     bytes previous_value = 2;
     uint64 previous_version = 3;
-    int64 new_version = 4;
+    uint64 new_version = 4;
 }
 
 message GetRequest {

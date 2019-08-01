@@ -87,7 +87,7 @@ func (m *mapServer) Size(ctx context.Context, request *pb.SizeRequest) (*pb.Size
 
 func (m *mapServer) Exists(ctx context.Context, request *pb.ExistsRequest) (*pb.ExistsResponse, error) {
 	in, err := proto.Marshal(&ContainsKeyRequest{
-		Keys: []string{request.Key},
+		Key: request.Key,
 	})
 	if err != nil {
 		return nil, err
