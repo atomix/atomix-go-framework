@@ -46,7 +46,7 @@ func (m *mapServer) Create(ctx context.Context, request *pb.CreateRequest) (*pb.
 }
 
 func (m *mapServer) KeepAlive(ctx context.Context, request *pb.KeepAliveRequest) (*pb.KeepAliveResponse, error) {
-	log.Tracef("Received CreateRequest %+v", request)
+	log.Tracef("Received KeepAliveRequest %+v", request)
 	if err := m.KeepAliveSession(ctx, request.Header); err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func (m *mapServer) KeepAlive(ctx context.Context, request *pb.KeepAliveRequest)
 }
 
 func (m *mapServer) Close(ctx context.Context, request *pb.CloseRequest) (*pb.CloseResponse, error) {
-	log.Tracef("Received CreateRequest %+v", request)
+	log.Tracef("Received CloseRequest %+v", request)
 	if err := m.CloseSession(ctx, request.Header); err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func (m *mapServer) Close(ctx context.Context, request *pb.CloseRequest) (*pb.Cl
 }
 
 func (m *mapServer) Size(ctx context.Context, request *pb.SizeRequest) (*pb.SizeResponse, error) {
-	log.Tracef("Received CreateRequest %+v", request)
+	log.Tracef("Received SizeRequest %+v", request)
 	in, err := proto.Marshal(&SizeRequest{})
 	if err != nil {
 		return nil, err
@@ -99,7 +99,7 @@ func (m *mapServer) Size(ctx context.Context, request *pb.SizeRequest) (*pb.Size
 }
 
 func (m *mapServer) Exists(ctx context.Context, request *pb.ExistsRequest) (*pb.ExistsResponse, error) {
-	log.Tracef("Received CreateRequest %+v", request)
+	log.Tracef("Received ExistsRequest %+v", request)
 	in, err := proto.Marshal(&ContainsKeyRequest{
 		Key: request.Key,
 	})
@@ -126,7 +126,7 @@ func (m *mapServer) Exists(ctx context.Context, request *pb.ExistsRequest) (*pb.
 }
 
 func (m *mapServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutResponse, error) {
-	log.Tracef("Received CreateRequest %+v", request)
+	log.Tracef("Received PutRequest %+v", request)
 	in, err := proto.Marshal(&PutRequest{
 		Key:     request.Key,
 		Value:   request.Value,
@@ -159,7 +159,7 @@ func (m *mapServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRes
 }
 
 func (m *mapServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*pb.ReplaceResponse, error) {
-	log.Tracef("Received CreateRequest %+v", request)
+	log.Tracef("Received ReplaceRequest %+v", request)
 	in, err := proto.Marshal(&ReplaceRequest{
 		Key:             request.Key,
 		PreviousValue:   request.PreviousValue,
@@ -187,12 +187,12 @@ func (m *mapServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*p
 		PreviousValue:   serviceResponse.PreviousValue,
 		PreviousVersion: int64(serviceResponse.PreviousVersion),
 	}
-	log.Tracef("Sending CreateResponse %+v", response)
+	log.Tracef("Sending ReplaceResponse %+v", response)
 	return response, nil
 }
 
 func (m *mapServer) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetResponse, error) {
-	log.Tracef("Received CreateRequest %+v", request)
+	log.Tracef("Received GetRequest %+v", request)
 	in, err := proto.Marshal(&GetRequest{
 		Key: request.Key,
 	})
@@ -215,12 +215,12 @@ func (m *mapServer) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetRes
 		Value:   serviceResponse.Value,
 		Version: int64(serviceResponse.Version),
 	}
-	log.Tracef("Sending CreateResponse %+v", response)
+	log.Tracef("Sending GetRequest %+v", response)
 	return response, nil
 }
 
 func (m *mapServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb.RemoveResponse, error) {
-	log.Tracef("Received CreateRequest %+v", request)
+	log.Tracef("Received RemoveRequest %+v", request)
 	in, err := proto.Marshal(&RemoveRequest{
 		Key:     request.Key,
 		Value:   request.Value,
@@ -246,12 +246,12 @@ func (m *mapServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb.
 		PreviousValue:   serviceResponse.PreviousValue,
 		PreviousVersion: int64(serviceResponse.PreviousVersion),
 	}
-	log.Tracef("Sending CreateResponse %+v", response)
+	log.Tracef("Sending RemoveRequest %+v", response)
 	return response, nil
 }
 
 func (m *mapServer) Clear(ctx context.Context, request *pb.ClearRequest) (*pb.ClearResponse, error) {
-	log.Tracef("Received CreateRequest %+v", request)
+	log.Tracef("Received ClearRequest %+v", request)
 	in, err := proto.Marshal(&ClearRequest{})
 	if err != nil {
 		return nil, err
@@ -270,12 +270,12 @@ func (m *mapServer) Clear(ctx context.Context, request *pb.ClearRequest) (*pb.Cl
 	response := &pb.ClearResponse{
 		Header: header,
 	}
-	log.Tracef("Sending CreateResponse %+v", response)
+	log.Tracef("Sending ClearResponse %+v", response)
 	return response, nil
 }
 
 func (m *mapServer) Events(request *pb.EventRequest, srv pb.MapService_EventsServer) error {
-	log.Tracef("Received CreateRequest %+v", request)
+	log.Tracef("Received EventRequest %+v", request)
 	in, err := proto.Marshal(&ListenRequest{})
 	if err != nil {
 		return err
@@ -312,7 +312,7 @@ func (m *mapServer) Events(request *pb.EventRequest, srv pb.MapService_EventsSer
 }
 
 func (m *mapServer) Entries(request *pb.EntriesRequest, srv pb.MapService_EntriesServer) error {
-	log.Tracef("Received CreateRequest %+v", request)
+	log.Tracef("Received EntriesRequest %+v", request)
 	in, err := proto.Marshal(&EntriesRequest{})
 	if err != nil {
 		return err
