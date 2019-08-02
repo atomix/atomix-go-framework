@@ -648,6 +648,9 @@ func (s *sessionStream) process() {
 
 // close closes the stream
 func (s *sessionStream) close() {
+	defer func() {
+		recover()
+	}()
 	close(s.inChan)
 }
 
