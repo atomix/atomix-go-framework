@@ -7,6 +7,7 @@ import (
 	"github.com/atomix/atomix-go-node/proto/atomix/headers"
 	pb "github.com/atomix/atomix-go-node/proto/atomix/map"
 	"github.com/golang/protobuf/proto"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
@@ -30,40 +31,50 @@ type mapServer struct {
 }
 
 func (m *mapServer) Create(ctx context.Context, request *pb.CreateRequest) (*pb.CreateResponse, error) {
+	log.Tracef("Received CreateRequest %+v", request)
 	session, err := m.OpenSession(ctx, request.Header, request.Timeout)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.CreateResponse{
+	response := &pb.CreateResponse{
 		Header: &headers.ResponseHeader{
 			SessionId: session,
 		},
-	}, nil
+	}
+	log.Tracef("Sending CreateResponse %+v", response)
+	return response, nil
 }
 
 func (m *mapServer) KeepAlive(ctx context.Context, request *pb.KeepAliveRequest) (*pb.KeepAliveResponse, error) {
+	log.Tracef("Received CreateRequest %+v", request)
 	if err := m.KeepAliveSession(ctx, request.Header); err != nil {
 		return nil, err
 	}
-	return &pb.KeepAliveResponse{
+	response := &pb.KeepAliveResponse{
 		Header: &headers.ResponseHeader{
 			SessionId: request.Header.SessionId,
 		},
-	}, nil
+	}
+	log.Tracef("Sending KeepAliveResponse %+v", response)
+	return response, nil
 }
 
 func (m *mapServer) Close(ctx context.Context, request *pb.CloseRequest) (*pb.CloseResponse, error) {
+	log.Tracef("Received CreateRequest %+v", request)
 	if err := m.CloseSession(ctx, request.Header); err != nil {
 		return nil, err
 	}
-	return &pb.CloseResponse{
+	response := &pb.CloseResponse{
 		Header: &headers.ResponseHeader{
 			SessionId: request.Header.SessionId,
 		},
-	}, nil
+	}
+	log.Tracef("Sending CloseResponse %+v", response)
+	return response, nil
 }
 
 func (m *mapServer) Size(ctx context.Context, request *pb.SizeRequest) (*pb.SizeResponse, error) {
+	log.Tracef("Received CreateRequest %+v", request)
 	in, err := proto.Marshal(&SizeRequest{})
 	if err != nil {
 		return nil, err
@@ -74,18 +85,21 @@ func (m *mapServer) Size(ctx context.Context, request *pb.SizeRequest) (*pb.Size
 		return nil, err
 	}
 
-	response := &SizeResponse{}
-	if err = proto.Unmarshal(out, response); err != nil {
+	sizeResponse := &SizeResponse{}
+	if err = proto.Unmarshal(out, sizeResponse); err != nil {
 		return nil, err
 	}
 
-	return &pb.SizeResponse{
+	response := &pb.SizeResponse{
 		Header: header,
-		Size:   response.Size,
-	}, nil
+		Size:   sizeResponse.Size,
+	}
+	log.Tracef("Sending SizeResponse %+v", response)
+	return response, nil
 }
 
 func (m *mapServer) Exists(ctx context.Context, request *pb.ExistsRequest) (*pb.ExistsResponse, error) {
+	log.Tracef("Received CreateRequest %+v", request)
 	in, err := proto.Marshal(&ContainsKeyRequest{
 		Key: request.Key,
 	})
@@ -98,18 +112,21 @@ func (m *mapServer) Exists(ctx context.Context, request *pb.ExistsRequest) (*pb.
 		return nil, err
 	}
 
-	response := &ContainsKeyResponse{}
-	if err = proto.Unmarshal(out, response); err != nil {
+	containsResponse := &ContainsKeyResponse{}
+	if err = proto.Unmarshal(out, containsResponse); err != nil {
 		return nil, err
 	}
 
-	return &pb.ExistsResponse{
+	response := &pb.ExistsResponse{
 		Header:      header,
-		ContainsKey: response.ContainsKey,
-	}, nil
+		ContainsKey: containsResponse.ContainsKey,
+	}
+	log.Tracef("Sending ExistsResponse %+v", response)
+	return response, nil
 }
 
 func (m *mapServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutResponse, error) {
+	log.Tracef("Received CreateRequest %+v", request)
 	in, err := proto.Marshal(&PutRequest{
 		Key:     request.Key,
 		Value:   request.Value,
@@ -126,20 +143,23 @@ func (m *mapServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRes
 		return nil, err
 	}
 
-	response := &PutResponse{}
-	if err = proto.Unmarshal(out, response); err != nil {
+	putResponse := &PutResponse{}
+	if err = proto.Unmarshal(out, putResponse); err != nil {
 		return nil, err
 	}
 
-	return &pb.PutResponse{
+	response := &pb.PutResponse{
 		Header:          header,
-		Status:          getResponseStatus(response.Status),
-		PreviousValue:   response.PreviousValue,
-		PreviousVersion: int64(response.PreviousVersion),
-	}, nil
+		Status:          getResponseStatus(putResponse.Status),
+		PreviousValue:   putResponse.PreviousValue,
+		PreviousVersion: int64(putResponse.PreviousVersion),
+	}
+	log.Tracef("Sending PutResponse %+v", response)
+	return response, nil
 }
 
 func (m *mapServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*pb.ReplaceResponse, error) {
+	log.Tracef("Received CreateRequest %+v", request)
 	in, err := proto.Marshal(&ReplaceRequest{
 		Key:             request.Key,
 		PreviousValue:   request.PreviousValue,
@@ -156,20 +176,23 @@ func (m *mapServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*p
 		return nil, err
 	}
 
-	response := &ReplaceResponse{}
-	if err = proto.Unmarshal(out, response); err != nil {
+	serviceResponse := &ReplaceResponse{}
+	if err = proto.Unmarshal(out, serviceResponse); err != nil {
 		return nil, err
 	}
 
-	return &pb.ReplaceResponse{
+	response := &pb.ReplaceResponse{
 		Header:          header,
-		Status:          getResponseStatus(response.Status),
-		PreviousValue:   response.PreviousValue,
-		PreviousVersion: int64(response.PreviousVersion),
-	}, nil
+		Status:          getResponseStatus(serviceResponse.Status),
+		PreviousValue:   serviceResponse.PreviousValue,
+		PreviousVersion: int64(serviceResponse.PreviousVersion),
+	}
+	log.Tracef("Sending CreateResponse %+v", response)
+	return response, nil
 }
 
 func (m *mapServer) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetResponse, error) {
+	log.Tracef("Received CreateRequest %+v", request)
 	in, err := proto.Marshal(&GetRequest{
 		Key: request.Key,
 	})
@@ -182,19 +205,22 @@ func (m *mapServer) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetRes
 		return nil, err
 	}
 
-	response := &GetResponse{}
-	if err = proto.Unmarshal(out, response); err != nil {
+	serviceResponse := &GetResponse{}
+	if err = proto.Unmarshal(out, serviceResponse); err != nil {
 		return nil, err
 	}
 
-	return &pb.GetResponse{
+	response := &pb.GetResponse{
 		Header:  header,
-		Value:   response.Value,
-		Version: int64(response.Version),
-	}, nil
+		Value:   serviceResponse.Value,
+		Version: int64(serviceResponse.Version),
+	}
+	log.Tracef("Sending CreateResponse %+v", response)
+	return response, nil
 }
 
 func (m *mapServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb.RemoveResponse, error) {
+	log.Tracef("Received CreateRequest %+v", request)
 	in, err := proto.Marshal(&RemoveRequest{
 		Key:     request.Key,
 		Value:   request.Value,
@@ -209,20 +235,23 @@ func (m *mapServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb.
 		return nil, err
 	}
 
-	response := &RemoveResponse{}
-	if err = proto.Unmarshal(out, response); err != nil {
+	serviceResponse := &RemoveResponse{}
+	if err = proto.Unmarshal(out, serviceResponse); err != nil {
 		return nil, err
 	}
 
-	return &pb.RemoveResponse{
+	response := &pb.RemoveResponse{
 		Header:          header,
-		Status:          getResponseStatus(response.Status),
-		PreviousValue:   response.PreviousValue,
-		PreviousVersion: int64(response.PreviousVersion),
-	}, nil
+		Status:          getResponseStatus(serviceResponse.Status),
+		PreviousValue:   serviceResponse.PreviousValue,
+		PreviousVersion: int64(serviceResponse.PreviousVersion),
+	}
+	log.Tracef("Sending CreateResponse %+v", response)
+	return response, nil
 }
 
 func (m *mapServer) Clear(ctx context.Context, request *pb.ClearRequest) (*pb.ClearResponse, error) {
+	log.Tracef("Received CreateRequest %+v", request)
 	in, err := proto.Marshal(&ClearRequest{})
 	if err != nil {
 		return nil, err
@@ -233,17 +262,20 @@ func (m *mapServer) Clear(ctx context.Context, request *pb.ClearRequest) (*pb.Cl
 		return nil, err
 	}
 
-	response := &ClearResponse{}
-	if err = proto.Unmarshal(out, response); err != nil {
+	serviceResponse := &ClearResponse{}
+	if err = proto.Unmarshal(out, serviceResponse); err != nil {
 		return nil, err
 	}
 
-	return &pb.ClearResponse{
+	response := &pb.ClearResponse{
 		Header: header,
-	}, nil
+	}
+	log.Tracef("Sending CreateResponse %+v", response)
+	return response, nil
 }
 
 func (m *mapServer) Events(request *pb.EventRequest, srv pb.MapService_EventsServer) error {
+	log.Tracef("Received CreateRequest %+v", request)
 	in, err := proto.Marshal(&ListenRequest{})
 	if err != nil {
 		return err
@@ -261,7 +293,7 @@ func (m *mapServer) Events(request *pb.EventRequest, srv pb.MapService_EventsSer
 				if err = proto.Unmarshal(result.Value, response); err != nil {
 					return err
 				} else {
-					srv.Send(&pb.EventResponse{
+					eventResponse := &pb.EventResponse{
 						Header:     result.Header,
 						Type:       getEventType(response.Type),
 						Key:        response.Key,
@@ -269,7 +301,9 @@ func (m *mapServer) Events(request *pb.EventRequest, srv pb.MapService_EventsSer
 						OldVersion: int64(response.OldVersion),
 						NewValue:   response.NewValue,
 						NewVersion: int64(response.NewVersion),
-					})
+					}
+					log.Tracef("Sending EventResponse %+v", response)
+					srv.Send(eventResponse)
 				}
 			}
 		}
@@ -278,6 +312,7 @@ func (m *mapServer) Events(request *pb.EventRequest, srv pb.MapService_EventsSer
 }
 
 func (m *mapServer) Entries(request *pb.EntriesRequest, srv pb.MapService_EntriesServer) error {
+	log.Tracef("Received CreateRequest %+v", request)
 	in, err := proto.Marshal(&EntriesRequest{})
 	if err != nil {
 		return err
@@ -295,12 +330,14 @@ func (m *mapServer) Entries(request *pb.EntriesRequest, srv pb.MapService_Entrie
 				if err = proto.Unmarshal(result.Value, response); err != nil {
 					srv.Context().Done()
 				} else {
-					srv.Send(&pb.EntriesResponse{
+					entriesResponse := &pb.EntriesResponse{
 						Header:  result.Header,
 						Key:     response.Key,
 						Value:   response.Value,
 						Version: int64(response.Version),
-					})
+					}
+					log.Tracef("Sending EntriesResponse %+v", response)
+					srv.Send(entriesResponse)
 				}
 			}
 		}
