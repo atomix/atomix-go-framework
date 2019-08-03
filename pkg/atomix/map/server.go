@@ -319,7 +319,7 @@ func (m *mapServer) Entries(request *pb.EntriesRequest, srv pb.MapService_Entrie
 	}
 
 	ch := make(chan server.SessionOutput)
-	if err := m.CommandStream("entries", in, request.Header, ch); err != nil {
+	if err := m.QueryStream("entries", in, request.Header, ch); err != nil {
 		return err
 	} else {
 		for result := range ch {

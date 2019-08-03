@@ -443,6 +443,40 @@ func TestMap(t *testing.T) {
 	index = getResponse.Header.Index
 	version := getResponse.Version
 
+	putResponse, err = client.Put(context.TODO(), &_map.PutRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			SessionId:      sessionID,
+			Index:          index,
+			SequenceNumber: 1,
+		},
+		Key:   "foo",
+		Value: []byte("Hello world!"),
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, _map.ResponseStatus_OK, putResponse.Status)
+	index = putResponse.Header.Index
+
+	getResponse, err = client.Get(context.TODO(), &_map.GetRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			SessionId:      sessionID,
+			Index:          index,
+			SequenceNumber: 1,
+		},
+		Key: "foo",
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "Hello world!", string(getResponse.Value))
+	index = getResponse.Header.Index
+	assert.Equal(t, version, getResponse.Version)
+
 	sizeResponse, err = client.Size(context.TODO(), &_map.SizeRequest{
 		Header: &headers.RequestHeader{
 			Name: &primitive.Name{
