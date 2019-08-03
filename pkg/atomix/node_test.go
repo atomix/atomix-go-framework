@@ -6,6 +6,7 @@ import (
 	"github.com/atomix/atomix-go-node/proto/atomix/controller"
 	"github.com/atomix/atomix-go-node/proto/atomix/headers"
 	"github.com/atomix/atomix-go-node/proto/atomix/list"
+	"github.com/atomix/atomix-go-node/proto/atomix/lock"
 	"github.com/atomix/atomix-go-node/proto/atomix/map"
 	"github.com/atomix/atomix-go-node/proto/atomix/primitive"
 	"github.com/golang/protobuf/ptypes/duration"
@@ -664,4 +665,129 @@ func TestMap(t *testing.T) {
 			assert.Fail(t, "unknown key")
 		}
 	}
+}
+
+func TestLock(t *testing.T) {
+	node := NewNode("foo", &controller.PartitionConfig{}, NewTestProtocol())
+	go node.Start()
+	defer node.Stop()
+	time.Sleep(100 * time.Millisecond)
+
+	conn, err := grpc.Dial(":5678", grpc.WithInsecure())
+	assert.NoError(t, err)
+	defer conn.Close()
+
+	client := lock.NewLockServiceClient(conn)
+
+	createResponse, err := client.Create(context.TODO(), &lock.CreateRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+		},
+		Timeout: &duration.Duration{
+			Seconds: 5,
+		},
+	})
+	assert.NoError(t, err)
+
+	sessionID := createResponse.Header.SessionId
+	index := createResponse.Header.Index
+
+	lockResponse, err := client.Lock(context.TODO(), &lock.LockRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			SessionId:      sessionID,
+			Index:          index,
+			SequenceNumber: 1,
+		},
+		Timeout: &duration.Duration{
+			Nanos: int32(-1),
+		},
+	})
+	assert.NoError(t, err)
+	assert.NotEqual(t, uint64(0), lockResponse.Version)
+	version := lockResponse.Version
+	index = lockResponse.Header.Index
+
+	isLockedResponse, err := client.IsLocked(context.TODO(), &lock.IsLockedRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			SessionId:      sessionID,
+			Index:          index,
+			SequenceNumber: 1,
+		},
+	})
+	assert.NoError(t, err)
+	assert.True(t, isLockedResponse.IsLocked)
+
+	isLockedResponse, err = client.IsLocked(context.TODO(), &lock.IsLockedRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			SessionId:      sessionID,
+			Index:          index,
+			SequenceNumber: 1,
+		},
+		Version: version,
+	})
+	assert.NoError(t, err)
+	assert.True(t, isLockedResponse.IsLocked)
+
+	isLockedResponse, err = client.IsLocked(context.TODO(), &lock.IsLockedRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			SessionId:      sessionID,
+			Index:          index,
+			SequenceNumber: 1,
+		},
+		Version: version + 1,
+	})
+	assert.NoError(t, err)
+	assert.False(t, isLockedResponse.IsLocked)
+	index = isLockedResponse.Header.Index
+
+	unlockResponse, err := client.Unlock(context.TODO(), &lock.UnlockRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			SessionId:      sessionID,
+			Index:          index,
+			SequenceNumber: 2,
+		},
+		Version: version + 1,
+	})
+	assert.NoError(t, err)
+	assert.False(t, unlockResponse.Unlocked)
+	index = unlockResponse.Header.Index
+
+	unlockResponse, err = client.Unlock(context.TODO(), &lock.UnlockRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			SessionId:      sessionID,
+			Index:          index,
+			SequenceNumber: 3,
+		},
+		Version: version,
+	})
+	assert.NoError(t, err)
+	assert.True(t, unlockResponse.Unlocked)
+	index = unlockResponse.Header.Index
 }

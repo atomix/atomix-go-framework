@@ -19,7 +19,7 @@ func RegisterLockServer(server *grpc.Server, client service.Client) {
 func NewLockServiceServer(client service.Client) pb.LockServiceServer {
 	return &lockServer{
 		SessionizedServer: &server.SessionizedServer{
-			Type:   "list",
+			Type:   "lock",
 			Client: client,
 		},
 	}

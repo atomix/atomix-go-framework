@@ -189,6 +189,7 @@ func (l *LockService) Unlock(bytes []byte, ch chan<- service.Result) {
 		// If the current lock ID does not match the requested lock ID, preserve the existing lock.
 		// However, ensure the associated lock request is removed from the queue.
 		if (request.Index == 0 && l.lock.session != session.Id) || (request.Index > 0 && l.lock.index != uint64(request.Index)) {
+			unlocked := false
 			element := l.queue.Front()
 			for element != nil {
 				next := element.Next()
@@ -200,12 +201,13 @@ func (l *LockService) Unlock(bytes []byte, ch chan<- service.Result) {
 						timer.Cancel()
 						delete(l.timers, holder.index)
 					}
+					unlocked = true
 				}
 				element = next
 			}
 
 			ch <- l.NewResult(proto.Marshal(&UnlockResponse{
-				Succeeded: true,
+				Succeeded: unlocked,
 			}))
 			return
 		}
