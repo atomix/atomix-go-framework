@@ -234,7 +234,7 @@ func (s *SessionizedService) applyCommand(request *SessionCommandRequest, ch cha
 		}
 	} else {
 		sequenceNumber := request.Context.SequenceNumber
-		if sequenceNumber != 0 && sequenceNumber < session.commandSequence {
+		if sequenceNumber != 0 && sequenceNumber <= session.commandSequence {
 			stream := session.getStream(sequenceNumber)
 			if stream != nil {
 				if ch != nil {
@@ -600,14 +600,14 @@ func (s *sessionStream) process() {
 
 		// If the event is being published during a read operation, throw an exception.
 		if s.ctx.OperationType() != OpTypeCommand {
-			return
+			continue
 		}
 
 		// If the client acked a sequence number greater than the current event sequence number since we know the
 		// client must have received it from another server.
 		s.eventID++
 		if s.completeID > s.eventID {
-			return
+			continue
 		}
 
 		// Record the last index sent on the stream
@@ -642,9 +642,9 @@ func (s *sessionStream) process() {
 		if s.outChan != nil {
 			s.outChan <- outResult.result.Output
 		}
-
-		s.closed = true
 	}
+
+	s.closed = true
 
 	ch := s.outChan
 	if ch != nil {

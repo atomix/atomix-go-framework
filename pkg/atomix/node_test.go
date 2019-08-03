@@ -280,7 +280,7 @@ func TestList(t *testing.T) {
 			},
 			SessionId:      sessionID,
 			Index:          index,
-			SequenceNumber: 2,
+			SequenceNumber: 3,
 		},
 	})
 	assert.NoError(t, err)
@@ -298,8 +298,6 @@ func TestList(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(100 * time.Millisecond)
-
 	appendResponse, err = client.Append(context.TODO(), &list.AppendRequest{
 		Header: &headers.RequestHeader{
 			Name: &primitive.Name{
@@ -308,7 +306,7 @@ func TestList(t *testing.T) {
 			},
 			SessionId:      sessionID,
 			Index:          index,
-			SequenceNumber: 3,
+			SequenceNumber: 4,
 		},
 		Value: "bar",
 	})
@@ -328,7 +326,7 @@ func TestList(t *testing.T) {
 			},
 			SessionId:      sessionID,
 			Index:          index,
-			SequenceNumber: 4,
+			SequenceNumber: 5,
 		},
 		Value: "baz",
 	})
@@ -344,7 +342,7 @@ func TestList(t *testing.T) {
 			},
 			SessionId:      sessionID,
 			Index:          index,
-			SequenceNumber: 4,
+			SequenceNumber: 5,
 		},
 	})
 	assert.NoError(t, err)
@@ -470,7 +468,7 @@ func TestMap(t *testing.T) {
 			Index:          index,
 			SequenceNumber: 2,
 		},
-		Key:   "foo",
+		Key: "foo",
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, _map.ResponseStatus_OK, removeResponse.Status)
@@ -486,7 +484,7 @@ func TestMap(t *testing.T) {
 			},
 			SessionId:      sessionID,
 			Index:          index,
-			SequenceNumber: 2,
+			SequenceNumber: 3,
 		},
 	})
 	assert.NoError(t, err)
@@ -495,10 +493,10 @@ func TestMap(t *testing.T) {
 		i := 0
 		for {
 			response, err := events.Recv()
-			if err == io.EOF {
+			if err != nil {
+				assert.Equal(t, 4, i)
 				break
 			}
-			assert.NoError(t, err)
 
 			if i == 0 {
 				assert.Equal(t, _map.EventResponse_INSERTED, response.Type)
@@ -506,12 +504,130 @@ func TestMap(t *testing.T) {
 				assert.Equal(t, "Hello world!", string(response.NewValue))
 				i++
 			} else if i == 1 {
-
+				assert.Equal(t, _map.EventResponse_INSERTED, response.Type)
+				assert.Equal(t, "bar", response.Key)
+				assert.Equal(t, "Hello world again!", string(response.NewValue))
+				i++
+			} else if i == 2 {
+				assert.Equal(t, _map.EventResponse_INSERTED, response.Type)
+				assert.Equal(t, "baz", response.Key)
+				assert.Equal(t, "Hello world again again!", string(response.NewValue))
+				i++
+			} else if i == 3 {
+				assert.Equal(t, _map.EventResponse_REMOVED, response.Type)
+				assert.Equal(t, "bar", response.Key)
+				assert.Equal(t, "Hello world again!", string(response.OldValue))
+				i++
 			}
 		}
 	}()
 
-	time.Sleep(100 * time.Millisecond)
+	putResponse, err = client.Put(context.TODO(), &_map.PutRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			SessionId:      sessionID,
+			Index:          index,
+			SequenceNumber: 4,
+		},
+		Key:   "foo",
+		Value: []byte("Hello world!"),
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, _map.ResponseStatus_OK, putResponse.Status)
+	index = putResponse.Header.Index
 
+	putResponse, err = client.Put(context.TODO(), &_map.PutRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			SessionId:      sessionID,
+			Index:          index,
+			SequenceNumber: 5,
+		},
+		Key:   "bar",
+		Value: []byte("Hello world again!"),
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, _map.ResponseStatus_OK, putResponse.Status)
+	index = putResponse.Header.Index
+	version = int64(putResponse.Header.Index)
 
+	putResponse, err = client.Put(context.TODO(), &_map.PutRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			SessionId:      sessionID,
+			Index:          index,
+			SequenceNumber: 6,
+		},
+		Key:   "baz",
+		Value: []byte("Hello world again again!"),
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, _map.ResponseStatus_OK, putResponse.Status)
+	index = putResponse.Header.Index
+
+	removeResponse, err = client.Remove(context.TODO(), &_map.RemoveRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			SessionId:      sessionID,
+			Index:          index,
+			SequenceNumber: 7,
+		},
+		Key: "bar",
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, _map.ResponseStatus_OK, removeResponse.Status)
+	assert.Equal(t, "Hello world again!", string(removeResponse.PreviousValue))
+	assert.Equal(t, version, removeResponse.PreviousVersion)
+	index = removeResponse.Header.Index
+
+	entries, err := client.Entries(context.TODO(), &_map.EntriesRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			SessionId:      sessionID,
+			Index:          index,
+			SequenceNumber: 7,
+		},
+	})
+	assert.NoError(t, err)
+
+	foo := false
+	bar := false
+	received := 0
+	for {
+		response, err := entries.Recv()
+		if err == io.EOF {
+			assert.Equal(t, 2, received)
+			break
+		}
+		assert.NoError(t, err)
+
+		if response.Key == "foo" {
+			assert.False(t, foo)
+			assert.Equal(t, "Hello world!", string(response.Value))
+			foo = true
+			received++
+		} else if response.Key == "baz" {
+			assert.False(t, bar)
+			assert.Equal(t, "Hello world again again!", string(response.Value))
+			bar = true
+			received++
+		} else {
+			assert.Fail(t, "unknown key")
+		}
+	}
 }
