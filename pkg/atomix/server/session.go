@@ -85,6 +85,7 @@ func (s *SessionizedServer) WriteStream(request []byte, header *headers.RequestH
 
 	// Create a goroutine to convert the results into raw form
 	go func() {
+		defer close(ch)
 		for result := range streamCh {
 			if result.Failed() {
 				ch <- result
@@ -175,6 +176,7 @@ func (s *SessionizedServer) ReadStream(request []byte, header *headers.RequestHe
 
 	// Create a goroutine to convert the results into raw form
 	go func() {
+		defer close(ch)
 		for result := range streamCh {
 			if result.Failed() {
 				ch <- result
@@ -261,6 +263,7 @@ func (s *SessionizedServer) CommandStream(name string, input []byte, header *hea
 	}
 
 	go func() {
+		defer close(ch)
 		for result := range resultCh {
 			if result.Failed() {
 				ch <- SessionOutput{
@@ -362,6 +365,7 @@ func (s *SessionizedServer) QueryStream(name string, input []byte, header *heade
 	}
 
 	go func() {
+		defer close(ch)
 		for result := range resultCh {
 			if result.Failed() {
 				ch <- SessionOutput{

@@ -78,6 +78,7 @@ func (s *SimpleService) Command(bytes []byte, ch chan<- Output) {
 		if ch != nil {
 			commandCh = make(chan Result)
 			go func() {
+				defer close(ch)
 				for result := range commandCh {
 					if result.Failed() {
 						ch <- result.Output
@@ -90,7 +91,6 @@ func (s *SimpleService) Command(bytes []byte, ch chan<- Output) {
 						}))
 					}
 				}
-				close(ch)
 			}()
 		}
 
@@ -119,6 +119,7 @@ func (s *SimpleService) Query(bytes []byte, ch chan<- Output) {
 		if ch != nil {
 			queryCh = make(chan Result)
 			go func() {
+				defer close(ch)
 				for result := range queryCh {
 					if result.Failed() {
 						ch <- result.Output
@@ -131,7 +132,6 @@ func (s *SimpleService) Query(bytes []byte, ch chan<- Output) {
 						}))
 					}
 				}
-				close(ch)
 			}()
 		}
 

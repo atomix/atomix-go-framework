@@ -363,7 +363,6 @@ func TestList(t *testing.T) {
 		} else if i == 1 {
 			assert.Equal(t, "baz", response.Value)
 			i++
-			break
 		}
 	}
 	assert.Equal(t, 2, i)
@@ -443,5 +442,76 @@ func TestMap(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "Hello world!", string(getResponse.Value))
-	index = putResponse.Header.Index
+	index = getResponse.Header.Index
+	version := getResponse.Version
+
+	sizeResponse, err = client.Size(context.TODO(), &_map.SizeRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			SessionId:      sessionID,
+			Index:          index,
+			SequenceNumber: 1,
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, int32(1), sizeResponse.Size)
+	index = sizeResponse.Header.Index
+
+	removeResponse, err := client.Remove(context.TODO(), &_map.RemoveRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			SessionId:      sessionID,
+			Index:          index,
+			SequenceNumber: 2,
+		},
+		Key:   "foo",
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, _map.ResponseStatus_OK, removeResponse.Status)
+	assert.Equal(t, "Hello world!", string(removeResponse.PreviousValue))
+	assert.Equal(t, version, removeResponse.PreviousVersion)
+	index = removeResponse.Header.Index
+
+	events, err := client.Events(context.TODO(), &_map.EventRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			SessionId:      sessionID,
+			Index:          index,
+			SequenceNumber: 2,
+		},
+	})
+	assert.NoError(t, err)
+
+	go func() {
+		i := 0
+		for {
+			response, err := events.Recv()
+			if err == io.EOF {
+				break
+			}
+			assert.NoError(t, err)
+
+			if i == 0 {
+				assert.Equal(t, _map.EventResponse_INSERTED, response.Type)
+				assert.Equal(t, "foo", response.Key)
+				assert.Equal(t, "Hello world!", string(response.NewValue))
+				i++
+			} else if i == 1 {
+
+			}
+		}
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+
+
 }

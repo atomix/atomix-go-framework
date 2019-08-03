@@ -401,6 +401,7 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 	if ch != nil {
 		queryCh = make(chan Result)
 		go func() {
+			defer close(ch)
 			for result := range queryCh {
 				if result.Failed() {
 					ch <- result.Output
@@ -643,6 +644,11 @@ func (s *sessionStream) process() {
 		}
 
 		s.closed = true
+	}
+
+	ch := s.outChan
+	if ch != nil {
+		close(ch)
 	}
 }
 

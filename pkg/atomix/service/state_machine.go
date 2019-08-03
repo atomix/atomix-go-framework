@@ -176,6 +176,7 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 
 				// Start a goroutine to encode the raw service results in a ServiceResponse
 				go func() {
+					defer close(ch)
 					for result := range serviceCh {
 						if result.Failed() {
 							ch <- result
@@ -262,6 +263,7 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
 
 					// Start a goroutine to encode the raw service results in a ServiceResponse
 					go func() {
+						defer close(ch)
 						for result := range serviceCh {
 							if result.Failed() {
 								ch <- result
