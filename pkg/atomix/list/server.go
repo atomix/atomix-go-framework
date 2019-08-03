@@ -299,7 +299,7 @@ func (s *listServer) Iterate(request *pb.IterateRequest, srv pb.ListService_Iter
 	}
 
 	ch := make(chan server.SessionOutput)
-	if err := s.CommandStream("iterate", in, request.Header, ch); err != nil {
+	if err := s.QueryStream("iterate", in, request.Header, ch); err != nil {
 		return err
 	} else {
 		for result := range ch {

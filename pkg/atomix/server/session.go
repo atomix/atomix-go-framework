@@ -268,7 +268,7 @@ func (s *SessionizedServer) CommandStream(name string, input []byte, header *hea
 				}
 			} else {
 				sessionResponse := &service.SessionResponse{}
-				err = proto.Unmarshal(bytes, sessionResponse)
+				err = proto.Unmarshal(result.Value, sessionResponse)
 				if err != nil {
 					ch <- SessionOutput{
 						Output: service.Output{
@@ -369,7 +369,7 @@ func (s *SessionizedServer) QueryStream(name string, input []byte, header *heade
 				}
 			} else {
 				sessionResponse := &service.SessionResponse{}
-				err = proto.Unmarshal(bytes, sessionResponse)
+				err = proto.Unmarshal(result.Value, sessionResponse)
 				if err != nil {
 					ch <- SessionOutput{
 						Output: service.Output{

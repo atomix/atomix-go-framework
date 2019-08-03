@@ -217,10 +217,10 @@ func (l *ListService) Iterate(bytes []byte, ch chan<- service.Result) {
 }
 
 func (l *ListService) sendEvent(event *ListenResponse) {
-	bytes, _ := proto.Marshal(event)
+	bytes, err := proto.Marshal(event)
 	for _, session := range l.Sessions() {
 		for _, ch := range session.ChannelsOf("events") {
-			ch <- l.NewSuccess(bytes)
+			ch <- l.NewResult(bytes, err)
 		}
 	}
 }

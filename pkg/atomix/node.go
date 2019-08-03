@@ -2,6 +2,7 @@ package atomix
 
 import (
 	"fmt"
+	"github.com/atomix/atomix-go-node/pkg/atomix/list"
 	map_ "github.com/atomix/atomix-go-node/pkg/atomix/map"
 	"github.com/atomix/atomix-go-node/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
@@ -155,6 +156,7 @@ func (l localListener) listen(node *Node) (net.Listener, error) {
 // registerServers registers all primitive servers on the given gRPC server
 func registerServers(server *grpc.Server, protocol Protocol) {
 	primitive.RegisterPrimitiveServer(server, protocol.Client())
+	list.RegisterListServer(server, protocol.Client())
 	map_.RegisterMapServer(server, protocol.Client())
 }
 
@@ -162,5 +164,6 @@ func registerServers(server *grpc.Server, protocol Protocol) {
 func getServiceRegistry() *service.ServiceRegistry {
 	registry := service.NewServiceRegistry()
 	map_.RegisterMapService(registry)
+	list.RegisterListService(registry)
 	return registry
 }
