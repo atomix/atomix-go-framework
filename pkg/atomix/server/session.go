@@ -316,7 +316,7 @@ func (s *SessionizedServer) Query(ctx context.Context, name string, input []byte
 		return nil, nil, err
 	}
 
-	bytes, err = s.Write(ctx, bytes, header)
+	bytes, err = s.Read(ctx, bytes, header)
 	if err != nil {
 		return nil, nil, err
 	}
