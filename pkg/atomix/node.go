@@ -3,6 +3,7 @@ package atomix
 import (
 	"fmt"
 	"github.com/atomix/atomix-go-node/pkg/atomix/list"
+	"github.com/atomix/atomix-go-node/pkg/atomix/lock"
 	map_ "github.com/atomix/atomix-go-node/pkg/atomix/map"
 	"github.com/atomix/atomix-go-node/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
@@ -106,7 +107,7 @@ func (n *Node) Start() error {
 
 	log.Info("Starting protocol")
 	err := n.protocol.Start(cluster, getServiceRegistry())
-	if err !=  nil {
+	if err != nil {
 		return err
 	}
 
@@ -157,13 +158,15 @@ func (l localListener) listen(node *Node) (net.Listener, error) {
 func registerServers(server *grpc.Server, protocol Protocol) {
 	primitive.RegisterPrimitiveServer(server, protocol.Client())
 	list.RegisterListServer(server, protocol.Client())
+	lock.RegisterLockServer(server, protocol.Client())
 	map_.RegisterMapServer(server, protocol.Client())
 }
 
 // getServiceRegistry returns a service registry for the node
 func getServiceRegistry() *service.ServiceRegistry {
 	registry := service.NewServiceRegistry()
-	map_.RegisterMapService(registry)
 	list.RegisterListService(registry)
+	lock.RegisterLockService(registry)
+	map_.RegisterMapService(registry)
 	return registry
 }
