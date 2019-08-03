@@ -6,8 +6,8 @@ import (
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/atomix/atomix-go-node/proto/atomix/headers"
 	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/duration"
-	"time"
 )
 
 // SessionizedServer is a base server for servers that support sessions
@@ -398,10 +398,15 @@ func (s *SessionizedServer) QueryStream(name string, input []byte, header *heade
 }
 
 func (s *SessionizedServer) OpenSession(ctx context.Context, header *headers.RequestHeader, timeout *duration.Duration) (uint64, error) {
+	duration, err := ptypes.Duration(timeout)
+	if err != nil {
+		return 0, err
+	}
+
 	sessionRequest := &service.SessionRequest{
 		Request: &service.SessionRequest_OpenSession{
 			OpenSession: &service.OpenSessionRequest{
-				Timeout: (timeout.Seconds + int64(timeout.Nanos)) / int64(time.Millisecond),
+				Timeout: duration.Nanoseconds(),
 			},
 		},
 	}
