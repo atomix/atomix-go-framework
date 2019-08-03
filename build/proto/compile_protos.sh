@@ -24,5 +24,6 @@ protoc -I=$proto_imports --go_out=Matomix/headers/headers.proto=github.com/atomi
 
 proto_imports="./pkg:${GOPATH}/src/github.com/google/protobuf/src:${GOPATH}/src"
 
+protoc -I=$proto_imports --go_out=import_path=atomix/list,plugins=grpc:pkg pkg/atomix/list/*.proto
 protoc -I=$proto_imports --go_out=import_path=atomix/map,plugins=grpc:pkg pkg/atomix/map/*.proto
 protoc -I=$proto_imports --go_out=import_path=atomix/service,plugins=grpc:pkg pkg/atomix/service/*.proto
