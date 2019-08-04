@@ -308,6 +308,7 @@ func (m *mapServer) Events(request *pb.EventRequest, srv pb.MapService_EventsSer
 			}
 		}
 	}
+	log.Tracef("Finished EventRequest %+v", request)
 	return nil
 }
 
@@ -342,6 +343,7 @@ func (m *mapServer) Entries(request *pb.EntriesRequest, srv pb.MapService_Entrie
 			}
 		}
 	}
+	log.Tracef("Finished EntriesRequest %+v", request)
 	return nil
 }
 

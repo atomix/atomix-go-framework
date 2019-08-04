@@ -288,6 +288,7 @@ func (s *listServer) Listen(request *pb.EventRequest, srv pb.ListService_ListenS
 			}
 		}
 	}
+	log.Tracef("Finished EventRequest %+v", request)
 	return nil
 }
 
@@ -320,6 +321,7 @@ func (s *listServer) Iterate(request *pb.IterateRequest, srv pb.ListService_Iter
 			}
 		}
 	}
+	log.Tracef("Finished IterateRequest %+v", request)
 	return nil
 }
 
