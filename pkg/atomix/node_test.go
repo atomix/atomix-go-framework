@@ -790,4 +790,79 @@ func TestLock(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, unlockResponse.Unlocked)
 	index = unlockResponse.Header.Index
+
+	unlockResponse, err = client.Unlock(context.TODO(), &lock.UnlockRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			SessionId:      sessionID,
+			Index:          index,
+			SequenceNumber: 4,
+		},
+		Version: version,
+	})
+	assert.NoError(t, err)
+	assert.False(t, unlockResponse.Unlocked)
+	index = unlockResponse.Header.Index
+
+	lockResponse, err = client.Lock(context.TODO(), &lock.LockRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			SessionId:      sessionID,
+			Index:          index,
+			SequenceNumber: 5,
+		},
+		Timeout: &duration.Duration{
+			Nanos: int32(-1),
+		},
+	})
+	assert.NoError(t, err)
+	assert.NotEqual(t, uint64(0), lockResponse.Version)
+	version = lockResponse.Version
+	index = lockResponse.Header.Index
+
+	locked := make(chan bool)
+	go func() {
+		lockResponse, err := client.Lock(context.TODO(), &lock.LockRequest{
+			Header: &headers.RequestHeader{
+				Name: &primitive.Name{
+					Name:      "test",
+					Namespace: "test",
+				},
+				SessionId:      sessionID,
+				Index:          index,
+				SequenceNumber: 6,
+			},
+			Timeout: &duration.Duration{
+				Nanos: int32(-1),
+			},
+		})
+		assert.NoError(t, err)
+		assert.NotEqual(t, uint64(0), lockResponse.Version)
+		assert.NotEqual(t, version, lockResponse.Version)
+		locked <- true
+	}()
+
+	unlockResponse, err = client.Unlock(context.TODO(), &lock.UnlockRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			SessionId:      sessionID,
+			Index:          index,
+			SequenceNumber: 7,
+		},
+		Version: version,
+	})
+	assert.NoError(t, err)
+	assert.True(t, unlockResponse.Unlocked)
+	index = unlockResponse.Header.Index
+
+	<-locked
 }
