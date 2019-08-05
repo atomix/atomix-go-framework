@@ -705,9 +705,6 @@ func TestLock(t *testing.T) {
 			Index:          index,
 			SequenceNumber: 1,
 		},
-		Timeout: &duration.Duration{
-			Nanos: int32(-1),
-		},
 	})
 	assert.NoError(t, err)
 	assert.NotEqual(t, uint64(0), lockResponse.Version)
@@ -817,9 +814,6 @@ func TestLock(t *testing.T) {
 			Index:          index,
 			SequenceNumber: 5,
 		},
-		Timeout: &duration.Duration{
-			Nanos: int32(-1),
-		},
 	})
 	assert.NoError(t, err)
 	assert.NotEqual(t, uint64(0), lockResponse.Version)
@@ -837,9 +831,6 @@ func TestLock(t *testing.T) {
 				SessionId:      sessionID,
 				Index:          index,
 				SequenceNumber: 6,
-			},
-			Timeout: &duration.Duration{
-				Nanos: int32(-1),
 			},
 		})
 		assert.NoError(t, err)
@@ -865,4 +856,36 @@ func TestLock(t *testing.T) {
 	index = unlockResponse.Header.Index
 
 	<-locked
+
+	go func() {
+		_, err := client.KeepAlive(context.TODO(), &lock.KeepAliveRequest{
+			Header: &headers.RequestHeader{
+				Name: &primitive.Name{
+					Name:      "test",
+					Namespace: "test",
+				},
+				SessionId:      sessionID,
+				Index:          index,
+				SequenceNumber: 9,
+			},
+		})
+		assert.NoError(t, err)
+	}()
+
+	lockResponse, err = client.Lock(context.TODO(), &lock.LockRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			SessionId:      sessionID,
+			Index:          index,
+			SequenceNumber: 8,
+		},
+		Timeout: &duration.Duration{
+			Nanos: 1000,
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(0), lockResponse.Version)
 }

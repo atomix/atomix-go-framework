@@ -10,6 +10,7 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
+	"time"
 )
 
 func RegisterLockServer(server *grpc.Server, client service.Client) {
@@ -75,9 +76,10 @@ func (s *lockServer) Close(ctx context.Context, request *pb.CloseRequest) (*pb.C
 
 func (s *lockServer) Lock(ctx context.Context, request *pb.LockRequest) (*pb.LockResponse, error) {
 	log.Tracef("Received LockRequest %+v", request)
-	timeout, err := ptypes.Duration(request.Timeout)
-	if err != nil {
-		return nil, err
+
+	timeout := -1 * time.Nanosecond
+	if request.Timeout != nil {
+		timeout, _ = ptypes.Duration(request.Timeout)
 	}
 
 	in, err := proto.Marshal(&LockRequest{
