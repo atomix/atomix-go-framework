@@ -314,8 +314,23 @@ func (m *MapService) Clear(value []byte, ch chan<- service.Result) {
 }
 
 // Events sends change events to the client
-func (m *MapService) Events(value []byte, ch chan<- service.Result) {
-	// Do nothing. Keep the result channel open.
+func (m *MapService) Events(bytes []byte, ch chan<- service.Result) {
+	request := &ListenRequest{}
+	if err := proto.Unmarshal(bytes, request); err != nil {
+		ch <- m.NewFailure(err)
+		close(ch)
+	}
+
+	if request.Replay {
+		for key, value := range m.entries {
+			ch <- m.NewResult(proto.Marshal(&ListenResponse{
+				Type:       ListenResponse_NONE,
+				Key:        key,
+				NewValue:   value.Value,
+				NewVersion: value.Version,
+			}))
+		}
+	}
 }
 
 // Entries returns a stream of entries to the client

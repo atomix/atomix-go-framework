@@ -276,7 +276,9 @@ func (m *mapServer) Clear(ctx context.Context, request *pb.ClearRequest) (*pb.Cl
 
 func (m *mapServer) Events(request *pb.EventRequest, srv pb.MapService_EventsServer) error {
 	log.Tracef("Received EventRequest %+v", request)
-	in, err := proto.Marshal(&ListenRequest{})
+	in, err := proto.Marshal(&ListenRequest{
+		Replay: request.Replay,
+	})
 	if err != nil {
 		return err
 	}
@@ -363,6 +365,8 @@ func getResponseStatus(status UpdateStatus) pb.ResponseStatus {
 
 func getEventType(eventType ListenResponse_Type) pb.EventResponse_Type {
 	switch eventType {
+	case ListenResponse_NONE:
+		return pb.EventResponse_NONE
 	case ListenResponse_INSERTED:
 		return pb.EventResponse_INSERTED
 	case ListenResponse_UPDATED:

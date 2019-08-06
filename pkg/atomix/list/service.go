@@ -96,10 +96,12 @@ func (l *ListService) Append(bytes []byte, ch chan<- service.Result) {
 		return
 	}
 
+	index := len(l.values)
 	l.values = append(l.values, request.Value)
 
 	l.sendEvent(&ListenResponse{
 		Type:  ListenResponse_ADDED,
+		Index: uint32(index),
 		Value: request.Value,
 	})
 
@@ -130,10 +132,12 @@ func (l *ListService) Insert(bytes []byte, ch chan<- service.Result) {
 
 	l.sendEvent(&ListenResponse{
 		Type:  ListenResponse_REMOVED,
+		Index: uint32(index),
 		Value: oldValue,
 	})
 	l.sendEvent(&ListenResponse{
 		Type:  ListenResponse_ADDED,
+		Index: uint32(index),
 		Value: request.Value,
 	})
 
@@ -204,7 +208,21 @@ func (l *ListService) Clear(bytes []byte, ch chan<- service.Result) {
 }
 
 func (l *ListService) Events(bytes []byte, ch chan<- service.Result) {
-	// Do not close the channel
+	request := &ListenRequest{}
+	if err := proto.Unmarshal(bytes, request); err != nil {
+		ch <- l.NewFailure(err)
+		close(ch)
+	}
+
+	if request.Replay {
+		for index, value := range l.values {
+			ch <- l.NewResult(proto.Marshal(&ListenResponse{
+				Type:  ListenResponse_NONE,
+				Index: uint32(index),
+				Value: value,
+			}))
+		}
+	}
 }
 
 func (l *ListService) Iterate(bytes []byte, ch chan<- service.Result) {

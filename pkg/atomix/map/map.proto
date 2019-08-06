@@ -120,7 +120,7 @@ message ClearResponse {
 }
 
 message ListenRequest {
-
+    bool replay = 1;
 }
 
 message ListenResponse {
@@ -132,9 +132,10 @@ message ListenResponse {
     uint64 new_version = 6;
 
     enum Type {
-        INSERTED = 0;
-        UPDATED = 1;
-        REMOVED = 2;
+        NONE = 0;
+        INSERTED = 1;
+        UPDATED = 2;
+        REMOVED = 3;
     }
 }
 

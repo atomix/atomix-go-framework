@@ -258,9 +258,11 @@ func (s *listServer) Clear(ctx context.Context, request *pb.ClearRequest) (*pb.C
 	return response, nil
 }
 
-func (s *listServer) Listen(request *pb.EventRequest, srv pb.ListService_ListenServer) error {
+func (s *listServer) Events(request *pb.EventRequest, srv pb.ListService_EventsServer) error {
 	log.Tracef("Received EventRequest %+v", request)
-	in, err := proto.Marshal(&ListenRequest{})
+	in, err := proto.Marshal(&ListenRequest{
+		Replay: request.Replay,
+	})
 	if err != nil {
 		return err
 	}
@@ -339,6 +341,8 @@ func getResponseStatus(status ResponseStatus) pb.ResponseStatus {
 
 func getEventType(eventType ListenResponse_Type) pb.EventResponse_Type {
 	switch eventType {
+	case ListenResponse_NONE:
+		return pb.EventResponse_NONE
 	case ListenResponse_ADDED:
 		return pb.EventResponse_ADDED
 	case ListenResponse_REMOVED:

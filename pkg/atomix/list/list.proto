@@ -77,16 +77,18 @@ message ClearResponse {
 }
 
 message ListenRequest {
-
+    bool replay = 1;
 }
 
 message ListenResponse {
     Type type = 1;
-    string value = 2;
+    uint32 index = 2;
+    string value = 3;
 
     enum Type {
-        ADDED = 0;
-        REMOVED = 1;
+        NONE = 0;
+        ADDED = 1;
+        REMOVED = 2;
     }
 }
 
