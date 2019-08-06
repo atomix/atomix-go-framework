@@ -205,7 +205,7 @@ func (s *SessionizedServer) Command(ctx context.Context, name string, input []by
 			Command: &service.SessionCommandRequest{
 				Context: &service.SessionCommandContext{
 					SessionId:      header.SessionId,
-					SequenceNumber: header.SequenceNumber,
+					SequenceNumber: header.RequestId,
 				},
 				Name:  name,
 				Input: input,
@@ -231,9 +231,10 @@ func (s *SessionizedServer) Command(ctx context.Context, name string, input []by
 
 	commandResponse := sessionResponse.GetCommand()
 	responseHeader := &headers.ResponseHeader{
-		SessionId:      header.SessionId,
-		Index:          commandResponse.Context.Index,
-		SequenceNumber: commandResponse.Context.Sequence,
+		SessionId:  header.SessionId,
+		StreamId:   commandResponse.Context.StreamId,
+		ResponseId: commandResponse.Context.Sequence,
+		Index:      commandResponse.Context.Index,
 	}
 	return commandResponse.Output, responseHeader, nil
 }
@@ -244,7 +245,7 @@ func (s *SessionizedServer) CommandStream(name string, input []byte, header *hea
 			Command: &service.SessionCommandRequest{
 				Context: &service.SessionCommandContext{
 					SessionId:      header.SessionId,
-					SequenceNumber: header.SequenceNumber,
+					SequenceNumber: header.RequestId,
 				},
 				Name:  name,
 				Input: input,
@@ -281,9 +282,10 @@ func (s *SessionizedServer) CommandStream(name string, input []byte, header *hea
 				} else {
 					commandResponse := sessionResponse.GetCommand()
 					responseHeader := &headers.ResponseHeader{
-						SessionId:      header.SessionId,
-						Index:          commandResponse.Context.Index,
-						SequenceNumber: commandResponse.Context.Sequence,
+						SessionId:  header.SessionId,
+						StreamId:   commandResponse.Context.StreamId,
+						ResponseId: commandResponse.Context.Sequence,
+						Index:      commandResponse.Context.Index,
 					}
 					ch <- SessionOutput{
 						Header: responseHeader,
@@ -306,7 +308,7 @@ func (s *SessionizedServer) Query(ctx context.Context, name string, input []byte
 				Context: &service.SessionQueryContext{
 					SessionId:          header.SessionId,
 					LastIndex:          header.Index,
-					LastSequenceNumber: header.SequenceNumber,
+					LastSequenceNumber: header.RequestId,
 				},
 				Name:  name,
 				Input: input,
@@ -332,9 +334,8 @@ func (s *SessionizedServer) Query(ctx context.Context, name string, input []byte
 
 	queryResponse := sessionResponse.GetQuery()
 	responseHeader := &headers.ResponseHeader{
-		SessionId:      header.SessionId,
-		Index:          queryResponse.Context.Index,
-		SequenceNumber: queryResponse.Context.Sequence,
+		SessionId: header.SessionId,
+		Index:     queryResponse.Context.Index,
 	}
 	return queryResponse.Output, responseHeader, nil
 }
@@ -346,7 +347,7 @@ func (s *SessionizedServer) QueryStream(name string, input []byte, header *heade
 				Context: &service.SessionQueryContext{
 					SessionId:          header.SessionId,
 					LastIndex:          header.Index,
-					LastSequenceNumber: header.SequenceNumber,
+					LastSequenceNumber: header.RequestId,
 				},
 				Name:  name,
 				Input: input,
@@ -383,9 +384,8 @@ func (s *SessionizedServer) QueryStream(name string, input []byte, header *heade
 				} else {
 					queryResponse := sessionResponse.GetQuery()
 					responseHeader := &headers.ResponseHeader{
-						SessionId:      header.SessionId,
-						Index:          queryResponse.Context.Index,
-						SequenceNumber: queryResponse.Context.Sequence,
+						SessionId: header.SessionId,
+						Index:     queryResponse.Context.Index,
 					}
 					ch <- SessionOutput{
 						Header: responseHeader,
@@ -437,14 +437,14 @@ func (s *SessionizedServer) OpenSession(ctx context.Context, header *headers.Req
 func (s *SessionizedServer) KeepAliveSession(ctx context.Context, header *headers.RequestHeader) error {
 	streams := make(map[uint64]uint64)
 	for _, stream := range header.Streams {
-		streams[stream.StreamId] = stream.LastItemNumber
+		streams[stream.StreamId] = stream.ResponseId
 	}
 
 	sessionRequest := &service.SessionRequest{
 		Request: &service.SessionRequest_KeepAlive{
 			KeepAlive: &service.KeepAliveRequest{
 				SessionId:       header.SessionId,
-				CommandSequence: header.SequenceNumber,
+				CommandSequence: header.RequestId,
 				Streams:         streams,
 			},
 		},
