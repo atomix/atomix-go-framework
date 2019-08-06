@@ -38,6 +38,7 @@ func (s *listServer) Create(ctx context.Context, request *pb.CreateRequest) (*pb
 	response := &pb.CreateResponse{
 		Header: &headers.ResponseHeader{
 			SessionId: session,
+			Index:     session,
 		},
 	}
 	log.Tracef("Sending CreateResponse %+v", response)

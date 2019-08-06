@@ -62,14 +62,14 @@ func (s *SessionizedService) snapshotSessions(writer io.Writer) error {
 		streams := make([]*SessionStreamSnapshot, 0, len(session.streams))
 		for _, stream := range session.streams {
 			streams = append(streams, &SessionStreamSnapshot{
-				StreamId:       stream.Id,
+				StreamId:       stream.ID,
 				Type:           stream.Type,
 				SequenceNumber: stream.eventID,
 				LastCompleted:  stream.completeID,
 			})
 		}
 		sessions = append(sessions, &SessionSnapshot{
-			SessionId:       session.Id,
+			SessionId:       session.ID,
 			Timeout:         uint64(session.Timeout),
 			Timestamp:       uint64(session.LastUpdated.UnixNano()),
 			CommandSequence: session.commandSequence,
@@ -149,7 +149,7 @@ func (s *SessionizedService) installSessions(reader io.Reader) error {
 		streams := make(map[uint64]*sessionStream)
 		for _, stream := range session.Streams {
 			s := &sessionStream{
-				Id:         stream.StreamId,
+				ID:         stream.StreamId,
 				Type:       stream.Type,
 				eventID:    stream.SequenceNumber,
 				completeID: stream.LastCompleted,
@@ -157,10 +157,10 @@ func (s *SessionizedService) installSessions(reader io.Reader) error {
 				inChan:     make(chan Result),
 				results:    list.New(),
 			}
-			streams[s.Id] = s
+			streams[s.ID] = s
 		}
 		s.sessions[session.SessionId] = &Session{
-			Id:              session.SessionId,
+			ID:              session.SessionId,
 			Timeout:         time.Duration(session.Timeout),
 			LastUpdated:     time.Unix(0, int64(session.Timestamp)),
 			commandSequence: session.CommandSequence,
@@ -275,13 +275,13 @@ func (s *SessionizedService) applySessionCommand(request *SessionCommandRequest,
 
 func (s *SessionizedService) applyOpenSession(request *OpenSessionRequest, ch chan<- Output) {
 	session := newSession(s.Context, time.Duration(request.Timeout))
-	s.sessions[session.Id] = session
+	s.sessions[session.ID] = session
 	s.OnOpen(session)
 	if ch != nil {
 		ch <- newOutput(proto.Marshal(&SessionResponse{
 			Response: &SessionResponse_OpenSession{
 				OpenSession: &OpenSessionResponse{
-					SessionId: session.Id,
+					SessionId: session.ID,
 				},
 			},
 		}))
@@ -343,7 +343,7 @@ func (s *SessionizedService) applyCloseSession(request *CloseSessionRequest, ch 
 		}
 	} else {
 		// Close the session and notify the service.
-		delete(s.sessions, session.Id)
+		delete(s.sessions, session.ID)
 		session.close()
 		s.OnClose(session)
 
@@ -443,7 +443,7 @@ func (s *SessionizedService) OnClose(session *Session) {
 
 func newSession(ctx Context, timeout time.Duration) *Session {
 	return &Session{
-		Id:               ctx.Index(),
+		ID:               ctx.Index(),
 		Timeout:          timeout,
 		LastUpdated:      ctx.Timestamp(),
 		ctx:              ctx,
@@ -455,7 +455,7 @@ func newSession(ctx Context, timeout time.Duration) *Session {
 
 // Session manages the ordering of request and response streams for a single client
 type Session struct {
-	Id               uint64
+	ID               uint64
 	Timeout          time.Duration
 	LastUpdated      time.Time
 	ctx              Context
@@ -494,7 +494,7 @@ func (s *Session) ChannelsOf(op string) []chan<- Result {
 // addStream adds a stream at the given sequence number
 func (s *Session) addStream(sequence uint64, op string, outChan chan<- Output) chan<- Result {
 	stream := &sessionStream{
-		Id:      sequence,
+		ID:      sequence,
 		Type:    op,
 		ctx:     s.ctx,
 		inChan:  make(chan Result),
@@ -573,7 +573,7 @@ func (s *Session) close() {
 
 // sessionStream manages a single stream for a session
 type sessionStream struct {
-	Id         uint64
+	ID         uint64
 	Type       string
 	closed     bool
 	eventID    uint64
@@ -621,7 +621,7 @@ func (s *sessionStream) process() {
 					Response: &SessionResponse_Command{
 						Command: &SessionCommandResponse{
 							Context: &SessionResponseContext{
-								StreamId: s.Id,
+								StreamId: s.ID,
 								Index:    inResult.Index,
 								Sequence: s.eventID,
 							},

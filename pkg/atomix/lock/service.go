@@ -124,7 +124,7 @@ func (l *LockService) Lock(bytes []byte, ch chan<- service.Result) {
 		// by the client-side primitive after the LOCK response.
 		l.lock = &lockHolder{
 			index:   l.Context.Index(),
-			session: session.Id,
+			session: session.ID,
 			expire:  0,
 			ch:      ch,
 		}
@@ -146,7 +146,7 @@ func (l *LockService) Lock(bytes []byte, ch chan<- service.Result) {
 		index := l.Context.Index()
 		holder := &lockHolder{
 			index:   index,
-			session: session.Id,
+			session: session.ID,
 			expire:  l.Context.Timestamp().Add(time.Duration(request.Timeout)).UnixNano(),
 			ch:      ch,
 		}
@@ -166,7 +166,7 @@ func (l *LockService) Lock(bytes []byte, ch chan<- service.Result) {
 		// If the lock is -1, just add the request to the queue with no expiration.
 		holder := &lockHolder{
 			index:   l.Context.Index(),
-			session: session.Id,
+			session: session.ID,
 			expire:  0,
 			ch:      ch,
 		}
@@ -188,13 +188,13 @@ func (l *LockService) Unlock(bytes []byte, ch chan<- service.Result) {
 		// If the commit's session does not match the current lock holder, preserve the existing lock.
 		// If the current lock ID does not match the requested lock ID, preserve the existing lock.
 		// However, ensure the associated lock request is removed from the queue.
-		if (request.Index == 0 && l.lock.session != session.Id) || (request.Index > 0 && l.lock.index != uint64(request.Index)) {
+		if (request.Index == 0 && l.lock.session != session.ID) || (request.Index > 0 && l.lock.index != uint64(request.Index)) {
 			unlocked := false
 			element := l.queue.Front()
 			for element != nil {
 				next := element.Next()
 				holder := element.Value.(*lockHolder)
-				if (request.Index == 0 && holder.session == session.Id) || (request.Index > 0 && holder.index == uint64(request.Index)) {
+				if (request.Index == 0 && holder.session == session.ID) || (request.Index > 0 && holder.index == uint64(request.Index)) {
 					l.queue.Remove(element)
 					timer, ok := l.timers[holder.index]
 					if ok {
@@ -274,7 +274,7 @@ func (l *LockService) releaseLock(session *service.Session) {
 	for element != nil {
 		next := element.Next()
 		lock := element.Value.(*lockHolder)
-		if lock.session == session.Id {
+		if lock.session == session.ID {
 			l.queue.Remove(element)
 			timer, ok := l.timers[lock.index]
 			if ok {
@@ -287,7 +287,7 @@ func (l *LockService) releaseLock(session *service.Session) {
 
 	// If the removed session is the current holder of the lock, nullify the lock and attempt to grant it
 	// to the next waiter in the queue.
-	if l.lock != nil && l.lock.session == session.Id {
+	if l.lock != nil && l.lock.session == session.ID {
 		l.lock = nil
 
 		element := l.queue.Front()
