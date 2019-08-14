@@ -59,14 +59,17 @@ func (s *SessionizedService) Snapshot(writer io.Writer) error {
 func (s *SessionizedService) snapshotSessions(writer io.Writer) error {
 	sessions := make([]*SessionSnapshot, 0, len(s.sessions))
 	for _, session := range s.sessions {
-		streams := make([]*SessionStreamSnapshot, 0, len(session.streams))
-		for _, stream := range session.streams {
+		streams := make([]*SessionStreamSnapshot, 0, session.streams.Len())
+		element := session.streams.Front()
+		for element != nil {
+			stream := element.Value.(*sessionStream)
 			streams = append(streams, &SessionStreamSnapshot{
 				StreamId:       stream.ID,
 				Type:           stream.Type,
 				SequenceNumber: stream.eventID,
 				LastCompleted:  stream.completeID,
 			})
+			element = element.Next()
 		}
 		sessions = append(sessions, &SessionSnapshot{
 			SessionId:       session.ID,
@@ -146,7 +149,7 @@ func (s *SessionizedService) installSessions(reader io.Reader) error {
 
 	s.sessions = make(map[uint64]*Session)
 	for _, session := range snapshot.Sessions {
-		streams := make(map[uint64]*sessionStream)
+		streams := list.New()
 		for _, stream := range session.Streams {
 			s := &sessionStream{
 				ID:         stream.StreamId,
@@ -157,7 +160,7 @@ func (s *SessionizedService) installSessions(reader io.Reader) error {
 				inChan:     make(chan Result),
 				results:    list.New(),
 			}
-			streams[s.ID] = s
+			streams.PushBack(s)
 		}
 		s.sessions[session.SessionId] = &Session{
 			ID:              session.SessionId,
@@ -193,8 +196,11 @@ func (s *SessionizedService) installService(reader io.Reader) error {
 func (s *SessionizedService) CanDelete(index uint64) bool {
 	lastCompleted := index
 	for _, session := range s.sessions {
-		for _, stream := range session.streams {
+		element := session.streams.Front()
+		for element != nil {
+			stream := element.Value.(*sessionStream)
 			lastCompleted = uint64(math.Min(float64(lastCompleted), float64(stream.completeIndex())))
+			element = element.Next()
 		}
 	}
 	return lastCompleted >= index
@@ -300,15 +306,7 @@ func (s *SessionizedService) applyKeepAlive(request *KeepAliveRequest, ch chan<-
 		session.LastUpdated = s.Context.Timestamp()
 
 		// Clear the results up to the given command sequence number
-		session.ack(request.CommandSequence)
-
-		// Acknowledge stream results up to the given result IDs
-		for streamId, resultId := range request.Streams {
-			stream, ok := session.streams[streamId]
-			if ok {
-				stream.ack(resultId)
-			}
-		}
+		session.ack(request.CommandSequence, request.Streams)
 
 		// Expire sessions that have not been kept alive
 		s.expireSessions()
@@ -449,7 +447,7 @@ func newSession(ctx Context, timeout time.Duration) *Session {
 		ctx:              ctx,
 		commandCallbacks: make(map[uint64]func()),
 		queryCallbacks:   make(map[uint64]*list.List),
-		streams:          make(map[uint64]*sessionStream),
+		streams:          list.New(),
 	}
 }
 
@@ -463,7 +461,7 @@ type Session struct {
 	ackSequence      uint64
 	commandCallbacks map[uint64]func()
 	queryCallbacks   map[uint64]*list.List
-	streams          map[uint64]*sessionStream
+	streams          *list.List
 }
 
 // timedOut returns a boolean indicating whether the session is timed out
@@ -473,20 +471,25 @@ func (s *Session) timedOut(time time.Time) bool {
 
 // Channels returns a slice of all open channels of any type owned by the session
 func (s *Session) Channels() []chan<- Result {
-	channels := make([]chan<- Result, 0, len(s.streams))
-	for _, stream := range s.streams {
-		channels = append(channels, stream.inChan)
+	channels := make([]chan<- Result, 0, s.streams.Len())
+	element := s.streams.Front()
+	for element != nil {
+		channels = append(channels, element.Value.(*sessionStream).inChan)
+		element = element.Next()
 	}
 	return channels
 }
 
 // ChannelsOf returns a slice of all open channels for the given named operation owned by the session
 func (s *Session) ChannelsOf(op string) []chan<- Result {
-	channels := make([]chan<- Result, 0, len(s.streams))
-	for _, stream := range s.streams {
+	channels := make([]chan<- Result, 0, s.streams.Len())
+	element := s.streams.Front()
+	for element != nil {
+		stream := element.Value.(*sessionStream)
 		if stream.Type == op {
 			channels = append(channels, stream.inChan)
 		}
+		element = element.Next()
 	}
 	return channels
 }
@@ -501,24 +504,49 @@ func (s *Session) addStream(sequence uint64, op string, outChan chan<- Output) c
 		outChan: outChan,
 		results: list.New(),
 	}
-	s.streams[sequence] = stream
+	s.streams.PushBack(stream)
 	go stream.process()
 	return stream.inChan
 }
 
 // getStream returns a stream by the request sequence number
 func (s *Session) getStream(sequenceNumber uint64) *sessionStream {
-	return s.streams[sequenceNumber]
+	element := s.streams.Back()
+	for element != nil {
+		stream := element.Value.(*sessionStream)
+		if stream.ID == sequenceNumber {
+			return stream
+		}
+		element = element.Prev()
+	}
+	return nil
 }
 
 // ack acknowledges response streams up to the given request sequence number
-func (s *Session) ack(sequenceNumber uint64) {
-	if sequenceNumber > s.ackSequence {
-		for i := s.ackSequence + 1; i <= sequenceNumber; i++ {
-			delete(s.streams, i)
-			s.ackSequence = i
+func (s *Session) ack(sequenceNumber uint64, streams map[uint64]uint64) {
+	element := s.streams.Front()
+	for element != nil {
+		stream := element.Value.(*sessionStream)
+
+		// If the stream ID is greater than the acknowledged sequence number, break out of the loop.
+		if stream.ID > sequenceNumber {
+			break
 		}
+
+		// Store the next element so it persists if we remove the current element.
+		next := element.Next()
+
+		// If the stream is still held by the client, ack the stream.
+		// Otherwise, close the stream.
+		streamAck, open := streams[stream.ID]
+		if open {
+			stream.ack(streamAck)
+		} else {
+			s.streams.Remove(element)
+		}
+		element = next
 	}
+	s.ackSequence = sequenceNumber
 }
 
 // scheduleQuery schedules a query to be executed after the given sequence number
@@ -566,8 +594,10 @@ func (s *Session) completeCommand(sequenceNumber uint64) {
 
 // close closes the session and completes all its streams
 func (s *Session) close() {
-	for _, stream := range s.streams {
-		stream.close()
+	element := s.streams.Front()
+	for element != nil {
+		element.Value.(*sessionStream).close()
+		element = element.Next()
 	}
 }
 
