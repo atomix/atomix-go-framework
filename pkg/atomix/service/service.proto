@@ -15,6 +15,9 @@ syntax = "proto3";
 
 package atomix.service;
 
+import "google/protobuf/timestamp.proto";
+import "gogoproto/gogo.proto";
+
 message ServiceId {
     string type = 1;
     string name = 2;
@@ -29,7 +32,7 @@ message ServiceSnapshot {
 // Simple service snapshot
 message SimpleServiceSnapshot {
     int64 index = 4;
-    int64 timestamp = 5;
+    google.protobuf.Timestamp timestamp = 5 [(gogoproto.stdtime) = true];
 }
 
 message ServiceRequest {

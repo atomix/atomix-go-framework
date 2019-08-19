@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/golang/protobuf/proto"
-	"time"
 )
 
 // RegisterMapService registers the map service in the given service registry
@@ -85,8 +84,8 @@ func (m *MapService) Put(value []byte, ch chan<- service.Result) {
 		newValue := &MapEntryValue{
 			Value:   request.Value,
 			Version: m.Context.Index(),
-			Ttl:     request.Ttl * int64(time.Millisecond),
-			Created: m.Context.Timestamp().UnixNano(),
+			TTL:     request.TTL,
+			Created: m.Context.Timestamp(),
 		}
 		m.entries[request.Key] = newValue
 
@@ -132,8 +131,8 @@ func (m *MapService) Put(value []byte, ch chan<- service.Result) {
 	newValue := &MapEntryValue{
 		Value:   request.Value,
 		Version: m.Context.Index(),
-		Ttl:     request.Ttl * int64(time.Millisecond),
-		Created: m.Context.Timestamp().UnixNano(),
+		TTL:     request.TTL,
+		Created: m.Context.Timestamp(),
 	}
 	m.entries[request.Key] = newValue
 
@@ -196,8 +195,8 @@ func (m *MapService) Replace(value []byte, ch chan<- service.Result) {
 	newValue := &MapEntryValue{
 		Value:   request.NewValue,
 		Version: m.Context.Index(),
-		Ttl:     request.Ttl * int64(time.Millisecond),
-		Created: m.Context.Timestamp().UnixNano(),
+		TTL:     request.TTL,
+		Created: m.Context.Timestamp(),
 	}
 	m.entries[request.Key] = newValue
 
@@ -302,7 +301,7 @@ func (m *MapService) ContainsKey(bytes []byte, ch chan<- service.Result) {
 func (m *MapService) Size(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 	ch <- m.NewResult(proto.Marshal(&SizeResponse{
-		Size: int32(len(m.entries)),
+		Size_: int32(len(m.entries)),
 	}))
 }
 
@@ -347,8 +346,8 @@ func (m *MapService) Entries(value []byte, ch chan<- service.Result) {
 
 func (m *MapService) scheduleTtl(key string, value *MapEntryValue) {
 	m.cancelTtl(key)
-	if value.Ttl > 0 {
-		m.timers[key] = m.Scheduler.ScheduleOnce(time.Duration(value.Ttl-(m.Context.Timestamp().UnixNano()-value.Created)), func() {
+	if value.TTL != nil {
+		m.timers[key] = m.Scheduler.ScheduleOnce(value.Created.Add(*value.TTL).Sub(m.Context.Timestamp()), func() {
 			delete(m.entries, key)
 			m.sendEvent(&ListenResponse{
 				Type:       ListenResponse_REMOVED,

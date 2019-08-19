@@ -3,11 +3,10 @@ package server
 import (
 	"context"
 	"errors"
+	"github.com/atomix/atomix-api/proto/atomix/headers"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
-	"github.com/atomix/atomix-go-node/proto/atomix/headers"
 	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/ptypes"
-	"github.com/golang/protobuf/ptypes/duration"
+	"time"
 )
 
 // SessionizedServer is a base server for servers that support sessions
@@ -204,8 +203,8 @@ func (s *SessionizedServer) Command(ctx context.Context, name string, input []by
 		Request: &service.SessionRequest_Command{
 			Command: &service.SessionCommandRequest{
 				Context: &service.SessionCommandContext{
-					SessionId:      header.SessionId,
-					SequenceNumber: header.RequestId,
+					SessionID:      header.SessionID,
+					SequenceNumber: header.RequestID,
 				},
 				Name:  name,
 				Input: input,
@@ -231,9 +230,9 @@ func (s *SessionizedServer) Command(ctx context.Context, name string, input []by
 
 	commandResponse := sessionResponse.GetCommand()
 	responseHeader := &headers.ResponseHeader{
-		SessionId:  header.SessionId,
-		StreamId:   commandResponse.Context.StreamId,
-		ResponseId: commandResponse.Context.Sequence,
+		SessionID:  header.SessionID,
+		StreamID:   commandResponse.Context.StreamID,
+		ResponseID: commandResponse.Context.Sequence,
 		Index:      commandResponse.Context.Index,
 	}
 	return commandResponse.Output, responseHeader, nil
@@ -244,8 +243,8 @@ func (s *SessionizedServer) CommandStream(name string, input []byte, header *hea
 		Request: &service.SessionRequest_Command{
 			Command: &service.SessionCommandRequest{
 				Context: &service.SessionCommandContext{
-					SessionId:      header.SessionId,
-					SequenceNumber: header.RequestId,
+					SessionID:      header.SessionID,
+					SequenceNumber: header.RequestID,
 				},
 				Name:  name,
 				Input: input,
@@ -282,9 +281,9 @@ func (s *SessionizedServer) CommandStream(name string, input []byte, header *hea
 				} else {
 					commandResponse := sessionResponse.GetCommand()
 					responseHeader := &headers.ResponseHeader{
-						SessionId:  header.SessionId,
-						StreamId:   commandResponse.Context.StreamId,
-						ResponseId: commandResponse.Context.Sequence,
+						SessionID:  header.SessionID,
+						StreamID:   commandResponse.Context.StreamID,
+						ResponseID: commandResponse.Context.Sequence,
 						Index:      commandResponse.Context.Index,
 					}
 					ch <- SessionOutput{
@@ -306,9 +305,9 @@ func (s *SessionizedServer) Query(ctx context.Context, name string, input []byte
 		Request: &service.SessionRequest_Query{
 			Query: &service.SessionQueryRequest{
 				Context: &service.SessionQueryContext{
-					SessionId:          header.SessionId,
+					SessionID:          header.SessionID,
 					LastIndex:          header.Index,
-					LastSequenceNumber: header.RequestId,
+					LastSequenceNumber: header.RequestID,
 				},
 				Name:  name,
 				Input: input,
@@ -334,7 +333,7 @@ func (s *SessionizedServer) Query(ctx context.Context, name string, input []byte
 
 	queryResponse := sessionResponse.GetQuery()
 	responseHeader := &headers.ResponseHeader{
-		SessionId: header.SessionId,
+		SessionID: header.SessionID,
 		Index:     queryResponse.Context.Index,
 	}
 	return queryResponse.Output, responseHeader, nil
@@ -345,9 +344,9 @@ func (s *SessionizedServer) QueryStream(name string, input []byte, header *heade
 		Request: &service.SessionRequest_Query{
 			Query: &service.SessionQueryRequest{
 				Context: &service.SessionQueryContext{
-					SessionId:          header.SessionId,
+					SessionID:          header.SessionID,
 					LastIndex:          header.Index,
-					LastSequenceNumber: header.RequestId,
+					LastSequenceNumber: header.RequestID,
 				},
 				Name:  name,
 				Input: input,
@@ -384,7 +383,7 @@ func (s *SessionizedServer) QueryStream(name string, input []byte, header *heade
 				} else {
 					queryResponse := sessionResponse.GetQuery()
 					responseHeader := &headers.ResponseHeader{
-						SessionId: header.SessionId,
+						SessionID: header.SessionID,
 						Index:     queryResponse.Context.Index,
 					}
 					ch <- SessionOutput{
@@ -401,16 +400,11 @@ func (s *SessionizedServer) QueryStream(name string, input []byte, header *heade
 	return nil
 }
 
-func (s *SessionizedServer) OpenSession(ctx context.Context, header *headers.RequestHeader, timeout *duration.Duration) (uint64, error) {
-	duration, err := ptypes.Duration(timeout)
-	if err != nil {
-		return 0, err
-	}
-
+func (s *SessionizedServer) OpenSession(ctx context.Context, header *headers.RequestHeader, timeout *time.Duration) (uint64, error) {
 	sessionRequest := &service.SessionRequest{
 		Request: &service.SessionRequest_OpenSession{
 			OpenSession: &service.OpenSessionRequest{
-				Timeout: duration.Nanoseconds(),
+				Timeout: timeout,
 			},
 		},
 	}
@@ -431,20 +425,20 @@ func (s *SessionizedServer) OpenSession(ctx context.Context, header *headers.Req
 		return 0, err
 	}
 
-	return sessionResponse.GetOpenSession().SessionId, nil
+	return sessionResponse.GetOpenSession().SessionID, nil
 }
 
 func (s *SessionizedServer) KeepAliveSession(ctx context.Context, header *headers.RequestHeader) error {
 	streams := make(map[uint64]uint64)
 	for _, stream := range header.Streams {
-		streams[stream.StreamId] = stream.ResponseId
+		streams[stream.StreamID] = stream.ResponseID
 	}
 
 	sessionRequest := &service.SessionRequest{
 		Request: &service.SessionRequest_KeepAlive{
 			KeepAlive: &service.KeepAliveRequest{
-				SessionId:       header.SessionId,
-				CommandSequence: header.RequestId,
+				SessionID:       header.SessionID,
+				CommandSequence: header.RequestID,
 				Streams:         streams,
 			},
 		},
@@ -468,7 +462,7 @@ func (s *SessionizedServer) CloseSession(ctx context.Context, header *headers.Re
 	sessionRequest := &service.SessionRequest{
 		Request: &service.SessionRequest_CloseSession{
 			CloseSession: &service.CloseSessionRequest{
-				SessionId: header.SessionId,
+				SessionID: header.SessionID,
 			},
 		},
 	}

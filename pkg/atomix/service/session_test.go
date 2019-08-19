@@ -40,10 +40,11 @@ func TestSessionService(t *testing.T) {
 }
 
 func newOpenSession() []byte {
+	timeout := 30 * time.Second
 	bytes, _ := proto.Marshal(&SessionRequest{
 		Request: &SessionRequest_OpenSession{
 			OpenSession: &OpenSessionRequest{
-				Timeout: int64(30 * time.Second),
+				Timeout: &timeout,
 			},
 		},
 	})
@@ -68,7 +69,7 @@ func newCommand(sessionID uint64, commandID uint64, name string, bytes []byte) [
 		Request: &SessionRequest_Command{
 			Command: &SessionCommandRequest{
 				Context: &SessionCommandContext{
-					SessionId:      sessionID,
+					SessionID:      sessionID,
 					SequenceNumber: commandID,
 				},
 				Name:  name,
@@ -101,7 +102,7 @@ func newQuery(sessionID uint64, commandID uint64, index uint64, name string, byt
 		Request: &SessionRequest_Query{
 			Query: &SessionQueryRequest{
 				Context: &SessionQueryContext{
-					SessionId:          sessionID,
+					SessionID:          sessionID,
 					LastIndex:          index,
 					LastSequenceNumber: commandID,
 				},

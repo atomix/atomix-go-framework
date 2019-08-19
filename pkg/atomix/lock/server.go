@@ -2,22 +2,20 @@ package lock
 
 import (
 	"context"
+	"github.com/atomix/atomix-api/proto/atomix/headers"
+	api "github.com/atomix/atomix-api/proto/atomix/lock"
 	"github.com/atomix/atomix-go-node/pkg/atomix/server"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
-	"github.com/atomix/atomix-go-node/proto/atomix/headers"
-	pb "github.com/atomix/atomix-go-node/proto/atomix/lock"
 	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/ptypes"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
-	"time"
 )
 
 func RegisterLockServer(server *grpc.Server, client service.Client) {
-	pb.RegisterLockServiceServer(server, NewLockServiceServer(client))
+	api.RegisterLockServiceServer(server, NewLockServiceServer(client))
 }
 
-func NewLockServiceServer(client service.Client) pb.LockServiceServer {
+func NewLockServiceServer(client service.Client) api.LockServiceServer {
 	return &lockServer{
 		SessionizedServer: &server.SessionizedServer{
 			Type:   "lock",
@@ -31,15 +29,15 @@ type lockServer struct {
 	*server.SessionizedServer
 }
 
-func (s *lockServer) Create(ctx context.Context, request *pb.CreateRequest) (*pb.CreateResponse, error) {
+func (s *lockServer) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
 	session, err := s.OpenSession(ctx, request.Header, request.Timeout)
 	if err != nil {
 		return nil, err
 	}
-	response := &pb.CreateResponse{
+	response := &api.CreateResponse{
 		Header: &headers.ResponseHeader{
-			SessionId: session,
+			SessionID: session,
 			Index:     session,
 		},
 	}
@@ -47,44 +45,39 @@ func (s *lockServer) Create(ctx context.Context, request *pb.CreateRequest) (*pb
 	return response, nil
 }
 
-func (s *lockServer) KeepAlive(ctx context.Context, request *pb.KeepAliveRequest) (*pb.KeepAliveResponse, error) {
+func (s *lockServer) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
 	log.Tracef("Received KeepAliveRequest %+v", request)
 	if err := s.KeepAliveSession(ctx, request.Header); err != nil {
 		return nil, err
 	}
-	response := &pb.KeepAliveResponse{
+	response := &api.KeepAliveResponse{
 		Header: &headers.ResponseHeader{
-			SessionId: request.Header.SessionId,
+			SessionID: request.Header.SessionID,
 		},
 	}
 	log.Tracef("Sending KeepAliveResponse %+v", response)
 	return response, nil
 }
 
-func (s *lockServer) Close(ctx context.Context, request *pb.CloseRequest) (*pb.CloseResponse, error) {
+func (s *lockServer) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if err := s.CloseSession(ctx, request.Header); err != nil {
 		return nil, err
 	}
-	response := &pb.CloseResponse{
+	response := &api.CloseResponse{
 		Header: &headers.ResponseHeader{
-			SessionId: request.Header.SessionId,
+			SessionID: request.Header.SessionID,
 		},
 	}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil
 }
 
-func (s *lockServer) Lock(ctx context.Context, request *pb.LockRequest) (*pb.LockResponse, error) {
+func (s *lockServer) Lock(ctx context.Context, request *api.LockRequest) (*api.LockResponse, error) {
 	log.Tracef("Received LockRequest %+v", request)
 
-	timeout := -1 * time.Nanosecond
-	if request.Timeout != nil {
-		timeout, _ = ptypes.Duration(request.Timeout)
-	}
-
 	in, err := proto.Marshal(&LockRequest{
-		Timeout: int64(timeout),
+		Timeout: request.Timeout,
 	})
 	if err != nil {
 		return nil, err
@@ -100,7 +93,7 @@ func (s *lockServer) Lock(ctx context.Context, request *pb.LockRequest) (*pb.Loc
 		return nil, err
 	}
 
-	response := &pb.LockResponse{
+	response := &api.LockResponse{
 		Header:  header,
 		Version: uint64(lockResponse.Index),
 	}
@@ -108,7 +101,7 @@ func (s *lockServer) Lock(ctx context.Context, request *pb.LockRequest) (*pb.Loc
 	return response, nil
 }
 
-func (s *lockServer) Unlock(ctx context.Context, request *pb.UnlockRequest) (*pb.UnlockResponse, error) {
+func (s *lockServer) Unlock(ctx context.Context, request *api.UnlockRequest) (*api.UnlockResponse, error) {
 	log.Tracef("Received UnlockRequest %+v", request)
 	in, err := proto.Marshal(&UnlockRequest{
 		Index: int64(request.Version),
@@ -127,7 +120,7 @@ func (s *lockServer) Unlock(ctx context.Context, request *pb.UnlockRequest) (*pb
 		return nil, err
 	}
 
-	response := &pb.UnlockResponse{
+	response := &api.UnlockResponse{
 		Header:   header,
 		Unlocked: unlockResponse.Succeeded,
 	}
@@ -135,7 +128,7 @@ func (s *lockServer) Unlock(ctx context.Context, request *pb.UnlockRequest) (*pb
 	return response, nil
 }
 
-func (s *lockServer) IsLocked(ctx context.Context, request *pb.IsLockedRequest) (*pb.IsLockedResponse, error) {
+func (s *lockServer) IsLocked(ctx context.Context, request *api.IsLockedRequest) (*api.IsLockedResponse, error) {
 	log.Tracef("Received IsLockedRequest %+v", request)
 	in, err := proto.Marshal(&IsLockedRequest{
 		Index: int64(request.Version),
@@ -154,7 +147,7 @@ func (s *lockServer) IsLocked(ctx context.Context, request *pb.IsLockedRequest) 
 		return nil, err
 	}
 
-	response := &pb.IsLockedResponse{
+	response := &api.IsLockedResponse{
 		Header:   header,
 		IsLocked: isLockedResponse.Locked,
 	}

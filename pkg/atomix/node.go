@@ -2,13 +2,13 @@ package atomix
 
 import (
 	"fmt"
+	"github.com/atomix/atomix-api/proto/atomix/controller"
 	"github.com/atomix/atomix-go-node/pkg/atomix/list"
 	"github.com/atomix/atomix-go-node/pkg/atomix/lock"
 	map_ "github.com/atomix/atomix-go-node/pkg/atomix/map"
 	"github.com/atomix/atomix-go-node/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/atomix/atomix-go-node/pkg/atomix/util"
-	"github.com/atomix/atomix-go-node/proto/atomix/controller"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"net"
@@ -93,8 +93,8 @@ type Node struct {
 func (n *Node) Start() error {
 	members := make(map[string]Member)
 	for _, member := range n.config.Members {
-		members[member.Id] = Member{
-			ID:   member.Id,
+		members[member.ID] = Member{
+			ID:   member.ID,
 			Host: member.Host,
 			Port: int(member.Port),
 		}

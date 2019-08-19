@@ -2,19 +2,19 @@ package primitive
 
 import (
 	"context"
+	api "github.com/atomix/atomix-api/proto/atomix/primitive"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
-	pb "github.com/atomix/atomix-go-node/proto/atomix/primitive"
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 )
 
 // RegisterPrimitiveServer registers the primitive server with the gRPC server
 func RegisterPrimitiveServer(server *grpc.Server, client service.Client) {
-	pb.RegisterPrimitiveServiceServer(server, newPrimitiveServiceServer(client))
+	api.RegisterPrimitiveServiceServer(server, newPrimitiveServiceServer(client))
 }
 
 // newPrimitiveServer returns a new PrimitiveServiceServer implementation
-func newPrimitiveServiceServer(client service.Client) pb.PrimitiveServiceServer {
+func newPrimitiveServiceServer(client service.Client) api.PrimitiveServiceServer {
 	return &primitiveServer{
 		client: client,
 	}
@@ -22,11 +22,11 @@ func newPrimitiveServiceServer(client service.Client) pb.PrimitiveServiceServer 
 
 // primitiveServer is an implementation of the PrimitiveServiceServer Protobuf service
 type primitiveServer struct {
-	pb.PrimitiveServiceServer
+	api.PrimitiveServiceServer
 	client service.Client
 }
 
-func (s *primitiveServer) GetPrimitives(ctx context.Context, request *pb.GetPrimitivesRequest) (*pb.GetPrimitivesResponse, error) {
+func (s *primitiveServer) GetPrimitives(ctx context.Context, request *api.GetPrimitivesRequest) (*api.GetPrimitivesResponse, error) {
 	in, err := proto.Marshal(&service.ServiceRequest{
 		Request: &service.ServiceRequest_Metadata{
 			Metadata: &service.MetadataRequest{
@@ -55,17 +55,17 @@ func (s *primitiveServer) GetPrimitives(ctx context.Context, request *pb.GetPrim
 
 	metadata := response.GetMetadata()
 
-	primitives := make([]*pb.PrimitiveInfo, len(metadata.Services))
+	primitives := make([]*api.PrimitiveInfo, len(metadata.Services))
 	for i, id := range metadata.Services {
-		primitives[i] = &pb.PrimitiveInfo{
+		primitives[i] = &api.PrimitiveInfo{
 			Type: id.Type,
-			Name: &pb.Name{
+			Name: &api.Name{
 				Name:      id.Name,
 				Namespace: id.Namespace,
 			},
 		}
 	}
-	return &pb.GetPrimitivesResponse{
+	return &api.GetPrimitivesResponse{
 		Primitives: primitives,
 	}, nil
 }

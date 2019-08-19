@@ -34,7 +34,7 @@ type LockService struct {
 type lockHolder struct {
 	index   uint64
 	session uint64
-	expire  int64
+	expire  *time.Time
 	ch      chan<- service.Result
 }
 
@@ -98,9 +98,9 @@ func (l *LockService) Restore(bytes []byte) error {
 			expire:  lock.Expire,
 		})
 
-		if lock.Expire > 0 {
+		if lock.Expire != nil {
 			index := uint64(lock.Index)
-			l.timers[index] = l.Scheduler.ScheduleOnce(time.Unix(0, lock.Expire).Sub(l.Context.Timestamp()), func() {
+			l.timers[index] = l.Scheduler.ScheduleOnce(lock.Expire.Sub(l.Context.Timestamp()), func() {
 				delete(l.timers, index)
 				l.queue.Remove(element)
 			})
@@ -125,7 +125,6 @@ func (l *LockService) Lock(bytes []byte, ch chan<- service.Result) {
 		l.lock = &lockHolder{
 			index:   l.Context.Index(),
 			session: session.ID,
-			expire:  0,
 			ch:      ch,
 		}
 
@@ -134,24 +133,25 @@ func (l *LockService) Lock(bytes []byte, ch chan<- service.Result) {
 			Acquired: true,
 		}))
 		close(ch)
-	} else if request.Timeout == 0 {
+	} else if request.Timeout != nil && int64(*request.Timeout) == 0 {
 		// If the timeout is 0, that indicates this is a tryLock request. Immediately fail the request.
 		ch <- l.NewResult(proto.Marshal(&LockResponse{
 			Acquired: false,
 		}))
 		close(ch)
-	} else if request.Timeout > 0 {
+	} else if request.Timeout != nil {
 		// If a timeout exists, add the request to the queue and set a timer. Note that the lock request expiration
 		// time is based on the *state machine* time - not the system time - to ensure consistency across servers.
 		index := l.Context.Index()
+		expire := l.Context.Timestamp().Add(*request.Timeout)
 		holder := &lockHolder{
 			index:   index,
 			session: session.ID,
-			expire:  l.Context.Timestamp().Add(time.Duration(request.Timeout)).UnixNano(),
+			expire:  &expire,
 			ch:      ch,
 		}
 		element := l.queue.PushBack(holder)
-		l.timers[index] = l.Scheduler.ScheduleOnce(time.Duration(request.Timeout), func() {
+		l.timers[index] = l.Scheduler.ScheduleOnce(*request.Timeout, func() {
 			// When the lock request timer expires, remove the request from the queue and publish a FAILED
 			// event to the session. Note that this timer is guaranteed to be executed in the same thread as the
 			// state machine commands, so there's no need to use a lock here.
@@ -167,7 +167,6 @@ func (l *LockService) Lock(bytes []byte, ch chan<- service.Result) {
 		holder := &lockHolder{
 			index:   l.Context.Index(),
 			session: session.ID,
-			expire:  0,
 			ch:      ch,
 		}
 		l.queue.PushBack(holder)

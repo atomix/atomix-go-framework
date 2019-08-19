@@ -2,14 +2,13 @@ package atomix
 
 import (
 	"context"
+	"github.com/atomix/atomix-api/proto/atomix/controller"
+	"github.com/atomix/atomix-api/proto/atomix/headers"
+	"github.com/atomix/atomix-api/proto/atomix/list"
+	"github.com/atomix/atomix-api/proto/atomix/lock"
+	"github.com/atomix/atomix-api/proto/atomix/map"
+	"github.com/atomix/atomix-api/proto/atomix/primitive"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
-	"github.com/atomix/atomix-go-node/proto/atomix/controller"
-	"github.com/atomix/atomix-go-node/proto/atomix/headers"
-	"github.com/atomix/atomix-go-node/proto/atomix/list"
-	"github.com/atomix/atomix-go-node/proto/atomix/lock"
-	"github.com/atomix/atomix-go-node/proto/atomix/map"
-	"github.com/atomix/atomix-go-node/proto/atomix/primitive"
-	"github.com/golang/protobuf/ptypes/duration"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"io"
@@ -148,6 +147,7 @@ func TestList(t *testing.T) {
 
 	client := list.NewListServiceClient(conn)
 
+	timeout := 5 * time.Second
 	createResponse, err := client.Create(context.TODO(), &list.CreateRequest{
 		Header: &headers.RequestHeader{
 			Name: &primitive.Name{
@@ -155,13 +155,11 @@ func TestList(t *testing.T) {
 				Namespace: "test",
 			},
 		},
-		Timeout: &duration.Duration{
-			Seconds: 5,
-		},
+		Timeout: &timeout,
 	})
 	assert.NoError(t, err)
 
-	sessionID := createResponse.Header.SessionId
+	sessionID := createResponse.Header.SessionID
 	index := createResponse.Header.Index
 
 	sizeResponse, err := client.Size(context.TODO(), &list.SizeRequest{
@@ -170,9 +168,9 @@ func TestList(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 0,
+			RequestID: 0,
 		},
 	})
 	assert.NoError(t, err)
@@ -185,9 +183,9 @@ func TestList(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 0,
+			RequestID: 0,
 		},
 		Value: "foo",
 	})
@@ -201,9 +199,9 @@ func TestList(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 1,
+			RequestID: 1,
 		},
 		Value: "foo",
 	})
@@ -217,9 +215,9 @@ func TestList(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 1,
+			RequestID: 1,
 		},
 		Value: "foo",
 	})
@@ -233,9 +231,9 @@ func TestList(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 1,
+			RequestID: 1,
 		},
 	})
 	assert.NoError(t, err)
@@ -248,9 +246,9 @@ func TestList(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 2,
+			RequestID: 2,
 		},
 		Index: 0,
 	})
@@ -264,9 +262,9 @@ func TestList(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 2,
+			RequestID: 2,
 		},
 	})
 	assert.NoError(t, err)
@@ -279,9 +277,9 @@ func TestList(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 3,
+			RequestID: 3,
 		},
 	})
 	assert.NoError(t, err)
@@ -305,9 +303,9 @@ func TestList(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 4,
+			RequestID: 4,
 		},
 		Value: "bar",
 	})
@@ -325,9 +323,9 @@ func TestList(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 5,
+			RequestID: 5,
 		},
 		Value: "baz",
 	})
@@ -341,9 +339,9 @@ func TestList(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 5,
+			RequestID: 5,
 		},
 	})
 	assert.NoError(t, err)
@@ -379,6 +377,7 @@ func TestMap(t *testing.T) {
 
 	client := _map.NewMapServiceClient(conn)
 
+	timeout := 5 * time.Second
 	createResponse, err := client.Create(context.TODO(), &_map.CreateRequest{
 		Header: &headers.RequestHeader{
 			Name: &primitive.Name{
@@ -386,13 +385,11 @@ func TestMap(t *testing.T) {
 				Namespace: "test",
 			},
 		},
-		Timeout: &duration.Duration{
-			Seconds: 5,
-		},
+		Timeout: &timeout,
 	})
 	assert.NoError(t, err)
 
-	sessionID := createResponse.Header.SessionId
+	sessionID := createResponse.Header.SessionID
 	index := createResponse.Header.Index
 
 	sizeResponse, err := client.Size(context.TODO(), &_map.SizeRequest{
@@ -401,9 +398,9 @@ func TestMap(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 0,
+			RequestID: 0,
 		},
 	})
 	assert.NoError(t, err)
@@ -416,9 +413,9 @@ func TestMap(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 1,
+			RequestID: 1,
 		},
 		Key:   "foo",
 		Value: []byte("Hello world!"),
@@ -433,9 +430,9 @@ func TestMap(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 1,
+			RequestID: 1,
 		},
 		Key: "foo",
 	})
@@ -450,9 +447,9 @@ func TestMap(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 1,
+			RequestID: 1,
 		},
 		Key:   "foo",
 		Value: []byte("Hello world!"),
@@ -467,9 +464,9 @@ func TestMap(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 1,
+			RequestID: 1,
 		},
 		Key: "foo",
 	})
@@ -484,9 +481,9 @@ func TestMap(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 1,
+			RequestID: 1,
 		},
 	})
 	assert.NoError(t, err)
@@ -499,9 +496,9 @@ func TestMap(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 2,
+			RequestID: 2,
 		},
 		Key: "foo",
 	})
@@ -517,9 +514,9 @@ func TestMap(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 3,
+			RequestID: 3,
 		},
 	})
 	assert.NoError(t, err)
@@ -563,9 +560,9 @@ func TestMap(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 4,
+			RequestID: 4,
 		},
 		Key:   "foo",
 		Value: []byte("Hello world!"),
@@ -580,9 +577,9 @@ func TestMap(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 5,
+			RequestID: 5,
 		},
 		Key:   "bar",
 		Value: []byte("Hello world again!"),
@@ -598,9 +595,9 @@ func TestMap(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 6,
+			RequestID: 6,
 		},
 		Key:   "baz",
 		Value: []byte("Hello world again again!"),
@@ -615,9 +612,9 @@ func TestMap(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 7,
+			RequestID: 7,
 		},
 		Key: "bar",
 	})
@@ -633,9 +630,9 @@ func TestMap(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 7,
+			RequestID: 7,
 		},
 	})
 	assert.NoError(t, err)
@@ -679,6 +676,7 @@ func TestLock(t *testing.T) {
 
 	client := lock.NewLockServiceClient(conn)
 
+	timeout := 5 * time.Second
 	createResponse, err := client.Create(context.TODO(), &lock.CreateRequest{
 		Header: &headers.RequestHeader{
 			Name: &primitive.Name{
@@ -686,13 +684,11 @@ func TestLock(t *testing.T) {
 				Namespace: "test",
 			},
 		},
-		Timeout: &duration.Duration{
-			Seconds: 5,
-		},
+		Timeout: &timeout,
 	})
 	assert.NoError(t, err)
 
-	sessionID := createResponse.Header.SessionId
+	sessionID := createResponse.Header.SessionID
 	index := createResponse.Header.Index
 
 	lockResponse, err := client.Lock(context.TODO(), &lock.LockRequest{
@@ -701,9 +697,9 @@ func TestLock(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 1,
+			RequestID: 1,
 		},
 	})
 	assert.NoError(t, err)
@@ -717,9 +713,9 @@ func TestLock(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 1,
+			RequestID: 1,
 		},
 	})
 	assert.NoError(t, err)
@@ -731,9 +727,9 @@ func TestLock(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 1,
+			RequestID: 1,
 		},
 		Version: version,
 	})
@@ -746,9 +742,9 @@ func TestLock(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 1,
+			RequestID: 1,
 		},
 		Version: version + 1,
 	})
@@ -762,9 +758,9 @@ func TestLock(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 2,
+			RequestID: 2,
 		},
 		Version: version + 1,
 	})
@@ -778,9 +774,9 @@ func TestLock(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 3,
+			RequestID: 3,
 		},
 		Version: version,
 	})
@@ -794,9 +790,9 @@ func TestLock(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 4,
+			RequestID: 4,
 		},
 		Version: version,
 	})
@@ -810,9 +806,9 @@ func TestLock(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 5,
+			RequestID: 5,
 		},
 	})
 	assert.NoError(t, err)
@@ -828,9 +824,9 @@ func TestLock(t *testing.T) {
 					Name:      "test",
 					Namespace: "test",
 				},
-				SessionId: sessionID,
+				SessionID: sessionID,
 				Index:     index,
-				RequestId: 6,
+				RequestID: 6,
 			},
 		})
 		assert.NoError(t, err)
@@ -845,9 +841,9 @@ func TestLock(t *testing.T) {
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 7,
+			RequestID: 7,
 		},
 		Version: version,
 	})
@@ -864,27 +860,26 @@ func TestLock(t *testing.T) {
 					Name:      "test",
 					Namespace: "test",
 				},
-				SessionId: sessionID,
+				SessionID: sessionID,
 				Index:     index,
-				RequestId: 9,
+				RequestID: 9,
 			},
 		})
 		assert.NoError(t, err)
 	}()
 
+	timeout = 10 * time.Millisecond
 	lockResponse, err = client.Lock(context.TODO(), &lock.LockRequest{
 		Header: &headers.RequestHeader{
 			Name: &primitive.Name{
 				Name:      "test",
 				Namespace: "test",
 			},
-			SessionId: sessionID,
+			SessionID: sessionID,
 			Index:     index,
-			RequestId: 8,
+			RequestID: 8,
 		},
-		Timeout: &duration.Duration{
-			Nanos: 1000,
-		},
+		Timeout: &timeout,
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(0), lockResponse.Version)

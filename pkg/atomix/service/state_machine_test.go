@@ -16,8 +16,8 @@ func TestPrimitiveStateMachine(t *testing.T) {
 	out := <-ch
 	assert.True(t, out.Succeeded())
 	openSessionResponse := getOpenSessionResponse(t, out.Value)
-	assert.NotEqual(t, 0, openSessionResponse.SessionId)
-	sessionID := openSessionResponse.SessionId
+	assert.NotEqual(t, 0, openSessionResponse.SessionID)
+	sessionID := openSessionResponse.SessionID
 
 	ch = make(chan Output)
 	bytes, err := proto.Marshal(&SetRequest{
@@ -44,10 +44,11 @@ func TestPrimitiveStateMachine(t *testing.T) {
 }
 
 func newOpenSessionRequest(t *testing.T) []byte {
+	timeout := 30 * time.Second
 	bytes, err := proto.Marshal(&SessionRequest{
 		Request: &SessionRequest_OpenSession{
 			OpenSession: &OpenSessionRequest{
-				Timeout: int64(30 * time.Second),
+				Timeout: &timeout,
 			},
 		},
 	})
@@ -67,7 +68,7 @@ func newKeepAliveRequest(t *testing.T, sessionID uint64, commandID uint64, strea
 	bytes, err := proto.Marshal(&SessionRequest{
 		Request: &SessionRequest_KeepAlive{
 			KeepAlive: &KeepAliveRequest{
-				SessionId:       sessionID,
+				SessionID:       sessionID,
 				CommandSequence: commandID,
 				Streams:         streams,
 			},
@@ -81,7 +82,7 @@ func newCloseSessionRequest(t *testing.T, sessionID uint64) []byte {
 	bytes, err := proto.Marshal(&SessionRequest{
 		Request: &SessionRequest_CloseSession{
 			CloseSession: &CloseSessionRequest{
-				SessionId: sessionID,
+				SessionID: sessionID,
 			},
 		},
 	})
@@ -94,7 +95,7 @@ func newCommandRequest(t *testing.T, sessionID uint64, commandID uint64, name st
 		Request: &SessionRequest_Command{
 			Command: &SessionCommandRequest{
 				Context: &SessionCommandContext{
-					SessionId:      sessionID,
+					SessionID:      sessionID,
 					SequenceNumber: commandID,
 				},
 				Name:  name,
@@ -119,7 +120,7 @@ func newQueryRequest(t *testing.T, sessionID uint64, lastIndex uint64, lastComma
 		Request: &SessionRequest_Query{
 			Query: &SessionQueryRequest{
 				Context: &SessionQueryContext{
-					SessionId:          sessionID,
+					SessionID:          sessionID,
 					LastIndex:          lastIndex,
 					LastSequenceNumber: lastCommandID,
 				},

@@ -72,9 +72,9 @@ func (s *SessionizedService) snapshotSessions(writer io.Writer) error {
 			element = element.Next()
 		}
 		sessions = append(sessions, &SessionSnapshot{
-			SessionId:       session.ID,
-			Timeout:         uint64(session.Timeout),
-			Timestamp:       uint64(session.LastUpdated.UnixNano()),
+			SessionID:       session.ID,
+			Timeout:         session.Timeout,
+			Timestamp:       session.LastUpdated,
 			CommandSequence: session.commandSequence,
 			Streams:         streams,
 		})
@@ -162,10 +162,10 @@ func (s *SessionizedService) installSessions(reader io.Reader) error {
 			}
 			streams.PushBack(s)
 		}
-		s.sessions[session.SessionId] = &Session{
-			ID:              session.SessionId,
+		s.sessions[session.SessionID] = &Session{
+			ID:              session.SessionID,
 			Timeout:         time.Duration(session.Timeout),
-			LastUpdated:     time.Unix(0, int64(session.Timestamp)),
+			LastUpdated:     session.Timestamp,
 			commandSequence: session.CommandSequence,
 			streams:         streams,
 		}
@@ -233,10 +233,10 @@ func (s *SessionizedService) Command(bytes []byte, ch chan<- Output) {
 }
 
 func (s *SessionizedService) applyCommand(request *SessionCommandRequest, ch chan<- Output) {
-	session, ok := s.sessions[request.Context.SessionId]
+	session, ok := s.sessions[request.Context.SessionID]
 	if !ok {
 		if ch != nil {
-			ch <- newFailure(errors.New(fmt.Sprintf("unknown session %d", request.Context.SessionId)))
+			ch <- newFailure(errors.New(fmt.Sprintf("unknown session %d", request.Context.SessionID)))
 		}
 	} else {
 		sequenceNumber := request.Context.SequenceNumber
@@ -262,10 +262,10 @@ func (s *SessionizedService) applyCommand(request *SessionCommandRequest, ch cha
 }
 
 func (s *SessionizedService) applySessionCommand(request *SessionCommandRequest, ch chan<- Output) {
-	session, ok := s.sessions[request.Context.SessionId]
+	session, ok := s.sessions[request.Context.SessionID]
 	if !ok {
 		if ch != nil {
-			ch <- newFailure(errors.New(fmt.Sprintf("unknown session %d", request.Context.SessionId)))
+			ch <- newFailure(errors.New(fmt.Sprintf("unknown session %d", request.Context.SessionID)))
 		}
 	} else {
 		s.session = session
@@ -280,14 +280,14 @@ func (s *SessionizedService) applySessionCommand(request *SessionCommandRequest,
 }
 
 func (s *SessionizedService) applyOpenSession(request *OpenSessionRequest, ch chan<- Output) {
-	session := newSession(s.Context, time.Duration(request.Timeout))
+	session := newSession(s.Context, request.Timeout)
 	s.sessions[session.ID] = session
 	s.OnOpen(session)
 	if ch != nil {
 		ch <- newOutput(proto.Marshal(&SessionResponse{
 			Response: &SessionResponse_OpenSession{
 				OpenSession: &OpenSessionResponse{
-					SessionId: session.ID,
+					SessionID: session.ID,
 				},
 			},
 		}))
@@ -296,10 +296,10 @@ func (s *SessionizedService) applyOpenSession(request *OpenSessionRequest, ch ch
 
 // applyKeepAlive applies a KeepAliveRequest to the service
 func (s *SessionizedService) applyKeepAlive(request *KeepAliveRequest, ch chan<- Output) {
-	session, ok := s.sessions[request.SessionId]
+	session, ok := s.sessions[request.SessionID]
 	if !ok {
 		if ch != nil {
-			ch <- newFailure(errors.New(fmt.Sprintf("unknown session %d", request.SessionId)))
+			ch <- newFailure(errors.New(fmt.Sprintf("unknown session %d", request.SessionID)))
 		}
 	} else {
 		// Update the session's last updated timestamp to prevent it from expiring
@@ -334,10 +334,10 @@ func (s *SessionizedService) expireSessions() {
 }
 
 func (s *SessionizedService) applyCloseSession(request *CloseSessionRequest, ch chan<- Output) {
-	session, ok := s.sessions[request.SessionId]
+	session, ok := s.sessions[request.SessionID]
 	if !ok {
 		if ch != nil {
-			ch <- newFailure(errors.New(fmt.Sprintf("unknown session %d", request.SessionId)))
+			ch <- newFailure(errors.New(fmt.Sprintf("unknown session %d", request.SessionID)))
 		}
 	} else {
 		// Close the session and notify the service.
@@ -376,10 +376,10 @@ func (s *SessionizedService) Query(bytes []byte, ch chan<- Output) {
 }
 
 func (s *SessionizedService) sequenceQuery(query *SessionQueryRequest, ch chan<- Output) {
-	session, ok := s.sessions[query.Context.SessionId]
+	session, ok := s.sessions[query.Context.SessionID]
 	if !ok {
 		if ch != nil {
-			ch <- newFailure(errors.New(fmt.Sprintf("unknown session %d", query.Context.SessionId)))
+			ch <- newFailure(errors.New(fmt.Sprintf("unknown session %d", query.Context.SessionID)))
 		}
 	} else {
 		sequenceNumber := query.Context.LastSequenceNumber
@@ -439,10 +439,14 @@ func (s *SessionizedService) OnClose(session *Session) {
 
 }
 
-func newSession(ctx Context, timeout time.Duration) *Session {
+func newSession(ctx Context, timeout *time.Duration) *Session {
+	if timeout == nil {
+		defaultTimeout := 30 * time.Second
+		timeout = &defaultTimeout
+	}
 	return &Session{
 		ID:               ctx.Index(),
-		Timeout:          timeout,
+		Timeout:          *timeout,
 		LastUpdated:      ctx.Timestamp(),
 		ctx:              ctx,
 		commandCallbacks: make(map[uint64]func()),
@@ -651,7 +655,7 @@ func (s *sessionStream) process() {
 					Response: &SessionResponse_Command{
 						Command: &SessionCommandResponse{
 							Context: &SessionResponseContext{
-								StreamId: s.ID,
+								StreamID: s.ID,
 								Index:    inResult.Index,
 								Sequence: s.eventID,
 							},

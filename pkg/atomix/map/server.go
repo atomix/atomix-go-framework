@@ -2,20 +2,20 @@ package _map
 
 import (
 	"context"
+	"github.com/atomix/atomix-api/proto/atomix/headers"
+	api "github.com/atomix/atomix-api/proto/atomix/map"
 	"github.com/atomix/atomix-go-node/pkg/atomix/server"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
-	"github.com/atomix/atomix-go-node/proto/atomix/headers"
-	pb "github.com/atomix/atomix-go-node/proto/atomix/map"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
 func RegisterMapServer(server *grpc.Server, client service.Client) {
-	pb.RegisterMapServiceServer(server, NewMapServiceServer(client))
+	api.RegisterMapServiceServer(server, NewMapServiceServer(client))
 }
 
-func NewMapServiceServer(client service.Client) pb.MapServiceServer {
+func NewMapServiceServer(client service.Client) api.MapServiceServer {
 	return &mapServer{
 		SessionizedServer: &server.SessionizedServer{
 			Type:   "map",
@@ -26,19 +26,19 @@ func NewMapServiceServer(client service.Client) pb.MapServiceServer {
 
 // mapServer is an implementation of MapServiceServer for the map primitive
 type mapServer struct {
-	pb.MapServiceServer
+	api.MapServiceServer
 	*server.SessionizedServer
 }
 
-func (m *mapServer) Create(ctx context.Context, request *pb.CreateRequest) (*pb.CreateResponse, error) {
+func (m *mapServer) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
 	session, err := m.OpenSession(ctx, request.Header, request.Timeout)
 	if err != nil {
 		return nil, err
 	}
-	response := &pb.CreateResponse{
+	response := &api.CreateResponse{
 		Header: &headers.ResponseHeader{
-			SessionId: session,
+			SessionID: session,
 			Index:     session,
 		},
 	}
@@ -46,35 +46,35 @@ func (m *mapServer) Create(ctx context.Context, request *pb.CreateRequest) (*pb.
 	return response, nil
 }
 
-func (m *mapServer) KeepAlive(ctx context.Context, request *pb.KeepAliveRequest) (*pb.KeepAliveResponse, error) {
+func (m *mapServer) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
 	log.Tracef("Received KeepAliveRequest %+v", request)
 	if err := m.KeepAliveSession(ctx, request.Header); err != nil {
 		return nil, err
 	}
-	response := &pb.KeepAliveResponse{
+	response := &api.KeepAliveResponse{
 		Header: &headers.ResponseHeader{
-			SessionId: request.Header.SessionId,
+			SessionID: request.Header.SessionID,
 		},
 	}
 	log.Tracef("Sending KeepAliveResponse %+v", response)
 	return response, nil
 }
 
-func (m *mapServer) Close(ctx context.Context, request *pb.CloseRequest) (*pb.CloseResponse, error) {
+func (m *mapServer) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if err := m.CloseSession(ctx, request.Header); err != nil {
 		return nil, err
 	}
-	response := &pb.CloseResponse{
+	response := &api.CloseResponse{
 		Header: &headers.ResponseHeader{
-			SessionId: request.Header.SessionId,
+			SessionID: request.Header.SessionID,
 		},
 	}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil
 }
 
-func (m *mapServer) Size(ctx context.Context, request *pb.SizeRequest) (*pb.SizeResponse, error) {
+func (m *mapServer) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeResponse, error) {
 	log.Tracef("Received SizeRequest %+v", request)
 	in, err := proto.Marshal(&SizeRequest{})
 	if err != nil {
@@ -91,15 +91,15 @@ func (m *mapServer) Size(ctx context.Context, request *pb.SizeRequest) (*pb.Size
 		return nil, err
 	}
 
-	response := &pb.SizeResponse{
+	response := &api.SizeResponse{
 		Header: header,
-		Size:   sizeResponse.Size,
+		Size_:  sizeResponse.Size_,
 	}
 	log.Tracef("Sending SizeResponse %+v", response)
 	return response, nil
 }
 
-func (m *mapServer) Exists(ctx context.Context, request *pb.ExistsRequest) (*pb.ExistsResponse, error) {
+func (m *mapServer) Exists(ctx context.Context, request *api.ExistsRequest) (*api.ExistsResponse, error) {
 	log.Tracef("Received ExistsRequest %+v", request)
 	in, err := proto.Marshal(&ContainsKeyRequest{
 		Key: request.Key,
@@ -118,7 +118,7 @@ func (m *mapServer) Exists(ctx context.Context, request *pb.ExistsRequest) (*pb.
 		return nil, err
 	}
 
-	response := &pb.ExistsResponse{
+	response := &api.ExistsResponse{
 		Header:      header,
 		ContainsKey: containsResponse.ContainsKey,
 	}
@@ -126,13 +126,13 @@ func (m *mapServer) Exists(ctx context.Context, request *pb.ExistsRequest) (*pb.
 	return response, nil
 }
 
-func (m *mapServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutResponse, error) {
+func (m *mapServer) Put(ctx context.Context, request *api.PutRequest) (*api.PutResponse, error) {
 	log.Tracef("Received PutRequest %+v", request)
 	in, err := proto.Marshal(&PutRequest{
 		Key:     request.Key,
 		Value:   request.Value,
 		Version: uint64(request.Version),
-		Ttl:     request.Ttl,
+		TTL:     request.TTL,
 		IfEmpty: request.Version == -1,
 	})
 	if err != nil {
@@ -149,7 +149,7 @@ func (m *mapServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRes
 		return nil, err
 	}
 
-	response := &pb.PutResponse{
+	response := &api.PutResponse{
 		Header:          header,
 		Status:          getResponseStatus(putResponse.Status),
 		PreviousValue:   putResponse.PreviousValue,
@@ -159,14 +159,14 @@ func (m *mapServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRes
 	return response, nil
 }
 
-func (m *mapServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*pb.ReplaceResponse, error) {
+func (m *mapServer) Replace(ctx context.Context, request *api.ReplaceRequest) (*api.ReplaceResponse, error) {
 	log.Tracef("Received ReplaceRequest %+v", request)
 	in, err := proto.Marshal(&ReplaceRequest{
 		Key:             request.Key,
 		PreviousValue:   request.PreviousValue,
 		PreviousVersion: uint64(request.PreviousVersion),
 		NewValue:        request.NewValue,
-		Ttl:             request.Ttl,
+		TTL:             request.TTL,
 	})
 	if err != nil {
 		return nil, err
@@ -182,7 +182,7 @@ func (m *mapServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*p
 		return nil, err
 	}
 
-	response := &pb.ReplaceResponse{
+	response := &api.ReplaceResponse{
 		Header:          header,
 		Status:          getResponseStatus(serviceResponse.Status),
 		PreviousValue:   serviceResponse.PreviousValue,
@@ -192,7 +192,7 @@ func (m *mapServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*p
 	return response, nil
 }
 
-func (m *mapServer) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetResponse, error) {
+func (m *mapServer) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
 	log.Tracef("Received GetRequest %+v", request)
 	in, err := proto.Marshal(&GetRequest{
 		Key: request.Key,
@@ -211,7 +211,7 @@ func (m *mapServer) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetRes
 		return nil, err
 	}
 
-	response := &pb.GetResponse{
+	response := &api.GetResponse{
 		Header:  header,
 		Value:   serviceResponse.Value,
 		Version: int64(serviceResponse.Version),
@@ -220,7 +220,7 @@ func (m *mapServer) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetRes
 	return response, nil
 }
 
-func (m *mapServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb.RemoveResponse, error) {
+func (m *mapServer) Remove(ctx context.Context, request *api.RemoveRequest) (*api.RemoveResponse, error) {
 	log.Tracef("Received RemoveRequest %+v", request)
 	in, err := proto.Marshal(&RemoveRequest{
 		Key:     request.Key,
@@ -241,7 +241,7 @@ func (m *mapServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb.
 		return nil, err
 	}
 
-	response := &pb.RemoveResponse{
+	response := &api.RemoveResponse{
 		Header:          header,
 		Status:          getResponseStatus(serviceResponse.Status),
 		PreviousValue:   serviceResponse.PreviousValue,
@@ -251,7 +251,7 @@ func (m *mapServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb.
 	return response, nil
 }
 
-func (m *mapServer) Clear(ctx context.Context, request *pb.ClearRequest) (*pb.ClearResponse, error) {
+func (m *mapServer) Clear(ctx context.Context, request *api.ClearRequest) (*api.ClearResponse, error) {
 	log.Tracef("Received ClearRequest %+v", request)
 	in, err := proto.Marshal(&ClearRequest{})
 	if err != nil {
@@ -268,14 +268,14 @@ func (m *mapServer) Clear(ctx context.Context, request *pb.ClearRequest) (*pb.Cl
 		return nil, err
 	}
 
-	response := &pb.ClearResponse{
+	response := &api.ClearResponse{
 		Header: header,
 	}
 	log.Tracef("Sending ClearResponse %+v", response)
 	return response, nil
 }
 
-func (m *mapServer) Events(request *pb.EventRequest, srv pb.MapService_EventsServer) error {
+func (m *mapServer) Events(request *api.EventRequest, srv api.MapService_EventsServer) error {
 	log.Tracef("Received EventRequest %+v", request)
 	in, err := proto.Marshal(&ListenRequest{
 		Replay: request.Replay,
@@ -296,7 +296,7 @@ func (m *mapServer) Events(request *pb.EventRequest, srv pb.MapService_EventsSer
 				if err = proto.Unmarshal(result.Value, response); err != nil {
 					return err
 				} else {
-					eventResponse := &pb.EventResponse{
+					eventResponse := &api.EventResponse{
 						Header:     result.Header,
 						Type:       getEventType(response.Type),
 						Key:        response.Key,
@@ -315,7 +315,7 @@ func (m *mapServer) Events(request *pb.EventRequest, srv pb.MapService_EventsSer
 	return nil
 }
 
-func (m *mapServer) Entries(request *pb.EntriesRequest, srv pb.MapService_EntriesServer) error {
+func (m *mapServer) Entries(request *api.EntriesRequest, srv api.MapService_EntriesServer) error {
 	log.Tracef("Received EntriesRequest %+v", request)
 	in, err := proto.Marshal(&EntriesRequest{})
 	if err != nil {
@@ -334,7 +334,7 @@ func (m *mapServer) Entries(request *pb.EntriesRequest, srv pb.MapService_Entrie
 				if err = proto.Unmarshal(result.Value, response); err != nil {
 					srv.Context().Done()
 				} else {
-					entriesResponse := &pb.EntriesResponse{
+					entriesResponse := &api.EntriesResponse{
 						Header:  result.Header,
 						Key:     response.Key,
 						Value:   response.Value,
@@ -350,30 +350,30 @@ func (m *mapServer) Entries(request *pb.EntriesRequest, srv pb.MapService_Entrie
 	return nil
 }
 
-func getResponseStatus(status UpdateStatus) pb.ResponseStatus {
+func getResponseStatus(status UpdateStatus) api.ResponseStatus {
 	switch status {
 	case UpdateStatus_OK:
-		return pb.ResponseStatus_OK
+		return api.ResponseStatus_OK
 	case UpdateStatus_NOOP:
-		return pb.ResponseStatus_NOOP
+		return api.ResponseStatus_NOOP
 	case UpdateStatus_PRECONDITION_FAILED:
-		return pb.ResponseStatus_PRECONDITION_FAILED
+		return api.ResponseStatus_PRECONDITION_FAILED
 	case UpdateStatus_WRITE_LOCK:
-		return pb.ResponseStatus_WRITE_LOCK
+		return api.ResponseStatus_WRITE_LOCK
 	}
-	return pb.ResponseStatus_OK
+	return api.ResponseStatus_OK
 }
 
-func getEventType(eventType ListenResponse_Type) pb.EventResponse_Type {
+func getEventType(eventType ListenResponse_Type) api.EventResponse_Type {
 	switch eventType {
 	case ListenResponse_NONE:
-		return pb.EventResponse_NONE
+		return api.EventResponse_NONE
 	case ListenResponse_INSERTED:
-		return pb.EventResponse_INSERTED
+		return api.EventResponse_INSERTED
 	case ListenResponse_UPDATED:
-		return pb.EventResponse_UPDATED
+		return api.EventResponse_UPDATED
 	case ListenResponse_REMOVED:
-		return pb.EventResponse_REMOVED
+		return api.EventResponse_REMOVED
 	}
-	return pb.EventResponse_UPDATED
+	return api.EventResponse_UPDATED
 }

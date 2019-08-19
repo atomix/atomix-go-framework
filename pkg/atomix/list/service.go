@@ -60,7 +60,7 @@ func (l *ListService) Restore(bytes []byte) error {
 func (l *ListService) Size(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 	ch <- l.NewResult(proto.Marshal(&SizeResponse{
-		Size: int32(len(l.values)),
+		Size_: int32(len(l.values)),
 	}))
 }
 

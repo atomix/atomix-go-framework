@@ -2,20 +2,20 @@ package list
 
 import (
 	"context"
+	"github.com/atomix/atomix-api/proto/atomix/headers"
+	api "github.com/atomix/atomix-api/proto/atomix/list"
 	"github.com/atomix/atomix-go-node/pkg/atomix/server"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
-	"github.com/atomix/atomix-go-node/proto/atomix/headers"
-	pb "github.com/atomix/atomix-go-node/proto/atomix/list"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
 func RegisterListServer(server *grpc.Server, client service.Client) {
-	pb.RegisterListServiceServer(server, NewListServiceServer(client))
+	api.RegisterListServiceServer(server, NewListServiceServer(client))
 }
 
-func NewListServiceServer(client service.Client) pb.ListServiceServer {
+func NewListServiceServer(client service.Client) api.ListServiceServer {
 	return &listServer{
 		SessionizedServer: &server.SessionizedServer{
 			Type:   "list",
@@ -29,15 +29,15 @@ type listServer struct {
 	*server.SessionizedServer
 }
 
-func (s *listServer) Create(ctx context.Context, request *pb.CreateRequest) (*pb.CreateResponse, error) {
+func (s *listServer) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
 	session, err := s.OpenSession(ctx, request.Header, request.Timeout)
 	if err != nil {
 		return nil, err
 	}
-	response := &pb.CreateResponse{
+	response := &api.CreateResponse{
 		Header: &headers.ResponseHeader{
-			SessionId: session,
+			SessionID: session,
 			Index:     session,
 		},
 	}
@@ -45,35 +45,35 @@ func (s *listServer) Create(ctx context.Context, request *pb.CreateRequest) (*pb
 	return response, nil
 }
 
-func (s *listServer) KeepAlive(ctx context.Context, request *pb.KeepAliveRequest) (*pb.KeepAliveResponse, error) {
+func (s *listServer) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
 	log.Tracef("Received KeepAliveRequest %+v", request)
 	if err := s.KeepAliveSession(ctx, request.Header); err != nil {
 		return nil, err
 	}
-	response := &pb.KeepAliveResponse{
+	response := &api.KeepAliveResponse{
 		Header: &headers.ResponseHeader{
-			SessionId: request.Header.SessionId,
+			SessionID: request.Header.SessionID,
 		},
 	}
 	log.Tracef("Sending KeepAliveResponse %+v", response)
 	return response, nil
 }
 
-func (s *listServer) Close(ctx context.Context, request *pb.CloseRequest) (*pb.CloseResponse, error) {
+func (s *listServer) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if err := s.CloseSession(ctx, request.Header); err != nil {
 		return nil, err
 	}
-	response := &pb.CloseResponse{
+	response := &api.CloseResponse{
 		Header: &headers.ResponseHeader{
-			SessionId: request.Header.SessionId,
+			SessionID: request.Header.SessionID,
 		},
 	}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil
 }
 
-func (s *listServer) Size(ctx context.Context, request *pb.SizeRequest) (*pb.SizeResponse, error) {
+func (s *listServer) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeResponse, error) {
 	log.Tracef("Received SizeRequest %+v", request)
 	in, err := proto.Marshal(&SizeRequest{})
 	if err != nil {
@@ -90,15 +90,15 @@ func (s *listServer) Size(ctx context.Context, request *pb.SizeRequest) (*pb.Siz
 		return nil, err
 	}
 
-	response := &pb.SizeResponse{
+	response := &api.SizeResponse{
 		Header: header,
-		Size:   sizeResponse.Size,
+		Size_:  sizeResponse.Size_,
 	}
 	log.Tracef("Sending SizeResponse %+v", response)
 	return response, nil
 }
 
-func (s *listServer) Contains(ctx context.Context, request *pb.ContainsRequest) (*pb.ContainsResponse, error) {
+func (s *listServer) Contains(ctx context.Context, request *api.ContainsRequest) (*api.ContainsResponse, error) {
 	log.Tracef("Received ContainsRequest %+v", request)
 	in, err := proto.Marshal(&ContainsRequest{
 		Value: request.Value,
@@ -117,7 +117,7 @@ func (s *listServer) Contains(ctx context.Context, request *pb.ContainsRequest) 
 		return nil, err
 	}
 
-	response := &pb.ContainsResponse{
+	response := &api.ContainsResponse{
 		Header:   header,
 		Contains: containsResponse.Contains,
 	}
@@ -125,7 +125,7 @@ func (s *listServer) Contains(ctx context.Context, request *pb.ContainsRequest) 
 	return response, nil
 }
 
-func (s *listServer) Append(ctx context.Context, request *pb.AppendRequest) (*pb.AppendResponse, error) {
+func (s *listServer) Append(ctx context.Context, request *api.AppendRequest) (*api.AppendResponse, error) {
 	log.Tracef("Received AppendRequest %+v", request)
 	in, err := proto.Marshal(&AppendRequest{
 		Value: request.Value,
@@ -144,7 +144,7 @@ func (s *listServer) Append(ctx context.Context, request *pb.AppendRequest) (*pb
 		return nil, err
 	}
 
-	response := &pb.AppendResponse{
+	response := &api.AppendResponse{
 		Header: header,
 		Status: getResponseStatus(appendResponse.Status),
 	}
@@ -152,7 +152,7 @@ func (s *listServer) Append(ctx context.Context, request *pb.AppendRequest) (*pb
 	return response, nil
 }
 
-func (s *listServer) Insert(ctx context.Context, request *pb.InsertRequest) (*pb.InsertResponse, error) {
+func (s *listServer) Insert(ctx context.Context, request *api.InsertRequest) (*api.InsertResponse, error) {
 	log.Tracef("Received InsertRequest %+v", request)
 	in, err := proto.Marshal(&InsertRequest{
 		Value: request.Value,
@@ -171,7 +171,7 @@ func (s *listServer) Insert(ctx context.Context, request *pb.InsertRequest) (*pb
 		return nil, err
 	}
 
-	response := &pb.InsertResponse{
+	response := &api.InsertResponse{
 		Header: header,
 		Status: getResponseStatus(insertResponse.Status),
 	}
@@ -179,7 +179,7 @@ func (s *listServer) Insert(ctx context.Context, request *pb.InsertRequest) (*pb
 	return response, nil
 }
 
-func (s *listServer) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetResponse, error) {
+func (s *listServer) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
 	log.Tracef("Received GetRequest %+v", request)
 	in, err := proto.Marshal(&GetRequest{
 		Index: request.Index,
@@ -198,7 +198,7 @@ func (s *listServer) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetRe
 		return nil, err
 	}
 
-	response := &pb.GetResponse{
+	response := &api.GetResponse{
 		Header: header,
 		Status: getResponseStatus(getResponse.Status),
 		Value:  getResponse.Value,
@@ -207,7 +207,7 @@ func (s *listServer) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetRe
 	return response, nil
 }
 
-func (s *listServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb.RemoveResponse, error) {
+func (s *listServer) Remove(ctx context.Context, request *api.RemoveRequest) (*api.RemoveResponse, error) {
 	log.Tracef("Received RemoveRequest %+v", request)
 	in, err := proto.Marshal(&RemoveRequest{
 		Index: request.Index,
@@ -226,7 +226,7 @@ func (s *listServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb
 		return nil, err
 	}
 
-	response := &pb.RemoveResponse{
+	response := &api.RemoveResponse{
 		Header: header,
 		Status: getResponseStatus(removeResponse.Status),
 		Value:  removeResponse.Value,
@@ -235,7 +235,7 @@ func (s *listServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb
 	return response, nil
 }
 
-func (s *listServer) Clear(ctx context.Context, request *pb.ClearRequest) (*pb.ClearResponse, error) {
+func (s *listServer) Clear(ctx context.Context, request *api.ClearRequest) (*api.ClearResponse, error) {
 	log.Tracef("Received ClearRequest %+v", request)
 	in, err := proto.Marshal(&ClearRequest{})
 	if err != nil {
@@ -252,14 +252,14 @@ func (s *listServer) Clear(ctx context.Context, request *pb.ClearRequest) (*pb.C
 		return nil, err
 	}
 
-	response := &pb.ClearResponse{
+	response := &api.ClearResponse{
 		Header: header,
 	}
 	log.Tracef("Sending ClearResponse %+v", response)
 	return response, nil
 }
 
-func (s *listServer) Events(request *pb.EventRequest, srv pb.ListService_EventsServer) error {
+func (s *listServer) Events(request *api.EventRequest, srv api.ListService_EventsServer) error {
 	log.Tracef("Received EventRequest %+v", request)
 	in, err := proto.Marshal(&ListenRequest{
 		Replay: request.Replay,
@@ -280,7 +280,7 @@ func (s *listServer) Events(request *pb.EventRequest, srv pb.ListService_EventsS
 				if err = proto.Unmarshal(result.Value, response); err != nil {
 					return err
 				} else {
-					eventResponse := &pb.EventResponse{
+					eventResponse := &api.EventResponse{
 						Header: result.Header,
 						Type:   getEventType(response.Type),
 						Value:  response.Value,
@@ -295,7 +295,7 @@ func (s *listServer) Events(request *pb.EventRequest, srv pb.ListService_EventsS
 	return nil
 }
 
-func (s *listServer) Iterate(request *pb.IterateRequest, srv pb.ListService_IterateServer) error {
+func (s *listServer) Iterate(request *api.IterateRequest, srv api.ListService_IterateServer) error {
 	log.Tracef("Received IterateRequest %+v", request)
 	in, err := proto.Marshal(&IterateRequest{})
 	if err != nil {
@@ -314,7 +314,7 @@ func (s *listServer) Iterate(request *pb.IterateRequest, srv pb.ListService_Iter
 				if err = proto.Unmarshal(result.Value, response); err != nil {
 					srv.Context().Done()
 				} else {
-					iterateResponse := &pb.IterateResponse{
+					iterateResponse := &api.IterateResponse{
 						Header: result.Header,
 						Value:  response.Value,
 					}
@@ -328,26 +328,26 @@ func (s *listServer) Iterate(request *pb.IterateRequest, srv pb.ListService_Iter
 	return nil
 }
 
-func getResponseStatus(status ResponseStatus) pb.ResponseStatus {
+func getResponseStatus(status ResponseStatus) api.ResponseStatus {
 	switch status {
 	case ResponseStatus_OK:
-		return pb.ResponseStatus_OK
+		return api.ResponseStatus_OK
 	case ResponseStatus_NOOP:
-		return pb.ResponseStatus_NOOP
+		return api.ResponseStatus_NOOP
 	case ResponseStatus_WRITE_LOCK:
-		return pb.ResponseStatus_WRITE_LOCK
+		return api.ResponseStatus_WRITE_LOCK
 	}
-	return pb.ResponseStatus_OK
+	return api.ResponseStatus_OK
 }
 
-func getEventType(eventType ListenResponse_Type) pb.EventResponse_Type {
+func getEventType(eventType ListenResponse_Type) api.EventResponse_Type {
 	switch eventType {
 	case ListenResponse_NONE:
-		return pb.EventResponse_NONE
+		return api.EventResponse_NONE
 	case ListenResponse_ADDED:
-		return pb.EventResponse_ADDED
+		return api.EventResponse_ADDED
 	case ListenResponse_REMOVED:
-		return pb.EventResponse_REMOVED
+		return api.EventResponse_REMOVED
 	}
 	return 0
 }
