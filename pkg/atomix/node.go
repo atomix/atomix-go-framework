@@ -53,8 +53,8 @@ func (o *defaultOption) apply(node *Node) {
 	node.listener = tcpListener{}
 }
 
-// withLocal sets the node to local mode for testing
-func withLocal(lis net.Listener) NodeOption {
+// WithLocal sets the node to local mode for testing
+func WithLocal(lis net.Listener) NodeOption {
 	return &localOption{lis}
 }
 
