@@ -30,7 +30,8 @@ func (s *primitiveServer) GetPrimitives(ctx context.Context, request *api.GetPri
 	in, err := proto.Marshal(&service.ServiceRequest{
 		Request: &service.ServiceRequest_Metadata{
 			Metadata: &service.MetadataRequest{
-				Type: request.Type,
+				Type:      request.Type,
+				Namespace: request.Namespace,
 			},
 		},
 	})

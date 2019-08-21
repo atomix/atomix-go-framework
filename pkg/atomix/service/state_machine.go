@@ -97,8 +97,8 @@ func (s *primitiveStateMachine) Snapshot(writer io.Writer) error {
 	for id, service := range s.services {
 		serviceId := &ServiceId{
 			Type:      service.Type,
-			Name:      strings.Split(id, ":")[0],
-			Namespace: strings.Split(id, ":")[1],
+			Name:      getServiceName(id),
+			Namespace: getServiceNamespace(id),
 		}
 		bytes, err := proto.Marshal(serviceId)
 		if err != nil {
@@ -134,7 +134,7 @@ func (s *primitiveStateMachine) Install(reader io.Reader) error {
 			return err
 		}
 		service := s.registry.types[serviceId.Type](s.ctx)
-		s.services[getServiceName(serviceId)] = newServiceStateMachine(serviceId.Type, service)
+		s.services[getQualifiedServiceName(serviceId)] = newServiceStateMachine(serviceId.Type, service)
 
 		n, err = reader.Read(lengthBytes)
 		if err != nil {
@@ -155,7 +155,7 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 		switch r := request.Request.(type) {
 		case *ServiceRequest_Command:
 			// If the service doesn't exist, create it.
-			service, ok := s.services[getServiceName(request.Id)]
+			service, ok := s.services[getQualifiedServiceName(request.Id)]
 			if !ok {
 				serviceType := s.registry.getType(request.Id.Type)
 				if serviceType == nil {
@@ -165,7 +165,7 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 					}
 				} else {
 					service = newServiceStateMachine(request.Id.Type, serviceType(s.ctx))
-					s.services[getServiceName(request.Id)] = service
+					s.services[getQualifiedServiceName(request.Id)] = service
 				}
 			}
 
@@ -194,7 +194,7 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 			// Execute the command on the service
 			service.Command(r.Command, serviceCh)
 		case *ServiceRequest_Create:
-			_, ok := s.services[getServiceName(request.Id)]
+			_, ok := s.services[getQualifiedServiceName(request.Id)]
 			if !ok {
 				serviceType := s.registry.getType(request.Id.Type)
 				if serviceType == nil {
@@ -203,7 +203,7 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 					}
 				} else {
 					service := serviceType(s.ctx)
-					s.services[getServiceName(request.Id)] = newServiceStateMachine(request.Id.Type, service)
+					s.services[getQualifiedServiceName(request.Id)] = newServiceStateMachine(request.Id.Type, service)
 
 					if ch != nil {
 						ch <- newOutput(proto.Marshal(&ServiceResponse{
@@ -223,7 +223,7 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 				}
 			}
 		case *ServiceRequest_Delete:
-			delete(s.services, getServiceName(request.Id))
+			delete(s.services, getQualifiedServiceName(request.Id))
 
 			if ch != nil {
 				ch <- newOutput(proto.Marshal(&ServiceResponse{
@@ -236,10 +236,6 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 	}
 }
 
-func getServiceName(id *ServiceId) string {
-	return id.Name + "." + id.Namespace
-}
-
 func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
 	request := &ServiceRequest{}
 	err := proto.Unmarshal(bytes, request)
@@ -250,10 +246,10 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
 	} else {
 		switch r := request.Request.(type) {
 		case *ServiceRequest_Query:
-			service, ok := s.services[getServiceName(request.Id)]
+			service, ok := s.services[getQualifiedServiceName(request.Id)]
 			if !ok {
 				if ch != nil {
-					ch <- newFailure(errors.New(fmt.Sprintf("unknown service %s", getServiceName(request.Id))))
+					ch <- newFailure(errors.New(fmt.Sprintf("unknown service %s", getQualifiedServiceName(request.Id))))
 				}
 			} else {
 				// Create a channel for the raw service results
@@ -284,11 +280,12 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
 		case *ServiceRequest_Metadata:
 			services := make([]*ServiceId, 0, len(s.services))
 			for id, service := range s.services {
-				if r.Metadata.Type == "" || service.Type == r.Metadata.Type {
+				namespace := getServiceNamespace(id)
+				if (r.Metadata.Namespace == "" || namespace == r.Metadata.Namespace) && (r.Metadata.Type == "" || service.Type == r.Metadata.Type) {
 					services = append(services, &ServiceId{
 						Type:      service.Type,
-						Name:      strings.Split(id, ":")[0],
-						Namespace: strings.Split(id, ":")[1],
+						Name:      getServiceName(id),
+						Namespace: namespace,
 					})
 				}
 			}
@@ -304,6 +301,18 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
 			}
 		}
 	}
+}
+
+func getQualifiedServiceName(id *ServiceId) string {
+	return id.Namespace + "." + id.Name
+}
+
+func getServiceNamespace(id string) string {
+	return strings.Split(id, ".")[0]
+}
+
+func getServiceName(id string) string {
+	return strings.Split(id, ".")[1]
 }
 
 // newServiceStateMachine returns a new wrapped service

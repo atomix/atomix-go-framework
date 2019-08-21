@@ -74,6 +74,7 @@ message DeleteResponse {
 
 message MetadataRequest {
     string type = 1;
+    string namespace = 2;
 }
 
 message MetadataResponse {
