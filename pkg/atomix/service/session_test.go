@@ -29,7 +29,7 @@ func TestSessionService(t *testing.T) {
 	go context.command(service, newOpenSession(), ch)
 	out := <-ch
 	assert.True(t, out.Succeeded())
-	sessionID := getOpenSession(out.Value).SessionId
+	sessionID := getOpenSession(out.Value).SessionID
 
 	setRequest1 := newCommand(sessionID, 1, "set", newSet("Hello world!"))
 	ch1 := make(chan Output)
@@ -67,7 +67,7 @@ func newOpenSession() []byte {
 
 func getOpenSession(bytes []byte) *OpenSessionResponse {
 	sessionResponse := &SessionResponse{}
-	proto.Unmarshal(bytes, sessionResponse)
+	_ = proto.Unmarshal(bytes, sessionResponse)
 	return sessionResponse.GetOpenSession()
 }
 
@@ -92,50 +92,4 @@ func newCommand(sessionID uint64, commandID uint64, name string, bytes []byte) [
 		},
 	})
 	return bytes
-}
-
-func getCommand(bytes []byte) *SessionCommandResponse {
-	sessionResponse := &SessionResponse{}
-	proto.Unmarshal(bytes, sessionResponse)
-	return sessionResponse.GetCommand()
-}
-
-func getPut(bytes []byte) *SetResponse {
-	setResponse := &SetResponse{}
-	proto.Unmarshal(bytes, setResponse)
-	return setResponse
-}
-
-func newGet() []byte {
-	bytes, _ := proto.Marshal(&GetRequest{})
-	return bytes
-}
-
-func newQuery(sessionID uint64, commandID uint64, index uint64, name string, bytes []byte) []byte {
-	bytes, _ = proto.Marshal(&SessionRequest{
-		Request: &SessionRequest_Query{
-			Query: &SessionQueryRequest{
-				Context: &SessionQueryContext{
-					SessionID:          sessionID,
-					LastIndex:          index,
-					LastSequenceNumber: commandID,
-				},
-				Name:  name,
-				Input: bytes,
-			},
-		},
-	})
-	return bytes
-}
-
-func getQuery(bytes []byte) *SessionQueryResponse {
-	sessionResponse := &SessionResponse{}
-	proto.Unmarshal(bytes, sessionResponse)
-	return sessionResponse.GetQuery()
-}
-
-func getGet(bytes []byte) *GetResponse {
-	getResponse := &GetResponse{}
-	proto.Unmarshal(bytes, getResponse)
-	return getResponse
 }

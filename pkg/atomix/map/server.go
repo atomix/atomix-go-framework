@@ -320,7 +320,9 @@ func (m *mapServer) Events(request *api.EventRequest, srv api.MapService_EventsS
 						NewVersion: int64(response.NewVersion),
 					}
 					log.Tracef("Sending EventResponse %+v", response)
-					srv.Send(eventResponse)
+					if err = srv.Send(eventResponse); err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -355,7 +357,9 @@ func (m *mapServer) Entries(request *api.EntriesRequest, srv api.MapService_Entr
 						Version: int64(response.Version),
 					}
 					log.Tracef("Sending EntriesResponse %+v", response)
-					srv.Send(entriesResponse)
+					if err = srv.Send(entriesResponse); err != nil {
+						return err
+					}
 				}
 			}
 		}

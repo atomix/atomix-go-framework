@@ -78,32 +78,6 @@ func getOpenSessionResponse(t *testing.T, bytes []byte) *OpenSessionResponse {
 	return sessionResponse.GetOpenSession()
 }
 
-func newKeepAliveRequest(t *testing.T, sessionID uint64, commandID uint64, streams map[uint64]uint64) []byte {
-	bytes, err := proto.Marshal(&SessionRequest{
-		Request: &SessionRequest_KeepAlive{
-			KeepAlive: &KeepAliveRequest{
-				SessionID:       sessionID,
-				CommandSequence: commandID,
-				Streams:         streams,
-			},
-		},
-	})
-	assert.NoError(t, err)
-	return newTestCommandRequest(t, bytes)
-}
-
-func newCloseSessionRequest(t *testing.T, sessionID uint64) []byte {
-	bytes, err := proto.Marshal(&SessionRequest{
-		Request: &SessionRequest_CloseSession{
-			CloseSession: &CloseSessionRequest{
-				SessionID: sessionID,
-			},
-		},
-	})
-	assert.NoError(t, err)
-	return newTestCommandRequest(t, bytes)
-}
-
 func newCommandRequest(t *testing.T, sessionID uint64, commandID uint64, name string, bytes []byte) []byte {
 	bytes, err := proto.Marshal(&SessionRequest{
 		Request: &SessionRequest_Command{

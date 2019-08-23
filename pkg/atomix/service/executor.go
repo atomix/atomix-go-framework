@@ -15,7 +15,6 @@
 package service
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -48,7 +47,7 @@ func (e *executor) Register(op string, callback func([]byte, chan<- Result)) {
 func (e *executor) Execute(name string, bytes []byte, ch chan<- Result) error {
 	op, ok := e.operations[name]
 	if !ok {
-		return errors.New(fmt.Sprintf("unknown operation %s", name))
+		return fmt.Errorf("unknown operation %s", name)
 	} else {
 		op(bytes, ch)
 	}

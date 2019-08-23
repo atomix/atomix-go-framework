@@ -135,8 +135,12 @@ func (c *TestClient) Read(ctx context.Context, input []byte, ch chan<- service.O
 
 func TestNode(t *testing.T) {
 	node := NewNode("foo", &controller.PartitionConfig{}, NewTestProtocol())
-	go node.Start()
-	defer node.Stop()
+	go func() {
+		_ = node.Start()
+	}()
+	defer func() {
+		_ = node.Stop()
+	}()
 	time.Sleep(100 * time.Millisecond)
 
 	conn, err := grpc.Dial(":5678", grpc.WithInsecure())
@@ -151,8 +155,12 @@ func TestNode(t *testing.T) {
 
 func TestList(t *testing.T) {
 	node := NewNode("foo", &controller.PartitionConfig{}, NewTestProtocol())
-	go node.Start()
-	defer node.Stop()
+	go func() {
+		_ = node.Start()
+	}()
+	defer func() {
+		_ = node.Stop()
+	}()
 	time.Sleep(100 * time.Millisecond)
 
 	conn, err := grpc.Dial(":5678", grpc.WithInsecure())
@@ -381,8 +389,12 @@ func TestList(t *testing.T) {
 
 func TestMap(t *testing.T) {
 	node := NewNode("foo", &controller.PartitionConfig{}, NewTestProtocol())
-	go node.Start()
-	defer node.Stop()
+	go func() {
+		_ = node.Start()
+	}()
+	defer func() {
+		_ = node.Stop()
+	}()
 	time.Sleep(100 * time.Millisecond)
 
 	conn, err := grpc.Dial(":5678", grpc.WithInsecure())
@@ -680,8 +692,12 @@ func TestMap(t *testing.T) {
 
 func TestLock(t *testing.T) {
 	node := NewNode("foo", &controller.PartitionConfig{}, NewTestProtocol())
-	go node.Start()
-	defer node.Stop()
+	go func() {
+		_ = node.Start()
+	}()
+	defer func() {
+		_ = node.Stop()
+	}()
 	time.Sleep(100 * time.Millisecond)
 
 	conn, err := grpc.Dial(":5678", grpc.WithInsecure())

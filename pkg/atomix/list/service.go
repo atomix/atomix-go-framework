@@ -134,7 +134,7 @@ func (l *ListService) Insert(bytes []byte, ch chan<- service.Result) {
 	}
 
 	index := request.Index
-	if index < 0 || index >= uint32(len(l.values)) {
+	if index >= uint32(len(l.values)) {
 		ch <- l.NewResult(proto.Marshal(&InsertResponse{
 			Status: ResponseStatus_OUT_OF_BOUNDS,
 		}))
@@ -170,7 +170,7 @@ func (l *ListService) Get(bytes []byte, ch chan<- service.Result) {
 	}
 
 	index := request.Index
-	if index < 0 || index >= uint32(len(l.values)) {
+	if index >= uint32(len(l.values)) {
 		ch <- l.NewResult(proto.Marshal(&GetResponse{
 			Status: ResponseStatus_OUT_OF_BOUNDS,
 		}))
@@ -194,7 +194,7 @@ func (l *ListService) Remove(bytes []byte, ch chan<- service.Result) {
 	}
 
 	index := request.Index
-	if index < 0 || index >= uint32(len(l.values)) {
+	if index >= uint32(len(l.values)) {
 		ch <- l.NewResult(proto.Marshal(&RemoveResponse{
 			Status: ResponseStatus_OUT_OF_BOUNDS,
 		}))

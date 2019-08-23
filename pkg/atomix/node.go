@@ -132,7 +132,7 @@ func (n *Node) Start() error {
 
 	// Set the ready file to indicate startup of the protocol is complete.
 	ready := util.NewFileReady()
-	ready.Set()
+	_ = ready.Set()
 
 	log.Info("Starting gRPC server")
 	n.server = grpc.NewServer()

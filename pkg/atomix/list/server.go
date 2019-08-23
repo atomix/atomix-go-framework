@@ -300,7 +300,9 @@ func (s *listServer) Events(request *api.EventRequest, srv api.ListService_Event
 						Value:  response.Value,
 					}
 					log.Tracef("Sending EventResponse %+v", response)
-					srv.Send(eventResponse)
+					if err = srv.Send(eventResponse); err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -333,7 +335,9 @@ func (s *listServer) Iterate(request *api.IterateRequest, srv api.ListService_It
 						Value:  response.Value,
 					}
 					log.Tracef("Sending IterateResponse %+v", response)
-					srv.Send(iterateResponse)
+					if err = srv.Send(iterateResponse); err != nil {
+						return err
+					}
 				}
 			}
 		}

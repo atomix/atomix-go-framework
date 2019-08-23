@@ -53,8 +53,16 @@ func (s *SimpleService) Snapshot(writer io.Writer) error {
 	} else {
 		length := make([]byte, 4)
 		binary.BigEndian.PutUint32(length, uint32(len(bytes)))
-		writer.Write(length)
-		writer.Write(bytes)
+
+		_, err = writer.Write(length)
+		if err != nil {
+			return err
+		}
+
+		_, err = writer.Write(bytes)
+		if err !=  nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -72,7 +80,7 @@ func (s *SimpleService) Install(reader io.Reader) error {
 
 	length := binary.BigEndian.Uint32(lengthBytes)
 	bytes := make([]byte, length)
-	n, err = reader.Read(bytes)
+	_, err = reader.Read(bytes)
 	if err != nil {
 		return err
 	}

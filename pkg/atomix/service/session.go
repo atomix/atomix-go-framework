@@ -106,9 +106,17 @@ func (s *SessionizedService) snapshotSessions(writer io.Writer) error {
 
 	length := make([]byte, 4)
 	binary.BigEndian.PutUint32(length, uint32(len(bytes)))
-	writer.Write(length)
-	writer.Write(bytes)
-	return nil
+
+	_, err = writer.Write(length)
+	if err != nil {
+		return err
+	}
+
+	_, err = writer.Write(bytes)
+	if err != nil {
+		return err
+	}
+	return err
 }
 
 func (s *SessionizedService) snapshotService(writer io.Writer) error {
@@ -118,8 +126,16 @@ func (s *SessionizedService) snapshotService(writer io.Writer) error {
 	} else {
 		length := make([]byte, 4)
 		binary.BigEndian.PutUint32(length, uint32(len(bytes)))
-		writer.Write(length)
-		writer.Write(bytes)
+
+		_, err = writer.Write(length)
+		if err != nil {
+			return err
+		}
+
+		_, err = writer.Write(bytes)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -147,7 +163,7 @@ func (s *SessionizedService) installSessions(reader io.Reader) error {
 
 	length := binary.BigEndian.Uint32(lengthBytes)
 	bytes := make([]byte, length)
-	n, err = reader.Read(bytes)
+	_, err = reader.Read(bytes)
 	if err != nil {
 		return err
 	}
@@ -200,7 +216,7 @@ func (s *SessionizedService) installService(reader io.Reader) error {
 
 	length := binary.BigEndian.Uint32(lengthBytes)
 	bytes := make([]byte, length)
-	n, err = reader.Read(bytes)
+	_, err = reader.Read(bytes)
 	if err != nil {
 		return err
 	}
@@ -250,7 +266,7 @@ func (s *SessionizedService) applyCommand(request *SessionCommandRequest, ch cha
 	session, ok := s.sessions[request.Context.SessionID]
 	if !ok {
 		if ch != nil {
-			ch <- newFailure(errors.New(fmt.Sprintf("unknown session %d", request.Context.SessionID)))
+			ch <- newFailure(fmt.Errorf("unknown session %d", request.Context.SessionID))
 		}
 	} else {
 		sequenceNumber := request.Context.SequenceNumber
@@ -262,7 +278,7 @@ func (s *SessionizedService) applyCommand(request *SessionCommandRequest, ch cha
 				}
 			} else {
 				if ch != nil {
-					ch <- newFailure(errors.New(fmt.Sprintf("sequence number %d has already been acknowledged", sequenceNumber)))
+					ch <- newFailure(fmt.Errorf("sequence number %d has already been acknowledged", sequenceNumber))
 				}
 			}
 		} else if sequenceNumber > session.nextCommandSequence() {
@@ -279,7 +295,7 @@ func (s *SessionizedService) applySessionCommand(request *SessionCommandRequest,
 	session, ok := s.sessions[request.Context.SessionID]
 	if !ok {
 		if ch != nil {
-			ch <- newFailure(errors.New(fmt.Sprintf("unknown session %d", request.Context.SessionID)))
+			ch <- newFailure(fmt.Errorf("unknown session %d", request.Context.SessionID))
 		}
 	} else {
 		s.session = session
@@ -313,7 +329,7 @@ func (s *SessionizedService) applyKeepAlive(request *KeepAliveRequest, ch chan<-
 	session, ok := s.sessions[request.SessionID]
 	if !ok {
 		if ch != nil {
-			ch <- newFailure(errors.New(fmt.Sprintf("unknown session %d", request.SessionID)))
+			ch <- newFailure(fmt.Errorf("unknown session %d", request.SessionID))
 		}
 	} else {
 		// Update the session's last updated timestamp to prevent it from expiring
@@ -351,7 +367,7 @@ func (s *SessionizedService) applyCloseSession(request *CloseSessionRequest, ch 
 	session, ok := s.sessions[request.SessionID]
 	if !ok {
 		if ch != nil {
-			ch <- newFailure(errors.New(fmt.Sprintf("unknown session %d", request.SessionID)))
+			ch <- newFailure(fmt.Errorf("unknown session %d", request.SessionID))
 		}
 	} else {
 		// Close the session and notify the service.
@@ -393,7 +409,7 @@ func (s *SessionizedService) sequenceQuery(query *SessionQueryRequest, ch chan<-
 	session, ok := s.sessions[query.Context.SessionID]
 	if !ok {
 		if ch != nil {
-			ch <- newFailure(errors.New(fmt.Sprintf("unknown session %d", query.Context.SessionID)))
+			ch <- newFailure(fmt.Errorf("unknown session %d", query.Context.SessionID))
 		}
 	} else {
 		sequenceNumber := query.Context.LastSequenceNumber
@@ -703,7 +719,7 @@ func (s *sessionStream) process() {
 // close closes the stream
 func (s *sessionStream) close() {
 	defer func() {
-		recover()
+		_ = recover()
 	}()
 	close(s.inChan)
 }

@@ -16,7 +16,6 @@ package service
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"io"
@@ -120,9 +119,21 @@ func (s *primitiveStateMachine) Snapshot(writer io.Writer) error {
 		} else {
 			length := make([]byte, 4)
 			binary.BigEndian.PutUint32(length, uint32(len(bytes)))
-			writer.Write(length)
-			writer.Write(bytes)
-			service.Snapshot(writer)
+
+			_, err = writer.Write(length)
+			if err != nil {
+				return err
+			}
+
+			_, err = writer.Write(bytes)
+			if err != nil {
+				return err
+			}
+
+			err = service.Snapshot(writer)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -138,7 +149,7 @@ func (s *primitiveStateMachine) Install(reader io.Reader) error {
 	for n > 0 {
 		length := binary.BigEndian.Uint32(lengthBytes)
 		bytes := make([]byte, length)
-		n, err = reader.Read(bytes)
+		_, err = reader.Read(bytes)
 		if err != nil {
 			return err
 		}
@@ -174,7 +185,7 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 				serviceType := s.registry.getType(request.Id.Type)
 				if serviceType == nil {
 					if ch != nil {
-						ch <- newFailure(errors.New(fmt.Sprintf("unknown service type %s", request.Id.Type)))
+						ch <- newFailure(fmt.Errorf("unknown service type %s", request.Id.Type))
 						return
 					}
 				} else {
@@ -213,7 +224,7 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 				serviceType := s.registry.getType(request.Id.Type)
 				if serviceType == nil {
 					if ch != nil {
-						ch <- newFailure(errors.New(fmt.Sprintf("unknown service type %s", request.Id.Type)))
+						ch <- newFailure(fmt.Errorf("unknown service type %s", request.Id.Type))
 					}
 				} else {
 					service := serviceType(s.ctx)
@@ -263,7 +274,7 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
 			service, ok := s.services[getQualifiedServiceName(request.Id)]
 			if !ok {
 				if ch != nil {
-					ch <- newFailure(errors.New(fmt.Sprintf("unknown service %s", getQualifiedServiceName(request.Id))))
+					ch <- newFailure(fmt.Errorf("unknown service %s", getQualifiedServiceName(request.Id)))
 				}
 			} else {
 				// Create a channel for the raw service results
@@ -344,12 +355,12 @@ type serviceStateMachine struct {
 	service Service
 }
 
-func (s *serviceStateMachine) Snapshot(writer io.Writer) {
-	s.service.Snapshot(writer)
+func (s *serviceStateMachine) Snapshot(writer io.Writer) error {
+	return s.service.Snapshot(writer)
 }
 
-func (s *serviceStateMachine) Install(reader io.Reader) {
-	s.service.Install(reader)
+func (s *serviceStateMachine) Install(reader io.Reader) error {
+	return s.service.Install(reader)
 }
 
 func (s *serviceStateMachine) CanDelete(index uint64) bool {
