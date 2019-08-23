@@ -253,6 +253,14 @@ func (m *MapService) Remove(bytes []byte, ch chan<- service.Result) {
 		return
 	}
 
+	// If the request version is set, verify that the request version matches the entry version.
+	if request.Version > 0 {
+		ch <- m.NewResult(proto.Marshal(&RemoveResponse{
+			Status: UpdateStatus_PRECONDITION_FAILED,
+		}))
+		return
+	}
+
 	// Delete the entry from the map.
 	delete(m.entries, request.Key)
 
