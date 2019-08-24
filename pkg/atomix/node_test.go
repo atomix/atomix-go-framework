@@ -17,6 +17,7 @@ package atomix
 import (
 	"context"
 	"github.com/atomix/atomix-api/proto/atomix/controller"
+	"github.com/atomix/atomix-api/proto/atomix/counter"
 	"github.com/atomix/atomix-api/proto/atomix/headers"
 	"github.com/atomix/atomix-api/proto/atomix/list"
 	"github.com/atomix/atomix-api/proto/atomix/lock"
@@ -151,6 +152,73 @@ func TestNode(t *testing.T) {
 	response, err := client.GetPrimitives(context.Background(), &primitive.GetPrimitivesRequest{})
 	assert.NoError(t, err)
 	assert.Len(t, response.Primitives, 0)
+}
+
+func TestCounter(t *testing.T) {
+	node := NewNode("foo", &controller.PartitionConfig{}, NewTestProtocol())
+	go func() {
+		_ = node.Start()
+	}()
+	defer func() {
+		_ = node.Stop()
+	}()
+	time.Sleep(100 * time.Millisecond)
+
+	conn, err := grpc.Dial(":5678", grpc.WithInsecure())
+	assert.NoError(t, err)
+	defer conn.Close()
+
+	client := counter.NewCounterServiceClient(conn)
+
+	createResponse, err := client.Create(context.TODO(), &counter.CreateRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+		},
+	})
+	assert.NoError(t, err)
+
+	index := createResponse.Header.Index
+
+	getResponse, err := client.Get(context.TODO(), &counter.GetRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			Index: index,
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, int64(0), getResponse.Value)
+	index = getResponse.Header.Index
+
+	setResponse, err := client.Set(context.TODO(), &counter.SetRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			Index: index,
+		},
+		Value: 100,
+	})
+	assert.NoError(t, err)
+	index = setResponse.Header.Index
+
+	getResponse, err = client.Get(context.TODO(), &counter.GetRequest{
+		Header: &headers.RequestHeader{
+			Name: &primitive.Name{
+				Name:      "test",
+				Namespace: "test",
+			},
+			Index: index,
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, int64(100), getResponse.Value)
 }
 
 func TestList(t *testing.T) {

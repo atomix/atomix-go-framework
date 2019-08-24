@@ -47,18 +47,15 @@ func (s *SimpleServer) Command(ctx context.Context, name string, input []byte, h
 		return nil, nil, err
 	}
 
-	sessionResponse := &service.SessionResponse{}
-	err = proto.Unmarshal(bytes, sessionResponse)
+	commandResponse := &service.CommandResponse{}
+	err = proto.Unmarshal(bytes, commandResponse)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	commandResponse := sessionResponse.GetCommand()
 	responseHeader := &headers.ResponseHeader{
-		SessionID:  header.SessionID,
-		StreamID:   commandResponse.Context.StreamID,
-		ResponseID: commandResponse.Context.Sequence,
-		Index:      commandResponse.Context.Index,
+		SessionID: header.SessionID,
+		Index:     commandResponse.Context.Index,
 	}
 	return commandResponse.Output, responseHeader, nil
 }
@@ -127,13 +124,12 @@ func (s *SimpleServer) Query(ctx context.Context, name string, input []byte, hea
 		return nil, nil, err
 	}
 
-	sessionResponse := &service.SessionResponse{}
-	err = proto.Unmarshal(bytes, sessionResponse)
+	queryResponse := &service.QueryResponse{}
+	err = proto.Unmarshal(bytes, queryResponse)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	queryResponse := sessionResponse.GetQuery()
 	responseHeader := &headers.ResponseHeader{
 		SessionID: header.SessionID,
 		Index:     queryResponse.Context.Index,

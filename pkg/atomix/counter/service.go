@@ -16,7 +16,7 @@ package counter
 
 import (
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
-	"github.com/golang/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 )
 
 // RegisterCounterService registers the counter service in the given service registry
@@ -41,8 +41,8 @@ type CounterService struct {
 
 // init initializes the list service
 func (c *CounterService) init() {
-	c.Executor.Register("get", c.Set)
-	c.Executor.Register("set", c.Get)
+	c.Executor.Register("get", c.Get)
+	c.Executor.Register("set", c.Set)
 	c.Executor.Register("increment", c.Increment)
 	c.Executor.Register("decrement", c.Decrement)
 	c.Executor.Register("cas", c.CheckAndSet)

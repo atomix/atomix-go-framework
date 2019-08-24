@@ -17,9 +17,10 @@ package counter
 import (
 	"context"
 	api "github.com/atomix/atomix-api/proto/atomix/counter"
+	"github.com/atomix/atomix-api/proto/atomix/headers"
 	"github.com/atomix/atomix-go-node/pkg/atomix/server"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
-	"github.com/golang/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
@@ -48,7 +49,9 @@ func (s *counterServer) Create(ctx context.Context, request *api.CreateRequest) 
 		return nil, err
 	}
 
-	response := &api.CreateResponse{}
+	response := &api.CreateResponse{
+		Header: &headers.ResponseHeader{},
+	}
 	log.Tracef("Sending CreateResponse %+v", response)
 	return response, nil
 }
@@ -56,7 +59,9 @@ func (s *counterServer) Create(ctx context.Context, request *api.CreateRequest) 
 func (s *counterServer) Set(ctx context.Context, request *api.SetRequest) (*api.SetResponse, error) {
 	log.Tracef("Received SetRequest %+v", request)
 
-	in, err := proto.Marshal(&SetRequest{})
+	in, err := proto.Marshal(&SetRequest{
+		Value: request.Value,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +204,9 @@ func (s *counterServer) Close(ctx context.Context, request *api.CloseRequest) (*
 		}
 	}
 
-	response := &api.CloseResponse{}
+	response := &api.CloseResponse{
+		Header: &headers.ResponseHeader{},
+	}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil
 }
