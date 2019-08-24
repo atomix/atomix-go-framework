@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"github.com/atomix/atomix-api/proto/atomix/controller"
 	"github.com/atomix/atomix-go-node/pkg/atomix/counter"
+	"github.com/atomix/atomix-go-node/pkg/atomix/election"
 	"github.com/atomix/atomix-go-node/pkg/atomix/list"
 	"github.com/atomix/atomix-go-node/pkg/atomix/lock"
 	map_ "github.com/atomix/atomix-go-node/pkg/atomix/map"
@@ -173,6 +174,7 @@ func (l localListener) listen(node *Node) (net.Listener, error) {
 func registerServers(server *grpc.Server, protocol Protocol) {
 	primitive.RegisterPrimitiveServer(server, protocol.Client())
 	counter.RegisterCounterServer(server, protocol.Client())
+	election.RegisterElectionServer(server, protocol.Client())
 	list.RegisterListServer(server, protocol.Client())
 	lock.RegisterLockServer(server, protocol.Client())
 	map_.RegisterMapServer(server, protocol.Client())
@@ -182,6 +184,7 @@ func registerServers(server *grpc.Server, protocol Protocol) {
 func getServiceRegistry() *service.ServiceRegistry {
 	registry := service.NewServiceRegistry()
 	counter.RegisterCounterService(registry)
+	election.RegisterElectionService(registry)
 	list.RegisterListService(registry)
 	lock.RegisterLockService(registry)
 	map_.RegisterMapService(registry)

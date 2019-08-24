@@ -6,6 +6,14 @@ github.com/atomix/atomix-api v0.0.0-20190819230829-366ccc994adb h1:5BfPSZekPTwr8
 github.com/atomix/atomix-api v0.0.0-20190819230829-366ccc994adb/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
 github.com/atomix/atomix-api v0.0.0-20190821212433-320dd0dbb83e h1:gsIp6ruL8Jm5OwLwnEgmadt/ZDcoa1aeRSEIXzGW6IM=
 github.com/atomix/atomix-api v0.0.0-20190821212433-320dd0dbb83e/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
+github.com/atomix/atomix-api v0.0.0-20190824033319-903bb032dd2e h1:AEkVS80F70tYnQUaAe28UZ32sibw4DHT9zNw5FuuCvc=
+github.com/atomix/atomix-api v0.0.0-20190824033319-903bb032dd2e/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
+github.com/atomix/atomix-api v0.0.0-20190824033507-1d7a2b7ab952 h1:McRk6rQxkCWVgO5HPuc9hrwJsIFyfE5SuYkQV3mnOWI=
+github.com/atomix/atomix-api v0.0.0-20190824033507-1d7a2b7ab952/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
+github.com/atomix/atomix-api v0.0.0-20190824061914-df02d51daee3 h1:ad+l01R2CcFiIGDvUuKP7f6gP1UZYtQ58oAKkSdO+ag=
+github.com/atomix/atomix-api v0.0.0-20190824061914-df02d51daee3/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
+github.com/atomix/atomix-api v0.0.0-20190824064933-a9d9a078f12a h1:hJ5EML/ocAZVFOTPyo0Dq3AcKJBzUaYesD5///TC6js=
+github.com/atomix/atomix-api v0.0.0-20190824064933-a9d9a078f12a/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
