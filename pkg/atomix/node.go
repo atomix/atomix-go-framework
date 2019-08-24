@@ -24,6 +24,7 @@ import (
 	map_ "github.com/atomix/atomix-go-node/pkg/atomix/map"
 	"github.com/atomix/atomix-go-node/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
+	"github.com/atomix/atomix-go-node/pkg/atomix/set"
 	"github.com/atomix/atomix-go-node/pkg/atomix/util"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -178,6 +179,7 @@ func registerServers(server *grpc.Server, protocol Protocol) {
 	list.RegisterListServer(server, protocol.Client())
 	lock.RegisterLockServer(server, protocol.Client())
 	map_.RegisterMapServer(server, protocol.Client())
+	set.RegisterSetServer(server, protocol.Client())
 }
 
 // getServiceRegistry returns a service registry for the node
@@ -188,5 +190,6 @@ func getServiceRegistry() *service.ServiceRegistry {
 	list.RegisterListService(registry)
 	lock.RegisterLockService(registry)
 	map_.RegisterMapService(registry)
+	set.RegisterSetService(registry)
 	return registry
 }
