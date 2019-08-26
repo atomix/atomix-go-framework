@@ -141,8 +141,6 @@ func (l *ListService) Insert(bytes []byte, ch chan<- service.Result) {
 		return
 	}
 
-	oldValue := l.values[index]
-
 	intIndex := int(index)
 	values := make([]string, 0)
 	for i := range l.values {
