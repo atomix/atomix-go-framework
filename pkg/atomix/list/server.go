@@ -193,6 +193,33 @@ func (s *listServer) Insert(ctx context.Context, request *api.InsertRequest) (*a
 	return response, nil
 }
 
+func (s *listServer) Set(ctx context.Context, request *api.SetRequest) (*api.SetResponse, error) {
+	log.Tracef("Received SetRequest %+v", request)
+	in, err := proto.Marshal(&SetRequest{
+		Value: request.Value,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	out, header, err := s.Command(ctx, "set", in, request.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	setResponse := &SetResponse{}
+	if err = proto.Unmarshal(out, setResponse); err != nil {
+		return nil, err
+	}
+
+	response := &api.SetResponse{
+		Header: header,
+		Status: getResponseStatus(setResponse.Status),
+	}
+	log.Tracef("Sending SetResponse %+v", response)
+	return response, nil
+}
+
 func (s *listServer) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
 	log.Tracef("Received GetRequest %+v", request)
 	in, err := proto.Marshal(&GetRequest{

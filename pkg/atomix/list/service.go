@@ -47,6 +47,7 @@ func (l *ListService) init() {
 	l.Executor.Register("append", l.Append)
 	l.Executor.Register("insert", l.Insert)
 	l.Executor.Register("get", l.Get)
+	l.Executor.Register("set", l.Set)
 	l.Executor.Register("remove", l.Remove)
 	l.Executor.Register("clear", l.Clear)
 	l.Executor.Register("events", l.Events)
@@ -159,6 +160,42 @@ func (l *ListService) Insert(bytes []byte, ch chan<- service.Result) {
 	})
 
 	ch <- l.NewResult(proto.Marshal(&InsertResponse{
+		Status: ResponseStatus_OK,
+	}))
+}
+
+func (l *ListService) Set(bytes []byte, ch chan<- service.Result) {
+	defer close(ch)
+
+	request := &SetRequest{}
+	if err := proto.Unmarshal(bytes, request); err != nil {
+		ch <- l.NewFailure(err)
+		return
+	}
+
+	index := request.Index
+	if index >= uint32(len(l.values)) {
+		ch <- l.NewResult(proto.Marshal(&InsertResponse{
+			Status: ResponseStatus_OUT_OF_BOUNDS,
+		}))
+		return
+	}
+
+	oldValue := l.values[index]
+	l.values[index] = request.Value
+
+	l.sendEvent(&ListenResponse{
+		Type:  ListenResponse_REMOVED,
+		Index: uint32(index),
+		Value: oldValue,
+	})
+	l.sendEvent(&ListenResponse{
+		Type:  ListenResponse_ADDED,
+		Index: uint32(index),
+		Value: request.Value,
+	})
+
+	ch <- l.NewResult(proto.Marshal(&SetResponse{
 		Status: ResponseStatus_OK,
 	}))
 }

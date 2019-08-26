@@ -46,6 +46,15 @@ message AppendResponse {
     ResponseStatus status = 1;
 }
 
+message SetRequest {
+    uint32 index = 1;
+    string value = 2;
+}
+
+message SetResponse {
+    ResponseStatus status = 1;
+}
+
 message InsertRequest {
     uint32 index = 1;
     string value = 2;
