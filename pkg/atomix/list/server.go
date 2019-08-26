@@ -354,6 +354,8 @@ func getResponseStatus(status ResponseStatus) api.ResponseStatus {
 		return api.ResponseStatus_NOOP
 	case ResponseStatus_WRITE_LOCK:
 		return api.ResponseStatus_WRITE_LOCK
+	case ResponseStatus_OUT_OF_BOUNDS:
+		return api.ResponseStatus_OUT_OF_BOUNDS
 	}
 	return api.ResponseStatus_OK
 }
