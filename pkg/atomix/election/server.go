@@ -63,11 +63,13 @@ func (s *electionServer) Enter(ctx context.Context, request *api.EnterRequest) (
 	}
 
 	response := &api.EnterResponse{
-		Header:     header,
-		Term:       enterResponse.Term,
-		Timestamp:  enterResponse.Timestamp,
-		Leader:     enterResponse.Leader,
-		Candidates: enterResponse.Candidates,
+		Header: header,
+		Term: &api.Term{
+			ID:         enterResponse.Term.ID,
+			Timestamp:  enterResponse.Term.Timestamp,
+			Leader:     enterResponse.Term.Leader,
+			Candidates: enterResponse.Term.Candidates,
+		},
 	}
 	log.Tracef("Sending EnterResponse %+v", response)
 	return response, nil
@@ -93,8 +95,13 @@ func (s *electionServer) Withdraw(ctx context.Context, request *api.WithdrawRequ
 	}
 
 	response := &api.WithdrawResponse{
-		Header:    header,
-		Succeeded: withdrawResponse.Succeeded,
+		Header: header,
+		Term: &api.Term{
+			ID:         withdrawResponse.Term.ID,
+			Timestamp:  withdrawResponse.Term.Timestamp,
+			Leader:     withdrawResponse.Term.Leader,
+			Candidates: withdrawResponse.Term.Candidates,
+		},
 	}
 	log.Tracef("Sending WithdrawResponse %+v", response)
 	return response, nil
@@ -120,8 +127,13 @@ func (s *electionServer) Anoint(ctx context.Context, request *api.AnointRequest)
 	}
 
 	response := &api.AnointResponse{
-		Header:    header,
-		Succeeded: anointResponse.Succeeded,
+		Header: header,
+		Term: &api.Term{
+			ID:         anointResponse.Term.ID,
+			Timestamp:  anointResponse.Term.Timestamp,
+			Leader:     anointResponse.Term.Leader,
+			Candidates: anointResponse.Term.Candidates,
+		},
 	}
 	log.Tracef("Sending AnointResponse %+v", response)
 	return response, nil
@@ -147,8 +159,13 @@ func (s *electionServer) Promote(ctx context.Context, request *api.PromoteReques
 	}
 
 	response := &api.PromoteResponse{
-		Header:    header,
-		Succeeded: promoteResponse.Succeeded,
+		Header: header,
+		Term: &api.Term{
+			ID:         promoteResponse.Term.ID,
+			Timestamp:  promoteResponse.Term.Timestamp,
+			Leader:     promoteResponse.Term.Leader,
+			Candidates: promoteResponse.Term.Candidates,
+		},
 	}
 	log.Tracef("Sending PromoteResponse %+v", response)
 	return response, nil
@@ -174,38 +191,45 @@ func (s *electionServer) Evict(ctx context.Context, request *api.EvictRequest) (
 	}
 
 	response := &api.EvictResponse{
-		Header:    header,
-		Succeeded: evictResponse.Succeeded,
+		Header: header,
+		Term: &api.Term{
+			ID:         evictResponse.Term.ID,
+			Timestamp:  evictResponse.Term.Timestamp,
+			Leader:     evictResponse.Term.Leader,
+			Candidates: evictResponse.Term.Candidates,
+		},
 	}
 	log.Tracef("Sending EvictResponse %+v", response)
 	return response, nil
 }
 
-func (s *electionServer) GetLeadership(ctx context.Context, request *api.GetLeadershipRequest) (*api.GetLeadershipResponse, error) {
-	log.Tracef("Received GetLeadershipRequest %+v", request)
-	in, err := proto.Marshal(&GetLeadershipRequest{})
+func (s *electionServer) GetTerm(ctx context.Context, request *api.GetTermRequest) (*api.GetTermResponse, error) {
+	log.Tracef("Received GetTermRequest %+v", request)
+	in, err := proto.Marshal(&GetTermRequest{})
 	if err != nil {
 		return nil, err
 	}
 
-	out, header, err := s.Query(ctx, "GetLeadership", in, request.Header)
+	out, header, err := s.Query(ctx, "GetTerm", in, request.Header)
 	if err != nil {
 		return nil, err
 	}
 
-	getResponse := &GetLeadershipResponse{}
+	getResponse := &GetTermResponse{}
 	if err = proto.Unmarshal(out, getResponse); err != nil {
 		return nil, err
 	}
 
-	response := &api.GetLeadershipResponse{
-		Header:     header,
-		Term:       getResponse.Term,
-		Timestamp:  getResponse.Timestamp,
-		Leader:     getResponse.Leader,
-		Candidates: getResponse.Candidates,
+	response := &api.GetTermResponse{
+		Header: header,
+		Term: &api.Term{
+			ID:         getResponse.Term.ID,
+			Timestamp:  getResponse.Term.Timestamp,
+			Leader:     getResponse.Term.Leader,
+			Candidates: getResponse.Term.Candidates,
+		},
 	}
-	log.Tracef("Sending GetResponse %+v", response)
+	log.Tracef("Sending GetTermResponse %+v", response)
 	return response, nil
 }
 
@@ -229,12 +253,14 @@ func (s *electionServer) Events(request *api.EventRequest, stream api.LeaderElec
 					return err
 				} else {
 					eventResponse := &api.EventResponse{
-						Header:     result.Header,
-						Type:       api.EventResponse_CHANGED,
-						Term:       response.Term,
-						Timestamp:  response.Timestamp,
-						Leader:     response.Leader,
-						Candidates: response.Candidates,
+						Header: result.Header,
+						Type:   api.EventResponse_CHANGED,
+						Term: &api.Term{
+							ID:         response.Term.ID,
+							Timestamp:  response.Term.Timestamp,
+							Leader:     response.Term.Leader,
+							Candidates: response.Term.Candidates,
+						},
 					}
 					log.Tracef("Sending EventResponse %+v", response)
 					if err = stream.Send(eventResponse); err != nil {

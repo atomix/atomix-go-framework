@@ -40,10 +40,7 @@ message EnterRequest {
 }
 
 message EnterResponse {
-    uint64 term = 1;
-    google.protobuf.Timestamp timestamp = 2 [(gogoproto.stdtime) = true];
-    string leader = 3;
-    repeated string candidates = 4;
+    Term term = 1;
 }
 
 message WithdrawRequest {
@@ -51,7 +48,7 @@ message WithdrawRequest {
 }
 
 message WithdrawResponse {
-    bool succeeded = 1;
+    Term term = 2;
 }
 
 message AnointRequest {
@@ -59,7 +56,7 @@ message AnointRequest {
 }
 
 message AnointResponse {
-    bool succeeded = 1;
+    Term term = 2;
 }
 
 message PromoteRequest {
@@ -67,7 +64,7 @@ message PromoteRequest {
 }
 
 message PromoteResponse {
-    bool succeeded = 1;
+    Term term = 2;
 }
 
 message EvictRequest {
@@ -75,18 +72,15 @@ message EvictRequest {
 }
 
 message EvictResponse {
-    bool succeeded = 1;
+    Term term = 2;
 }
 
-message GetLeadershipRequest {
+message GetTermRequest {
 
 }
 
-message GetLeadershipResponse {
-    uint64 term = 1;
-    google.protobuf.Timestamp timestamp = 2 [(gogoproto.stdtime) = true];
-    string leader = 3;
-    repeated string candidates = 4;
+message GetTermResponse {
+    Term term = 2;
 }
 
 message ListenRequest {
@@ -95,12 +89,16 @@ message ListenRequest {
 
 message ListenResponse {
     Type type = 1;
-    uint64 term = 2;
-    google.protobuf.Timestamp timestamp = 3 [(gogoproto.stdtime) = true];
-    string leader = 4;
-    repeated string candidates = 5;
+    Term term = 2;
 
     enum Type {
         CHANGED = 0;
     }
+}
+
+message Term {
+    uint64 id = 1 [(gogoproto.customname) = "ID"];
+    google.protobuf.Timestamp timestamp = 2 [(gogoproto.stdtime) = true];
+    string leader = 3;
+    repeated string candidates = 4;
 }

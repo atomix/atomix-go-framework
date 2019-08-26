@@ -28,6 +28,8 @@ github.com/atomix/atomix-api v0.0.0-20190826201512-eae5fd032cca h1:sOIVGbSjfoTVU
 github.com/atomix/atomix-api v0.0.0-20190826201512-eae5fd032cca/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
 github.com/atomix/atomix-api v0.0.0-20190826201611-6150fd9aaca1 h1:OhWeeiy/of0v2lpF286ttSQTNE3nYD+0IevUI9+IbT8=
 github.com/atomix/atomix-api v0.0.0-20190826201611-6150fd9aaca1/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
+github.com/atomix/atomix-api v0.0.0-20190826211343-dd8f4db3bf77 h1:+PUuY9wDRp+VAg/JbEguzdOMJj6ruUw6Kw/y+QYHB6s=
+github.com/atomix/atomix-api v0.0.0-20190826211343-dd8f4db3bf77/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

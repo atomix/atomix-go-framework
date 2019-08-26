@@ -587,7 +587,7 @@ func (s *Session) ack(sequenceNumber uint64, streams map[uint64]uint64) {
 func (s *Session) scheduleQuery(sequenceNumber uint64, f func()) {
 	queries, ok := s.queryCallbacks[sequenceNumber]
 	if !ok {
-		queries := list.New()
+		queries = list.New()
 		s.queryCallbacks[sequenceNumber] = queries
 	}
 	queries.PushBack(f)

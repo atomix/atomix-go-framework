@@ -51,7 +51,7 @@ func (e *ElectionService) init() {
 	e.Executor.Register("Anoint", e.Anoint)
 	e.Executor.Register("Promote", e.Promote)
 	e.Executor.Register("Evict", e.Evict)
-	e.Executor.Register("GetLeadership", e.GetLeadership)
+	e.Executor.Register("GetTerm", e.GetTerm)
 	e.Executor.Register("Events", e.Events)
 }
 
@@ -77,6 +77,19 @@ func (e *ElectionService) Restore(bytes []byte) error {
 	e.leader = snapshot.Leader
 	e.candidates = snapshot.Candidates
 	return nil
+}
+
+func (e *ElectionService) getTerm() *Term {
+	var leader string
+	if e.leader != nil {
+		leader = e.leader.ID
+	}
+	return &Term{
+		ID:         e.term,
+		Timestamp:  e.timestamp,
+		Leader:     leader,
+		Candidates: e.getCandidates(),
+	}
 }
 
 func (e *ElectionService) getCandidates() []string {
@@ -110,18 +123,12 @@ func (e *ElectionService) Enter(bytes []byte, ch chan<- service.Result) {
 	}
 
 	e.sendEvent(&ListenResponse{
-		Type:       ListenResponse_CHANGED,
-		Term:       e.term,
-		Timestamp:  e.timestamp,
-		Leader:     e.leader.ID,
-		Candidates: e.getCandidates(),
+		Type: ListenResponse_CHANGED,
+		Term: e.getTerm(),
 	})
 
 	ch <- e.NewResult(proto.Marshal(&EnterResponse{
-		Term:       e.term,
-		Timestamp:  e.timestamp,
-		Leader:     e.leader.ID,
-		Candidates: []string{e.leader.ID},
+		Term: e.getTerm(),
 	}))
 }
 
@@ -155,21 +162,14 @@ func (e *ElectionService) Withdraw(bytes []byte, ch chan<- service.Result) {
 		}
 
 		e.sendEvent(&ListenResponse{
-			Type:       ListenResponse_CHANGED,
-			Term:       e.term,
-			Timestamp:  e.timestamp,
-			Leader:     e.leader.ID,
-			Candidates: e.getCandidates(),
+			Type: ListenResponse_CHANGED,
+			Term: e.getTerm(),
 		})
-
-		ch <- e.NewResult(proto.Marshal(&WithdrawResponse{
-			Succeeded: true,
-		}))
-	} else {
-		ch <- e.NewResult(proto.Marshal(&WithdrawResponse{
-			Succeeded: false,
-		}))
 	}
+
+	ch <- e.NewResult(proto.Marshal(&WithdrawResponse{
+		Term: e.getTerm(),
+	}))
 }
 
 func (e *ElectionService) Anoint(bytes []byte, ch chan<- service.Result) {
@@ -183,7 +183,7 @@ func (e *ElectionService) Anoint(bytes []byte, ch chan<- service.Result) {
 
 	if e.leader != nil && e.leader.ID == request.ID {
 		ch <- e.NewResult(proto.Marshal(&AnointResponse{
-			Succeeded: true,
+			Term: e.getTerm(),
 		}))
 		return
 	}
@@ -198,7 +198,7 @@ func (e *ElectionService) Anoint(bytes []byte, ch chan<- service.Result) {
 
 	if leader == nil {
 		ch <- e.NewResult(proto.Marshal(&AnointResponse{
-			Succeeded: false,
+			Term: e.getTerm(),
 		}))
 		return
 	}
@@ -218,15 +218,12 @@ func (e *ElectionService) Anoint(bytes []byte, ch chan<- service.Result) {
 	e.candidates = candidates
 
 	e.sendEvent(&ListenResponse{
-		Type:       ListenResponse_CHANGED,
-		Term:       e.term,
-		Timestamp:  e.timestamp,
-		Leader:     e.leader.ID,
-		Candidates: e.getCandidates(),
+		Type: ListenResponse_CHANGED,
+		Term: e.getTerm(),
 	})
 
 	ch <- e.NewResult(proto.Marshal(&AnointResponse{
-		Succeeded: true,
+		Term: e.getTerm(),
 	}))
 }
 
@@ -241,7 +238,7 @@ func (e *ElectionService) Promote(bytes []byte, ch chan<- service.Result) {
 
 	if e.leader != nil && e.leader.ID == request.ID {
 		ch <- e.NewResult(proto.Marshal(&PromoteResponse{
-			Succeeded: true,
+			Term: e.getTerm(),
 		}))
 		return
 	}
@@ -258,7 +255,7 @@ func (e *ElectionService) Promote(bytes []byte, ch chan<- service.Result) {
 
 	if promote == nil {
 		ch <- e.NewResult(proto.Marshal(&PromoteResponse{
-			Succeeded: false,
+			Term: e.getTerm(),
 		}))
 		return
 	}
@@ -286,15 +283,12 @@ func (e *ElectionService) Promote(bytes []byte, ch chan<- service.Result) {
 	e.candidates = candidates
 
 	e.sendEvent(&ListenResponse{
-		Type:       ListenResponse_CHANGED,
-		Term:       e.term,
-		Timestamp:  e.timestamp,
-		Leader:     e.leader.ID,
-		Candidates: e.getCandidates(),
+		Type: ListenResponse_CHANGED,
+		Term: e.getTerm(),
 	})
 
 	ch <- e.NewResult(proto.Marshal(&AnointResponse{
-		Succeeded: true,
+		Term: e.getTerm(),
 	}))
 }
 
@@ -328,30 +322,20 @@ func (e *ElectionService) Evict(bytes []byte, ch chan<- service.Result) {
 		}
 
 		e.sendEvent(&ListenResponse{
-			Type:       ListenResponse_CHANGED,
-			Term:       e.term,
-			Timestamp:  e.timestamp,
-			Leader:     e.leader.ID,
-			Candidates: e.getCandidates(),
+			Type: ListenResponse_CHANGED,
+			Term: e.getTerm(),
 		})
-
-		ch <- e.NewResult(proto.Marshal(&WithdrawResponse{
-			Succeeded: true,
-		}))
-	} else {
-		ch <- e.NewResult(proto.Marshal(&WithdrawResponse{
-			Succeeded: false,
-		}))
 	}
+
+	ch <- e.NewResult(proto.Marshal(&WithdrawResponse{
+		Term: e.getTerm(),
+	}))
 }
 
-func (e *ElectionService) GetLeadership(bytes []byte, ch chan<- service.Result) {
+func (e *ElectionService) GetTerm(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
-	ch <- e.NewResult(proto.Marshal(&GetLeadershipResponse{
-		Term:       e.term,
-		Timestamp:  e.timestamp,
-		Leader:     e.leader.ID,
-		Candidates: e.getCandidates(),
+	ch <- e.NewResult(proto.Marshal(&GetTermResponse{
+		Term: e.getTerm(),
 	}))
 }
 
