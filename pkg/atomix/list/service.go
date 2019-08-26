@@ -155,7 +155,7 @@ func (l *ListService) Insert(bytes []byte, ch chan<- service.Result) {
 
 	l.sendEvent(&ListenResponse{
 		Type:  ListenResponse_ADDED,
-		Index: uint32(index),
+		Index: index,
 		Value: request.Value,
 	})
 
@@ -186,12 +186,12 @@ func (l *ListService) Set(bytes []byte, ch chan<- service.Result) {
 
 	l.sendEvent(&ListenResponse{
 		Type:  ListenResponse_REMOVED,
-		Index: uint32(index),
+		Index: index,
 		Value: oldValue,
 	})
 	l.sendEvent(&ListenResponse{
 		Type:  ListenResponse_ADDED,
-		Index: uint32(index),
+		Index: index,
 		Value: request.Value,
 	})
 
@@ -246,6 +246,7 @@ func (l *ListService) Remove(bytes []byte, ch chan<- service.Result) {
 
 	l.sendEvent(&ListenResponse{
 		Type:  ListenResponse_REMOVED,
+		Index: index,
 		Value: value,
 	})
 

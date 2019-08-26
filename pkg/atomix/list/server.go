@@ -169,6 +169,7 @@ func (s *listServer) Append(ctx context.Context, request *api.AppendRequest) (*a
 func (s *listServer) Insert(ctx context.Context, request *api.InsertRequest) (*api.InsertResponse, error) {
 	log.Tracef("Received InsertRequest %+v", request)
 	in, err := proto.Marshal(&InsertRequest{
+		Index: request.Index,
 		Value: request.Value,
 	})
 	if err != nil {
@@ -196,6 +197,7 @@ func (s *listServer) Insert(ctx context.Context, request *api.InsertRequest) (*a
 func (s *listServer) Set(ctx context.Context, request *api.SetRequest) (*api.SetResponse, error) {
 	log.Tracef("Received SetRequest %+v", request)
 	in, err := proto.Marshal(&SetRequest{
+		Index: request.Index,
 		Value: request.Value,
 	})
 	if err != nil {
@@ -324,6 +326,7 @@ func (s *listServer) Events(request *api.EventRequest, srv api.ListService_Event
 					eventResponse := &api.EventResponse{
 						Header: result.Header,
 						Type:   getEventType(response.Type),
+						Index:  response.Index,
 						Value:  response.Value,
 					}
 					log.Tracef("Sending EventResponse %+v", response)
