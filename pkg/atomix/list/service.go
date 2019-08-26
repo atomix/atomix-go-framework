@@ -142,13 +142,18 @@ func (l *ListService) Insert(bytes []byte, ch chan<- service.Result) {
 	}
 
 	oldValue := l.values[index]
-	l.values[index] = request.Value
 
-	l.sendEvent(&ListenResponse{
-		Type:  ListenResponse_REMOVED,
-		Index: uint32(index),
-		Value: oldValue,
-	})
+	intIndex := int(index)
+	values := make([]string, 0)
+	for i := range l.values {
+		if i == intIndex {
+			values = append(values, request.Value)
+		}
+		values = append(values, l.values[i])
+	}
+
+	l.values = values
+
 	l.sendEvent(&ListenResponse{
 		Type:  ListenResponse_ADDED,
 		Index: uint32(index),
