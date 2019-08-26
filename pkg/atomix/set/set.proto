@@ -61,7 +61,7 @@ message ClearResponse {
 }
 
 message ListenRequest {
-
+    bool replay = 1;
 }
 
 message ListenResponse {
@@ -69,8 +69,9 @@ message ListenResponse {
     string value = 2;
 
     enum Type {
-        ADDED = 0;
-        REMOVED = 1;
+        NONE = 0;
+        ADDED = 1;
+        REMOVED = 2;
     }
 }
 

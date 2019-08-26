@@ -101,6 +101,8 @@ func (s *SetService) Add(bytes []byte, ch chan<- service.Result) {
 	}
 
 	if _, ok := s.values[request.Value]; !ok {
+		s.values[request.Value] = true
+
 		s.sendEvent(&ListenResponse{
 			Type:  ListenResponse_ADDED,
 			Value: request.Value,
@@ -150,7 +152,20 @@ func (s *SetService) Clear(bytes []byte, ch chan<- service.Result) {
 }
 
 func (s *SetService) Events(bytes []byte, ch chan<- service.Result) {
-	// Keep the channel open
+	request := &ListenRequest{}
+	if err := proto.Unmarshal(bytes, request); err != nil {
+		ch <- s.NewFailure(err)
+		close(ch)
+	}
+
+	if request.Replay {
+		for value := range s.values {
+			ch <- s.NewResult(proto.Marshal(&ListenResponse{
+				Type:  ListenResponse_NONE,
+				Value: value,
+			}))
+		}
+	}
 }
 
 func (s *SetService) Iterate(bytes []byte, ch chan<- service.Result) {

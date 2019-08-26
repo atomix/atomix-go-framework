@@ -175,7 +175,9 @@ func (s *setServer) Clear(ctx context.Context, request *api.ClearRequest) (*api.
 
 func (s *setServer) Events(request *api.EventRequest, srv api.SetService_EventsServer) error {
 	log.Tracef("Received EventRequest %+v", request)
-	in, err := proto.Marshal(&ListenRequest{})
+	in, err := proto.Marshal(&ListenRequest{
+		Replay: request.Replay,
+	})
 	if err != nil {
 		return err
 	}
