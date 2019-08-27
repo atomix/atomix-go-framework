@@ -19,14 +19,14 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-// RegisterSetService registers the set service in the given service registry
-func RegisterSetService(registry *service.ServiceRegistry) {
-	registry.Register("set", newSetService)
+// RegisterService registers the set service in the given service registry
+func RegisterService(registry *service.Registry) {
+	registry.Register("set", newService)
 }
 
-// newSetService returns a new SetService
-func newSetService(context service.Context) service.Service {
-	service := &SetService{
+// newService returns a new Service
+func newService(context service.Context) service.Service {
+	service := &Service{
 		SessionizedService: service.NewSessionizedService(context),
 		values:             make(map[string]bool),
 	}
@@ -34,14 +34,14 @@ func newSetService(context service.Context) service.Service {
 	return service
 }
 
-// SetService is a state machine for a list primitive
-type SetService struct {
+// Service is a state machine for a list primitive
+type Service struct {
 	*service.SessionizedService
 	values map[string]bool
 }
 
 // init initializes the list service
-func (s *SetService) init() {
+func (s *Service) init() {
 	s.Executor.Register("size", s.Size)
 	s.Executor.Register("contains", s.Contains)
 	s.Executor.Register("add", s.Add)
@@ -52,7 +52,7 @@ func (s *SetService) init() {
 }
 
 // Backup backs up the list service
-func (s *SetService) Backup() ([]byte, error) {
+func (s *Service) Backup() ([]byte, error) {
 	snapshot := &SetSnapshot{
 		Values: s.values,
 	}
@@ -60,7 +60,7 @@ func (s *SetService) Backup() ([]byte, error) {
 }
 
 // Restore restores the list service
-func (s *SetService) Restore(bytes []byte) error {
+func (s *Service) Restore(bytes []byte) error {
 	snapshot := &SetSnapshot{}
 	if err := proto.Unmarshal(bytes, snapshot); err != nil {
 		return err
@@ -69,14 +69,16 @@ func (s *SetService) Restore(bytes []byte) error {
 	return nil
 }
 
-func (s *SetService) Size(bytes []byte, ch chan<- service.Result) {
+// Size gets the number of elements in the set
+func (s *Service) Size(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 	ch <- s.NewResult(proto.Marshal(&SizeResponse{
 		Size_: int32(len(s.values)),
 	}))
 }
 
-func (s *SetService) Contains(bytes []byte, ch chan<- service.Result) {
+// Contains checks whether the set contains an element
+func (s *Service) Contains(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &ContainsRequest{}
@@ -91,7 +93,8 @@ func (s *SetService) Contains(bytes []byte, ch chan<- service.Result) {
 	}))
 }
 
-func (s *SetService) Add(bytes []byte, ch chan<- service.Result) {
+// Add adds an element to the set
+func (s *Service) Add(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &AddRequest{}
@@ -118,7 +121,8 @@ func (s *SetService) Add(bytes []byte, ch chan<- service.Result) {
 	}
 }
 
-func (s *SetService) Remove(bytes []byte, ch chan<- service.Result) {
+// Remove removes an element from the set
+func (s *Service) Remove(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &RemoveRequest{}
@@ -145,13 +149,15 @@ func (s *SetService) Remove(bytes []byte, ch chan<- service.Result) {
 	}
 }
 
-func (s *SetService) Clear(bytes []byte, ch chan<- service.Result) {
+// Clear removes all elements from the set
+func (s *Service) Clear(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 	s.values = make(map[string]bool)
 	ch <- s.NewResult(proto.Marshal(&ClearResponse{}))
 }
 
-func (s *SetService) Events(bytes []byte, ch chan<- service.Result) {
+// Events registers a channel on which to send set change events
+func (s *Service) Events(bytes []byte, ch chan<- service.Result) {
 	request := &ListenRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		ch <- s.NewFailure(err)
@@ -168,7 +174,8 @@ func (s *SetService) Events(bytes []byte, ch chan<- service.Result) {
 	}
 }
 
-func (s *SetService) Iterate(bytes []byte, ch chan<- service.Result) {
+// Iterate sends all current set elements on the given channel
+func (s *Service) Iterate(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 	for value := range s.values {
 		ch <- s.NewResult(proto.Marshal(&IterateResponse{
@@ -177,7 +184,7 @@ func (s *SetService) Iterate(bytes []byte, ch chan<- service.Result) {
 	}
 }
 
-func (s *SetService) sendEvent(event *ListenResponse) {
+func (s *Service) sendEvent(event *ListenResponse) {
 	bytes, err := proto.Marshal(event)
 	for _, session := range s.Sessions() {
 		for _, ch := range session.ChannelsOf("events") {

@@ -46,27 +46,29 @@ type SimpleService struct {
 	parent    Context
 }
 
+// Snapshot takes a snapshot of the service
 func (s *SimpleService) Snapshot(writer io.Writer) error {
 	bytes, err := s.Backup()
 	if err != nil {
 		return err
-	} else {
-		length := make([]byte, 4)
-		binary.BigEndian.PutUint32(length, uint32(len(bytes)))
+	}
 
-		_, err = writer.Write(length)
-		if err != nil {
-			return err
-		}
+	length := make([]byte, 4)
+	binary.BigEndian.PutUint32(length, uint32(len(bytes)))
 
-		_, err = writer.Write(bytes)
-		if err !=  nil {
-			return err
-		}
+	_, err = writer.Write(length)
+	if err != nil {
+		return err
+	}
+
+	_, err = writer.Write(bytes)
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
+// Install installs a snapshot to the service
 func (s *SimpleService) Install(reader io.Reader) error {
 	lengthBytes := make([]byte, 4)
 	n, err := reader.Read(lengthBytes)
@@ -87,6 +89,7 @@ func (s *SimpleService) Install(reader io.Reader) error {
 	return s.Restore(bytes)
 }
 
+// Command handles a service command
 func (s *SimpleService) Command(bytes []byte, ch chan<- Output) {
 	s.context.setCommand(s.parent.Timestamp())
 	command := &CommandRequest{}
@@ -129,6 +132,7 @@ func (s *SimpleService) Command(bytes []byte, ch chan<- Output) {
 	}
 }
 
+// Query handles a service query
 func (s *SimpleService) Query(bytes []byte, ch chan<- Output) {
 	query := &QueryRequest{}
 	if err := proto.Unmarshal(bytes, query); err != nil {

@@ -60,6 +60,7 @@ func (s *SessionizedService) Sessions() map[uint64]*Session {
 	return s.sessions
 }
 
+// Snapshot takes a snapshot of the service
 func (s *SessionizedService) Snapshot(writer io.Writer) error {
 	if err := s.snapshotSessions(writer); err != nil {
 		return err
@@ -123,23 +124,24 @@ func (s *SessionizedService) snapshotService(writer io.Writer) error {
 	bytes, err := s.Backup()
 	if err != nil {
 		return err
-	} else {
-		length := make([]byte, 4)
-		binary.BigEndian.PutUint32(length, uint32(len(bytes)))
+	}
 
-		_, err = writer.Write(length)
-		if err != nil {
-			return err
-		}
+	length := make([]byte, 4)
+	binary.BigEndian.PutUint32(length, uint32(len(bytes)))
 
-		_, err = writer.Write(bytes)
-		if err != nil {
-			return err
-		}
+	_, err = writer.Write(length)
+	if err != nil {
+		return err
+	}
+
+	_, err = writer.Write(bytes)
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
+// Install installs a snapshot of the service
 func (s *SessionizedService) Install(reader io.Reader) error {
 	if err := s.installSessions(reader); err != nil {
 		return err
@@ -223,6 +225,7 @@ func (s *SessionizedService) installService(reader io.Reader) error {
 	return s.Restore(bytes)
 }
 
+// CanDelete returns a boolean indicating whether entries up to the given index can be deleted
 func (s *SessionizedService) CanDelete(index uint64) bool {
 	lastCompleted := index
 	for _, session := range s.sessions {
@@ -236,6 +239,7 @@ func (s *SessionizedService) CanDelete(index uint64) bool {
 	return lastCompleted >= index
 }
 
+// Command handles a service command
 func (s *SessionizedService) Command(bytes []byte, ch chan<- Output) {
 	s.context.setCommand(s.parent.Timestamp())
 	request := &SessionRequest{}
@@ -386,6 +390,7 @@ func (s *SessionizedService) applyCloseSession(request *CloseSessionRequest, ch 
 	}
 }
 
+// Query handles a service query
 func (s *SessionizedService) Query(bytes []byte, ch chan<- Output) {
 	request := &SessionRequest{}
 	err := proto.Unmarshal(bytes, request)
@@ -457,14 +462,17 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 	}
 }
 
+// OnOpen is called when a session is opened
 func (s *SessionizedService) OnOpen(session *Session) {
 
 }
 
+// OnExpire is called when a session is expired by the server
 func (s *SessionizedService) OnExpire(session *Session) {
 
 }
 
+// OnClose is called when a session is closed by the client
 func (s *SessionizedService) OnClose(session *Session) {
 
 }

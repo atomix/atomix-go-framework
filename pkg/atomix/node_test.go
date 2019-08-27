@@ -42,7 +42,7 @@ type TestProtocol struct {
 	context      *TestContext
 }
 
-func (p *TestProtocol) Start(cluster Cluster, registry *service.ServiceRegistry) error {
+func (p *TestProtocol) Start(cluster Cluster, registry *service.Registry) error {
 	p.context = &TestContext{}
 	p.stateMachine = service.NewPrimitiveStateMachine(registry, p.context)
 	p.client = &TestClient{

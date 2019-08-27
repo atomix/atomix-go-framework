@@ -58,27 +58,27 @@ func TestScheduler(t *testing.T) {
 	timer2.Cancel()
 
 	// 75 milliseconds later, 3 and 4 should run
-	sched.runScheduledTasks(now.Add(75*time.Millisecond))
+	sched.runScheduledTasks(now.Add(75 * time.Millisecond))
 
 	assert.Equal(t, 0, run2)
 	assert.Equal(t, 1, run3)
 	assert.Equal(t, 1, run4)
 
 	// 175 milliseconds later, 4 should have run twice
-	sched.runScheduledTasks(now.Add(175*time.Millisecond))
+	sched.runScheduledTasks(now.Add(175 * time.Millisecond))
 
 	assert.Equal(t, 0, run2)
 	assert.Equal(t, 1, run3)
 	assert.Equal(t, 2, run4)
 
 	// 275 milliseconds later, 4 should have run 3 times
-	sched.runScheduledTasks(now.Add(275*time.Millisecond))
+	sched.runScheduledTasks(now.Add(275 * time.Millisecond))
 
 	assert.Equal(t, 3, run4)
 
 	timer4.Cancel()
 
-	sched.runScheduledTasks(now.Add(500*time.Millisecond))
+	sched.runScheduledTasks(now.Add(500 * time.Millisecond))
 
 	assert.Equal(t, 1, run1)
 	assert.Equal(t, 0, run2)

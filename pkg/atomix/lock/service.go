@@ -21,14 +21,14 @@ import (
 	"time"
 )
 
-// RegisterLockService registers the map service in the given service registry
-func RegisterLockService(registry *service.ServiceRegistry) {
-	registry.Register("lock", newLockService)
+// RegisterService registers the lock service in the given service registry
+func RegisterService(registry *service.Registry) {
+	registry.Register("lock", newService)
 }
 
-// newLockService returns a new LockService
-func newLockService(context service.Context) service.Service {
-	service := &LockService{
+// newService returns a new Service
+func newService(context service.Context) service.Service {
+	service := &Service{
 		SessionizedService: service.NewSessionizedService(context),
 		queue:              list.New(),
 		timers:             make(map[uint64]service.Timer),
@@ -37,8 +37,8 @@ func newLockService(context service.Context) service.Service {
 	return service
 }
 
-// LockService is a state machine for a list primitive
-type LockService struct {
+// Service is a state machine for a list primitive
+type Service struct {
 	*service.SessionizedService
 	lock   *lockHolder
 	queue  *list.List
@@ -52,15 +52,15 @@ type lockHolder struct {
 	ch      chan<- service.Result
 }
 
-// init initializes the list service
-func (l *LockService) init() {
+// init initializes the lock service
+func (l *Service) init() {
 	l.Executor.Register("lock", l.Lock)
 	l.Executor.Register("unlock", l.Unlock)
 	l.Executor.Register("islocked", l.IsLocked)
 }
 
-// Backup backs up the list service
-func (l *LockService) Backup() ([]byte, error) {
+// Backup backs up the lock service
+func (l *Service) Backup() ([]byte, error) {
 	var lock *LockCall
 	if l.lock != nil {
 		lock = &LockCall{
@@ -89,8 +89,8 @@ func (l *LockService) Backup() ([]byte, error) {
 	return proto.Marshal(snapshot)
 }
 
-// Restore restores the list service
-func (l *LockService) Restore(bytes []byte) error {
+// Restore restores the lock service
+func (l *Service) Restore(bytes []byte) error {
 	snapshot := &LockSnapshot{}
 	if err := proto.Unmarshal(bytes, snapshot); err != nil {
 		return err
@@ -123,7 +123,8 @@ func (l *LockService) Restore(bytes []byte) error {
 	return nil
 }
 
-func (l *LockService) Lock(bytes []byte, ch chan<- service.Result) {
+// Lock attempts to acquire the lock for the current session
+func (l *Service) Lock(bytes []byte, ch chan<- service.Result) {
 	request := &LockRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		ch <- l.NewFailure(err)
@@ -188,7 +189,8 @@ func (l *LockService) Lock(bytes []byte, ch chan<- service.Result) {
 	}
 }
 
-func (l *LockService) Unlock(bytes []byte, ch chan<- service.Result) {
+// Unlock releases the current lock
+func (l *Service) Unlock(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &UnlockRequest{}
@@ -242,7 +244,7 @@ func (l *LockService) Unlock(bytes []byte, ch chan<- service.Result) {
 			l.lock = lock
 
 			lock.ch <- l.NewResult(proto.Marshal(&LockResponse{
-				Index: int64(lock.index),
+				Index:    int64(lock.index),
 				Acquired: true,
 			}))
 			close(lock.ch)
@@ -260,7 +262,8 @@ func (l *LockService) Unlock(bytes []byte, ch chan<- service.Result) {
 	}
 }
 
-func (l *LockService) IsLocked(bytes []byte, ch chan<- service.Result) {
+// IsLocked checks whether the lock is held by a specific session
+func (l *Service) IsLocked(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &IsLockedRequest{}
@@ -275,15 +278,17 @@ func (l *LockService) IsLocked(bytes []byte, ch chan<- service.Result) {
 	}))
 }
 
-func (l *LockService) OnExpire(session *service.Session) {
+// OnExpire releases the lock when the owning session expires
+func (l *Service) OnExpire(session *service.Session) {
 	l.releaseLock(session)
 }
 
-func (l *LockService) OnClose(session *service.Session) {
+// OnClose releases the lock when the owning session is closed
+func (l *Service) OnClose(session *service.Session) {
 	l.releaseLock(session)
 }
 
-func (l *LockService) releaseLock(session *service.Session) {
+func (l *Service) releaseLock(session *service.Session) {
 	// Remove all instances of the session from the queue.
 	element := l.queue.Front()
 	for element != nil {
@@ -320,7 +325,7 @@ func (l *LockService) releaseLock(session *service.Session) {
 			l.lock = lock
 
 			lock.ch <- l.NewResult(proto.Marshal(&LockResponse{
-				Index: int64(lock.index),
+				Index:    int64(lock.index),
 				Acquired: true,
 			}))
 			close(lock.ch)

@@ -25,12 +25,13 @@ import (
 	"google.golang.org/grpc"
 )
 
-func RegisterLockServer(server *grpc.Server, client service.Client) {
-	api.RegisterLockServiceServer(server, NewLockServiceServer(client))
+// RegisterServer registers a lock server with the given gRPC server
+func RegisterServer(server *grpc.Server, client service.Client) {
+	api.RegisterLockServiceServer(server, newServer(client))
 }
 
-func NewLockServiceServer(client service.Client) api.LockServiceServer {
-	return &lockServer{
+func newServer(client service.Client) api.LockServiceServer {
+	return &Server{
 		SessionizedServer: &server.SessionizedServer{
 			Type:   "lock",
 			Client: client,
@@ -38,12 +39,13 @@ func NewLockServiceServer(client service.Client) api.LockServiceServer {
 	}
 }
 
-// lockServer is an implementation of MapServiceServer for the map primitive
-type lockServer struct {
+// Server is an implementation of MapServiceServer for the map primitive
+type Server struct {
 	*server.SessionizedServer
 }
 
-func (s *lockServer) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
+// Create opens a new session
+func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
 	session, err := s.OpenSession(ctx, request.Header, request.Timeout)
 	if err != nil {
@@ -59,7 +61,8 @@ func (s *lockServer) Create(ctx context.Context, request *api.CreateRequest) (*a
 	return response, nil
 }
 
-func (s *lockServer) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
+// KeepAlive keeps an existing session alive
+func (s *Server) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
 	log.Tracef("Received KeepAliveRequest %+v", request)
 	if err := s.KeepAliveSession(ctx, request.Header); err != nil {
 		return nil, err
@@ -73,7 +76,8 @@ func (s *lockServer) KeepAlive(ctx context.Context, request *api.KeepAliveReques
 	return response, nil
 }
 
-func (s *lockServer) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
+// Close closes a session
+func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if request.Delete {
 		if err := s.Delete(ctx, request.Header); err != nil {
@@ -94,7 +98,8 @@ func (s *lockServer) Close(ctx context.Context, request *api.CloseRequest) (*api
 	return response, nil
 }
 
-func (s *lockServer) Lock(ctx context.Context, request *api.LockRequest) (*api.LockResponse, error) {
+// Lock acquires a lock
+func (s *Server) Lock(ctx context.Context, request *api.LockRequest) (*api.LockResponse, error) {
 	log.Tracef("Received LockRequest %+v", request)
 
 	in, err := proto.Marshal(&LockRequest{
@@ -122,7 +127,8 @@ func (s *lockServer) Lock(ctx context.Context, request *api.LockRequest) (*api.L
 	return response, nil
 }
 
-func (s *lockServer) Unlock(ctx context.Context, request *api.UnlockRequest) (*api.UnlockResponse, error) {
+// Unlock releases the lock
+func (s *Server) Unlock(ctx context.Context, request *api.UnlockRequest) (*api.UnlockResponse, error) {
 	log.Tracef("Received UnlockRequest %+v", request)
 	in, err := proto.Marshal(&UnlockRequest{
 		Index: int64(request.Version),
@@ -149,7 +155,8 @@ func (s *lockServer) Unlock(ctx context.Context, request *api.UnlockRequest) (*a
 	return response, nil
 }
 
-func (s *lockServer) IsLocked(ctx context.Context, request *api.IsLockedRequest) (*api.IsLockedResponse, error) {
+// IsLocked checks whether the lock is held by any session
+func (s *Server) IsLocked(ctx context.Context, request *api.IsLockedRequest) (*api.IsLockedResponse, error) {
 	log.Tracef("Received IsLockedRequest %+v", request)
 	in, err := proto.Marshal(&IsLockedRequest{
 		Index: int64(request.Version),

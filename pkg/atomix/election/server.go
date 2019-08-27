@@ -25,12 +25,13 @@ import (
 	"google.golang.org/grpc"
 )
 
-func RegisterElectionServer(server *grpc.Server, client service.Client) {
-	api.RegisterLeaderElectionServiceServer(server, newElectionServiceServer(client))
+// RegisterServer registers an election server with the given gRPC server
+func RegisterServer(server *grpc.Server, client service.Client) {
+	api.RegisterLeaderElectionServiceServer(server, newServer(client))
 }
 
-func newElectionServiceServer(client service.Client) api.LeaderElectionServiceServer {
-	return &electionServer{
+func newServer(client service.Client) api.LeaderElectionServiceServer {
+	return &Server{
 		SessionizedServer: &server.SessionizedServer{
 			Type:   "election",
 			Client: client,
@@ -38,12 +39,13 @@ func newElectionServiceServer(client service.Client) api.LeaderElectionServiceSe
 	}
 }
 
-// electionServer is an implementation of LeaderElectionServiceServer for the election primitive
-type electionServer struct {
+// Server is an implementation of LeaderElectionServiceServer for the election primitive
+type Server struct {
 	*server.SessionizedServer
 }
 
-func (s *electionServer) Enter(ctx context.Context, request *api.EnterRequest) (*api.EnterResponse, error) {
+// Enter enters a candidate in the election
+func (s *Server) Enter(ctx context.Context, request *api.EnterRequest) (*api.EnterResponse, error) {
 	log.Tracef("Received EnterRequest %+v", request)
 	in, err := proto.Marshal(&EnterRequest{
 		ID: request.CandidateID,
@@ -75,7 +77,8 @@ func (s *electionServer) Enter(ctx context.Context, request *api.EnterRequest) (
 	return response, nil
 }
 
-func (s *electionServer) Withdraw(ctx context.Context, request *api.WithdrawRequest) (*api.WithdrawResponse, error) {
+// Withdraw withdraws a candidate from the election
+func (s *Server) Withdraw(ctx context.Context, request *api.WithdrawRequest) (*api.WithdrawResponse, error) {
 	log.Tracef("Received WithdrawRequest %+v", request)
 	in, err := proto.Marshal(&WithdrawRequest{
 		ID: request.CandidateID,
@@ -107,7 +110,8 @@ func (s *electionServer) Withdraw(ctx context.Context, request *api.WithdrawRequ
 	return response, nil
 }
 
-func (s *electionServer) Anoint(ctx context.Context, request *api.AnointRequest) (*api.AnointResponse, error) {
+// Anoint assigns leadership to a candidate
+func (s *Server) Anoint(ctx context.Context, request *api.AnointRequest) (*api.AnointResponse, error) {
 	log.Tracef("Received AnointRequest %+v", request)
 	in, err := proto.Marshal(&AnointRequest{
 		ID: request.CandidateID,
@@ -139,7 +143,8 @@ func (s *electionServer) Anoint(ctx context.Context, request *api.AnointRequest)
 	return response, nil
 }
 
-func (s *electionServer) Promote(ctx context.Context, request *api.PromoteRequest) (*api.PromoteResponse, error) {
+// Promote increases the priority of a candidate
+func (s *Server) Promote(ctx context.Context, request *api.PromoteRequest) (*api.PromoteResponse, error) {
 	log.Tracef("Received PromoteRequest %+v", request)
 	in, err := proto.Marshal(&PromoteRequest{
 		ID: request.CandidateID,
@@ -171,7 +176,8 @@ func (s *electionServer) Promote(ctx context.Context, request *api.PromoteReques
 	return response, nil
 }
 
-func (s *electionServer) Evict(ctx context.Context, request *api.EvictRequest) (*api.EvictResponse, error) {
+// Evict removes a candidate from the election
+func (s *Server) Evict(ctx context.Context, request *api.EvictRequest) (*api.EvictResponse, error) {
 	log.Tracef("Received EvictRequest %+v", request)
 	in, err := proto.Marshal(&EvictRequest{
 		ID: request.CandidateID,
@@ -203,7 +209,8 @@ func (s *electionServer) Evict(ctx context.Context, request *api.EvictRequest) (
 	return response, nil
 }
 
-func (s *electionServer) GetTerm(ctx context.Context, request *api.GetTermRequest) (*api.GetTermResponse, error) {
+// GetTerm gets the current election term
+func (s *Server) GetTerm(ctx context.Context, request *api.GetTermRequest) (*api.GetTermResponse, error) {
 	log.Tracef("Received GetTermRequest %+v", request)
 	in, err := proto.Marshal(&GetTermRequest{})
 	if err != nil {
@@ -233,7 +240,8 @@ func (s *electionServer) GetTerm(ctx context.Context, request *api.GetTermReques
 	return response, nil
 }
 
-func (s *electionServer) Events(request *api.EventRequest, stream api.LeaderElectionService_EventsServer) error {
+// Events lists for election change events
+func (s *Server) Events(request *api.EventRequest, stream api.LeaderElectionService_EventsServer) error {
 	log.Tracef("Received EventRequest %+v", request)
 	in, err := proto.Marshal(&ListenRequest{})
 	if err != nil {
@@ -243,38 +251,38 @@ func (s *electionServer) Events(request *api.EventRequest, stream api.LeaderElec
 	ch := make(chan server.SessionOutput)
 	if err := s.CommandStream("Events", in, request.Header, ch); err != nil {
 		return err
-	} else {
-		for result := range ch {
-			if result.Failed() {
-				return result.Error
-			} else {
-				response := &ListenResponse{}
-				if err = proto.Unmarshal(result.Value, response); err != nil {
-					return err
-				} else {
-					eventResponse := &api.EventResponse{
-						Header: result.Header,
-						Type:   api.EventResponse_CHANGED,
-						Term: &api.Term{
-							ID:         response.Term.ID,
-							Timestamp:  response.Term.Timestamp,
-							Leader:     response.Term.Leader,
-							Candidates: response.Term.Candidates,
-						},
-					}
-					log.Tracef("Sending EventResponse %+v", response)
-					if err = stream.Send(eventResponse); err != nil {
-						return err
-					}
-				}
-			}
+	}
+
+	for result := range ch {
+		if result.Failed() {
+			return result.Error
+		}
+
+		response := &ListenResponse{}
+		if err = proto.Unmarshal(result.Value, response); err != nil {
+			return err
+		}
+		eventResponse := &api.EventResponse{
+			Header: result.Header,
+			Type:   api.EventResponse_CHANGED,
+			Term: &api.Term{
+				ID:         response.Term.ID,
+				Timestamp:  response.Term.Timestamp,
+				Leader:     response.Term.Leader,
+				Candidates: response.Term.Candidates,
+			},
+		}
+		log.Tracef("Sending EventResponse %+v", response)
+		if err = stream.Send(eventResponse); err != nil {
+			return err
 		}
 	}
 	log.Tracef("Finished EventRequest %+v", request)
 	return nil
 }
 
-func (s *electionServer) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
+// Create opens a new session
+func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
 	session, err := s.OpenSession(ctx, request.Header, request.Timeout)
 	if err != nil {
@@ -290,7 +298,8 @@ func (s *electionServer) Create(ctx context.Context, request *api.CreateRequest)
 	return response, nil
 }
 
-func (s *electionServer) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
+// KeepAlive keeps an existing session alive
+func (s *Server) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
 	log.Tracef("Received KeepAliveRequest %+v", request)
 	if err := s.KeepAliveSession(ctx, request.Header); err != nil {
 		return nil, err
@@ -304,7 +313,8 @@ func (s *electionServer) KeepAlive(ctx context.Context, request *api.KeepAliveRe
 	return response, nil
 }
 
-func (s *electionServer) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
+// Close closes a session
+func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if request.Delete {
 		if err := s.Delete(ctx, request.Header); err != nil {

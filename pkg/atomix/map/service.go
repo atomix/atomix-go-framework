@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package _map
+package _map //nolint:golint
 
 import (
 	"bytes"
@@ -20,14 +20,14 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-// RegisterMapService registers the map service in the given service registry
-func RegisterMapService(registry *service.ServiceRegistry) {
-	registry.Register("map", newMapService)
+// RegisterService registers the map service in the given service registry
+func RegisterService(registry *service.Registry) {
+	registry.Register("map", newService)
 }
 
-// newMapService returns a new MapService
-func newMapService(context service.Context) service.Service {
-	service := &MapService{
+// newService returns a new Service
+func newService(context service.Context) service.Service {
+	service := &Service{
 		SessionizedService: service.NewSessionizedService(context),
 		entries:            make(map[string]*MapEntryValue),
 		timers:             make(map[string]service.Timer),
@@ -36,15 +36,15 @@ func newMapService(context service.Context) service.Service {
 	return service
 }
 
-// MapService is a state machine for a map primitive
-type MapService struct {
+// Service is a state machine for a map primitive
+type Service struct {
 	*service.SessionizedService
 	entries map[string]*MapEntryValue
 	timers  map[string]service.Timer
 }
 
 // init initializes the map service
-func (m *MapService) init() {
+func (m *Service) init() {
 	m.Executor.Register("put", m.Put)
 	m.Executor.Register("replace", m.Replace)
 	m.Executor.Register("remove", m.Remove)
@@ -57,7 +57,7 @@ func (m *MapService) init() {
 }
 
 // Backup backs up the map service
-func (m *MapService) Backup() ([]byte, error) {
+func (m *Service) Backup() ([]byte, error) {
 	snapshot := &MapSnapshot{
 		Entries: m.entries,
 	}
@@ -65,7 +65,7 @@ func (m *MapService) Backup() ([]byte, error) {
 }
 
 // Restore restores the map service
-func (m *MapService) Restore(bytes []byte) error {
+func (m *Service) Restore(bytes []byte) error {
 	snapshot := &MapSnapshot{}
 	if err := proto.Unmarshal(bytes, snapshot); err != nil {
 		return err
@@ -75,7 +75,7 @@ func (m *MapService) Restore(bytes []byte) error {
 }
 
 // Put puts a key/value pair in the map
-func (m *MapService) Put(value []byte, ch chan<- service.Result) {
+func (m *Service) Put(value []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &PutRequest{}
@@ -104,7 +104,7 @@ func (m *MapService) Put(value []byte, ch chan<- service.Result) {
 		m.entries[request.Key] = newValue
 
 		// Schedule the timeout for the value if necessary.
-		m.scheduleTtl(request.Key, newValue)
+		m.scheduleTTL(request.Key, newValue)
 
 		// Publish an event to listener streams.
 		m.sendEvent(&ListenResponse{
@@ -118,17 +118,17 @@ func (m *MapService) Put(value []byte, ch chan<- service.Result) {
 			Status: UpdateStatus_OK,
 		}))
 		return
-	} else {
-		// If the version is -1 then reject the request.
-		// If the version is positive then compare the version to the current version.
-		if request.IfEmpty || (request.Version > 0 && request.Version != oldValue.Version) {
-			ch <- m.NewResult(proto.Marshal(&PutResponse{
-				Status:          UpdateStatus_PRECONDITION_FAILED,
-				PreviousValue:   oldValue.Value,
-				PreviousVersion: oldValue.Version,
-			}))
-			return
-		}
+	}
+
+	// If the version is -1 then reject the request.
+	// If the version is positive then compare the version to the current version.
+	if request.IfEmpty || (request.Version > 0 && request.Version != oldValue.Version) {
+		ch <- m.NewResult(proto.Marshal(&PutResponse{
+			Status:          UpdateStatus_PRECONDITION_FAILED,
+			PreviousValue:   oldValue.Value,
+			PreviousVersion: oldValue.Version,
+		}))
+		return
 	}
 
 	// If the value is equal to the current value, return a no-op.
@@ -151,7 +151,7 @@ func (m *MapService) Put(value []byte, ch chan<- service.Result) {
 	m.entries[request.Key] = newValue
 
 	// Schedule the timeout for the value if necessary.
-	m.scheduleTtl(request.Key, newValue)
+	m.scheduleTTL(request.Key, newValue)
 
 	// Publish an event to listener streams.
 	m.sendEvent(&ListenResponse{
@@ -171,7 +171,7 @@ func (m *MapService) Put(value []byte, ch chan<- service.Result) {
 }
 
 // Replace replaces a key/value pair in the map
-func (m *MapService) Replace(value []byte, ch chan<- service.Result) {
+func (m *Service) Replace(value []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &ReplaceRequest{}
@@ -215,7 +215,7 @@ func (m *MapService) Replace(value []byte, ch chan<- service.Result) {
 	m.entries[request.Key] = newValue
 
 	// Schedule the timeout for the value if necessary.
-	m.scheduleTtl(request.Key, newValue)
+	m.scheduleTTL(request.Key, newValue)
 
 	// Publish an event to listener streams.
 	m.sendEvent(&ListenResponse{
@@ -236,7 +236,7 @@ func (m *MapService) Replace(value []byte, ch chan<- service.Result) {
 }
 
 // Remove removes a key/value pair from the map
-func (m *MapService) Remove(bytes []byte, ch chan<- service.Result) {
+func (m *Service) Remove(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &RemoveRequest{}
@@ -265,7 +265,7 @@ func (m *MapService) Remove(bytes []byte, ch chan<- service.Result) {
 	delete(m.entries, request.Key)
 
 	// Cancel any TTLs.
-	m.cancelTtl(request.Key)
+	m.cancelTTL(request.Key)
 
 	// Publish an event to listener streams.
 	m.sendEvent(&ListenResponse{
@@ -283,7 +283,7 @@ func (m *MapService) Remove(bytes []byte, ch chan<- service.Result) {
 }
 
 // Get gets a value from the map
-func (m *MapService) Get(bytes []byte, ch chan<- service.Result) {
+func (m *Service) Get(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &GetRequest{}
@@ -304,7 +304,7 @@ func (m *MapService) Get(bytes []byte, ch chan<- service.Result) {
 }
 
 // ContainsKey checks if the map contains a key
-func (m *MapService) ContainsKey(bytes []byte, ch chan<- service.Result) {
+func (m *Service) ContainsKey(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &ContainsKeyRequest{}
@@ -320,7 +320,7 @@ func (m *MapService) ContainsKey(bytes []byte, ch chan<- service.Result) {
 }
 
 // Size returns the size of the map
-func (m *MapService) Size(bytes []byte, ch chan<- service.Result) {
+func (m *Service) Size(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 	ch <- m.NewResult(proto.Marshal(&SizeResponse{
 		Size_: int32(len(m.entries)),
@@ -328,14 +328,14 @@ func (m *MapService) Size(bytes []byte, ch chan<- service.Result) {
 }
 
 // Clear removes all entries from the map
-func (m *MapService) Clear(value []byte, ch chan<- service.Result) {
+func (m *Service) Clear(value []byte, ch chan<- service.Result) {
 	defer close(ch)
 	m.entries = make(map[string]*MapEntryValue)
 	ch <- m.NewResult(proto.Marshal(&ClearResponse{}))
 }
 
 // Events sends change events to the client
-func (m *MapService) Events(bytes []byte, ch chan<- service.Result) {
+func (m *Service) Events(bytes []byte, ch chan<- service.Result) {
 	request := &ListenRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		ch <- m.NewFailure(err)
@@ -355,7 +355,7 @@ func (m *MapService) Events(bytes []byte, ch chan<- service.Result) {
 }
 
 // Entries returns a stream of entries to the client
-func (m *MapService) Entries(value []byte, ch chan<- service.Result) {
+func (m *Service) Entries(value []byte, ch chan<- service.Result) {
 	defer close(ch)
 	for key, entry := range m.entries {
 		ch <- m.NewResult(proto.Marshal(&EntriesResponse{
@@ -366,8 +366,8 @@ func (m *MapService) Entries(value []byte, ch chan<- service.Result) {
 	}
 }
 
-func (m *MapService) scheduleTtl(key string, value *MapEntryValue) {
-	m.cancelTtl(key)
+func (m *Service) scheduleTTL(key string, value *MapEntryValue) {
+	m.cancelTTL(key)
 	if value.TTL != nil {
 		m.timers[key] = m.Scheduler.ScheduleOnce(value.Created.Add(*value.TTL).Sub(m.Context.Timestamp()), func() {
 			delete(m.entries, key)
@@ -381,14 +381,14 @@ func (m *MapService) scheduleTtl(key string, value *MapEntryValue) {
 	}
 }
 
-func (m *MapService) cancelTtl(key string) {
+func (m *Service) cancelTTL(key string) {
 	timer, ok := m.timers[key]
 	if ok {
 		timer.Cancel()
 	}
 }
 
-func (m *MapService) sendEvent(event *ListenResponse) {
+func (m *Service) sendEvent(event *ListenResponse) {
 	bytes, _ := proto.Marshal(event)
 	for _, session := range m.Sessions() {
 		for _, ch := range session.ChannelsOf("events") {

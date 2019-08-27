@@ -48,8 +48,7 @@ func (e *executor) Execute(name string, bytes []byte, ch chan<- Result) error {
 	op, ok := e.operations[name]
 	if !ok {
 		return fmt.Errorf("unknown operation %s", name)
-	} else {
-		op(bytes, ch)
 	}
+	op(bytes, ch)
 	return nil
 }

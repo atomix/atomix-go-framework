@@ -159,7 +159,7 @@ func newTestQueryRequest(t *testing.T, bytes []byte) []byte {
 	return bytes
 }
 
-func getServiceRegistry() *ServiceRegistry {
+func getServiceRegistry() *Registry {
 	registry := NewServiceRegistry()
 	RegisterTestService(registry)
 	return registry

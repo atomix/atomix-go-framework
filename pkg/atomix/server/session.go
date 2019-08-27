@@ -29,6 +29,7 @@ type SessionizedServer struct {
 	Type   string
 }
 
+// Write sends a write to the service
 func (s *SessionizedServer) Write(ctx context.Context, request []byte, header *headers.RequestHeader) ([]byte, error) {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
@@ -74,6 +75,7 @@ func (s *SessionizedServer) Write(ctx context.Context, request []byte, header *h
 	return serviceResponse.GetCommand(), nil
 }
 
+// WriteStream sends a streaming write to the service
 func (s *SessionizedServer) WriteStream(request []byte, header *headers.RequestHeader, ch chan<- service.Output) error {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
@@ -121,6 +123,7 @@ func (s *SessionizedServer) WriteStream(request []byte, header *headers.RequestH
 	return nil
 }
 
+// Read sends a read to the service
 func (s *SessionizedServer) Read(ctx context.Context, request []byte, header *headers.RequestHeader) ([]byte, error) {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
@@ -165,6 +168,7 @@ func (s *SessionizedServer) Read(ctx context.Context, request []byte, header *he
 	return serviceResponse.GetQuery(), nil
 }
 
+// ReadStream sends a streaming read to the service
 func (s *SessionizedServer) ReadStream(request []byte, header *headers.RequestHeader, ch chan<- service.Output) error {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
@@ -212,6 +216,7 @@ func (s *SessionizedServer) ReadStream(request []byte, header *headers.RequestHe
 	return nil
 }
 
+// Command submits a command to the service
 func (s *SessionizedServer) Command(ctx context.Context, name string, input []byte, header *headers.RequestHeader) ([]byte, *headers.ResponseHeader, error) {
 	sessionRequest := &service.SessionRequest{
 		Request: &service.SessionRequest_Command{
@@ -252,6 +257,7 @@ func (s *SessionizedServer) Command(ctx context.Context, name string, input []by
 	return commandResponse.Output, responseHeader, nil
 }
 
+// CommandStream submits a streaming command to the service
 func (s *SessionizedServer) CommandStream(name string, input []byte, header *headers.RequestHeader, ch chan<- SessionOutput) error {
 	sessionRequest := &service.SessionRequest{
 		Request: &service.SessionRequest_Command{
@@ -314,6 +320,7 @@ func (s *SessionizedServer) CommandStream(name string, input []byte, header *hea
 	return nil
 }
 
+// Query submits a query to the service
 func (s *SessionizedServer) Query(ctx context.Context, name string, input []byte, header *headers.RequestHeader) ([]byte, *headers.ResponseHeader, error) {
 	sessionRequest := &service.SessionRequest{
 		Request: &service.SessionRequest_Query{
@@ -353,6 +360,7 @@ func (s *SessionizedServer) Query(ctx context.Context, name string, input []byte
 	return queryResponse.Output, responseHeader, nil
 }
 
+// QueryStream submits a streaming query to the service
 func (s *SessionizedServer) QueryStream(name string, input []byte, header *headers.RequestHeader, ch chan<- SessionOutput) error {
 	sessionRequest := &service.SessionRequest{
 		Request: &service.SessionRequest_Query{
@@ -414,6 +422,7 @@ func (s *SessionizedServer) QueryStream(name string, input []byte, header *heade
 	return nil
 }
 
+// OpenSession opens a new session
 func (s *SessionizedServer) OpenSession(ctx context.Context, header *headers.RequestHeader, timeout *time.Duration) (uint64, error) {
 	sessionRequest := &service.SessionRequest{
 		Request: &service.SessionRequest_OpenSession{
@@ -442,6 +451,7 @@ func (s *SessionizedServer) OpenSession(ctx context.Context, header *headers.Req
 	return sessionResponse.GetOpenSession().SessionID, nil
 }
 
+// KeepAliveSession keeps a session alive
 func (s *SessionizedServer) KeepAliveSession(ctx context.Context, header *headers.RequestHeader) error {
 	streams := make(map[uint64]uint64)
 	for _, stream := range header.Streams {
@@ -472,6 +482,7 @@ func (s *SessionizedServer) KeepAliveSession(ctx context.Context, header *header
 	return proto.Unmarshal(bytes, sessionResponse)
 }
 
+// CloseSession closes a session
 func (s *SessionizedServer) CloseSession(ctx context.Context, header *headers.RequestHeader) error {
 	sessionRequest := &service.SessionRequest{
 		Request: &service.SessionRequest_CloseSession{
@@ -495,6 +506,7 @@ func (s *SessionizedServer) CloseSession(ctx context.Context, header *headers.Re
 	return proto.Unmarshal(bytes, sessionResponse)
 }
 
+// Delete deletes the service
 func (s *SessionizedServer) Delete(ctx context.Context, header *headers.RequestHeader) error {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{

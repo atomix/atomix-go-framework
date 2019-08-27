@@ -16,7 +16,7 @@ package service
 
 import "context"
 
-// Atomix protocol client
+// Client is the interface for protocol clients
 type Client interface {
 	// Write sends a write request
 	Write(ctx context.Context, input []byte, ch chan<- Output) error

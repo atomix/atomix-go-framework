@@ -20,14 +20,14 @@ import (
 	"time"
 )
 
-// RegisterElectionService registers the election service in the given service registry
-func RegisterElectionService(registry *service.ServiceRegistry) {
-	registry.Register("election", newElectionService)
+// RegisterService registers the election service in the given service registry
+func RegisterService(registry *service.Registry) {
+	registry.Register("election", newService)
 }
 
-// newElectionService returns a new ElectionService
-func newElectionService(context service.Context) service.Service {
-	service := &ElectionService{
+// newService returns a new Service
+func newService(context service.Context) service.Service {
+	service := &Service{
 		SessionizedService: service.NewSessionizedService(context),
 		candidates:         make([]*ElectionRegistration, 0),
 	}
@@ -35,8 +35,8 @@ func newElectionService(context service.Context) service.Service {
 	return service
 }
 
-// ElectionService is a state machine for an election primitive
-type ElectionService struct {
+// Service is a state machine for an election primitive
+type Service struct {
 	*service.SessionizedService
 	leader     *ElectionRegistration
 	term       uint64
@@ -45,7 +45,7 @@ type ElectionService struct {
 }
 
 // init initializes the election service
-func (e *ElectionService) init() {
+func (e *Service) init() {
 	e.Executor.Register("Enter", e.Enter)
 	e.Executor.Register("Withdraw", e.Withdraw)
 	e.Executor.Register("Anoint", e.Anoint)
@@ -56,7 +56,7 @@ func (e *ElectionService) init() {
 }
 
 // Backup backs up the list service
-func (e *ElectionService) Backup() ([]byte, error) {
+func (e *Service) Backup() ([]byte, error) {
 	snapshot := &ElectionSnapshot{
 		Term:       e.term,
 		Timestamp:  e.timestamp,
@@ -67,7 +67,7 @@ func (e *ElectionService) Backup() ([]byte, error) {
 }
 
 // Restore restores the list service
-func (e *ElectionService) Restore(bytes []byte) error {
+func (e *Service) Restore(bytes []byte) error {
 	snapshot := &ElectionSnapshot{}
 	if err := proto.Unmarshal(bytes, snapshot); err != nil {
 		return err
@@ -79,7 +79,8 @@ func (e *ElectionService) Restore(bytes []byte) error {
 	return nil
 }
 
-func (e *ElectionService) getTerm() *Term {
+// getTerm returns the current election term
+func (e *Service) getTerm() *Term {
 	var leader string
 	if e.leader != nil {
 		leader = e.leader.ID
@@ -92,7 +93,8 @@ func (e *ElectionService) getTerm() *Term {
 	}
 }
 
-func (e *ElectionService) getCandidates() []string {
+// getCandidates returns a slice of candidate IDs
+func (e *Service) getCandidates() []string {
 	candidates := make([]string, len(e.candidates))
 	for i, candidate := range e.candidates {
 		candidates[i] = candidate.ID
@@ -100,7 +102,8 @@ func (e *ElectionService) getCandidates() []string {
 	return candidates
 }
 
-func (e *ElectionService) Enter(bytes []byte, ch chan<- service.Result) {
+// Enter enters a candidate in the election
+func (e *Service) Enter(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &EnterRequest{}
@@ -132,7 +135,8 @@ func (e *ElectionService) Enter(bytes []byte, ch chan<- service.Result) {
 	}))
 }
 
-func (e *ElectionService) Withdraw(bytes []byte, ch chan<- service.Result) {
+// Withdraw withdraws a candidate from the election
+func (e *Service) Withdraw(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &WithdrawRequest{}
@@ -172,7 +176,8 @@ func (e *ElectionService) Withdraw(bytes []byte, ch chan<- service.Result) {
 	}))
 }
 
-func (e *ElectionService) Anoint(bytes []byte, ch chan<- service.Result) {
+// Anoint assigns leadership to a candidate
+func (e *Service) Anoint(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &AnointRequest{}
@@ -227,7 +232,8 @@ func (e *ElectionService) Anoint(bytes []byte, ch chan<- service.Result) {
 	}))
 }
 
-func (e *ElectionService) Promote(bytes []byte, ch chan<- service.Result) {
+// Promote increases the priority of a candidate
+func (e *Service) Promote(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &PromoteRequest{}
@@ -292,7 +298,8 @@ func (e *ElectionService) Promote(bytes []byte, ch chan<- service.Result) {
 	}))
 }
 
-func (e *ElectionService) Evict(bytes []byte, ch chan<- service.Result) {
+// Evict removes a candidate from the election
+func (e *Service) Evict(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &EvictRequest{}
@@ -332,18 +339,20 @@ func (e *ElectionService) Evict(bytes []byte, ch chan<- service.Result) {
 	}))
 }
 
-func (e *ElectionService) GetTerm(bytes []byte, ch chan<- service.Result) {
+// GetTerm gets the current election term
+func (e *Service) GetTerm(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 	ch <- e.NewResult(proto.Marshal(&GetTermResponse{
 		Term: e.getTerm(),
 	}))
 }
 
-func (e *ElectionService) Events(bytes []byte, ch chan<- service.Result) {
+// Events registers the given channel to receive election events
+func (e *Service) Events(bytes []byte, ch chan<- service.Result) {
 	// Keep the stream open
 }
 
-func (e *ElectionService) sendEvent(event *ListenResponse) {
+func (e *Service) sendEvent(event *ListenResponse) {
 	bytes, err := proto.Marshal(event)
 	for _, session := range e.Sessions() {
 		for _, ch := range session.ChannelsOf("Events") {

@@ -16,11 +16,14 @@ package service
 
 import "time"
 
+// OperationType is the type for a service operation
 type OperationType string
 
 const (
+	// OpTypeCommand is an OperationType indicating a command operation
 	OpTypeCommand OperationType = "command"
-	OpTypeQuery   OperationType = "query"
+	// OpTypeQuery is an OperationType indicating a query operation
+	OpTypeQuery OperationType = "query"
 )
 
 // Service is an interface for primitive services
@@ -34,24 +37,24 @@ type Service interface {
 	Restore(bytes []byte) error
 }
 
-// ServiceRegistry is a registry of service types
-type ServiceRegistry struct {
+// Registry is a registry of service types
+type Registry struct {
 	types map[string]func(ctx Context) Service
 }
 
 // Register registers a new primitive type
-func (r *ServiceRegistry) Register(name string, f func(ctx Context) Service) {
+func (r *Registry) Register(name string, f func(ctx Context) Service) {
 	r.types[name] = f
 }
 
 // getType returns a service type by name
-func (r *ServiceRegistry) getType(name string) func(sctx Context) Service {
+func (r *Registry) getType(name string) func(sctx Context) Service {
 	return r.types[name]
 }
 
 // NewServiceRegistry returns a new primitive type registry
-func NewServiceRegistry() *ServiceRegistry {
-	return &ServiceRegistry{types: make(map[string]func(ctx Context) Service)}
+func NewServiceRegistry() *Registry {
+	return &Registry{types: make(map[string]func(ctx Context) Service)}
 }
 
 // service is an internal base for service implementations

@@ -39,7 +39,6 @@ type Timer interface {
 
 	// Cancel cancels the timer, preventing it from running in the future
 	Cancel()
-
 }
 
 func newScheduler() *scheduler {
@@ -66,9 +65,9 @@ func (s *scheduler) Execute(f func()) {
 func (s *scheduler) ScheduleOnce(delay time.Duration, f func()) Timer {
 	task := &task{
 		scheduler: s,
-		time: time.Now().Add(delay),
-		interval: 0,
-		callback: f,
+		time:      time.Now().Add(delay),
+		interval:  0,
+		callback:  f,
 	}
 	s.schedule(task)
 	return task
@@ -77,9 +76,9 @@ func (s *scheduler) ScheduleOnce(delay time.Duration, f func()) Timer {
 func (s *scheduler) ScheduleRepeat(delay time.Duration, interval time.Duration, f func()) Timer {
 	task := &task{
 		scheduler: s,
-		time: time.Now().Add(delay),
-		interval: interval,
-		callback: f,
+		time:      time.Now().Add(delay),
+		interval:  interval,
+		callback:  f,
 	}
 	s.schedule(task)
 	return task
@@ -171,10 +170,10 @@ func (s *scheduler) schedule(t *task) {
 type task struct {
 	Timer
 	scheduler *scheduler
-	interval time.Duration
-	callback func()
-	time time.Time
-	element *list.Element
+	interval  time.Duration
+	callback  func()
+	time      time.Time
+	element   *list.Element
 }
 
 func (t *task) isRunnable(time time.Time) bool {

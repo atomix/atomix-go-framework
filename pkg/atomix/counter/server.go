@@ -25,12 +25,13 @@ import (
 	"google.golang.org/grpc"
 )
 
-func RegisterCounterServer(server *grpc.Server, client service.Client) {
-	api.RegisterCounterServiceServer(server, NewCounterServiceServer(client))
+// RegisterServer registers a counter server with the given gRPC server
+func RegisterServer(server *grpc.Server, client service.Client) {
+	api.RegisterCounterServiceServer(server, newServer(client))
 }
 
-func NewCounterServiceServer(client service.Client) api.CounterServiceServer {
-	return &counterServer{
+func newServer(client service.Client) api.CounterServiceServer {
+	return &Server{
 		SimpleServer: &server.SimpleServer{
 			Type:   "counter",
 			Client: client,
@@ -38,12 +39,13 @@ func NewCounterServiceServer(client service.Client) api.CounterServiceServer {
 	}
 }
 
-// counterServer is an implementation of CounterServiceServer for the counter primitive
-type counterServer struct {
+// Server is an implementation of CounterServiceServer for the counter primitive
+type Server struct {
 	*server.SimpleServer
 }
 
-func (s *counterServer) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
+// Create opens a new session
+func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
 	if err := s.Open(ctx, request.Header); err != nil {
 		return nil, err
@@ -56,7 +58,8 @@ func (s *counterServer) Create(ctx context.Context, request *api.CreateRequest) 
 	return response, nil
 }
 
-func (s *counterServer) Set(ctx context.Context, request *api.SetRequest) (*api.SetResponse, error) {
+// Set sets the current value of the counter
+func (s *Server) Set(ctx context.Context, request *api.SetRequest) (*api.SetResponse, error) {
 	log.Tracef("Received SetRequest %+v", request)
 
 	in, err := proto.Marshal(&SetRequest{
@@ -83,7 +86,8 @@ func (s *counterServer) Set(ctx context.Context, request *api.SetRequest) (*api.
 	return response, nil
 }
 
-func (s *counterServer) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
+// Get gets the current value of the counter
+func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
 	log.Tracef("Received GetRequest %+v", request)
 
 	in, err := proto.Marshal(&GetRequest{})
@@ -109,7 +113,8 @@ func (s *counterServer) Get(ctx context.Context, request *api.GetRequest) (*api.
 	return response, nil
 }
 
-func (s *counterServer) Increment(ctx context.Context, request *api.IncrementRequest) (*api.IncrementResponse, error) {
+// Increment increments the value of the counter by a delta
+func (s *Server) Increment(ctx context.Context, request *api.IncrementRequest) (*api.IncrementResponse, error) {
 	log.Tracef("Received IncrementRequest %+v", request)
 
 	in, err := proto.Marshal(&IncrementRequest{
@@ -138,7 +143,8 @@ func (s *counterServer) Increment(ctx context.Context, request *api.IncrementReq
 	return response, nil
 }
 
-func (s *counterServer) Decrement(ctx context.Context, request *api.DecrementRequest) (*api.DecrementResponse, error) {
+// Decrement decrements the value of the counter by a delta
+func (s *Server) Decrement(ctx context.Context, request *api.DecrementRequest) (*api.DecrementResponse, error) {
 	log.Tracef("Received DecrementRequest %+v", request)
 
 	in, err := proto.Marshal(&DecrementRequest{
@@ -167,7 +173,8 @@ func (s *counterServer) Decrement(ctx context.Context, request *api.DecrementReq
 	return response, nil
 }
 
-func (s *counterServer) CheckAndSet(ctx context.Context, request *api.CheckAndSetRequest) (*api.CheckAndSetResponse, error) {
+// CheckAndSet updates the value of the counter conditionally
+func (s *Server) CheckAndSet(ctx context.Context, request *api.CheckAndSetRequest) (*api.CheckAndSetResponse, error) {
 	log.Tracef("Received CheckAndSetRequest %+v", request)
 
 	in, err := proto.Marshal(&CheckAndSetRequest{
@@ -196,7 +203,8 @@ func (s *counterServer) CheckAndSet(ctx context.Context, request *api.CheckAndSe
 	return response, nil
 }
 
-func (s *counterServer) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
+// Close closes a session
+func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if request.Delete {
 		if err := s.Delete(ctx, request.Header); err != nil {

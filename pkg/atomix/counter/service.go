@@ -19,37 +19,37 @@ import (
 	"github.com/gogo/protobuf/proto"
 )
 
-// RegisterCounterService registers the counter service in the given service registry
-func RegisterCounterService(registry *service.ServiceRegistry) {
-	registry.Register("counter", newCounterService)
+// RegisterService registers the counter service in the given service registry
+func RegisterService(registry *service.Registry) {
+	registry.Register("counter", newService)
 }
 
-// newCounterService returns a new CounterService
-func newCounterService(context service.Context) service.Service {
-	service := &CounterService{
+// newService returns a new Service
+func newService(context service.Context) service.Service {
+	service := &Service{
 		SimpleService: service.NewSimpleService(context),
 	}
 	service.init()
 	return service
 }
 
-// CounterService is a state machine for a counter primitive
-type CounterService struct {
+// Service is a state machine for a counter primitive
+type Service struct {
 	*service.SimpleService
 	value int64
 }
 
 // init initializes the list service
-func (c *CounterService) init() {
+func (c *Service) init() {
 	c.Executor.Register("get", c.Get)
 	c.Executor.Register("set", c.Set)
 	c.Executor.Register("increment", c.Increment)
 	c.Executor.Register("decrement", c.Decrement)
-	c.Executor.Register("cas", c.CheckAndSet)
+	c.Executor.Register("cas", c.CAS)
 }
 
 // Backup backs up the list service
-func (c *CounterService) Backup() ([]byte, error) {
+func (c *Service) Backup() ([]byte, error) {
 	snapshot := &CounterSnapshot{
 		Value: c.value,
 	}
@@ -57,7 +57,7 @@ func (c *CounterService) Backup() ([]byte, error) {
 }
 
 // Restore restores the list service
-func (c *CounterService) Restore(bytes []byte) error {
+func (c *Service) Restore(bytes []byte) error {
 	snapshot := &CounterSnapshot{}
 	if err := proto.Unmarshal(bytes, snapshot); err != nil {
 		return err
@@ -66,14 +66,16 @@ func (c *CounterService) Restore(bytes []byte) error {
 	return nil
 }
 
-func (c *CounterService) Get(bytes []byte, ch chan<- service.Result) {
+// Get gets the current value of the counter
+func (c *Service) Get(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 	ch <- c.NewResult(proto.Marshal(&GetResponse{
 		Value: c.value,
 	}))
 }
 
-func (c *CounterService) Set(bytes []byte, ch chan<- service.Result) {
+// Set sets the value of the counter
+func (c *Service) Set(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 	request := &SetRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
@@ -85,7 +87,8 @@ func (c *CounterService) Set(bytes []byte, ch chan<- service.Result) {
 	ch <- c.NewResult(proto.Marshal(&SetResponse{}))
 }
 
-func (c *CounterService) Increment(bytes []byte, ch chan<- service.Result) {
+// Increment increments the value of the counter by a delta
+func (c *Service) Increment(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 	request := &IncrementRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
@@ -101,7 +104,8 @@ func (c *CounterService) Increment(bytes []byte, ch chan<- service.Result) {
 	}))
 }
 
-func (c *CounterService) Decrement(bytes []byte, ch chan<- service.Result) {
+// Decrement decrements the value of the counter by a delta
+func (c *Service) Decrement(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 	request := &DecrementRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
@@ -117,7 +121,8 @@ func (c *CounterService) Decrement(bytes []byte, ch chan<- service.Result) {
 	}))
 }
 
-func (c *CounterService) CheckAndSet(bytes []byte, ch chan<- service.Result) {
+// CAS updates the value of the counter if it matches a current value
+func (c *Service) CAS(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 	request := &CheckAndSetRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {

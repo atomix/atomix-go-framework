@@ -25,12 +25,13 @@ import (
 	"google.golang.org/grpc"
 )
 
-func RegisterSetServer(server *grpc.Server, client service.Client) {
-	api.RegisterSetServiceServer(server, newSetServiceServer(client))
+// RegisterServer registers a set server with the given gRPC server
+func RegisterServer(server *grpc.Server, client service.Client) {
+	api.RegisterSetServiceServer(server, newServer(client))
 }
 
-func newSetServiceServer(client service.Client) api.SetServiceServer {
-	return &setServer{
+func newServer(client service.Client) api.SetServiceServer {
+	return &Server{
 		SessionizedServer: &server.SessionizedServer{
 			Type:   "set",
 			Client: client,
@@ -38,12 +39,13 @@ func newSetServiceServer(client service.Client) api.SetServiceServer {
 	}
 }
 
-// setServer is an implementation of SetServiceServer for the set primitive
-type setServer struct {
+// Server is an implementation of SetServiceServer for the set primitive
+type Server struct {
 	*server.SessionizedServer
 }
 
-func (s *setServer) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeResponse, error) {
+// Size gets the number of elements in the set
+func (s *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeResponse, error) {
 	log.Tracef("Received SizeRequest %+v", request)
 	in, err := proto.Marshal(&SizeRequest{})
 	if err != nil {
@@ -68,7 +70,8 @@ func (s *setServer) Size(ctx context.Context, request *api.SizeRequest) (*api.Si
 	return response, nil
 }
 
-func (s *setServer) Contains(ctx context.Context, request *api.ContainsRequest) (*api.ContainsResponse, error) {
+// Contains checks whether the set contains an element
+func (s *Server) Contains(ctx context.Context, request *api.ContainsRequest) (*api.ContainsResponse, error) {
 	log.Tracef("Received ContainsRequest %+v", request)
 	in, err := proto.Marshal(&ContainsRequest{
 		Value: request.Value,
@@ -95,7 +98,8 @@ func (s *setServer) Contains(ctx context.Context, request *api.ContainsRequest) 
 	return response, nil
 }
 
-func (s *setServer) Add(ctx context.Context, request *api.AddRequest) (*api.AddResponse, error) {
+// Add adds an element to the set
+func (s *Server) Add(ctx context.Context, request *api.AddRequest) (*api.AddResponse, error) {
 	log.Tracef("Received AddRequest %+v", request)
 	in, err := proto.Marshal(&AddRequest{
 		Value: request.Value,
@@ -122,7 +126,8 @@ func (s *setServer) Add(ctx context.Context, request *api.AddRequest) (*api.AddR
 	return response, nil
 }
 
-func (s *setServer) Remove(ctx context.Context, request *api.RemoveRequest) (*api.RemoveResponse, error) {
+// Remove removes an element from the set
+func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.RemoveResponse, error) {
 	log.Tracef("Received RemoveRequest %+v", request)
 	in, err := proto.Marshal(&RemoveRequest{
 		Value: request.Value,
@@ -149,7 +154,8 @@ func (s *setServer) Remove(ctx context.Context, request *api.RemoveRequest) (*ap
 	return response, nil
 }
 
-func (s *setServer) Clear(ctx context.Context, request *api.ClearRequest) (*api.ClearResponse, error) {
+// Clear removes all elements from the set
+func (s *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.ClearResponse, error) {
 	log.Tracef("Received ClearRequest %+v", request)
 	in, err := proto.Marshal(&ClearRequest{})
 	if err != nil {
@@ -173,7 +179,8 @@ func (s *setServer) Clear(ctx context.Context, request *api.ClearRequest) (*api.
 	return response, nil
 }
 
-func (s *setServer) Events(request *api.EventRequest, srv api.SetService_EventsServer) error {
+// Events listens for set change events
+func (s *Server) Events(request *api.EventRequest, srv api.SetService_EventsServer) error {
 	log.Tracef("Received EventRequest %+v", request)
 	in, err := proto.Marshal(&ListenRequest{
 		Replay: request.Replay,
@@ -185,33 +192,33 @@ func (s *setServer) Events(request *api.EventRequest, srv api.SetService_EventsS
 	ch := make(chan server.SessionOutput)
 	if err := s.CommandStream("events", in, request.Header, ch); err != nil {
 		return err
-	} else {
-		for result := range ch {
-			if result.Failed() {
-				return result.Error
-			} else {
-				response := &ListenResponse{}
-				if err = proto.Unmarshal(result.Value, response); err != nil {
-					return err
-				} else {
-					eventResponse := &api.EventResponse{
-						Header: result.Header,
-						Type:   getEventType(response.Type),
-						Value:  response.Value,
-					}
-					log.Tracef("Sending EventResponse %+v", response)
-					if err = srv.Send(eventResponse); err != nil {
-						return err
-					}
-				}
-			}
+	}
+
+	for result := range ch {
+		if result.Failed() {
+			return result.Error
+		}
+
+		response := &ListenResponse{}
+		if err = proto.Unmarshal(result.Value, response); err != nil {
+			return err
+		}
+		eventResponse := &api.EventResponse{
+			Header: result.Header,
+			Type:   getEventType(response.Type),
+			Value:  response.Value,
+		}
+		log.Tracef("Sending EventResponse %+v", response)
+		if err = srv.Send(eventResponse); err != nil {
+			return err
 		}
 	}
 	log.Tracef("Finished EventRequest %+v", request)
 	return nil
 }
 
-func (s *setServer) Iterate(request *api.IterateRequest, srv api.SetService_IterateServer) error {
+// Iterate lists all elements currently in the set
+func (s *Server) Iterate(request *api.IterateRequest, srv api.SetService_IterateServer) error {
 	log.Tracef("Received IterateRequest %+v", request)
 	in, err := proto.Marshal(&IterateRequest{})
 	if err != nil {
@@ -221,32 +228,32 @@ func (s *setServer) Iterate(request *api.IterateRequest, srv api.SetService_Iter
 	ch := make(chan server.SessionOutput)
 	if err := s.QueryStream("iterate", in, request.Header, ch); err != nil {
 		return err
-	} else {
-		for result := range ch {
-			if result.Failed() {
-				return result.Error
-			} else {
-				response := &IterateResponse{}
-				if err = proto.Unmarshal(result.Value, response); err != nil {
-					srv.Context().Done()
-				} else {
-					iterateResponse := &api.IterateResponse{
-						Header: result.Header,
-						Value:  response.Value,
-					}
-					log.Tracef("Sending IterateResponse %+v", response)
-					if err = srv.Send(iterateResponse); err != nil {
-						return err
-					}
-				}
-			}
+	}
+
+	for result := range ch {
+		if result.Failed() {
+			return result.Error
+		}
+
+		response := &IterateResponse{}
+		if err = proto.Unmarshal(result.Value, response); err != nil {
+			return err
+		}
+		iterateResponse := &api.IterateResponse{
+			Header: result.Header,
+			Value:  response.Value,
+		}
+		log.Tracef("Sending IterateResponse %+v", response)
+		if err = srv.Send(iterateResponse); err != nil {
+			return err
 		}
 	}
 	log.Tracef("Finished IterateRequest %+v", request)
 	return nil
 }
 
-func (s *setServer) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
+// Create opens a new session
+func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
 	session, err := s.OpenSession(ctx, request.Header, request.Timeout)
 	if err != nil {
@@ -262,7 +269,8 @@ func (s *setServer) Create(ctx context.Context, request *api.CreateRequest) (*ap
 	return response, nil
 }
 
-func (s *setServer) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
+// KeepAlive keeps an existing session alive
+func (s *Server) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
 	log.Tracef("Received KeepAliveRequest %+v", request)
 	if err := s.KeepAliveSession(ctx, request.Header); err != nil {
 		return nil, err
@@ -276,7 +284,8 @@ func (s *setServer) KeepAlive(ctx context.Context, request *api.KeepAliveRequest
 	return response, nil
 }
 
-func (s *setServer) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
+// Close closes a session
+func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if request.Delete {
 		if err := s.Delete(ctx, request.Header); err != nil {

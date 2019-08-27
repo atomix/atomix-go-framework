@@ -28,6 +28,7 @@ type SimpleServer struct {
 	Type   string
 }
 
+// Command submits a command to the service
 func (s *SimpleServer) Command(ctx context.Context, name string, input []byte, header *headers.RequestHeader) ([]byte, *headers.ResponseHeader, error) {
 	commandRequest := &service.CommandRequest{
 		Context: &service.RequestContext{
@@ -60,6 +61,7 @@ func (s *SimpleServer) Command(ctx context.Context, name string, input []byte, h
 	return commandResponse.Output, responseHeader, nil
 }
 
+// Write sends a write to the service
 func (s *SimpleServer) Write(ctx context.Context, request []byte, header *headers.RequestHeader) ([]byte, error) {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
@@ -105,6 +107,7 @@ func (s *SimpleServer) Write(ctx context.Context, request []byte, header *header
 	return serviceResponse.GetCommand(), nil
 }
 
+// Query submits a query to the service
 func (s *SimpleServer) Query(ctx context.Context, name string, input []byte, header *headers.RequestHeader) ([]byte, *headers.ResponseHeader, error) {
 	queryRequest := &service.QueryRequest{
 		Context: &service.RequestContext{
@@ -137,6 +140,7 @@ func (s *SimpleServer) Query(ctx context.Context, name string, input []byte, hea
 	return queryResponse.Output, responseHeader, nil
 }
 
+// Read sends a read to the service
 func (s *SimpleServer) Read(ctx context.Context, request []byte, header *headers.RequestHeader) ([]byte, error) {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
@@ -181,6 +185,7 @@ func (s *SimpleServer) Read(ctx context.Context, request []byte, header *headers
 	return serviceResponse.GetQuery(), nil
 }
 
+// Open opens a simple session
 func (s *SimpleServer) Open(ctx context.Context, header *headers.RequestHeader) error {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
@@ -226,6 +231,7 @@ func (s *SimpleServer) Open(ctx context.Context, header *headers.RequestHeader) 
 	return nil
 }
 
+// Delete deletes the service
 func (s *SimpleServer) Delete(ctx context.Context, header *headers.RequestHeader) error {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{

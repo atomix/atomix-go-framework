@@ -19,36 +19,36 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-// RegisterValueService registers the set service in the given service registry
-func RegisterValueService(registry *service.ServiceRegistry) {
-	registry.Register("value", newValueService)
+// RegisterService registers the value service in the given service registry
+func RegisterService(registry *service.Registry) {
+	registry.Register("value", newService)
 }
 
-// newValueService returns a new ValueService
-func newValueService(context service.Context) service.Service {
-	service := &ValueService{
+// newService returns a new Service
+func newService(context service.Context) service.Service {
+	service := &Service{
 		SessionizedService: service.NewSessionizedService(context),
 	}
 	service.init()
 	return service
 }
 
-// ValueService is a state machine for a list primitive
-type ValueService struct {
+// Service is a state machine for a list primitive
+type Service struct {
 	*service.SessionizedService
 	value   []byte
 	version uint64
 }
 
 // init initializes the list service
-func (v *ValueService) init() {
+func (v *Service) init() {
 	v.Executor.Register("set", v.Set)
 	v.Executor.Register("get", v.Get)
 	v.Executor.Register("events", v.Events)
 }
 
 // Backup backs up the value service
-func (v *ValueService) Backup() ([]byte, error) {
+func (v *Service) Backup() ([]byte, error) {
 	snapshot := &ValueSnapshot{
 		Value:   v.value,
 		Version: v.version,
@@ -57,7 +57,7 @@ func (v *ValueService) Backup() ([]byte, error) {
 }
 
 // Restore restores the value service
-func (v *ValueService) Restore(bytes []byte) error {
+func (v *Service) Restore(bytes []byte) error {
 	snapshot := &ValueSnapshot{}
 	if err := proto.Unmarshal(bytes, snapshot); err != nil {
 		return err
@@ -67,7 +67,8 @@ func (v *ValueService) Restore(bytes []byte) error {
 	return nil
 }
 
-func (v *ValueService) Set(bytes []byte, ch chan<- service.Result) {
+// Set sets the value
+func (v *Service) Set(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &SetRequest{}
@@ -107,7 +108,8 @@ func (v *ValueService) Set(bytes []byte, ch chan<- service.Result) {
 	}
 }
 
-func (v *ValueService) Get(bytes []byte, ch chan<- service.Result) {
+// Get gets the current value
+func (v *Service) Get(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &GetRequest{}
@@ -122,11 +124,12 @@ func (v *ValueService) Get(bytes []byte, ch chan<- service.Result) {
 	}))
 }
 
-func (v *ValueService) Events(bytes []byte, ch chan<- service.Result) {
+// Events registers a channel on which to send events
+func (v *Service) Events(bytes []byte, ch chan<- service.Result) {
 	// Keep the stream open
 }
 
-func (v *ValueService) sendEvent(event *ListenResponse) {
+func (v *Service) sendEvent(event *ListenResponse) {
 	bytes, err := proto.Marshal(event)
 	for _, session := range v.Sessions() {
 		for _, ch := range session.ChannelsOf("events") {

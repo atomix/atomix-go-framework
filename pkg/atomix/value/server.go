@@ -25,12 +25,13 @@ import (
 	"google.golang.org/grpc"
 )
 
-func RegisterValueServer(server *grpc.Server, client service.Client) {
-	api.RegisterValueServiceServer(server, newValueServiceServer(client))
+// RegisterServer registers a value server with the given gRPC server
+func RegisterServer(server *grpc.Server, client service.Client) {
+	api.RegisterValueServiceServer(server, newServer(client))
 }
 
-func newValueServiceServer(client service.Client) api.ValueServiceServer {
-	return &valueServer{
+func newServer(client service.Client) api.ValueServiceServer {
+	return &Server{
 		SessionizedServer: &server.SessionizedServer{
 			Type:   "value",
 			Client: client,
@@ -38,12 +39,13 @@ func newValueServiceServer(client service.Client) api.ValueServiceServer {
 	}
 }
 
-// valueServer is an implementation of ValueServiceServer for the value primitive
-type valueServer struct {
+// Server is an implementation of ValueServiceServer for the value primitive
+type Server struct {
 	*server.SessionizedServer
 }
 
-func (s *valueServer) Set(ctx context.Context, request *api.SetRequest) (*api.SetResponse, error) {
+// Set sets the value
+func (s *Server) Set(ctx context.Context, request *api.SetRequest) (*api.SetResponse, error) {
 	log.Tracef("Received SetRequest %+v", request)
 	in, err := proto.Marshal(&SetRequest{
 		ExpectVersion: request.ExpectVersion,
@@ -73,7 +75,8 @@ func (s *valueServer) Set(ctx context.Context, request *api.SetRequest) (*api.Se
 	return response, nil
 }
 
-func (s *valueServer) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
+// Get gets the current value and version
+func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
 	log.Tracef("Received GetRequest %+v", request)
 	in, err := proto.Marshal(&GetRequest{})
 	if err != nil {
@@ -99,7 +102,8 @@ func (s *valueServer) Get(ctx context.Context, request *api.GetRequest) (*api.Ge
 	return response, nil
 }
 
-func (s *valueServer) Events(request *api.EventRequest, stream api.ValueService_EventsServer) error {
+// Events listens for value change events
+func (s *Server) Events(request *api.EventRequest, stream api.ValueService_EventsServer) error {
 	log.Tracef("Received EventRequest %+v", request)
 	in, err := proto.Marshal(&ListenRequest{})
 	if err != nil {
@@ -109,36 +113,36 @@ func (s *valueServer) Events(request *api.EventRequest, stream api.ValueService_
 	ch := make(chan server.SessionOutput)
 	if err := s.CommandStream("events", in, request.Header, ch); err != nil {
 		return err
-	} else {
-		for result := range ch {
-			if result.Failed() {
-				return result.Error
-			} else {
-				response := &ListenResponse{}
-				if err = proto.Unmarshal(result.Value, response); err != nil {
-					return err
-				} else {
-					eventResponse := &api.EventResponse{
-						Header:          result.Header,
-						Type:            api.EventResponse_UPDATED,
-						PreviousValue:   response.PreviousValue,
-						PreviousVersion: response.PreviousVersion,
-						NewValue:        response.NewValue,
-						NewVersion:      response.NewVersion,
-					}
-					log.Tracef("Sending EventResponse %+v", response)
-					if err = stream.Send(eventResponse); err != nil {
-						return err
-					}
-				}
-			}
+	}
+
+	for result := range ch {
+		if result.Failed() {
+			return result.Error
+		}
+
+		response := &ListenResponse{}
+		if err = proto.Unmarshal(result.Value, response); err != nil {
+			return err
+		}
+		eventResponse := &api.EventResponse{
+			Header:          result.Header,
+			Type:            api.EventResponse_UPDATED,
+			PreviousValue:   response.PreviousValue,
+			PreviousVersion: response.PreviousVersion,
+			NewValue:        response.NewValue,
+			NewVersion:      response.NewVersion,
+		}
+		log.Tracef("Sending EventResponse %+v", response)
+		if err = stream.Send(eventResponse); err != nil {
+			return err
 		}
 	}
 	log.Tracef("Finished EventRequest %+v", request)
 	return nil
 }
 
-func (s *valueServer) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
+// Create opens a new session
+func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
 	session, err := s.OpenSession(ctx, request.Header, request.Timeout)
 	if err != nil {
@@ -154,7 +158,8 @@ func (s *valueServer) Create(ctx context.Context, request *api.CreateRequest) (*
 	return response, nil
 }
 
-func (s *valueServer) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
+// KeepAlive keeps an existing session alive
+func (s *Server) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
 	log.Tracef("Received KeepAliveRequest %+v", request)
 	if err := s.KeepAliveSession(ctx, request.Header); err != nil {
 		return nil, err
@@ -168,7 +173,8 @@ func (s *valueServer) KeepAlive(ctx context.Context, request *api.KeepAliveReque
 	return response, nil
 }
 
-func (s *valueServer) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
+// Close closes a session
+func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if request.Delete {
 		if err := s.Delete(ctx, request.Header); err != nil {

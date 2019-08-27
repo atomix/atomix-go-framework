@@ -89,8 +89,8 @@ type Result struct {
 	Index uint64
 }
 
-// newPrimitiveStateMachine returns a new primitive state machine
-func NewPrimitiveStateMachine(registry *ServiceRegistry, ctx Context) StateMachine {
+// NewPrimitiveStateMachine returns a new primitive state machine
+func NewPrimitiveStateMachine(registry *Registry, ctx Context) StateMachine {
 	return &primitiveStateMachine{
 		ctx:      ctx,
 		registry: registry,
@@ -102,38 +102,38 @@ func NewPrimitiveStateMachine(registry *ServiceRegistry, ctx Context) StateMachi
 type primitiveStateMachine struct {
 	StateMachine
 	ctx      Context
-	registry *ServiceRegistry
+	registry *Registry
 	services map[string]*serviceStateMachine
 }
 
 func (s *primitiveStateMachine) Snapshot(writer io.Writer) error {
 	for id, service := range s.services {
-		serviceId := &ServiceId{
+		serviceID := &ServiceId{
 			Type:      service.Type,
 			Name:      getServiceName(id),
 			Namespace: getServiceNamespace(id),
 		}
-		bytes, err := proto.Marshal(serviceId)
+		bytes, err := proto.Marshal(serviceID)
 		if err != nil {
 			return err
-		} else {
-			length := make([]byte, 4)
-			binary.BigEndian.PutUint32(length, uint32(len(bytes)))
+		}
 
-			_, err = writer.Write(length)
-			if err != nil {
-				return err
-			}
+		length := make([]byte, 4)
+		binary.BigEndian.PutUint32(length, uint32(len(bytes)))
 
-			_, err = writer.Write(bytes)
-			if err != nil {
-				return err
-			}
+		_, err = writer.Write(length)
+		if err != nil {
+			return err
+		}
 
-			err = service.Snapshot(writer)
-			if err != nil {
-				return err
-			}
+		_, err = writer.Write(bytes)
+		if err != nil {
+			return err
+		}
+
+		err = service.Snapshot(writer)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
@@ -154,12 +154,12 @@ func (s *primitiveStateMachine) Install(reader io.Reader) error {
 			return err
 		}
 
-		serviceId := &ServiceId{}
-		if err = proto.Unmarshal(bytes, serviceId); err != nil {
+		serviceID := &ServiceId{}
+		if err = proto.Unmarshal(bytes, serviceID); err != nil {
 			return err
 		}
-		service := s.registry.types[serviceId.Type](s.ctx)
-		s.services[getQualifiedServiceName(serviceId)] = newServiceStateMachine(serviceId.Type, service)
+		service := s.registry.types[serviceID.Type](s.ctx)
+		s.services[getQualifiedServiceName(serviceID)] = newServiceStateMachine(serviceID.Type, service)
 
 		n, err = reader.Read(lengthBytes)
 		if err != nil {

@@ -17,7 +17,7 @@ package service
 import "github.com/golang/protobuf/proto"
 
 // RegisterTestService registers the map service in the given service registry
-func RegisterTestService(registry *ServiceRegistry) {
+func RegisterTestService(registry *Registry) {
 	registry.Register("test", newTestService)
 }
 
@@ -60,12 +60,14 @@ func (s *TestService) Restore(bytes []byte) error {
 	return nil
 }
 
+// Get gets the value
 func (s *TestService) Get(value []byte, ch chan<- Result) {
 	ch <- s.NewResult(proto.Marshal(&GetResponse{
 		Value: s.value,
 	}))
 }
 
+// Set sets the value
 func (s *TestService) Set(value []byte, ch chan<- Result) {
 	request := &SetRequest{}
 	if err := proto.Unmarshal(value, request); err != nil {

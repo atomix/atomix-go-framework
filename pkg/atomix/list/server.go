@@ -25,12 +25,13 @@ import (
 	"google.golang.org/grpc"
 )
 
-func RegisterListServer(server *grpc.Server, client service.Client) {
-	api.RegisterListServiceServer(server, NewListServiceServer(client))
+// RegisterServer registers a list server with the given gRPC server
+func RegisterServer(server *grpc.Server, client service.Client) {
+	api.RegisterListServiceServer(server, newServer(client))
 }
 
-func NewListServiceServer(client service.Client) api.ListServiceServer {
-	return &listServer{
+func newServer(client service.Client) api.ListServiceServer {
+	return &Server{
 		SessionizedServer: &server.SessionizedServer{
 			Type:   "list",
 			Client: client,
@@ -38,12 +39,13 @@ func NewListServiceServer(client service.Client) api.ListServiceServer {
 	}
 }
 
-// listServer is an implementation of MapServiceServer for the map primitive
-type listServer struct {
+// Server is an implementation of MapServiceServer for the map primitive
+type Server struct {
 	*server.SessionizedServer
 }
 
-func (s *listServer) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
+// Create opens a new session
+func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
 	session, err := s.OpenSession(ctx, request.Header, request.Timeout)
 	if err != nil {
@@ -59,7 +61,8 @@ func (s *listServer) Create(ctx context.Context, request *api.CreateRequest) (*a
 	return response, nil
 }
 
-func (s *listServer) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
+// KeepAlive keeps an existing session alive
+func (s *Server) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
 	log.Tracef("Received KeepAliveRequest %+v", request)
 	if err := s.KeepAliveSession(ctx, request.Header); err != nil {
 		return nil, err
@@ -73,7 +76,8 @@ func (s *listServer) KeepAlive(ctx context.Context, request *api.KeepAliveReques
 	return response, nil
 }
 
-func (s *listServer) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
+// Close closes a session
+func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if request.Delete {
 		if err := s.Delete(ctx, request.Header); err != nil {
@@ -94,7 +98,8 @@ func (s *listServer) Close(ctx context.Context, request *api.CloseRequest) (*api
 	return response, nil
 }
 
-func (s *listServer) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeResponse, error) {
+// Size gets the number of elements in the list
+func (s *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeResponse, error) {
 	log.Tracef("Received SizeRequest %+v", request)
 	in, err := proto.Marshal(&SizeRequest{})
 	if err != nil {
@@ -119,7 +124,8 @@ func (s *listServer) Size(ctx context.Context, request *api.SizeRequest) (*api.S
 	return response, nil
 }
 
-func (s *listServer) Contains(ctx context.Context, request *api.ContainsRequest) (*api.ContainsResponse, error) {
+// Contains checks whether the list contains a value
+func (s *Server) Contains(ctx context.Context, request *api.ContainsRequest) (*api.ContainsResponse, error) {
 	log.Tracef("Received ContainsRequest %+v", request)
 	in, err := proto.Marshal(&ContainsRequest{
 		Value: request.Value,
@@ -146,7 +152,8 @@ func (s *listServer) Contains(ctx context.Context, request *api.ContainsRequest)
 	return response, nil
 }
 
-func (s *listServer) Append(ctx context.Context, request *api.AppendRequest) (*api.AppendResponse, error) {
+// Append adds a value to the end of the list
+func (s *Server) Append(ctx context.Context, request *api.AppendRequest) (*api.AppendResponse, error) {
 	log.Tracef("Received AppendRequest %+v", request)
 	in, err := proto.Marshal(&AppendRequest{
 		Value: request.Value,
@@ -173,7 +180,8 @@ func (s *listServer) Append(ctx context.Context, request *api.AppendRequest) (*a
 	return response, nil
 }
 
-func (s *listServer) Insert(ctx context.Context, request *api.InsertRequest) (*api.InsertResponse, error) {
+// Insert inserts a value at a specific index
+func (s *Server) Insert(ctx context.Context, request *api.InsertRequest) (*api.InsertResponse, error) {
 	log.Tracef("Received InsertRequest %+v", request)
 	in, err := proto.Marshal(&InsertRequest{
 		Index: request.Index,
@@ -201,7 +209,8 @@ func (s *listServer) Insert(ctx context.Context, request *api.InsertRequest) (*a
 	return response, nil
 }
 
-func (s *listServer) Set(ctx context.Context, request *api.SetRequest) (*api.SetResponse, error) {
+// Set sets the value at a specific index
+func (s *Server) Set(ctx context.Context, request *api.SetRequest) (*api.SetResponse, error) {
 	log.Tracef("Received SetRequest %+v", request)
 	in, err := proto.Marshal(&SetRequest{
 		Index: request.Index,
@@ -229,7 +238,8 @@ func (s *listServer) Set(ctx context.Context, request *api.SetRequest) (*api.Set
 	return response, nil
 }
 
-func (s *listServer) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
+// Get gets the value at a specific index
+func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
 	log.Tracef("Received GetRequest %+v", request)
 	in, err := proto.Marshal(&GetRequest{
 		Index: request.Index,
@@ -257,7 +267,8 @@ func (s *listServer) Get(ctx context.Context, request *api.GetRequest) (*api.Get
 	return response, nil
 }
 
-func (s *listServer) Remove(ctx context.Context, request *api.RemoveRequest) (*api.RemoveResponse, error) {
+// Remove removes an index from the list
+func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.RemoveResponse, error) {
 	log.Tracef("Received RemoveRequest %+v", request)
 	in, err := proto.Marshal(&RemoveRequest{
 		Index: request.Index,
@@ -285,7 +296,8 @@ func (s *listServer) Remove(ctx context.Context, request *api.RemoveRequest) (*a
 	return response, nil
 }
 
-func (s *listServer) Clear(ctx context.Context, request *api.ClearRequest) (*api.ClearResponse, error) {
+// Clear removes all indexes from the list
+func (s *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.ClearResponse, error) {
 	log.Tracef("Received ClearRequest %+v", request)
 	in, err := proto.Marshal(&ClearRequest{})
 	if err != nil {
@@ -309,7 +321,8 @@ func (s *listServer) Clear(ctx context.Context, request *api.ClearRequest) (*api
 	return response, nil
 }
 
-func (s *listServer) Events(request *api.EventRequest, srv api.ListService_EventsServer) error {
+// Events listens for list change events
+func (s *Server) Events(request *api.EventRequest, srv api.ListService_EventsServer) error {
 	log.Tracef("Received EventRequest %+v", request)
 	in, err := proto.Marshal(&ListenRequest{
 		Replay: request.Replay,
@@ -321,34 +334,36 @@ func (s *listServer) Events(request *api.EventRequest, srv api.ListService_Event
 	ch := make(chan server.SessionOutput)
 	if err := s.CommandStream("events", in, request.Header, ch); err != nil {
 		return err
-	} else {
-		for result := range ch {
-			if result.Failed() {
-				return result.Error
-			} else {
-				response := &ListenResponse{}
-				if err = proto.Unmarshal(result.Value, response); err != nil {
-					return err
-				} else {
-					eventResponse := &api.EventResponse{
-						Header: result.Header,
-						Type:   getEventType(response.Type),
-						Index:  response.Index,
-						Value:  response.Value,
-					}
-					log.Tracef("Sending EventResponse %+v", response)
-					if err = srv.Send(eventResponse); err != nil {
-						return err
-					}
-				}
-			}
+	}
+
+	for result := range ch {
+		if result.Failed() {
+			return result.Error
+		}
+
+		response := &ListenResponse{}
+		if err = proto.Unmarshal(result.Value, response); err != nil {
+			return err
+		}
+
+		eventResponse := &api.EventResponse{
+			Header: result.Header,
+			Type:   getEventType(response.Type),
+			Index:  response.Index,
+			Value:  response.Value,
+		}
+		log.Tracef("Sending EventResponse %+v", response)
+		if err = srv.Send(eventResponse); err != nil {
+			return err
 		}
 	}
+
 	log.Tracef("Finished EventRequest %+v", request)
 	return nil
 }
 
-func (s *listServer) Iterate(request *api.IterateRequest, srv api.ListService_IterateServer) error {
+// Iterate lists all the value in the list
+func (s *Server) Iterate(request *api.IterateRequest, srv api.ListService_IterateServer) error {
 	log.Tracef("Received IterateRequest %+v", request)
 	in, err := proto.Marshal(&IterateRequest{})
 	if err != nil {
@@ -358,27 +373,27 @@ func (s *listServer) Iterate(request *api.IterateRequest, srv api.ListService_It
 	ch := make(chan server.SessionOutput)
 	if err := s.QueryStream("iterate", in, request.Header, ch); err != nil {
 		return err
-	} else {
-		for result := range ch {
-			if result.Failed() {
-				return result.Error
-			} else {
-				response := &IterateResponse{}
-				if err = proto.Unmarshal(result.Value, response); err != nil {
-					srv.Context().Done()
-				} else {
-					iterateResponse := &api.IterateResponse{
-						Header: result.Header,
-						Value:  response.Value,
-					}
-					log.Tracef("Sending IterateResponse %+v", response)
-					if err = srv.Send(iterateResponse); err != nil {
-						return err
-					}
-				}
-			}
+	}
+
+	for result := range ch {
+		if result.Failed() {
+			return result.Error
+		}
+
+		response := &IterateResponse{}
+		if err = proto.Unmarshal(result.Value, response); err != nil {
+			srv.Context().Done()
+		}
+		iterateResponse := &api.IterateResponse{
+			Header: result.Header,
+			Value:  response.Value,
+		}
+		log.Tracef("Sending IterateResponse %+v", response)
+		if err = srv.Send(iterateResponse); err != nil {
+			return err
 		}
 	}
+
 	log.Tracef("Finished IterateRequest %+v", request)
 	return nil
 }

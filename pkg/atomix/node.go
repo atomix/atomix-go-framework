@@ -32,10 +32,10 @@ import (
 	"net"
 )
 
-// Protocol
+// Protocol is the interface to be implemented by replication protocols
 type Protocol interface {
 	// Start starts the protocol
-	Start(cluster Cluster, registry *service.ServiceRegistry) error
+	Start(cluster Cluster, registry *service.Registry) error
 
 	// Client returns the protocol client
 	Client() service.Client
@@ -47,7 +47,7 @@ type Protocol interface {
 // NewNode creates a new node running the given protocol
 func NewNode(nodeID string, config *controller.PartitionConfig, protocol Protocol, opts ...NodeOption) *Node {
 	node := &Node{
-		Id:       nodeID,
+		ID:       nodeID,
 		config:   config,
 		protocol: protocol,
 	}
@@ -99,7 +99,7 @@ func (o *portOption) apply(node *Node) {
 
 // Node is an Atomix node
 type Node struct {
-	Id       string
+	ID       string
 	config   *controller.PartitionConfig
 	protocol Protocol
 	port     int
@@ -119,7 +119,7 @@ func (n *Node) Start() error {
 	}
 
 	cluster := Cluster{
-		MemberID: n.Id,
+		MemberID: n.ID,
 		Members:  members,
 	}
 
@@ -175,24 +175,24 @@ func (l localListener) listen(node *Node) (net.Listener, error) {
 // registerServers registers all primitive servers on the given gRPC server
 func registerServers(server *grpc.Server, protocol Protocol) {
 	primitive.RegisterPrimitiveServer(server, protocol.Client())
-	counter.RegisterCounterServer(server, protocol.Client())
-	election.RegisterElectionServer(server, protocol.Client())
-	list.RegisterListServer(server, protocol.Client())
-	lock.RegisterLockServer(server, protocol.Client())
-	map_.RegisterMapServer(server, protocol.Client())
-	set.RegisterSetServer(server, protocol.Client())
-	value.RegisterValueServer(server, protocol.Client())
+	counter.RegisterServer(server, protocol.Client())
+	election.RegisterServer(server, protocol.Client())
+	list.RegisterServer(server, protocol.Client())
+	lock.RegisterServer(server, protocol.Client())
+	map_.RegisterServer(server, protocol.Client())
+	set.RegisterServer(server, protocol.Client())
+	value.RegisterServer(server, protocol.Client())
 }
 
 // getServiceRegistry returns a service registry for the node
-func getServiceRegistry() *service.ServiceRegistry {
+func getServiceRegistry() *service.Registry {
 	registry := service.NewServiceRegistry()
-	counter.RegisterCounterService(registry)
-	election.RegisterElectionService(registry)
-	list.RegisterListService(registry)
-	lock.RegisterLockService(registry)
-	map_.RegisterMapService(registry)
-	set.RegisterSetService(registry)
-	value.RegisterValueService(registry)
+	counter.RegisterService(registry)
+	election.RegisterService(registry)
+	list.RegisterService(registry)
+	lock.RegisterService(registry)
+	map_.RegisterService(registry)
+	set.RegisterService(registry)
+	value.RegisterService(registry)
 	return registry
 }

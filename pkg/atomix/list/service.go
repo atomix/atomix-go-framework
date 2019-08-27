@@ -19,14 +19,14 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-// RegisterListService registers the map service in the given service registry
-func RegisterListService(registry *service.ServiceRegistry) {
-	registry.Register("list", newListService)
+// RegisterService registers the list service in the given service registry
+func RegisterService(registry *service.Registry) {
+	registry.Register("list", newService)
 }
 
-// newListService returns a new ListService
-func newListService(context service.Context) service.Service {
-	service := &ListService{
+// newService returns a new Service
+func newService(context service.Context) service.Service {
+	service := &Service{
 		SessionizedService: service.NewSessionizedService(context),
 		values:             make([]string, 0),
 	}
@@ -34,14 +34,14 @@ func newListService(context service.Context) service.Service {
 	return service
 }
 
-// ListService is a state machine for a list primitive
-type ListService struct {
+// Service is a state machine for a list primitive
+type Service struct {
 	*service.SessionizedService
 	values []string
 }
 
 // init initializes the list service
-func (l *ListService) init() {
+func (l *Service) init() {
 	l.Executor.Register("size", l.Size)
 	l.Executor.Register("contains", l.Contains)
 	l.Executor.Register("append", l.Append)
@@ -55,7 +55,7 @@ func (l *ListService) init() {
 }
 
 // Backup backs up the list service
-func (l *ListService) Backup() ([]byte, error) {
+func (l *Service) Backup() ([]byte, error) {
 	snapshot := &ListSnapshot{
 		Values: l.values,
 	}
@@ -63,7 +63,7 @@ func (l *ListService) Backup() ([]byte, error) {
 }
 
 // Restore restores the list service
-func (l *ListService) Restore(bytes []byte) error {
+func (l *Service) Restore(bytes []byte) error {
 	snapshot := &ListSnapshot{}
 	if err := proto.Unmarshal(bytes, snapshot); err != nil {
 		return err
@@ -72,14 +72,16 @@ func (l *ListService) Restore(bytes []byte) error {
 	return nil
 }
 
-func (l *ListService) Size(bytes []byte, ch chan<- service.Result) {
+// Size gets the size of the list
+func (l *Service) Size(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 	ch <- l.NewResult(proto.Marshal(&SizeResponse{
 		Size_: int32(len(l.values)),
 	}))
 }
 
-func (l *ListService) Contains(bytes []byte, ch chan<- service.Result) {
+// Contains checks whether the list contains a value
+func (l *Service) Contains(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &ContainsRequest{}
@@ -102,7 +104,8 @@ func (l *ListService) Contains(bytes []byte, ch chan<- service.Result) {
 	}))
 }
 
-func (l *ListService) Append(bytes []byte, ch chan<- service.Result) {
+// Append adds a value to the end of the list
+func (l *Service) Append(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &AppendRequest{}
@@ -125,7 +128,8 @@ func (l *ListService) Append(bytes []byte, ch chan<- service.Result) {
 	}))
 }
 
-func (l *ListService) Insert(bytes []byte, ch chan<- service.Result) {
+// Insert inserts a value at a specific index in the list
+func (l *Service) Insert(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &InsertRequest{}
@@ -164,7 +168,8 @@ func (l *ListService) Insert(bytes []byte, ch chan<- service.Result) {
 	}))
 }
 
-func (l *ListService) Set(bytes []byte, ch chan<- service.Result) {
+// Set sets the value at a specific index in the list
+func (l *Service) Set(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &SetRequest{}
@@ -200,7 +205,8 @@ func (l *ListService) Set(bytes []byte, ch chan<- service.Result) {
 	}))
 }
 
-func (l *ListService) Get(bytes []byte, ch chan<- service.Result) {
+// Get gets the value at a specific index in the list
+func (l *Service) Get(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &GetRequest{}
@@ -224,7 +230,8 @@ func (l *ListService) Get(bytes []byte, ch chan<- service.Result) {
 	}))
 }
 
-func (l *ListService) Remove(bytes []byte, ch chan<- service.Result) {
+// Remove removes an index from the list
+func (l *Service) Remove(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 
 	request := &RemoveRequest{}
@@ -256,13 +263,15 @@ func (l *ListService) Remove(bytes []byte, ch chan<- service.Result) {
 	}))
 }
 
-func (l *ListService) Clear(bytes []byte, ch chan<- service.Result) {
+// Clear removes all indexes from the list
+func (l *Service) Clear(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 	l.values = make([]string, 0)
 	ch <- l.NewResult(proto.Marshal(&ClearResponse{}))
 }
 
-func (l *ListService) Events(bytes []byte, ch chan<- service.Result) {
+// Events registers a channel to send list change events
+func (l *Service) Events(bytes []byte, ch chan<- service.Result) {
 	request := &ListenRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		ch <- l.NewFailure(err)
@@ -280,7 +289,8 @@ func (l *ListService) Events(bytes []byte, ch chan<- service.Result) {
 	}
 }
 
-func (l *ListService) Iterate(bytes []byte, ch chan<- service.Result) {
+// Iterate sends all current values on the given channel
+func (l *Service) Iterate(bytes []byte, ch chan<- service.Result) {
 	defer close(ch)
 	for _, value := range l.values {
 		ch <- l.NewResult(proto.Marshal(&IterateResponse{
@@ -289,7 +299,7 @@ func (l *ListService) Iterate(bytes []byte, ch chan<- service.Result) {
 	}
 }
 
-func (l *ListService) sendEvent(event *ListenResponse) {
+func (l *Service) sendEvent(event *ListenResponse) {
 	bytes, err := proto.Marshal(event)
 	for _, session := range l.Sessions() {
 		for _, ch := range session.ChannelsOf("events") {
