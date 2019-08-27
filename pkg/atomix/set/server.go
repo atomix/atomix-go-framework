@@ -278,9 +278,16 @@ func (s *setServer) KeepAlive(ctx context.Context, request *api.KeepAliveRequest
 
 func (s *setServer) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
-	if err := s.CloseSession(ctx, request.Header); err != nil {
-		return nil, err
+	if request.Delete {
+		if err := s.Delete(ctx, request.Header); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := s.CloseSession(ctx, request.Header); err != nil {
+			return nil, err
+		}
 	}
+
 	response := &api.CloseResponse{
 		Header: &headers.ResponseHeader{
 			SessionID: request.Header.SessionID,

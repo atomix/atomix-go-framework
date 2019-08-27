@@ -495,6 +495,51 @@ func (s *SessionizedServer) CloseSession(ctx context.Context, header *headers.Re
 	return proto.Unmarshal(bytes, sessionResponse)
 }
 
+func (s *SessionizedServer) Delete(ctx context.Context, header *headers.RequestHeader) error {
+	serviceRequest := &service.ServiceRequest{
+		Id: &service.ServiceId{
+			Type:      s.Type,
+			Name:      header.Name.Name,
+			Namespace: header.Name.Namespace,
+		},
+		Request: &service.ServiceRequest_Delete{
+			Delete: &service.DeleteRequest{},
+		},
+	}
+
+	bytes, err := proto.Marshal(serviceRequest)
+	if err != nil {
+		return err
+	}
+
+	// Create a write channel
+	ch := make(chan service.Output)
+
+	// Write the request
+	if err := s.Client.Write(ctx, bytes, ch); err != nil {
+		return err
+	}
+
+	// Wait for the result
+	result, ok := <-ch
+	if !ok {
+		return errors.New("write channel closed")
+	}
+
+	// If the result failed, return the error
+	if result.Failed() {
+		return result.Error
+	}
+
+	// Decode and return the response
+	serviceResponse := &service.ServiceResponse{}
+	err = proto.Unmarshal(result.Value, serviceResponse)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // SessionOutput is a result for session-supporting servers containing session header information
 type SessionOutput struct {
 	service.Output

@@ -76,9 +76,16 @@ func (m *mapServer) KeepAlive(ctx context.Context, request *api.KeepAliveRequest
 
 func (m *mapServer) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
-	if err := m.CloseSession(ctx, request.Header); err != nil {
-		return nil, err
+	if request.Delete {
+		if err := m.Delete(ctx, request.Header); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := m.CloseSession(ctx, request.Header); err != nil {
+			return nil, err
+		}
 	}
+
 	response := &api.CloseResponse{
 		Header: &headers.ResponseHeader{
 			SessionID: request.Header.SessionID,
