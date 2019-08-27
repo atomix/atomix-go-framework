@@ -70,7 +70,7 @@ func (s *scheduler) ScheduleOnce(delay time.Duration, f func()) Timer {
 		interval: 0,
 		callback: f,
 	}
-	s.scheduledTasks.PushBack(task)
+	s.schedule(task)
 	return task
 }
 
@@ -81,7 +81,7 @@ func (s *scheduler) ScheduleRepeat(delay time.Duration, interval time.Duration, 
 		interval: interval,
 		callback: f,
 	}
-	s.scheduledTasks.PushBack(task)
+	s.schedule(task)
 	return task
 }
 
@@ -113,10 +113,12 @@ func (s *scheduler) runScheduledTasks(time time.Time) {
 		for element != nil {
 			task := element.Value.(*task)
 			if task.isRunnable(time) {
+				next := element.Next()
+				s.scheduledTasks.Remove(element)
 				s.time = task.time
 				task.run()
 				complete.PushBack(task)
-				element = element.Next()
+				element = next
 			} else {
 				break
 			}

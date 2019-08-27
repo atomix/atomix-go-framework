@@ -127,6 +127,7 @@ func (l *LockService) Lock(bytes []byte, ch chan<- service.Result) {
 	request := &LockRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		ch <- l.NewFailure(err)
+		close(ch)
 		return
 	}
 
@@ -244,6 +245,7 @@ func (l *LockService) Unlock(bytes []byte, ch chan<- service.Result) {
 				Index: int64(lock.index),
 				Acquired: true,
 			}))
+			close(lock.ch)
 		} else {
 			l.lock = nil
 		}
@@ -321,6 +323,7 @@ func (l *LockService) releaseLock(session *service.Session) {
 				Index: int64(lock.index),
 				Acquired: true,
 			}))
+			close(lock.ch)
 		}
 	}
 }
