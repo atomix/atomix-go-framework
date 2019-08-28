@@ -31,6 +31,7 @@ func NewNode(nodeID string, config *controller.PartitionConfig, protocol service
 		ID:       nodeID,
 		config:   config,
 		protocol: protocol,
+		startCh:  make(chan error),
 	}
 	(&defaultOption{}).apply(node)
 	for _, opt := range opts {
@@ -86,6 +87,7 @@ type Node struct {
 	port     int
 	listener listener
 	server   *grpc.Server
+	startCh  chan error
 }
 
 // Start starts the node
@@ -119,6 +121,14 @@ func (n *Node) Start() error {
 	ready := util.NewFileReady()
 	_ = ready.Set()
 
+	go func() {
+		_ = n.run(lis)
+	}()
+	return nil
+}
+
+// Run runs the server
+func (n *Node) run(lis net.Listener) error {
 	log.Info("Starting gRPC server")
 	n.server = grpc.NewServer()
 	service.RegisterServers(n.server, n.protocol)
@@ -127,7 +137,7 @@ func (n *Node) Start() error {
 
 // Stop stops the node
 func (n *Node) Stop() error {
-	n.server.Stop()
+	n.server.GracefulStop()
 	if err := n.protocol.Stop(); err != nil {
 		return err
 	}

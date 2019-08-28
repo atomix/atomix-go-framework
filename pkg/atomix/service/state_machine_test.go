@@ -23,7 +23,7 @@ import (
 
 func TestPrimitiveStateMachine(t *testing.T) {
 	ctx := &TestContext{}
-	sm := NewPrimitiveStateMachine(getServiceRegistry(), ctx)
+	sm := NewPrimitiveStateMachine(GetRegistry(), ctx)
 
 	ch := make(chan Output)
 	go ctx.command(sm, newOpenSessionRequest(t), ch)
@@ -157,12 +157,6 @@ func newTestQueryRequest(t *testing.T, bytes []byte) []byte {
 	})
 	assert.NoError(t, err)
 	return bytes
-}
-
-func getServiceRegistry() *Registry {
-	registry := NewServiceRegistry()
-	RegisterTestService(registry)
-	return registry
 }
 
 type TestContext struct {

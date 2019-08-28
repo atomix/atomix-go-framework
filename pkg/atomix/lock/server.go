@@ -18,7 +18,6 @@ import (
 	"context"
 	"github.com/atomix/atomix-api/proto/atomix/headers"
 	api "github.com/atomix/atomix-api/proto/atomix/lock"
-	"github.com/atomix/atomix-go-node/pkg/atomix/protocol"
 	"github.com/atomix/atomix-go-node/pkg/atomix/server"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/golang/protobuf/proto"
@@ -31,7 +30,7 @@ func init() {
 }
 
 // registerServer registers a lock server with the given gRPC server
-func registerServer(server *grpc.Server, protocol protocol.Protocol) {
+func registerServer(server *grpc.Server, protocol service.Protocol) {
 	api.RegisterLockServiceServer(server, newServer(protocol.Client()))
 }
 

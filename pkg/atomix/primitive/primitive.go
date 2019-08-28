@@ -22,13 +22,17 @@ import (
 	"google.golang.org/grpc"
 )
 
-// RegisterPrimitiveServer registers the primitive server with the gRPC server
-func RegisterPrimitiveServer(server *grpc.Server, client service.Client) {
-	api.RegisterPrimitiveServiceServer(server, newPrimitiveServiceServer(client))
+func init() {
+	service.RegisterServer(registerServer)
 }
 
-// newPrimitiveServer returns a new PrimitiveServiceServer implementation
-func newPrimitiveServiceServer(client service.Client) api.PrimitiveServiceServer {
+// registerServer registers a primitive server with the given gRPC server
+func registerServer(server *grpc.Server, protocol service.Protocol) {
+	api.RegisterPrimitiveServiceServer(server, newServer(protocol.Client()))
+}
+
+// newServer returns a new PrimitiveServiceServer implementation
+func newServer(client service.Client) api.PrimitiveServiceServer {
 	return &primitiveServer{
 		client: client,
 	}

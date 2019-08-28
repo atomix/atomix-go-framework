@@ -15,22 +15,87 @@
 package counter
 
 import (
-	"github.com/atomix/atomix-api/proto/atomix/counter"
+	"context"
+	client "github.com/atomix/atomix-go-client/pkg/client/counter"
+	"github.com/atomix/atomix-go-client/pkg/client/primitive"
+	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-node/pkg/atomix/test"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"testing"
+	"time"
 )
 
 func TestCounter(t *testing.T) {
-	node := test.NewTestNode()
+	node, conn := test.StartTestNode()
 	defer node.Stop()
 
-
-	conn, err := grpc.Dial(":5678", grpc.WithInsecure())
+	name := primitive.NewName("default", "test", "default", "test")
+	counter, err := client.New(context.TODO(), name, []*grpc.ClientConn{conn}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
-	defer conn.Close()
+	assert.NotNil(t, counter)
 
-	client := counter.NewCounterServiceClient(conn)
-	assert.NotNil(t, client)
+	value, err := counter.Get(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, int64(0), value)
+
+	err = counter.Set(context.TODO(), 1)
+	assert.NoError(t, err)
+
+	value, err = counter.Get(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, int64(1), value)
+
+	err = counter.Set(context.TODO(), -1)
+	assert.NoError(t, err)
+
+	value, err = counter.Get(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, int64(-1), value)
+
+	value, err = counter.Increment(context.TODO(), 1)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(0), value)
+
+	value, err = counter.Decrement(context.TODO(), 10)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(-10), value)
+
+	value, err = counter.Get(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, int64(-10), value)
+
+	value, err = counter.Increment(context.TODO(), 20)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(10), value)
+
+	err = counter.Close()
+	assert.NoError(t, err)
+
+	counter1, err := client.New(context.TODO(), name, []*grpc.ClientConn{conn}, session.WithTimeout(5*time.Second))
+	assert.NoError(t, err)
+
+	counter2, err := client.New(context.TODO(), name, []*grpc.ClientConn{conn}, session.WithTimeout(5*time.Second))
+	assert.NoError(t, err)
+
+	value, err = counter1.Get(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, int64(10), value)
+
+	err = counter1.Close()
+	assert.NoError(t, err)
+
+	err = counter1.Delete()
+	assert.NoError(t, err)
+
+	err = counter2.Delete()
+	assert.NoError(t, err)
+
+	counter, err = client.New(context.TODO(), name, []*grpc.ClientConn{conn}, session.WithTimeout(5*time.Second))
+	assert.NoError(t, err)
+
+	value, err = counter.Get(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, int64(0), value)
+
 }

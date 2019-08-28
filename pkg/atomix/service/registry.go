@@ -18,7 +18,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-var registry *Registry = newRegistry()
+var registry = newRegistry()
 
 // GetRegistry returns the service registry
 func GetRegistry() *Registry {
