@@ -12,17 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package atomix
+package service
 
-// Cluster describes the structure of the Atomix cluster
-type Cluster struct {
-	MemberID string
-	Members  map[string]Member
-}
+import (
+	"github.com/atomix/atomix-go-node/pkg/atomix/cluster"
+)
 
-// Member describes a single member of the Atomix cluster
-type Member struct {
-	ID   string
-	Host string
-	Port int
+// Protocol is the interface to be implemented by replication protocols
+type Protocol interface {
+	// Start starts the protocol
+	Start(cluster cluster.Cluster, registry *Registry) error
+
+	// Client returns the protocol client
+	Client() Client
+
+	// Stop stops the protocol
+	Stop() error
 }

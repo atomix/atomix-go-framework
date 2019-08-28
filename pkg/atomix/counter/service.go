@@ -19,9 +19,8 @@ import (
 	"github.com/gogo/protobuf/proto"
 )
 
-// RegisterService registers the counter service in the given service registry
-func RegisterService(registry *service.Registry) {
-	registry.Register("counter", newService)
+func init() {
+	service.RegisterService("counter", newService)
 }
 
 // newService returns a new Service

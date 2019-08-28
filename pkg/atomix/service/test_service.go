@@ -16,9 +16,8 @@ package service
 
 import "github.com/golang/protobuf/proto"
 
-// RegisterTestService registers the map service in the given service registry
-func RegisterTestService(registry *Registry) {
-	registry.Register("test", newTestService)
+func init() {
+	RegisterService("test", newTestService)
 }
 
 // newTestService returns a new TestService

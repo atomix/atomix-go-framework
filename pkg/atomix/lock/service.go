@@ -21,9 +21,8 @@ import (
 	"time"
 )
 
-// RegisterService registers the lock service in the given service registry
-func RegisterService(registry *service.Registry) {
-	registry.Register("lock", newService)
+func init() {
+	service.RegisterService("lock", newService)
 }
 
 // newService returns a new Service

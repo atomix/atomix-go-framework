@@ -20,9 +20,8 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-// RegisterService registers the map service in the given service registry
-func RegisterService(registry *service.Registry) {
-	registry.Register("map", newService)
+func init() {
+	service.RegisterService("map", newService)
 }
 
 // newService returns a new Service

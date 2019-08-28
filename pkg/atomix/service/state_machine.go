@@ -158,7 +158,7 @@ func (s *primitiveStateMachine) Install(reader io.Reader) error {
 		if err = proto.Unmarshal(bytes, serviceID); err != nil {
 			return err
 		}
-		service := s.registry.types[serviceID.Type](s.ctx)
+		service := s.registry.services[serviceID.Type](s.ctx)
 		s.services[getQualifiedServiceName(serviceID)] = newServiceStateMachine(serviceID.Type, service)
 
 		n, err = reader.Read(lengthBytes)

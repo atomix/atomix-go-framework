@@ -20,9 +20,8 @@ import (
 	"time"
 )
 
-// RegisterService registers the election service in the given service registry
-func RegisterService(registry *service.Registry) {
-	registry.Register("election", newService)
+func init() {
+	service.RegisterService("election", newService)
 }
 
 // newService returns a new Service

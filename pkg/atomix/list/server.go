@@ -18,6 +18,7 @@ import (
 	"context"
 	"github.com/atomix/atomix-api/proto/atomix/headers"
 	api "github.com/atomix/atomix-api/proto/atomix/list"
+	"github.com/atomix/atomix-go-node/pkg/atomix/protocol"
 	"github.com/atomix/atomix-go-node/pkg/atomix/server"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/golang/protobuf/proto"
@@ -25,9 +26,13 @@ import (
 	"google.golang.org/grpc"
 )
 
-// RegisterServer registers a list server with the given gRPC server
-func RegisterServer(server *grpc.Server, client service.Client) {
-	api.RegisterListServiceServer(server, newServer(client))
+func init() {
+	service.RegisterServer(registerServer)
+}
+
+// registerServer registers a list server with the given gRPC server
+func registerServer(server *grpc.Server, protocol protocol.Protocol) {
+	api.RegisterListServiceServer(server, newServer(protocol.Client()))
 }
 
 func newServer(client service.Client) api.ListServiceServer {

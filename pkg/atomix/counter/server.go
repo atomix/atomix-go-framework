@@ -25,9 +25,13 @@ import (
 	"google.golang.org/grpc"
 )
 
-// RegisterServer registers a counter server with the given gRPC server
-func RegisterServer(server *grpc.Server, client service.Client) {
-	api.RegisterCounterServiceServer(server, newServer(client))
+func init() {
+	service.RegisterServer(registerServer)
+}
+
+// registerServer registers a counter server with the given gRPC server
+func registerServer(server *grpc.Server, protocol service.Protocol) {
+	api.RegisterCounterServiceServer(server, newServer(protocol.Client()))
 }
 
 func newServer(client service.Client) api.CounterServiceServer {

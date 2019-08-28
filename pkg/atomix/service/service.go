@@ -14,7 +14,9 @@
 
 package service
 
-import "time"
+import (
+	"time"
+)
 
 // OperationType is the type for a service operation
 type OperationType string
@@ -35,26 +37,6 @@ type Service interface {
 
 	// Restore must be implemented by services to restore the state of the service from a serialized backup
 	Restore(bytes []byte) error
-}
-
-// Registry is a registry of service types
-type Registry struct {
-	types map[string]func(ctx Context) Service
-}
-
-// Register registers a new primitive type
-func (r *Registry) Register(name string, f func(ctx Context) Service) {
-	r.types[name] = f
-}
-
-// getType returns a service type by name
-func (r *Registry) getType(name string) func(sctx Context) Service {
-	return r.types[name]
-}
-
-// NewServiceRegistry returns a new primitive type registry
-func NewServiceRegistry() *Registry {
-	return &Registry{types: make(map[string]func(ctx Context) Service)}
 }
 
 // service is an internal base for service implementations

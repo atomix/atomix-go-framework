@@ -19,9 +19,8 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-// RegisterService registers the value service in the given service registry
-func RegisterService(registry *service.Registry) {
-	registry.Register("value", newService)
+func init() {
+	service.RegisterService("value", newService)
 }
 
 // newService returns a new Service

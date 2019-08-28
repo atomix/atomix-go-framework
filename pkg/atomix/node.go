@@ -17,35 +17,16 @@ package atomix
 import (
 	"fmt"
 	"github.com/atomix/atomix-api/proto/atomix/controller"
-	"github.com/atomix/atomix-go-node/pkg/atomix/counter"
-	"github.com/atomix/atomix-go-node/pkg/atomix/election"
-	"github.com/atomix/atomix-go-node/pkg/atomix/list"
-	"github.com/atomix/atomix-go-node/pkg/atomix/lock"
-	map_ "github.com/atomix/atomix-go-node/pkg/atomix/map"
-	"github.com/atomix/atomix-go-node/pkg/atomix/primitive"
+	"github.com/atomix/atomix-go-node/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
-	"github.com/atomix/atomix-go-node/pkg/atomix/set"
 	"github.com/atomix/atomix-go-node/pkg/atomix/util"
-	"github.com/atomix/atomix-go-node/pkg/atomix/value"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"net"
 )
 
-// Protocol is the interface to be implemented by replication protocols
-type Protocol interface {
-	// Start starts the protocol
-	Start(cluster Cluster, registry *service.Registry) error
-
-	// Client returns the protocol client
-	Client() service.Client
-
-	// Stop stops the protocol
-	Stop() error
-}
-
 // NewNode creates a new node running the given protocol
-func NewNode(nodeID string, config *controller.PartitionConfig, protocol Protocol, opts ...NodeOption) *Node {
+func NewNode(nodeID string, config *controller.PartitionConfig, protocol service.Protocol, opts ...NodeOption) *Node {
 	node := &Node{
 		ID:       nodeID,
 		config:   config,
@@ -101,7 +82,7 @@ func (o *portOption) apply(node *Node) {
 type Node struct {
 	ID       string
 	config   *controller.PartitionConfig
-	protocol Protocol
+	protocol service.Protocol
 	port     int
 	listener listener
 	server   *grpc.Server
@@ -109,22 +90,22 @@ type Node struct {
 
 // Start starts the node
 func (n *Node) Start() error {
-	members := make(map[string]Member)
+	members := make(map[string]cluster.Member)
 	for _, member := range n.config.Members {
-		members[member.ID] = Member{
+		members[member.ID] = cluster.Member{
 			ID:   member.ID,
 			Host: member.Host,
 			Port: int(member.Port),
 		}
 	}
 
-	cluster := Cluster{
+	cluster := cluster.Cluster{
 		MemberID: n.ID,
 		Members:  members,
 	}
 
 	log.Info("Starting protocol")
-	err := n.protocol.Start(cluster, getServiceRegistry())
+	err := n.protocol.Start(cluster, service.GetRegistry())
 	if err != nil {
 		return err
 	}
@@ -140,7 +121,7 @@ func (n *Node) Start() error {
 
 	log.Info("Starting gRPC server")
 	n.server = grpc.NewServer()
-	registerServers(n.server, n.protocol)
+	service.RegisterServers(n.server, n.protocol)
 	return n.server.Serve(lis)
 }
 
@@ -170,29 +151,4 @@ type localListener struct {
 
 func (l localListener) listen(node *Node) (net.Listener, error) {
 	return l.listener, nil
-}
-
-// registerServers registers all primitive servers on the given gRPC server
-func registerServers(server *grpc.Server, protocol Protocol) {
-	primitive.RegisterPrimitiveServer(server, protocol.Client())
-	counter.RegisterServer(server, protocol.Client())
-	election.RegisterServer(server, protocol.Client())
-	list.RegisterServer(server, protocol.Client())
-	lock.RegisterServer(server, protocol.Client())
-	map_.RegisterServer(server, protocol.Client())
-	set.RegisterServer(server, protocol.Client())
-	value.RegisterServer(server, protocol.Client())
-}
-
-// getServiceRegistry returns a service registry for the node
-func getServiceRegistry() *service.Registry {
-	registry := service.NewServiceRegistry()
-	counter.RegisterService(registry)
-	election.RegisterService(registry)
-	list.RegisterService(registry)
-	lock.RegisterService(registry)
-	map_.RegisterService(registry)
-	set.RegisterService(registry)
-	value.RegisterService(registry)
-	return registry
 }

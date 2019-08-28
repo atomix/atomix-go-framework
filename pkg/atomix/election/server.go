@@ -18,6 +18,7 @@ import (
 	"context"
 	api "github.com/atomix/atomix-api/proto/atomix/election"
 	"github.com/atomix/atomix-api/proto/atomix/headers"
+	"github.com/atomix/atomix-go-node/pkg/atomix/protocol"
 	"github.com/atomix/atomix-go-node/pkg/atomix/server"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/gogo/protobuf/proto"
@@ -25,9 +26,13 @@ import (
 	"google.golang.org/grpc"
 )
 
-// RegisterServer registers an election server with the given gRPC server
-func RegisterServer(server *grpc.Server, client service.Client) {
-	api.RegisterLeaderElectionServiceServer(server, newServer(client))
+func init() {
+	service.RegisterServer(registerServer)
+}
+
+// registerServer registers an election server with the given gRPC server
+func registerServer(server *grpc.Server, protocol protocol.Protocol) {
+	api.RegisterLeaderElectionServiceServer(server, newServer(protocol.Client()))
 }
 
 func newServer(client service.Client) api.LeaderElectionServiceServer {
