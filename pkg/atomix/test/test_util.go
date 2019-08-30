@@ -18,6 +18,7 @@ import (
 	"context"
 	"github.com/atomix/atomix-go-local/pkg/atomix/local"
 	"github.com/atomix/atomix-go-node/pkg/atomix"
+	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
 	"net"
@@ -26,7 +27,7 @@ import (
 // StartTestNode starts a single test node
 func StartTestNode() (*atomix.Node, *grpc.ClientConn) {
 	lis := bufconn.Listen(1024 * 1024)
-	node := local.NewNode(lis)
+	node := local.NewNode(lis, service.GetRegistry())
 	node.Start()
 
 	dialer := func(ctx context.Context, address string) (net.Conn, error) {

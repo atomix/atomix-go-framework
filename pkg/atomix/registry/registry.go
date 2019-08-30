@@ -16,16 +16,32 @@ package registry
 
 // Import all services to ensure they're registered
 import (
+	// Register the counter primitive
 	_ "github.com/atomix/atomix-go-node/pkg/atomix/counter"
+
+	// Register the election primitive
 	_ "github.com/atomix/atomix-go-node/pkg/atomix/election"
+
+	// Register the list primitive
 	_ "github.com/atomix/atomix-go-node/pkg/atomix/list"
+
+	// Register the lock primitive
 	_ "github.com/atomix/atomix-go-node/pkg/atomix/lock"
+
+	// Register the map primitive
 	_ "github.com/atomix/atomix-go-node/pkg/atomix/map"
+
+	// Register the primitive metadata service
 	_ "github.com/atomix/atomix-go-node/pkg/atomix/primitive"
+
+	// Register the set primitive
 	_ "github.com/atomix/atomix-go-node/pkg/atomix/set"
+
+	// Register the value primitive
 	_ "github.com/atomix/atomix-go-node/pkg/atomix/value"
 )
 
 import "github.com/atomix/atomix-go-node/pkg/atomix/service"
 
+// Registry is a service registry populated with all default primitive services
 var Registry = service.GetRegistry()

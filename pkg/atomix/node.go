@@ -26,11 +26,12 @@ import (
 )
 
 // NewNode creates a new node running the given protocol
-func NewNode(nodeID string, config *controller.PartitionConfig, protocol service.Protocol, opts ...NodeOption) *Node {
+func NewNode(nodeID string, config *controller.PartitionConfig, protocol service.Protocol, registry *service.Registry, opts ...NodeOption) *Node {
 	node := &Node{
 		ID:       nodeID,
 		config:   config,
 		protocol: protocol,
+		registry: registry,
 		startCh:  make(chan error),
 	}
 	(&defaultOption{}).apply(node)
@@ -84,6 +85,7 @@ type Node struct {
 	ID       string
 	config   *controller.PartitionConfig
 	protocol service.Protocol
+	registry *service.Registry
 	port     int
 	listener listener
 	server   *grpc.Server
@@ -107,7 +109,7 @@ func (n *Node) Start() error {
 	}
 
 	log.Info("Starting protocol")
-	err := n.protocol.Start(cluster, service.GetRegistry())
+	err := n.protocol.Start(cluster, n.registry)
 	if err != nil {
 		return err
 	}
