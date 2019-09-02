@@ -263,6 +263,7 @@ func (s *SessionizedService) Command(bytes []byte, ch chan<- Output) {
 		}
 
 		scheduler.runImmediateTasks()
+		scheduler.runIndex(s.Context.Index())
 	}
 }
 
