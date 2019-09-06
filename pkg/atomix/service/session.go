@@ -23,6 +23,7 @@ import (
 	"io"
 	"math"
 	"time"
+	log "github.com/sirupsen/logrus"
 )
 
 // NewSessionizedService returns an initialized SessionizedService
@@ -673,6 +674,7 @@ func (s *sessionStream) process() {
 
 		// If the event is being published during a read operation, throw an exception.
 		if s.ctx.OperationType() != OpTypeCommand {
+			log.Debugf("Skipped response for operation type %s", s.ctx.OperationType())
 			continue
 		}
 
@@ -680,6 +682,7 @@ func (s *sessionStream) process() {
 		// client must have received it from another server.
 		s.eventID++
 		if s.completeID > s.eventID {
+			log.Debugf("Skipped acknowledged response %d", s.eventID)
 			continue
 		}
 
@@ -710,6 +713,7 @@ func (s *sessionStream) process() {
 			result: inResult,
 		}
 		s.results.PushBack(outResult)
+		log.Tracef("Cached result %s", outResult)
 
 		// If the out channel is set, send the result
 		if s.outChan != nil {
