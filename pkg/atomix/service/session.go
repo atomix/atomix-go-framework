@@ -20,10 +20,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/golang/protobuf/proto"
+	log "github.com/sirupsen/logrus"
 	"io"
 	"math"
 	"time"
-	log "github.com/sirupsen/logrus"
 )
 
 // NewSessionizedService returns an initialized SessionizedService
@@ -713,7 +713,7 @@ func (s *sessionStream) process() {
 			result: inResult,
 		}
 		s.results.PushBack(outResult)
-		log.Tracef("Cached result %s", outResult)
+		log.Tracef("Cached result %v", outResult)
 
 		// If the out channel is set, send the result
 		if s.outChan != nil {
