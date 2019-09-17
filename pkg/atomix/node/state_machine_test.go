@@ -161,10 +161,13 @@ func newTestQueryRequest(t *testing.T, bytes []byte) []byte {
 }
 
 type TestContext struct {
-	Context
 	index     uint64
 	timestamp time.Time
 	operation service.OperationType
+}
+
+func (c *TestContext) Node() string {
+	return "test"
 }
 
 func (c *TestContext) Index() uint64 {
