@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"github.com/atomix/atomix-go-node/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
-	log "github.com/sirupsen/logrus"
 	"io"
 	"math"
 	"time"
@@ -184,12 +183,20 @@ func (s *SessionizedService) installSessions(reader io.Reader) error {
 	}
 
 	s.sessions = make(map[uint64]*Session)
-	for _, session := range snapshot.Sessions {
+	for _, state := range snapshot.Sessions {
+		session := &Session{
+			ID:              state.SessionID,
+			Timeout:         time.Duration(state.Timeout),
+			LastUpdated:     state.Timestamp,
+			commandSequence: state.CommandSequence,
+		}
+
 		streams := list.New()
-		for _, stream := range session.Streams {
+		for _, stream := range state.Streams {
 			s := &sessionStream{
 				ID:         stream.StreamId,
 				Type:       stream.Type,
+				session:    session,
 				responseID: stream.SequenceNumber,
 				completeID: stream.LastCompleted,
 				ctx:        s.Context,
@@ -198,13 +205,8 @@ func (s *SessionizedService) installSessions(reader io.Reader) error {
 			}
 			streams.PushBack(s)
 		}
-		s.sessions[session.SessionID] = &Session{
-			ID:              session.SessionID,
-			Timeout:         time.Duration(session.Timeout),
-			LastUpdated:     session.Timestamp,
-			commandSequence: session.CommandSequence,
-			streams:         streams,
-		}
+		session.streams = streams
+		s.sessions[session.ID] = session
 	}
 	return nil
 }
@@ -501,7 +503,7 @@ func newSession(ctx Context, timeout *time.Duration) *Session {
 		streams:          list.New(),
 	}
 	util.SessionEntry(ctx.Node(), ctx.Namespace(), ctx.Name(), session.ID).
-		Debugf("Session %d: Open", session.ID)
+		Debug("Session open")
 	return session
 }
 
@@ -553,13 +555,15 @@ func (s *Session) addStream(sequence uint64, op string, outChan chan<- Result) c
 	stream := &sessionStream{
 		ID:      sequence,
 		Type:    op,
+		session: s,
 		ctx:     s.ctx,
 		inChan:  make(chan Result),
 		outChan: outChan,
 		results: list.New(),
 	}
 	s.streams.PushBack(stream)
-	log.Tracef("Session %d: Opened stream", stream.ID)
+	util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.ID, stream.ID).
+		Trace("Stream open")
 	go stream.process()
 	return stream.inChan
 }
@@ -649,7 +653,8 @@ func (s *Session) completeCommand(sequenceNumber uint64) {
 
 // close closes the session and completes all its streams
 func (s *Session) close() {
-	log.Debugf("Session %d: Closed", s.ID)
+	util.SessionEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.ID).
+		Debug("Session closed")
 	element := s.streams.Front()
 	for element != nil {
 		element.Value.(*sessionStream).close()
@@ -661,6 +666,7 @@ func (s *Session) close() {
 type sessionStream struct {
 	ID         uint64
 	Type       string
+	session    *Session
 	closed     bool
 	responseID uint64
 	completeID uint64
@@ -686,7 +692,8 @@ func (s *sessionStream) process() {
 
 		// If the event is being published during a read operation, throw an exception.
 		if s.ctx.OperationType() != OpTypeCommand {
-			log.Debugf("Skipped response for operation type %s", s.ctx.OperationType())
+			util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.session.ID, s.ID).
+				Debugf("Skipped response for operation type %s", s.ctx.OperationType())
 			continue
 		}
 
@@ -694,7 +701,8 @@ func (s *sessionStream) process() {
 		// client must have received it from another server.
 		s.responseID++
 		if s.completeID > s.responseID {
-			log.Debugf("Skipped completed result %d", s.responseID)
+			util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.session.ID, s.ID).
+				Debugf("Skipped completed result %d", s.responseID)
 			continue
 		}
 
@@ -723,17 +731,20 @@ func (s *sessionStream) process() {
 			result: inResult,
 		}
 		s.results.PushBack(outResult)
-		log.Tracef("Stream %d: Cached response %d", s.ID, s.responseID)
+		util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.session.ID, s.ID).
+			Tracef("Cached response %d", s.responseID)
 
 		// If the out channel is set, send the result
 		if s.outChan != nil {
 			out := outResult.result
-			log.Tracef("Stream %d: Sending response %d %v", s.ID, s.responseID, out)
+			util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.session.ID, s.ID).
+				Tracef("Sending response %d %v", s.responseID, out)
 			s.outChan <- out
 		}
 	}
 
-	log.Debugf("Stream %d: Finished processing stream responses", s.ID)
+	util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.session.ID, s.ID).
+		Trace("Finished processing responses")
 	s.closed = true
 
 	ch := s.outChan
@@ -777,7 +788,8 @@ func (s *sessionStream) ack(id uint64) {
 			s.completeID = event.Value.(sessionStreamResult).id
 			event = next
 		}
-		log.Tracef("Stream %d: Evicted cached responses up to %d", s.ID, id)
+		util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.session.ID, s.ID).
+			Tracef("Discarded cached responses up to %d", id)
 	}
 }
 
@@ -785,9 +797,10 @@ func (s *sessionStream) ack(id uint64) {
 func (s *sessionStream) replay(ch chan<- Result) {
 	result := s.results.Front()
 	for result != nil {
-		out := result.Value.(sessionStreamResult).result
-		log.Tracef("Stream %d: Sending response %d %v", s.ID, s.responseID, out)
-		ch <- out
+		response := result.Value.(sessionStreamResult)
+		util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.session.ID, s.ID).
+			Tracef("Sending response %d %v", response.id, response.result)
+		ch <- response.result
 		result = result.Next()
 	}
 	s.outChan = ch
