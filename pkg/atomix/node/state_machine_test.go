@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package service
+package node
 
 import (
+	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -59,9 +60,9 @@ func TestPrimitiveStateMachine(t *testing.T) {
 
 func newOpenSessionRequest(t *testing.T) []byte {
 	timeout := 30 * time.Second
-	bytes, err := proto.Marshal(&SessionRequest{
-		Request: &SessionRequest_OpenSession{
-			OpenSession: &OpenSessionRequest{
+	bytes, err := proto.Marshal(&service.SessionRequest{
+		Request: &service.SessionRequest_OpenSession{
+			OpenSession: &service.OpenSessionRequest{
 				Timeout: &timeout,
 			},
 		},
@@ -70,19 +71,19 @@ func newOpenSessionRequest(t *testing.T) []byte {
 	return newTestCommandRequest(t, bytes)
 }
 
-func getOpenSessionResponse(t *testing.T, bytes []byte) *OpenSessionResponse {
-	serviceResponse := &ServiceResponse{}
+func getOpenSessionResponse(t *testing.T, bytes []byte) *service.OpenSessionResponse {
+	serviceResponse := &service.ServiceResponse{}
 	assert.NoError(t, proto.Unmarshal(bytes, serviceResponse))
-	sessionResponse := &SessionResponse{}
+	sessionResponse := &service.SessionResponse{}
 	assert.NoError(t, proto.Unmarshal(serviceResponse.GetCommand(), sessionResponse))
 	return sessionResponse.GetOpenSession()
 }
 
 func newCommandRequest(t *testing.T, sessionID uint64, commandID uint64, name string, bytes []byte) []byte {
-	bytes, err := proto.Marshal(&SessionRequest{
-		Request: &SessionRequest_Command{
-			Command: &SessionCommandRequest{
-				Context: &SessionCommandContext{
+	bytes, err := proto.Marshal(&service.SessionRequest{
+		Request: &service.SessionRequest_Command{
+			Command: &service.SessionCommandRequest{
+				Context: &service.SessionCommandContext{
 					SessionID:      sessionID,
 					SequenceNumber: commandID,
 				},
@@ -95,19 +96,19 @@ func newCommandRequest(t *testing.T, sessionID uint64, commandID uint64, name st
 	return newTestCommandRequest(t, bytes)
 }
 
-func getCommandResponse(t *testing.T, bytes []byte) *SessionCommandResponse {
-	serviceResponse := &ServiceResponse{}
+func getCommandResponse(t *testing.T, bytes []byte) *service.SessionCommandResponse {
+	serviceResponse := &service.ServiceResponse{}
 	assert.NoError(t, proto.Unmarshal(bytes, serviceResponse))
-	sessionResponse := &SessionResponse{}
+	sessionResponse := &service.SessionResponse{}
 	assert.NoError(t, proto.Unmarshal(serviceResponse.GetCommand(), sessionResponse))
 	return sessionResponse.GetCommand()
 }
 
 func newQueryRequest(t *testing.T, sessionID uint64, lastIndex uint64, lastCommandID uint64, name string, bytes []byte) []byte {
-	bytes, err := proto.Marshal(&SessionRequest{
-		Request: &SessionRequest_Query{
-			Query: &SessionQueryRequest{
-				Context: &SessionQueryContext{
+	bytes, err := proto.Marshal(&service.SessionRequest{
+		Request: &service.SessionRequest_Query{
+			Query: &service.SessionQueryRequest{
+				Context: &service.SessionQueryContext{
 					SessionID:          sessionID,
 					LastIndex:          lastIndex,
 					LastSequenceNumber: lastCommandID,
@@ -121,22 +122,22 @@ func newQueryRequest(t *testing.T, sessionID uint64, lastIndex uint64, lastComma
 	return newTestQueryRequest(t, bytes)
 }
 
-func getQueryResponse(t *testing.T, bytes []byte) *SessionQueryResponse {
-	serviceResponse := &ServiceResponse{}
+func getQueryResponse(t *testing.T, bytes []byte) *service.SessionQueryResponse {
+	serviceResponse := &service.ServiceResponse{}
 	assert.NoError(t, proto.Unmarshal(bytes, serviceResponse))
-	sessionResponse := &SessionResponse{}
+	sessionResponse := &service.SessionResponse{}
 	assert.NoError(t, proto.Unmarshal(serviceResponse.GetQuery(), sessionResponse))
 	return sessionResponse.GetQuery()
 }
 
 func newTestCommandRequest(t *testing.T, bytes []byte) []byte {
-	bytes, err := proto.Marshal(&ServiceRequest{
-		Id: &ServiceId{
+	bytes, err := proto.Marshal(&service.ServiceRequest{
+		Id: &service.ServiceId{
 			Type:      "test",
 			Name:      "test",
 			Namespace: "test",
 		},
-		Request: &ServiceRequest_Command{
+		Request: &service.ServiceRequest_Command{
 			Command: bytes,
 		},
 	})
@@ -145,13 +146,13 @@ func newTestCommandRequest(t *testing.T, bytes []byte) []byte {
 }
 
 func newTestQueryRequest(t *testing.T, bytes []byte) []byte {
-	bytes, err := proto.Marshal(&ServiceRequest{
-		Id: &ServiceId{
+	bytes, err := proto.Marshal(&service.ServiceRequest{
+		Id: &service.ServiceId{
 			Type:      "test",
 			Name:      "test",
 			Namespace: "test",
 		},
-		Request: &ServiceRequest_Query{
+		Request: &service.ServiceRequest_Query{
 			Query: bytes,
 		},
 	})
@@ -163,7 +164,7 @@ type TestContext struct {
 	Context
 	index     uint64
 	timestamp time.Time
-	operation OperationType
+	operation service.OperationType
 }
 
 func (c *TestContext) Index() uint64 {
@@ -174,17 +175,17 @@ func (c *TestContext) Timestamp() time.Time {
 	return c.timestamp
 }
 
-func (c *TestContext) OperationType() OperationType {
+func (c *TestContext) OperationType() service.OperationType {
 	return c.operation
 }
 
 func (c *TestContext) command(sm StateMachine, input []byte, ch chan<- Output) {
 	c.index++
-	c.operation = OpTypeCommand
+	c.operation = service.OpTypeCommand
 	sm.Command(input, ch)
 }
 
 func (c *TestContext) query(sm StateMachine, input []byte, ch chan<- Output) {
-	c.operation = OpTypeQuery
+	c.operation = service.OpTypeQuery
 	sm.Query(input, ch)
 }

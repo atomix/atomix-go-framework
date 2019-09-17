@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"github.com/atomix/atomix-api/proto/atomix/controller"
 	"github.com/atomix/atomix-go-node/pkg/atomix/cluster"
-	"github.com/atomix/atomix-go-node/pkg/atomix/service"
+	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/util"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -26,7 +26,7 @@ import (
 )
 
 // NewNode creates a new node running the given protocol
-func NewNode(nodeID string, config *controller.PartitionConfig, protocol service.Protocol, registry *service.Registry, opts ...NodeOption) *Node {
+func NewNode(nodeID string, config *controller.PartitionConfig, protocol node.Protocol, registry *node.Registry, opts ...NodeOption) *Node {
 	node := &Node{
 		ID:       nodeID,
 		config:   config,
@@ -84,8 +84,8 @@ func (o *portOption) apply(node *Node) {
 type Node struct {
 	ID       string
 	config   *controller.PartitionConfig
-	protocol service.Protocol
-	registry *service.Registry
+	protocol node.Protocol
+	registry *node.Registry
 	port     int
 	listener listener
 	server   *grpc.Server
@@ -133,7 +133,7 @@ func (n *Node) Start() error {
 func (n *Node) run(lis net.Listener) error {
 	log.Info("Starting gRPC server")
 	n.server = grpc.NewServer()
-	service.RegisterServers(n.server, n.protocol)
+	node.RegisterServers(n.server, n.protocol)
 	return n.server.Serve(lis)
 }
 

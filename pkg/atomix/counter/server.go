@@ -18,23 +18,23 @@ import (
 	"context"
 	api "github.com/atomix/atomix-api/proto/atomix/counter"
 	"github.com/atomix/atomix-api/proto/atomix/headers"
+	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/server"
-	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
 func init() {
-	service.RegisterServer(registerServer)
+	node.RegisterServer(registerServer)
 }
 
 // registerServer registers a counter server with the given gRPC server
-func registerServer(server *grpc.Server, protocol service.Protocol) {
+func registerServer(server *grpc.Server, protocol node.Protocol) {
 	api.RegisterCounterServiceServer(server, newServer(protocol.Client()))
 }
 
-func newServer(client service.Client) api.CounterServiceServer {
+func newServer(client node.Client) api.CounterServiceServer {
 	return &Server{
 		SimpleServer: &server.SimpleServer{
 			Type:   "counter",

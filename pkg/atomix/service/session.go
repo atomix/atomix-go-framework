@@ -19,6 +19,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/atomix/atomix-go-node/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"io"
@@ -28,7 +29,9 @@ import (
 
 // NewSessionizedService returns an initialized SessionizedService
 func NewSessionizedService(parent Context) *SessionizedService {
-	ctx := &mutableContext{}
+	ctx := &mutableContext{
+		parent: parent,
+	}
 	return &SessionizedService{
 		service: &service{
 			Scheduler: newScheduler(),
@@ -82,7 +85,7 @@ func (s *SessionizedService) snapshotSessions(writer io.Writer) error {
 			streams = append(streams, &SessionStreamSnapshot{
 				StreamId:       stream.ID,
 				Type:           stream.Type,
-				SequenceNumber: stream.eventID,
+				SequenceNumber: stream.responseID,
 				LastCompleted:  stream.completeID,
 			})
 			element = element.Next()
@@ -187,7 +190,7 @@ func (s *SessionizedService) installSessions(reader io.Reader) error {
 			s := &sessionStream{
 				ID:         stream.StreamId,
 				Type:       stream.Type,
-				eventID:    stream.SequenceNumber,
+				responseID: stream.SequenceNumber,
 				completeID: stream.LastCompleted,
 				ctx:        s.Context,
 				inChan:     make(chan Result),
@@ -241,12 +244,12 @@ func (s *SessionizedService) CanDelete(index uint64) bool {
 }
 
 // Command handles a service command
-func (s *SessionizedService) Command(bytes []byte, ch chan<- Output) {
+func (s *SessionizedService) Command(bytes []byte, ch chan<- Result) {
 	s.context.setCommand(s.parent.Timestamp())
 	request := &SessionRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		if ch != nil {
-			ch <- newFailure(err)
+			ch <- newFailure(s.context.Index(), err)
 		}
 	} else {
 		scheduler := s.Scheduler.(*scheduler)
@@ -268,11 +271,11 @@ func (s *SessionizedService) Command(bytes []byte, ch chan<- Output) {
 	}
 }
 
-func (s *SessionizedService) applyCommand(request *SessionCommandRequest, ch chan<- Output) {
+func (s *SessionizedService) applyCommand(request *SessionCommandRequest, ch chan<- Result) {
 	session, ok := s.sessions[request.Context.SessionID]
 	if !ok {
 		if ch != nil {
-			ch <- newFailure(fmt.Errorf("unknown session %d", request.Context.SessionID))
+			ch <- newFailure(s.context.Index(), fmt.Errorf("unknown session %d", request.Context.SessionID))
 		}
 	} else {
 		sequenceNumber := request.Context.SequenceNumber
@@ -284,7 +287,7 @@ func (s *SessionizedService) applyCommand(request *SessionCommandRequest, ch cha
 				}
 			} else {
 				if ch != nil {
-					ch <- newFailure(fmt.Errorf("sequence number %d has already been acknowledged", sequenceNumber))
+					ch <- newFailure(s.context.Index(), fmt.Errorf("sequence number %d has already been acknowledged", sequenceNumber))
 				}
 			}
 		} else if sequenceNumber > session.nextCommandSequence() {
@@ -297,45 +300,46 @@ func (s *SessionizedService) applyCommand(request *SessionCommandRequest, ch cha
 	}
 }
 
-func (s *SessionizedService) applySessionCommand(request *SessionCommandRequest, ch chan<- Output) {
+func (s *SessionizedService) applySessionCommand(request *SessionCommandRequest, ch chan<- Result) {
 	session, ok := s.sessions[request.Context.SessionID]
 	if !ok {
 		if ch != nil {
-			ch <- newFailure(fmt.Errorf("unknown session %d", request.Context.SessionID))
+			ch <- newFailure(s.context.Index(), fmt.Errorf("unknown session %d", request.Context.SessionID))
 		}
 	} else {
 		s.session = session
 		stream := session.addStream(request.Context.SequenceNumber, request.Name, ch)
 		if err := s.Executor.Execute(request.Name, request.Input, stream); err != nil {
 			if ch != nil {
-				ch <- newFailure(err)
+				ch <- newFailure(s.context.Index(), err)
 			}
 		}
 		session.completeCommand(request.Context.SequenceNumber)
 	}
 }
 
-func (s *SessionizedService) applyOpenSession(request *OpenSessionRequest, ch chan<- Output) {
+func (s *SessionizedService) applyOpenSession(request *OpenSessionRequest, ch chan<- Result) {
 	session := newSession(s.Context, request.Timeout)
 	s.sessions[session.ID] = session
 	s.OnOpen(session)
 	if ch != nil {
-		ch <- newOutput(proto.Marshal(&SessionResponse{
+		bytes, err := proto.Marshal(&SessionResponse{
 			Response: &SessionResponse_OpenSession{
 				OpenSession: &OpenSessionResponse{
 					SessionID: session.ID,
 				},
 			},
-		}))
+		})
+		ch <- newResult(s.context.Index(), bytes, err)
 	}
 }
 
 // applyKeepAlive applies a KeepAliveRequest to the service
-func (s *SessionizedService) applyKeepAlive(request *KeepAliveRequest, ch chan<- Output) {
+func (s *SessionizedService) applyKeepAlive(request *KeepAliveRequest, ch chan<- Result) {
 	session, ok := s.sessions[request.SessionID]
 	if !ok {
 		if ch != nil {
-			ch <- newFailure(fmt.Errorf("unknown session %d", request.SessionID))
+			ch <- newFailure(s.context.Index(), fmt.Errorf("unknown session %d", request.SessionID))
 		}
 	} else {
 		// Update the session's last updated timestamp to prevent it from expiring
@@ -349,11 +353,12 @@ func (s *SessionizedService) applyKeepAlive(request *KeepAliveRequest, ch chan<-
 
 		// Send the response
 		if ch != nil {
-			ch <- newOutput(proto.Marshal(&SessionResponse{
+			bytes, err := proto.Marshal(&SessionResponse{
 				Response: &SessionResponse_KeepAlive{
 					KeepAlive: &KeepAliveResponse{},
 				},
-			}))
+			})
+			ch <- newResult(s.context.Index(), bytes, err)
 		}
 	}
 }
@@ -369,11 +374,11 @@ func (s *SessionizedService) expireSessions() {
 	}
 }
 
-func (s *SessionizedService) applyCloseSession(request *CloseSessionRequest, ch chan<- Output) {
+func (s *SessionizedService) applyCloseSession(request *CloseSessionRequest, ch chan<- Result) {
 	session, ok := s.sessions[request.SessionID]
 	if !ok {
 		if ch != nil {
-			ch <- newFailure(fmt.Errorf("unknown session %d", request.SessionID))
+			ch <- newFailure(s.context.Index(), fmt.Errorf("unknown session %d", request.SessionID))
 		}
 	} else {
 		// Close the session and notify the service.
@@ -383,22 +388,23 @@ func (s *SessionizedService) applyCloseSession(request *CloseSessionRequest, ch 
 
 		// Send the response
 		if ch != nil {
-			ch <- newOutput(proto.Marshal(&SessionResponse{
+			bytes, err := proto.Marshal(&SessionResponse{
 				Response: &SessionResponse_CloseSession{
 					CloseSession: &CloseSessionResponse{},
 				},
-			}))
+			})
+			ch <- newResult(s.context.Index(), bytes, err)
 		}
 	}
 }
 
 // Query handles a service query
-func (s *SessionizedService) Query(bytes []byte, ch chan<- Output) {
+func (s *SessionizedService) Query(bytes []byte, ch chan<- Result) {
 	request := &SessionRequest{}
 	err := proto.Unmarshal(bytes, request)
 	if err != nil {
 		if ch != nil {
-			ch <- newFailure(err)
+			ch <- newFailure(s.context.Index(), err)
 		}
 	} else {
 		query := request.GetQuery()
@@ -412,11 +418,11 @@ func (s *SessionizedService) Query(bytes []byte, ch chan<- Output) {
 	}
 }
 
-func (s *SessionizedService) sequenceQuery(query *SessionQueryRequest, ch chan<- Output) {
+func (s *SessionizedService) sequenceQuery(query *SessionQueryRequest, ch chan<- Result) {
 	session, ok := s.sessions[query.Context.SessionID]
 	if !ok {
 		if ch != nil {
-			ch <- newFailure(fmt.Errorf("unknown session %d", query.Context.SessionID))
+			ch <- newFailure(s.context.Index(), fmt.Errorf("unknown session %d", query.Context.SessionID))
 		}
 	} else {
 		sequenceNumber := query.Context.LastSequenceNumber
@@ -430,7 +436,7 @@ func (s *SessionizedService) sequenceQuery(query *SessionQueryRequest, ch chan<-
 	}
 }
 
-func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Session, ch chan<- Output) {
+func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Session, ch chan<- Result) {
 	// If the result channel is non-nil, create a channel for transforming results.
 	var queryCh chan Result
 	if ch != nil {
@@ -439,9 +445,9 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 			defer close(ch)
 			for result := range queryCh {
 				if result.Failed() {
-					ch <- result.Output
+					ch <- result
 				} else {
-					ch <- newOutput(proto.Marshal(&SessionResponse{
+					bytes, err := proto.Marshal(&SessionResponse{
 						Response: &SessionResponse_Query{
 							Query: &SessionQueryResponse{
 								Context: &SessionResponseContext{
@@ -451,7 +457,8 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 								Output: result.Value,
 							},
 						},
-					}))
+					})
+					ch <- newResult(result.Index, bytes, err)
 				}
 			}
 		}()
@@ -459,7 +466,7 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 
 	s.context.setQuery()
 	if err := s.Executor.Execute(query.Name, query.Input, queryCh); err != nil {
-		ch <- newFailure(err)
+		ch <- newFailure(s.context.Index(), err)
 		return
 	}
 }
@@ -484,7 +491,7 @@ func newSession(ctx Context, timeout *time.Duration) *Session {
 		defaultTimeout := 30 * time.Second
 		timeout = &defaultTimeout
 	}
-	return &Session{
+	session := &Session{
 		ID:               ctx.Index(),
 		Timeout:          *timeout,
 		LastUpdated:      ctx.Timestamp(),
@@ -493,6 +500,9 @@ func newSession(ctx Context, timeout *time.Duration) *Session {
 		queryCallbacks:   make(map[uint64]*list.List),
 		streams:          list.New(),
 	}
+	util.SessionEntry(ctx.Node(), ctx.Namespace(), ctx.Name(), session.ID).
+		Debugf("Session %d: Open", session.ID)
+	return session
 }
 
 // Session manages the ordering of request and response streams for a single client
@@ -539,7 +549,7 @@ func (s *Session) ChannelsOf(op string) []chan<- Result {
 }
 
 // addStream adds a stream at the given sequence number
-func (s *Session) addStream(sequence uint64, op string, outChan chan<- Output) chan<- Result {
+func (s *Session) addStream(sequence uint64, op string, outChan chan<- Result) chan<- Result {
 	stream := &sessionStream{
 		ID:      sequence,
 		Type:    op,
@@ -549,6 +559,7 @@ func (s *Session) addStream(sequence uint64, op string, outChan chan<- Output) c
 		results: list.New(),
 	}
 	s.streams.PushBack(stream)
+	log.Tracef("Session %d: Opened stream", stream.ID)
 	go stream.process()
 	return stream.inChan
 }
@@ -638,6 +649,7 @@ func (s *Session) completeCommand(sequenceNumber uint64) {
 
 // close closes the session and completes all its streams
 func (s *Session) close() {
+	log.Debugf("Session %d: Closed", s.ID)
 	element := s.streams.Front()
 	for element != nil {
 		element.Value.(*sessionStream).close()
@@ -650,12 +662,12 @@ type sessionStream struct {
 	ID         uint64
 	Type       string
 	closed     bool
-	eventID    uint64
+	responseID uint64
 	completeID uint64
 	lastIndex  uint64
 	ctx        Context
 	inChan     chan Result
-	outChan    chan<- Output
+	outChan    chan<- Result
 	results    *list.List
 }
 
@@ -680,9 +692,9 @@ func (s *sessionStream) process() {
 
 		// If the client acked a sequence number greater than the current event sequence number since we know the
 		// client must have received it from another server.
-		s.eventID++
-		if s.completeID > s.eventID {
-			log.Debugf("Skipped acknowledged response %d", s.eventID)
+		s.responseID++
+		if s.completeID > s.responseID {
+			log.Debugf("Skipped completed result %d", s.responseID)
 			continue
 		}
 
@@ -691,36 +703,37 @@ func (s *sessionStream) process() {
 
 		// Create the stream result and add it to the results list.
 		if inResult.Succeeded() {
-			inResult = Result{
-				Index: inResult.Index,
-				Output: newOutput(proto.Marshal(&SessionResponse{
-					Response: &SessionResponse_Command{
-						Command: &SessionCommandResponse{
-							Context: &SessionResponseContext{
-								StreamID: s.ID,
-								Index:    inResult.Index,
-								Sequence: s.eventID,
-							},
-							Output: inResult.Value,
+			bytes, err := proto.Marshal(&SessionResponse{
+				Response: &SessionResponse_Command{
+					Command: &SessionCommandResponse{
+						Context: &SessionResponseContext{
+							StreamID: s.ID,
+							Index:    inResult.Index,
+							Sequence: s.responseID,
 						},
+						Output: inResult.Value,
 					},
-				})),
-			}
+				},
+			})
+			inResult = newResult(inResult.Index, bytes, err)
 		}
 
 		outResult := sessionStreamResult{
-			id:     s.eventID,
+			id:     s.responseID,
 			result: inResult,
 		}
 		s.results.PushBack(outResult)
-		log.Tracef("Cached result %v", outResult)
+		log.Tracef("Stream %d: Cached response %d", s.ID, s.responseID)
 
 		// If the out channel is set, send the result
 		if s.outChan != nil {
-			s.outChan <- outResult.result.Output
+			out := outResult.result
+			log.Tracef("Stream %d: Sending response %d %v", s.ID, s.responseID, out)
+			s.outChan <- out
 		}
 	}
 
+	log.Debugf("Stream %d: Finished processing stream responses", s.ID)
 	s.closed = true
 
 	ch := s.outChan
@@ -764,14 +777,17 @@ func (s *sessionStream) ack(id uint64) {
 			s.completeID = event.Value.(sessionStreamResult).id
 			event = next
 		}
+		log.Tracef("Stream %d: Evicted cached responses up to %d", s.ID, id)
 	}
 }
 
 // replay resends results on the given channel
-func (s *sessionStream) replay(ch chan<- Output) {
+func (s *sessionStream) replay(ch chan<- Result) {
 	result := s.results.Front()
 	for result != nil {
-		ch <- result.Value.(sessionStreamResult).result.Output
+		out := result.Value.(sessionStreamResult).result
+		log.Tracef("Stream %d: Sending response %d %v", s.ID, s.responseID, out)
+		ch <- out
 		result = result.Next()
 	}
 	s.outChan = ch

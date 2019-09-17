@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package service
+package node
 
 import (
+	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"google.golang.org/grpc"
 )
 
@@ -31,7 +32,7 @@ func RegisterServer(server func(*grpc.Server, Protocol)) {
 }
 
 // RegisterService registers a new service
-func RegisterService(name string, service func(ctx Context) Service) {
+func RegisterService(name string, service func(ctx service.Context) service.Service) {
 	registry.RegisterService(name, service)
 }
 
@@ -45,7 +46,7 @@ func RegisterServers(server *grpc.Server, protocol Protocol) {
 // Registry is a registry of service types
 type Registry struct {
 	servers  []func(*grpc.Server, Protocol)
-	services map[string]func(ctx Context) Service
+	services map[string]func(ctx service.Context) service.Service
 }
 
 // RegisterServer registers a new primitive server
@@ -54,12 +55,12 @@ func (r *Registry) RegisterServer(server func(*grpc.Server, Protocol)) {
 }
 
 // RegisterService registers a new primitive service
-func (r *Registry) RegisterService(name string, service func(ctx Context) Service) {
+func (r *Registry) RegisterService(name string, service func(ctx service.Context) service.Service) {
 	r.services[name] = service
 }
 
 // getType returns a service type by name
-func (r *Registry) getType(name string) func(sctx Context) Service {
+func (r *Registry) getType(name string) func(sctx service.Context) service.Service {
 	return r.services[name]
 }
 
@@ -67,6 +68,6 @@ func (r *Registry) getType(name string) func(sctx Context) Service {
 func newRegistry() *Registry {
 	return &Registry{
 		servers:  make([]func(*grpc.Server, Protocol), 0),
-		services: make(map[string]func(ctx Context) Service),
+		services: make(map[string]func(ctx service.Context) service.Service),
 	}
 }

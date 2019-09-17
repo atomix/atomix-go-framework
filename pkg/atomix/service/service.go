@@ -15,6 +15,7 @@
 package service
 
 import (
+	"io"
 	"time"
 )
 
@@ -28,15 +29,82 @@ const (
 	OpTypeQuery OperationType = "query"
 )
 
+// Context provides information about the context within which a state machine is running
+type Context interface {
+	// Node is the local node identifier
+	Node() string
+
+	// Name is the service name
+	Name() string
+
+	// Namespace is the service namespace name
+	Namespace() string
+
+	// Index returns the current index of the state machine
+	Index() uint64
+
+	// Timestamp returns a deterministic, monotonically increasing timestamp
+	Timestamp() time.Time
+
+	// OperationType returns the type of the operation currently being executed against the state machine
+	OperationType() OperationType
+}
+
 // Service is an interface for primitive services
 type Service interface {
-	StateMachine
+	// Snapshot writes the state machine snapshot to the given writer
+	Snapshot(writer io.Writer) error
+
+	// Install reads the state machine snapshot from the given reader
+	Install(reader io.Reader) error
+
+	// CanDelete returns a bool indicating whether the node can delete changes up to the given index without affecting
+	// the correctness of the state machine
+	CanDelete(index uint64) bool
+
+	// Command applies a command to the state machine
+	Command(bytes []byte, ch chan<- Result)
+
+	// Query applies a query to the state machine
+	Query(bytes []byte, ch chan<- Result)
 
 	// Backup must be implemented by services to return the serialized state of the service
 	Backup() ([]byte, error)
 
 	// Restore must be implemented by services to restore the state of the service from a serialized backup
 	Restore(bytes []byte) error
+}
+
+func newResult(index uint64, value []byte, err error) Result {
+	return Result{
+		Index: index,
+		Value: value,
+		Error: err,
+	}
+}
+
+func newFailure(index uint64, err error) Result {
+	return Result{
+		Index: index,
+		Error: err,
+	}
+}
+
+// Result is a state machine operation result
+type Result struct {
+	Index uint64
+	Value []byte
+	Error error
+}
+
+// Failed returns a boolean indicating whether the operation failed
+func (r Result) Failed() bool {
+	return r.Error != nil
+}
+
+// Succeeded returns a boolean indicating whether the operation was successful
+func (r Result) Succeeded() bool {
+	return !r.Failed()
 }
 
 // service is an internal base for service implementations
@@ -50,10 +118,8 @@ type service struct {
 func (s *service) NewResult(value []byte, err error) Result {
 	return Result{
 		Index: s.Context.Index(),
-		Output: Output{
-			Value: value,
-			Error: err,
-		},
+		Value: value,
+		Error: err,
 	}
 }
 
@@ -61,9 +127,7 @@ func (s *service) NewResult(value []byte, err error) Result {
 func (s *service) NewSuccess(value []byte) Result {
 	return Result{
 		Index: s.Context.Index(),
-		Output: Output{
-			Value: value,
-		},
+		Value: value,
 	}
 }
 
@@ -71,18 +135,28 @@ func (s *service) NewSuccess(value []byte) Result {
 func (s *service) NewFailure(err error) Result {
 	return Result{
 		Index: s.Context.Index(),
-		Output: Output{
-			Error: err,
-		},
+		Error: err,
 	}
 }
 
 // mutableContext is an internal context implementation which supports per-service indexes
 type mutableContext struct {
-	Context
-	index uint64
-	time  time.Time
-	op    OperationType
+	parent Context
+	index  uint64
+	time   time.Time
+	op     OperationType
+}
+
+func (c *mutableContext) Node() string {
+	return c.parent.Node()
+}
+
+func (c *mutableContext) Name() string {
+	return c.parent.Name()
+}
+
+func (c *mutableContext) Namespace() string {
+	return c.parent.Namespace()
 }
 
 func (c *mutableContext) Index() uint64 {

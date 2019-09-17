@@ -12,16 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package service
+package node
 
 import (
+	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/golang/protobuf/proto"
 )
 
+func init() {
+	RegisterService("test", newTestService)
+}
+
 // newTestService returns a new TestService
-func newTestService(context Context) Service {
+func newTestService(context service.Context) service.Service {
 	service := &TestService{
-		SessionizedService: NewSessionizedService(context),
+		SessionizedService: service.NewSessionizedService(context),
 	}
 	service.init()
 	return service
@@ -29,7 +34,7 @@ func newTestService(context Context) Service {
 
 // TestService is a state machine for a test primitive
 type TestService struct {
-	*SessionizedService
+	*service.SessionizedService
 	value string
 }
 
@@ -58,14 +63,14 @@ func (s *TestService) Restore(bytes []byte) error {
 }
 
 // Get gets the value
-func (s *TestService) Get(value []byte, ch chan<- Result) {
+func (s *TestService) Get(value []byte, ch chan<- service.Result) {
 	ch <- s.NewResult(proto.Marshal(&GetResponse{
 		Value: s.value,
 	}))
 }
 
 // Set sets the value
-func (s *TestService) Set(value []byte, ch chan<- Result) {
+func (s *TestService) Set(value []byte, ch chan<- service.Result) {
 	request := &SetRequest{}
 	if err := proto.Unmarshal(value, request); err != nil {
 		ch <- s.NewFailure(err)

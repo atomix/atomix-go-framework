@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package service
+package node
 
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/golang/protobuf/proto"
 	"io"
 	"strings"
@@ -25,6 +26,9 @@ import (
 
 // Context provides information about the context within which a state machine is running
 type Context interface {
+	// Node is the local node identifier
+	Node() string
+
 	// Index returns the current index of the state machine
 	Index() uint64
 
@@ -32,7 +36,7 @@ type Context interface {
 	Timestamp() time.Time
 
 	// OperationType returns the type of the operation currently being executed against the state machine
-	OperationType() OperationType
+	OperationType() service.OperationType
 }
 
 // StateMachine applies commands from a protocol to a collection of state machines
@@ -83,12 +87,6 @@ func (r Output) Succeeded() bool {
 	return !r.Failed()
 }
 
-// Result is a state machine operation result
-type Result struct {
-	Output
-	Index uint64
-}
-
 // NewPrimitiveStateMachine returns a new primitive state machine
 func NewPrimitiveStateMachine(registry *Registry, ctx Context) StateMachine {
 	return &primitiveStateMachine{
@@ -107,9 +105,9 @@ type primitiveStateMachine struct {
 }
 
 func (s *primitiveStateMachine) Snapshot(writer io.Writer) error {
-	for id, service := range s.services {
-		serviceID := &ServiceId{
-			Type:      service.Type,
+	for id, svc := range s.services {
+		serviceID := &service.ServiceId{
+			Type:      svc.Type,
 			Name:      getServiceName(id),
 			Namespace: getServiceNamespace(id),
 		}
@@ -131,7 +129,7 @@ func (s *primitiveStateMachine) Snapshot(writer io.Writer) error {
 			return err
 		}
 
-		err = service.Snapshot(writer)
+		err = svc.Snapshot(writer)
 		if err != nil {
 			return err
 		}
@@ -154,12 +152,12 @@ func (s *primitiveStateMachine) Install(reader io.Reader) error {
 			return err
 		}
 
-		serviceID := &ServiceId{}
+		serviceID := &service.ServiceId{}
 		if err = proto.Unmarshal(bytes, serviceID); err != nil {
 			return err
 		}
-		service := s.registry.services[serviceID.Type](s.ctx)
-		s.services[getQualifiedServiceName(serviceID)] = newServiceStateMachine(serviceID.Type, service)
+		svc := s.registry.services[serviceID.Type](newServiceContext(s.ctx, serviceID))
+		s.services[getQualifiedServiceName(serviceID)] = newServiceStateMachine(serviceID.Type, svc)
 
 		n, err = reader.Read(lengthBytes)
 		if err != nil {
@@ -170,7 +168,7 @@ func (s *primitiveStateMachine) Install(reader io.Reader) error {
 }
 
 func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
-	request := &ServiceRequest{}
+	request := &service.ServiceRequest{}
 	err := proto.Unmarshal(bytes, request)
 	if err != nil {
 		if ch != nil {
@@ -178,9 +176,9 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 		}
 	} else {
 		switch r := request.Request.(type) {
-		case *ServiceRequest_Command:
+		case *service.ServiceRequest_Command:
 			// If the service doesn't exist, create it.
-			service, ok := s.services[getQualifiedServiceName(request.Id)]
+			svc, ok := s.services[getQualifiedServiceName(request.Id)]
 			if !ok {
 				serviceType := s.registry.getType(request.Id.Type)
 				if serviceType == nil {
@@ -189,8 +187,8 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 						return
 					}
 				} else {
-					service = newServiceStateMachine(request.Id.Type, serviceType(s.ctx))
-					s.services[getQualifiedServiceName(request.Id)] = service
+					svc = newServiceStateMachine(request.Id.Type, serviceType(newServiceContext(s.ctx, request.Id)))
+					s.services[getQualifiedServiceName(request.Id)] = svc
 				}
 			}
 
@@ -206,8 +204,8 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 						if result.Failed() {
 							ch <- result
 						} else {
-							ch <- newOutput(proto.Marshal(&ServiceResponse{
-								Response: &ServiceResponse_Command{
+							ch <- newOutput(proto.Marshal(&service.ServiceResponse{
+								Response: &service.ServiceResponse_Command{
 									Command: result.Value,
 								},
 							}))
@@ -217,8 +215,8 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 			}
 
 			// Execute the command on the service
-			service.Command(r.Command, serviceCh)
-		case *ServiceRequest_Create:
+			svc.Command(r.Command, serviceCh)
+		case *service.ServiceRequest_Create:
 			_, ok := s.services[getQualifiedServiceName(request.Id)]
 			if !ok {
 				serviceType := s.registry.getType(request.Id.Type)
@@ -227,33 +225,33 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 						ch <- newFailure(fmt.Errorf("unknown service type %s", request.Id.Type))
 					}
 				} else {
-					service := serviceType(s.ctx)
-					s.services[getQualifiedServiceName(request.Id)] = newServiceStateMachine(request.Id.Type, service)
+					svc := serviceType(newServiceContext(s.ctx, request.Id))
+					s.services[getQualifiedServiceName(request.Id)] = newServiceStateMachine(request.Id.Type, svc)
 
 					if ch != nil {
-						ch <- newOutput(proto.Marshal(&ServiceResponse{
-							Response: &ServiceResponse_Create{
-								Create: &CreateResponse{},
+						ch <- newOutput(proto.Marshal(&service.ServiceResponse{
+							Response: &service.ServiceResponse_Create{
+								Create: &service.CreateResponse{},
 							},
 						}))
 					}
 				}
 			} else {
 				if ch != nil {
-					ch <- newOutput(proto.Marshal(&ServiceResponse{
-						Response: &ServiceResponse_Create{
-							Create: &CreateResponse{},
+					ch <- newOutput(proto.Marshal(&service.ServiceResponse{
+						Response: &service.ServiceResponse_Create{
+							Create: &service.CreateResponse{},
 						},
 					}))
 				}
 			}
-		case *ServiceRequest_Delete:
+		case *service.ServiceRequest_Delete:
 			delete(s.services, getQualifiedServiceName(request.Id))
 
 			if ch != nil {
-				ch <- newOutput(proto.Marshal(&ServiceResponse{
-					Response: &ServiceResponse_Delete{
-						Delete: &DeleteResponse{},
+				ch <- newOutput(proto.Marshal(&service.ServiceResponse{
+					Response: &service.ServiceResponse_Delete{
+						Delete: &service.DeleteResponse{},
 					},
 				}))
 			}
@@ -262,7 +260,7 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 }
 
 func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
-	request := &ServiceRequest{}
+	request := &service.ServiceRequest{}
 	err := proto.Unmarshal(bytes, request)
 	if err != nil {
 		if ch != nil {
@@ -270,8 +268,8 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
 		}
 	} else {
 		switch r := request.Request.(type) {
-		case *ServiceRequest_Query:
-			service, ok := s.services[getQualifiedServiceName(request.Id)]
+		case *service.ServiceRequest_Query:
+			svc, ok := s.services[getQualifiedServiceName(request.Id)]
 			if !ok {
 				if ch != nil {
 					ch <- newFailure(fmt.Errorf("unknown service %s", getQualifiedServiceName(request.Id)))
@@ -289,8 +287,8 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
 							if result.Failed() {
 								ch <- result
 							} else {
-								ch <- newOutput(proto.Marshal(&ServiceResponse{
-									Response: &ServiceResponse_Query{
+								ch <- newOutput(proto.Marshal(&service.ServiceResponse{
+									Response: &service.ServiceResponse_Query{
 										Query: result.Value,
 									},
 								}))
@@ -300,15 +298,15 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
 				}
 
 				// Execute the query on the service
-				service.Query(r.Query, serviceCh)
+				svc.Query(r.Query, serviceCh)
 			}
-		case *ServiceRequest_Metadata:
-			services := make([]*ServiceId, 0, len(s.services))
-			for id, service := range s.services {
+		case *service.ServiceRequest_Metadata:
+			services := make([]*service.ServiceId, 0, len(s.services))
+			for id, svc := range s.services {
 				namespace := getServiceNamespace(id)
-				if (r.Metadata.Namespace == "" || namespace == r.Metadata.Namespace) && (r.Metadata.Type == "" || service.Type == r.Metadata.Type) {
-					services = append(services, &ServiceId{
-						Type:      service.Type,
+				if (r.Metadata.Namespace == "" || namespace == r.Metadata.Namespace) && (r.Metadata.Type == "" || svc.Type == r.Metadata.Type) {
+					services = append(services, &service.ServiceId{
+						Type:      svc.Type,
 						Name:      getServiceName(id),
 						Namespace: namespace,
 					})
@@ -316,9 +314,9 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
 			}
 
 			if ch != nil {
-				ch <- newOutput(proto.Marshal(&ServiceResponse{
-					Response: &ServiceResponse_Metadata{
-						Metadata: &MetadataResponse{
+				ch <- newOutput(proto.Marshal(&service.ServiceResponse{
+					Response: &service.ServiceResponse_Metadata{
+						Metadata: &service.MetadataResponse{
 							Services: services,
 						},
 					},
@@ -328,7 +326,7 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
 	}
 }
 
-func getQualifiedServiceName(id *ServiceId) string {
+func getQualifiedServiceName(id *service.ServiceId) string {
 	return id.Namespace + "." + id.Name
 }
 
@@ -341,7 +339,7 @@ func getServiceName(id string) string {
 }
 
 // newServiceStateMachine returns a new wrapped service
-func newServiceStateMachine(serviceType string, service Service) *serviceStateMachine {
+func newServiceStateMachine(serviceType string, service service.Service) *serviceStateMachine {
 	return &serviceStateMachine{
 		Type:    serviceType,
 		service: service,
@@ -352,7 +350,7 @@ func newServiceStateMachine(serviceType string, service Service) *serviceStateMa
 type serviceStateMachine struct {
 	StateMachine
 	Type    string
-	service Service
+	service service.Service
 }
 
 func (s *serviceStateMachine) Snapshot(writer io.Writer) error {
@@ -368,9 +366,72 @@ func (s *serviceStateMachine) CanDelete(index uint64) bool {
 }
 
 func (s *serviceStateMachine) Command(bytes []byte, ch chan<- Output) {
-	s.service.Command(bytes, ch)
+	resultCh := make(chan service.Result)
+	go func() {
+		for result := range resultCh {
+			ch <- Output{
+				Value: result.Value,
+				Error: result.Error,
+			}
+		}
+		defer func() {
+			_ = recover()
+		}()
+		close(ch)
+	}()
+	s.service.Command(bytes, resultCh)
 }
 
 func (s *serviceStateMachine) Query(bytes []byte, ch chan<- Output) {
-	s.service.Query(bytes, ch)
+	resultCh := make(chan service.Result)
+	go func() {
+		for result := range resultCh {
+			ch <- Output{
+				Value: result.Value,
+				Error: result.Error,
+			}
+		}
+		defer func() {
+			_ = recover()
+		}()
+		close(ch)
+	}()
+	s.service.Query(bytes, resultCh)
+}
+
+func newServiceContext(ctx Context, serviceID *service.ServiceId) service.Context {
+	return &serviceContext{
+		parent: ctx,
+		id:     serviceID,
+	}
+}
+
+// serviceContext is a minimal service.Context to provide metadata to services
+type serviceContext struct {
+	parent Context
+	id     *service.ServiceId
+}
+
+func (c *serviceContext) Index() uint64 {
+	return c.parent.Index()
+}
+
+func (c *serviceContext) Timestamp() time.Time {
+	return c.parent.Timestamp()
+}
+
+func (c *serviceContext) OperationType() service.OperationType {
+	return c.parent.OperationType()
+}
+
+func (c *serviceContext) Node() string {
+	return c.parent.Node()
+}
+
+func (c *serviceContext) Namespace() string {
+	return c.id.Namespace
+}
+
+func (c *serviceContext) Name() string {
+	return c.id.Name
 }

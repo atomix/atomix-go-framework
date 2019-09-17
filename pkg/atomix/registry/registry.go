@@ -18,6 +18,7 @@ package registry
 import (
 	// Register the counter primitive
 	_ "github.com/atomix/atomix-go-node/pkg/atomix/counter"
+	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 
 	// Register the election primitive
 	_ "github.com/atomix/atomix-go-node/pkg/atomix/election"
@@ -41,7 +42,5 @@ import (
 	_ "github.com/atomix/atomix-go-node/pkg/atomix/value"
 )
 
-import "github.com/atomix/atomix-go-node/pkg/atomix/service"
-
 // Registry is a service registry populated with all default primitive services
-var Registry = service.GetRegistry()
+var Registry = node.GetRegistry()

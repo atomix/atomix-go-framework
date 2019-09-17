@@ -15,12 +15,13 @@
 package list
 
 import (
+	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/golang/protobuf/proto"
 )
 
 func init() {
-	service.RegisterService("list", newService)
+	node.RegisterService("list", newService)
 }
 
 // newService returns a new Service

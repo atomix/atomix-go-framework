@@ -12,3 +12,5 @@ require (
 	github.com/stretchr/testify v1.3.0
 	google.golang.org/grpc v1.22.1
 )
+
+replace github.com/atomix/atomix-go-local => ../atomix-go-local

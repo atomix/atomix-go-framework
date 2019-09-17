@@ -16,12 +16,13 @@ package _map //nolint:golint
 
 import (
 	"bytes"
+	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/golang/protobuf/proto"
 )
 
 func init() {
-	service.RegisterService("map", newService)
+	node.RegisterService("map", newService)
 }
 
 // newService returns a new Service

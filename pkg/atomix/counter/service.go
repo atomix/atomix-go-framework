@@ -15,12 +15,13 @@
 package counter
 
 import (
+	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/gogo/protobuf/proto"
 )
 
 func init() {
-	service.RegisterService("counter", newService)
+	node.RegisterService("counter", newService)
 }
 
 // newService returns a new Service

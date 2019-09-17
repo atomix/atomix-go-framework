@@ -25,26 +25,26 @@ func TestSessionService(t *testing.T) {
 	context := &TestContext{}
 	service := newTestService(context)
 
-	ch := make(chan Output)
+	ch := make(chan Result)
 	go context.command(service, newOpenSession(), ch)
 	out := <-ch
 	assert.True(t, out.Succeeded())
 	sessionID := getOpenSession(out.Value).SessionID
 
 	setRequest1 := newCommand(sessionID, 1, "set", newSet("Hello world!"))
-	ch1 := make(chan Output)
+	ch1 := make(chan Result)
 	go context.command(service, setRequest1, ch1)
 	out1 := <-ch1
 	assert.True(t, out1.Succeeded())
 
 	setRequest3 := newCommand(sessionID, 3, "set", newSet("Hello world 3"))
-	ch3 := make(chan Output)
+	ch3 := make(chan Result)
 	go context.command(service, setRequest3, ch3)
 
 	time.Sleep(100 * time.Millisecond)
 
 	setRequest2 := newCommand(sessionID, 2, "set", newSet("Hello world 2"))
-	ch2 := make(chan Output)
+	ch2 := make(chan Result)
 	go context.command(service, setRequest2, ch2)
 
 	out2 := <-ch2
@@ -92,4 +92,40 @@ func newCommand(sessionID uint64, commandID uint64, name string, bytes []byte) [
 		},
 	})
 	return bytes
+}
+
+type TestContext struct {
+	index     uint64
+	timestamp time.Time
+	operation OperationType
+}
+
+func (c *TestContext) Node() string {
+	return "test"
+}
+
+func (c *TestContext) Name() string {
+	return "test"
+}
+
+func (c *TestContext) Namespace() string {
+	return "test"
+}
+
+func (c *TestContext) Index() uint64 {
+	return c.index
+}
+
+func (c *TestContext) Timestamp() time.Time {
+	return c.timestamp
+}
+
+func (c *TestContext) OperationType() OperationType {
+	return c.operation
+}
+
+func (c *TestContext) command(service Service, input []byte, ch chan<- Result) {
+	c.index++
+	c.operation = OpTypeCommand
+	service.Command(input, ch)
 }

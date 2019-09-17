@@ -16,13 +16,14 @@ package lock
 
 import (
 	"container/list"
+	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/golang/protobuf/proto"
 	"time"
 )
 
 func init() {
-	service.RegisterService("lock", newService)
+	node.RegisterService("lock", newService)
 }
 
 // newService returns a new Service

@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"github.com/atomix/atomix-api/proto/atomix/headers"
+	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/golang/protobuf/proto"
 	"time"
@@ -25,7 +26,7 @@ import (
 
 // SessionizedServer is a base server for servers that support sessions
 type SessionizedServer struct {
-	Client service.Client
+	Client node.Client
 	Type   string
 }
 
@@ -48,7 +49,7 @@ func (s *SessionizedServer) Write(ctx context.Context, request []byte, header *h
 	}
 
 	// Create a write channel
-	ch := make(chan service.Output)
+	ch := make(chan node.Output)
 
 	// Write the request
 	if err := s.Client.Write(ctx, bytes, ch); err != nil {
@@ -76,7 +77,7 @@ func (s *SessionizedServer) Write(ctx context.Context, request []byte, header *h
 }
 
 // WriteStream sends a streaming write to the service
-func (s *SessionizedServer) WriteStream(request []byte, header *headers.RequestHeader, ch chan<- service.Output) error {
+func (s *SessionizedServer) WriteStream(request []byte, header *headers.RequestHeader, ch chan<- node.Output) error {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,
@@ -93,7 +94,7 @@ func (s *SessionizedServer) WriteStream(request []byte, header *headers.RequestH
 		return err
 	}
 
-	streamCh := make(chan service.Output)
+	streamCh := make(chan node.Output)
 	if err := s.Client.Write(context.TODO(), bytes, streamCh); err != nil {
 		return err
 	}
@@ -108,11 +109,11 @@ func (s *SessionizedServer) WriteStream(request []byte, header *headers.RequestH
 				serviceResponse := &service.ServiceResponse{}
 				err := proto.Unmarshal(result.Value, serviceResponse)
 				if err != nil {
-					ch <- service.Output{
+					ch <- node.Output{
 						Error: err,
 					}
 				} else {
-					ch <- service.Output{
+					ch <- node.Output{
 						Value: serviceResponse.GetCommand(),
 					}
 				}
@@ -142,7 +143,7 @@ func (s *SessionizedServer) Read(ctx context.Context, request []byte, header *he
 	}
 
 	// Create a read channel
-	ch := make(chan service.Output)
+	ch := make(chan node.Output)
 
 	// Read the request
 	if err := s.Client.Read(ctx, bytes, ch); err != nil {
@@ -169,7 +170,7 @@ func (s *SessionizedServer) Read(ctx context.Context, request []byte, header *he
 }
 
 // ReadStream sends a streaming read to the service
-func (s *SessionizedServer) ReadStream(request []byte, header *headers.RequestHeader, ch chan<- service.Output) error {
+func (s *SessionizedServer) ReadStream(request []byte, header *headers.RequestHeader, ch chan<- node.Output) error {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,
@@ -186,7 +187,7 @@ func (s *SessionizedServer) ReadStream(request []byte, header *headers.RequestHe
 		return err
 	}
 
-	streamCh := make(chan service.Output)
+	streamCh := make(chan node.Output)
 	if err := s.Client.Read(context.TODO(), bytes, streamCh); err != nil {
 		return err
 	}
@@ -201,11 +202,11 @@ func (s *SessionizedServer) ReadStream(request []byte, header *headers.RequestHe
 				serviceResponse := &service.ServiceResponse{}
 				err := proto.Unmarshal(result.Value, serviceResponse)
 				if err != nil {
-					ch <- service.Output{
+					ch <- node.Output{
 						Error: err,
 					}
 				} else {
-					ch <- service.Output{
+					ch <- node.Output{
 						Value: serviceResponse.GetQuery(),
 					}
 				}
@@ -277,7 +278,7 @@ func (s *SessionizedServer) CommandStream(name string, input []byte, header *hea
 		return err
 	}
 
-	resultCh := make(chan service.Output)
+	resultCh := make(chan node.Output)
 	if err = s.WriteStream(bytes, header, resultCh); err != nil {
 		return err
 	}
@@ -294,7 +295,7 @@ func (s *SessionizedServer) CommandStream(name string, input []byte, header *hea
 				err = proto.Unmarshal(result.Value, sessionResponse)
 				if err != nil {
 					ch <- SessionOutput{
-						Output: service.Output{
+						Output: node.Output{
 							Error: err,
 						},
 					}
@@ -308,7 +309,7 @@ func (s *SessionizedServer) CommandStream(name string, input []byte, header *hea
 					}
 					ch <- SessionOutput{
 						Header: responseHeader,
-						Output: service.Output{
+						Output: node.Output{
 							Value: commandResponse.Output,
 						},
 					}
@@ -381,7 +382,7 @@ func (s *SessionizedServer) QueryStream(name string, input []byte, header *heade
 		return err
 	}
 
-	resultCh := make(chan service.Output)
+	resultCh := make(chan node.Output)
 	if err = s.ReadStream(bytes, header, resultCh); err != nil {
 		return err
 	}
@@ -398,7 +399,7 @@ func (s *SessionizedServer) QueryStream(name string, input []byte, header *heade
 				err = proto.Unmarshal(result.Value, sessionResponse)
 				if err != nil {
 					ch <- SessionOutput{
-						Output: service.Output{
+						Output: node.Output{
 							Error: err,
 						},
 					}
@@ -410,7 +411,7 @@ func (s *SessionizedServer) QueryStream(name string, input []byte, header *heade
 					}
 					ch <- SessionOutput{
 						Header: responseHeader,
-						Output: service.Output{
+						Output: node.Output{
 							Value: queryResponse.Output,
 						},
 					}
@@ -525,7 +526,7 @@ func (s *SessionizedServer) Delete(ctx context.Context, header *headers.RequestH
 	}
 
 	// Create a write channel
-	ch := make(chan service.Output)
+	ch := make(chan node.Output)
 
 	// Write the request
 	if err := s.Client.Write(ctx, bytes, ch); err != nil {
@@ -554,6 +555,6 @@ func (s *SessionizedServer) Delete(ctx context.Context, header *headers.RequestH
 
 // SessionOutput is a result for session-supporting servers containing session header information
 type SessionOutput struct {
-	service.Output
+	node.Output
 	Header *headers.ResponseHeader
 }

@@ -24,7 +24,9 @@ import (
 // NewSimpleService returns a new simple primitive service
 func NewSimpleService(parent Context) *SimpleService {
 	scheduler := newScheduler()
-	ctx := &mutableContext{}
+	ctx := &mutableContext{
+		parent: parent,
+	}
 	return &SimpleService{
 		service: &service{
 			Scheduler: newScheduler(),
@@ -90,11 +92,11 @@ func (s *SimpleService) Install(reader io.Reader) error {
 }
 
 // Command handles a service command
-func (s *SimpleService) Command(bytes []byte, ch chan<- Output) {
+func (s *SimpleService) Command(bytes []byte, ch chan<- Result) {
 	s.context.setCommand(s.parent.Timestamp())
 	command := &CommandRequest{}
 	if err := proto.Unmarshal(bytes, command); err != nil {
-		ch <- newFailure(err)
+		ch <- newFailure(s.context.Index(), err)
 	} else {
 		s.scheduler.runScheduledTasks(s.Context.Timestamp())
 
@@ -106,14 +108,15 @@ func (s *SimpleService) Command(bytes []byte, ch chan<- Output) {
 				defer close(ch)
 				for result := range commandCh {
 					if result.Failed() {
-						ch <- result.Output
+						ch <- result
 					} else {
-						ch <- newOutput(proto.Marshal(&CommandResponse{
+						bytes, err := proto.Marshal(&CommandResponse{
 							Context: &ResponseContext{
 								Index: s.Context.Index(),
 							},
 							Output: result.Value,
-						}))
+						})
+						ch <- newResult(result.Index, bytes, err)
 					}
 				}
 			}()
@@ -121,7 +124,7 @@ func (s *SimpleService) Command(bytes []byte, ch chan<- Output) {
 
 		if err := s.Executor.Execute(command.Name, command.Command, commandCh); err != nil {
 			if ch != nil {
-				ch <- newFailure(err)
+				ch <- newFailure(s.context.Index(), err)
 				close(commandCh)
 			}
 			return
@@ -133,11 +136,11 @@ func (s *SimpleService) Command(bytes []byte, ch chan<- Output) {
 }
 
 // Query handles a service query
-func (s *SimpleService) Query(bytes []byte, ch chan<- Output) {
+func (s *SimpleService) Query(bytes []byte, ch chan<- Result) {
 	query := &QueryRequest{}
 	if err := proto.Unmarshal(bytes, query); err != nil {
 		if ch != nil {
-			ch <- newFailure(err)
+			ch <- newFailure(s.context.Index(), err)
 		}
 	} else {
 		// If the channel is non-nil, create a channel to pass to the service query and mutate the results.
@@ -148,14 +151,15 @@ func (s *SimpleService) Query(bytes []byte, ch chan<- Output) {
 				defer close(ch)
 				for result := range queryCh {
 					if result.Failed() {
-						ch <- result.Output
+						ch <- result
 					} else {
-						ch <- newOutput(proto.Marshal(&QueryResponse{
+						bytes, err := proto.Marshal(&QueryResponse{
 							Context: &ResponseContext{
 								Index: s.Context.Index(),
 							},
 							Output: result.Value,
-						}))
+						})
+						ch <- newResult(result.Index, bytes, err)
 					}
 				}
 			}()
@@ -165,14 +169,14 @@ func (s *SimpleService) Query(bytes []byte, ch chan<- Output) {
 			s.Scheduler.ScheduleIndex(query.Context.Index, func() {
 				s.context.setQuery()
 				if err := s.Executor.Execute(query.Name, query.Query, queryCh); err != nil {
-					ch <- newFailure(err)
+					ch <- newFailure(s.context.Index(), err)
 					close(queryCh)
 				}
 			})
 		} else {
 			s.context.setQuery()
 			if err := s.Executor.Execute(query.Name, query.Query, queryCh); err != nil {
-				ch <- newFailure(err)
+				ch <- newFailure(s.context.Index(), err)
 				close(queryCh)
 			}
 		}

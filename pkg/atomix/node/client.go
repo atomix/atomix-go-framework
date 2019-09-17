@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package service
+package node
 
-import "context"
+import (
+	"context"
+)
 
 // Client is the interface for protocol clients
 type Client interface {

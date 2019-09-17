@@ -15,13 +15,14 @@
 package election
 
 import (
+	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/golang/protobuf/proto"
 	"time"
 )
 
 func init() {
-	service.RegisterService("election", newService)
+	node.RegisterService("election", newService)
 }
 
 // newService returns a new Service

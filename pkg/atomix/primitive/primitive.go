@@ -17,22 +17,23 @@ package primitive
 import (
 	"context"
 	api "github.com/atomix/atomix-api/proto/atomix/primitive"
+	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 )
 
 func init() {
-	service.RegisterServer(registerServer)
+	node.RegisterServer(registerServer)
 }
 
 // registerServer registers a primitive server with the given gRPC server
-func registerServer(server *grpc.Server, protocol service.Protocol) {
+func registerServer(server *grpc.Server, protocol node.Protocol) {
 	api.RegisterPrimitiveServiceServer(server, newServer(protocol.Client()))
 }
 
 // newServer returns a new PrimitiveServiceServer implementation
-func newServer(client service.Client) api.PrimitiveServiceServer {
+func newServer(client node.Client) api.PrimitiveServiceServer {
 	return &primitiveServer{
 		client: client,
 	}
@@ -41,7 +42,7 @@ func newServer(client service.Client) api.PrimitiveServiceServer {
 // primitiveServer is an implementation of the PrimitiveServiceServer Protobuf service
 type primitiveServer struct {
 	api.PrimitiveServiceServer
-	client service.Client
+	client node.Client
 }
 
 func (s *primitiveServer) GetPrimitives(ctx context.Context, request *api.GetPrimitivesRequest) (*api.GetPrimitivesResponse, error) {
@@ -57,7 +58,7 @@ func (s *primitiveServer) GetPrimitives(ctx context.Context, request *api.GetPri
 		return nil, err
 	}
 
-	ch := make(chan service.Output)
+	ch := make(chan node.Output)
 	if err := s.client.Read(ctx, in, ch); err != nil {
 		return nil, err
 	}

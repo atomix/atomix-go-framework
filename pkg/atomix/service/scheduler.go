@@ -36,7 +36,6 @@ type Scheduler interface {
 
 // Timer is a cancellable timer
 type Timer interface {
-
 	// Cancel cancels the timer, preventing it from running in the future
 	Cancel()
 }
