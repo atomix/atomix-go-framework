@@ -28,11 +28,39 @@ const (
 	serviceNamespaceField = "serviceNamespace"
 	sessionIDField        = "sessionID"
 	streamIDField         = "streamID"
+	arg1Field             = "arg1"
+	arg2Field             = "arg2"
+	arg3Field             = "arg3"
 )
 
 // NodeEntry returns a log Entry with additional fields containing the given node metadata
 func NodeEntry(nodeID string) *log.Entry {
 	return log.WithField(nodeIDField, nodeID)
+}
+
+// MessageEntry returns a log Entry with additional fields containing request metadata
+func MessageEntry(nodeID string, args ...string) *log.Entry {
+	entry := log.WithField(nodeIDField, nodeID)
+	if len(args) > 0 {
+		entry = entry.WithField(arg1Field, args[0])
+	}
+	if len(args) > 1 {
+		entry = entry.WithField(arg1Field, args[1])
+	}
+	if len(args) > 2 {
+		entry = entry.WithField(arg1Field, args[2])
+	}
+	return entry
+}
+
+// RequestEntry returns a log Entry with additional fields containing request metadata
+func RequestEntry(nodeID string, args ...string) *log.Entry {
+	return MessageEntry(nodeID, args...)
+}
+
+// ResponseEntry returns a log Entry with additional fields containing response metadata
+func ResponseEntry(nodeID string, args ...string) *log.Entry {
+	return MessageEntry(nodeID, args...)
 }
 
 // ServiceEntry returns a log Entry with additional fields containing the given service metadata
@@ -68,33 +96,51 @@ func (f *nodeFormatter) Format(entry *log.Entry) ([]byte, error) {
 	buf.Write([]byte(fmt.Sprintf("%-6v", strings.ToUpper(entry.Level.String()))))
 	buf.Write([]byte(" "))
 
-	memberID := entry.Data["memberID"]
+	memberID := entry.Data[nodeIDField]
 	if memberID != nil {
 		buf.Write([]byte(fmt.Sprintf("%-10v", memberID)))
 		buf.Write([]byte(" "))
 	}
 
-	serviceNamespace := entry.Data["serviceNamespace"]
+	serviceNamespace := entry.Data[serviceNamespaceField]
 	if serviceNamespace != nil {
 		buf.Write([]byte(fmt.Sprintf("%-10v", serviceNamespace)))
 		buf.Write([]byte(" "))
 	}
 
-	serviceName := entry.Data["serviceName"]
+	serviceName := entry.Data[serviceNameField]
 	if serviceName != nil {
 		buf.Write([]byte(fmt.Sprintf("%-10v", serviceName)))
 		buf.Write([]byte(" "))
 	}
 
-	sessionID := entry.Data["sessionID"]
+	sessionID := entry.Data[sessionIDField]
 	if sessionID != nil {
 		buf.Write([]byte(fmt.Sprintf("%-6v", sessionID)))
 		buf.Write([]byte(" "))
 	}
 
-	streamID := entry.Data["streamID"]
+	streamID := entry.Data[streamIDField]
 	if streamID != nil {
 		buf.Write([]byte(fmt.Sprintf("%-6v", streamID)))
+		buf.Write([]byte(" "))
+	}
+
+	arg1 := entry.Data[arg1Field]
+	if arg1 != nil {
+		buf.Write([]byte(fmt.Sprintf("%-10v", arg1)))
+		buf.Write([]byte(" "))
+	}
+
+	arg2 := entry.Data[arg1Field]
+	if arg2 != nil {
+		buf.Write([]byte(fmt.Sprintf("%-10v", arg2)))
+		buf.Write([]byte(" "))
+	}
+
+	arg3 := entry.Data[arg1Field]
+	if arg3 != nil {
+		buf.Write([]byte(fmt.Sprintf("%-10v", arg3)))
 		buf.Write([]byte(" "))
 	}
 
