@@ -45,10 +45,10 @@ func MessageEntry(nodeID string, args ...string) *log.Entry {
 		entry = entry.WithField(arg1Field, args[0])
 	}
 	if len(args) > 1 {
-		entry = entry.WithField(arg1Field, args[1])
+		entry = entry.WithField(arg2Field, args[1])
 	}
 	if len(args) > 2 {
-		entry = entry.WithField(arg1Field, args[2])
+		entry = entry.WithField(arg3Field, args[2])
 	}
 	return entry
 }
@@ -132,13 +132,13 @@ func (f *nodeFormatter) Format(entry *log.Entry) ([]byte, error) {
 		buf.Write([]byte(" "))
 	}
 
-	arg2 := entry.Data[arg1Field]
+	arg2 := entry.Data[arg2Field]
 	if arg2 != nil {
 		buf.Write([]byte(fmt.Sprintf("%-10v", arg2)))
 		buf.Write([]byte(" "))
 	}
 
-	arg3 := entry.Data[arg1Field]
+	arg3 := entry.Data[arg3Field]
 	if arg3 != nil {
 		buf.Write([]byte(fmt.Sprintf("%-10v", arg3)))
 		buf.Write([]byte(" "))
