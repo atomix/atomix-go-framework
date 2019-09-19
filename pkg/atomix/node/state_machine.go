@@ -321,6 +321,7 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
 						},
 					},
 				}))
+				close(ch)
 			}
 		}
 	}
