@@ -90,6 +90,11 @@ func newFailure(index uint64, err error) Result {
 	}
 }
 
+func fail(ch chan<- Result, index uint64, err error) {
+	ch <- newFailure(index, err)
+	close(ch)
+}
+
 // Result is a state machine operation result
 type Result struct {
 	Index uint64

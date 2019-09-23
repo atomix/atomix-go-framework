@@ -251,7 +251,7 @@ func (s *SessionizedService) Command(bytes []byte, ch chan<- Result) {
 	request := &SessionRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		if ch != nil {
-			ch <- newFailure(s.context.Index(), err)
+			fail(ch, s.context.Index(), err)
 		}
 	} else {
 		scheduler := s.Scheduler.(*scheduler)
@@ -277,7 +277,7 @@ func (s *SessionizedService) applyCommand(request *SessionCommandRequest, ch cha
 	session, ok := s.sessions[request.Context.SessionID]
 	if !ok {
 		if ch != nil {
-			ch <- newFailure(s.context.Index(), fmt.Errorf("unknown session %d", request.Context.SessionID))
+			fail(ch, s.context.Index(), fmt.Errorf("unknown session %d", request.Context.SessionID))
 		}
 	} else {
 		sequenceNumber := request.Context.SequenceNumber
@@ -289,7 +289,7 @@ func (s *SessionizedService) applyCommand(request *SessionCommandRequest, ch cha
 				}
 			} else {
 				if ch != nil {
-					ch <- newFailure(s.context.Index(), fmt.Errorf("sequence number %d has already been acknowledged", sequenceNumber))
+					fail(ch, s.context.Index(), fmt.Errorf("sequence number %d has already been acknowledged", sequenceNumber))
 				}
 			}
 		} else if sequenceNumber > session.nextCommandSequence() {
@@ -306,14 +306,14 @@ func (s *SessionizedService) applySessionCommand(request *SessionCommandRequest,
 	session, ok := s.sessions[request.Context.SessionID]
 	if !ok {
 		if ch != nil {
-			ch <- newFailure(s.context.Index(), fmt.Errorf("unknown session %d", request.Context.SessionID))
+			fail(ch, s.context.Index(), fmt.Errorf("unknown session %d", request.Context.SessionID))
 		}
 	} else {
 		s.session = session
 		stream := session.addStream(request.Context.SequenceNumber, request.Name, ch)
 		if err := s.Executor.Execute(request.Name, request.Input, stream); err != nil {
 			if ch != nil {
-				ch <- newFailure(s.context.Index(), err)
+				fail(ch, s.context.Index(), err)
 			}
 		}
 		session.completeCommand(request.Context.SequenceNumber)
@@ -325,7 +325,6 @@ func (s *SessionizedService) applyOpenSession(request *OpenSessionRequest, ch ch
 	s.sessions[session.ID] = session
 	s.OnOpen(session)
 	if ch != nil {
-		defer close(ch)
 		bytes, err := proto.Marshal(&SessionResponse{
 			Response: &SessionResponse_OpenSession{
 				OpenSession: &OpenSessionResponse{
@@ -334,6 +333,7 @@ func (s *SessionizedService) applyOpenSession(request *OpenSessionRequest, ch ch
 			},
 		})
 		ch <- newResult(s.context.Index(), bytes, err)
+		close(ch)
 	}
 }
 
@@ -342,8 +342,7 @@ func (s *SessionizedService) applyKeepAlive(request *KeepAliveRequest, ch chan<-
 	session, ok := s.sessions[request.SessionID]
 	if !ok {
 		if ch != nil {
-			defer close(ch)
-			ch <- newFailure(s.context.Index(), fmt.Errorf("unknown session %d", request.SessionID))
+			fail(ch, s.context.Index(), fmt.Errorf("unknown session %d", request.SessionID))
 		}
 	} else {
 		// Update the session's last updated timestamp to prevent it from expiring
@@ -357,13 +356,13 @@ func (s *SessionizedService) applyKeepAlive(request *KeepAliveRequest, ch chan<-
 
 		// Send the response
 		if ch != nil {
-			defer close(ch)
 			bytes, err := proto.Marshal(&SessionResponse{
 				Response: &SessionResponse_KeepAlive{
 					KeepAlive: &KeepAliveResponse{},
 				},
 			})
 			ch <- newResult(s.context.Index(), bytes, err)
+			close(ch)
 		}
 	}
 }
@@ -383,8 +382,7 @@ func (s *SessionizedService) applyCloseSession(request *CloseSessionRequest, ch 
 	session, ok := s.sessions[request.SessionID]
 	if !ok {
 		if ch != nil {
-			defer close(ch)
-			ch <- newFailure(s.context.Index(), fmt.Errorf("unknown session %d", request.SessionID))
+			fail(ch, s.context.Index(), fmt.Errorf("unknown session %d", request.SessionID))
 		}
 	} else {
 		// Close the session and notify the service.
@@ -394,13 +392,13 @@ func (s *SessionizedService) applyCloseSession(request *CloseSessionRequest, ch 
 
 		// Send the response
 		if ch != nil {
-			defer close(ch)
 			bytes, err := proto.Marshal(&SessionResponse{
 				Response: &SessionResponse_CloseSession{
 					CloseSession: &CloseSessionResponse{},
 				},
 			})
 			ch <- newResult(s.context.Index(), bytes, err)
+			close(ch)
 		}
 	}
 }
@@ -411,7 +409,7 @@ func (s *SessionizedService) Query(bytes []byte, ch chan<- Result) {
 	err := proto.Unmarshal(bytes, request)
 	if err != nil {
 		if ch != nil {
-			ch <- newFailure(s.context.Index(), err)
+			fail(ch, s.context.Index(), err)
 		}
 	} else {
 		query := request.GetQuery()
@@ -429,7 +427,7 @@ func (s *SessionizedService) sequenceQuery(query *SessionQueryRequest, ch chan<-
 	session, ok := s.sessions[query.Context.SessionID]
 	if !ok {
 		if ch != nil {
-			ch <- newFailure(s.context.Index(), fmt.Errorf("unknown session %d", query.Context.SessionID))
+			fail(ch, s.context.Index(), fmt.Errorf("unknown session %d", query.Context.SessionID))
 		}
 	} else {
 		sequenceNumber := query.Context.LastSequenceNumber
@@ -473,8 +471,7 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 
 	s.context.setQuery()
 	if err := s.Executor.Execute(query.Name, query.Input, queryCh); err != nil {
-		ch <- newFailure(s.context.Index(), err)
-		return
+		fail(ch, s.context.Index(), err)
 	}
 }
 
