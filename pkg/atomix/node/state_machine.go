@@ -189,10 +189,9 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 				if serviceType == nil {
 					fail(ch, fmt.Errorf("unknown service type %s", request.Id.Type))
 					return
-				} else {
-					svc = newServiceStateMachine(request.Id.Type, serviceType(newServiceContext(s.ctx, request.Id)))
-					s.services[getQualifiedServiceName(request.Id)] = svc
 				}
+				svc = newServiceStateMachine(request.Id.Type, serviceType(newServiceContext(s.ctx, request.Id)))
+				s.services[getQualifiedServiceName(request.Id)] = svc
 			}
 
 			// Create a channel for the raw service results
