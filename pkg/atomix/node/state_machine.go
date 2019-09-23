@@ -71,6 +71,13 @@ func newFailure(err error) Output {
 	}
 }
 
+func fail(ch chan<- Output, err error) {
+	if ch != nil {
+		ch <- newFailure(err)
+		close(ch)
+	}
+}
+
 // Output is a state machine operation output
 type Output struct {
 	Value []byte
@@ -171,9 +178,7 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 	request := &service.ServiceRequest{}
 	err := proto.Unmarshal(bytes, request)
 	if err != nil {
-		if ch != nil {
-			ch <- newFailure(err)
-		}
+		fail(ch, err)
 	} else {
 		switch r := request.Request.(type) {
 		case *service.ServiceRequest_Command:
@@ -182,10 +187,8 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 			if !ok {
 				serviceType := s.registry.getType(request.Id.Type)
 				if serviceType == nil {
-					if ch != nil {
-						ch <- newFailure(fmt.Errorf("unknown service type %s", request.Id.Type))
-						return
-					}
+					fail(ch, fmt.Errorf("unknown service type %s", request.Id.Type))
+					return
 				} else {
 					svc = newServiceStateMachine(request.Id.Type, serviceType(newServiceContext(s.ctx, request.Id)))
 					s.services[getQualifiedServiceName(request.Id)] = svc
@@ -221,9 +224,7 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 			if !ok {
 				serviceType := s.registry.getType(request.Id.Type)
 				if serviceType == nil {
-					if ch != nil {
-						ch <- newFailure(fmt.Errorf("unknown service type %s", request.Id.Type))
-					}
+					fail(ch, fmt.Errorf("unknown service type %s", request.Id.Type))
 				} else {
 					svc := serviceType(newServiceContext(s.ctx, request.Id))
 					s.services[getQualifiedServiceName(request.Id)] = newServiceStateMachine(request.Id.Type, svc)
@@ -263,17 +264,13 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
 	request := &service.ServiceRequest{}
 	err := proto.Unmarshal(bytes, request)
 	if err != nil {
-		if ch != nil {
-			ch <- newFailure(err)
-		}
+		fail(ch, err)
 	} else {
 		switch r := request.Request.(type) {
 		case *service.ServiceRequest_Query:
 			svc, ok := s.services[getQualifiedServiceName(request.Id)]
 			if !ok {
-				if ch != nil {
-					ch <- newFailure(fmt.Errorf("unknown service %s", getQualifiedServiceName(request.Id)))
-				}
+				fail(ch, fmt.Errorf("unknown service %s", getQualifiedServiceName(request.Id)))
 			} else {
 				// Create a channel for the raw service results
 				var serviceCh chan Output
