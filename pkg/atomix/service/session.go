@@ -325,6 +325,7 @@ func (s *SessionizedService) applyOpenSession(request *OpenSessionRequest, ch ch
 	s.sessions[session.ID] = session
 	s.OnOpen(session)
 	if ch != nil {
+		defer close(ch)
 		bytes, err := proto.Marshal(&SessionResponse{
 			Response: &SessionResponse_OpenSession{
 				OpenSession: &OpenSessionResponse{
@@ -341,6 +342,7 @@ func (s *SessionizedService) applyKeepAlive(request *KeepAliveRequest, ch chan<-
 	session, ok := s.sessions[request.SessionID]
 	if !ok {
 		if ch != nil {
+			defer close(ch)
 			ch <- newFailure(s.context.Index(), fmt.Errorf("unknown session %d", request.SessionID))
 		}
 	} else {
@@ -355,6 +357,7 @@ func (s *SessionizedService) applyKeepAlive(request *KeepAliveRequest, ch chan<-
 
 		// Send the response
 		if ch != nil {
+			defer close(ch)
 			bytes, err := proto.Marshal(&SessionResponse{
 				Response: &SessionResponse_KeepAlive{
 					KeepAlive: &KeepAliveResponse{},
@@ -380,6 +383,7 @@ func (s *SessionizedService) applyCloseSession(request *CloseSessionRequest, ch 
 	session, ok := s.sessions[request.SessionID]
 	if !ok {
 		if ch != nil {
+			defer close(ch)
 			ch <- newFailure(s.context.Index(), fmt.Errorf("unknown session %d", request.SessionID))
 		}
 	} else {
@@ -390,6 +394,7 @@ func (s *SessionizedService) applyCloseSession(request *CloseSessionRequest, ch 
 
 		// Send the response
 		if ch != nil {
+			defer close(ch)
 			bytes, err := proto.Marshal(&SessionResponse{
 				Response: &SessionResponse_CloseSession{
 					CloseSession: &CloseSessionResponse{},
