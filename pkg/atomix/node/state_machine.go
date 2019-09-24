@@ -113,6 +113,11 @@ type primitiveStateMachine struct {
 
 func (s *primitiveStateMachine) Snapshot(writer io.Writer) error {
 	for id, svc := range s.services {
+		// If the service is not active, skip the snapshot
+		if !svc.active {
+			continue
+		}
+
 		serviceID := &service.ServiceId{
 			Type:      svc.Type,
 			Name:      getServiceName(id),
@@ -164,7 +169,7 @@ func (s *primitiveStateMachine) Install(reader io.Reader) error {
 			return err
 		}
 		svc := s.registry.services[serviceID.Type](newServiceContext(s.ctx, serviceID))
-		s.services[getQualifiedServiceName(serviceID)] = newServiceStateMachine(serviceID.Type, svc)
+		s.services[getQualifiedServiceName(serviceID)] = newServiceStateMachine(serviceID.Type, svc, true)
 
 		n, err = reader.Read(lengthBytes)
 		if err != nil {
@@ -190,7 +195,7 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 					fail(ch, fmt.Errorf("unknown service type %s", request.Id.Type))
 					return
 				}
-				svc = newServiceStateMachine(request.Id.Type, serviceType(newServiceContext(s.ctx, request.Id)))
+				svc = newServiceStateMachine(request.Id.Type, serviceType(newServiceContext(s.ctx, request.Id)), true)
 				s.services[getQualifiedServiceName(request.Id)] = svc
 			}
 
@@ -226,7 +231,7 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 					fail(ch, fmt.Errorf("unknown service type %s", request.Id.Type))
 				} else {
 					svc := serviceType(newServiceContext(s.ctx, request.Id))
-					s.services[getQualifiedServiceName(request.Id)] = newServiceStateMachine(request.Id.Type, svc)
+					s.services[getQualifiedServiceName(request.Id)] = newServiceStateMachine(request.Id.Type, svc, true)
 
 					if ch != nil {
 						ch <- newOutput(proto.Marshal(&service.ServiceResponse{
@@ -267,35 +272,42 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
 	} else {
 		switch r := request.Request.(type) {
 		case *service.ServiceRequest_Query:
+			// If the service doesn't exist, create it.
 			svc, ok := s.services[getQualifiedServiceName(request.Id)]
 			if !ok {
-				fail(ch, fmt.Errorf("unknown service %s", getQualifiedServiceName(request.Id)))
-			} else {
-				// Create a channel for the raw service results
-				var serviceCh chan Output
-				if ch != nil {
-					serviceCh = make(chan Output)
-
-					// Start a goroutine to encode the raw service results in a ServiceResponse
-					go func() {
-						defer close(ch)
-						for result := range serviceCh {
-							if result.Failed() {
-								ch <- result
-							} else {
-								ch <- newOutput(proto.Marshal(&service.ServiceResponse{
-									Response: &service.ServiceResponse_Query{
-										Query: result.Value,
-									},
-								}))
-							}
-						}
-					}()
+				serviceType := s.registry.getType(request.Id.Type)
+				if serviceType == nil {
+					fail(ch, fmt.Errorf("unknown service type %s", request.Id.Type))
+					return
 				}
-
-				// Execute the query on the service
-				svc.Query(r.Query, serviceCh)
+				svc = newServiceStateMachine(request.Id.Type, serviceType(newServiceContext(s.ctx, request.Id)), false)
+				s.services[getQualifiedServiceName(request.Id)] = svc
 			}
+
+			// Create a channel for the raw service results
+			var serviceCh chan Output
+			if ch != nil {
+				serviceCh = make(chan Output)
+
+				// Start a goroutine to encode the raw service results in a ServiceResponse
+				go func() {
+					defer close(ch)
+					for result := range serviceCh {
+						if result.Failed() {
+							ch <- result
+						} else {
+							ch <- newOutput(proto.Marshal(&service.ServiceResponse{
+								Response: &service.ServiceResponse_Query{
+									Query: result.Value,
+								},
+							}))
+						}
+					}
+				}()
+			}
+
+			// Execute the query on the service
+			svc.Query(r.Query, serviceCh)
 		case *service.ServiceRequest_Metadata:
 			services := make([]*service.ServiceId, 0, len(s.services))
 			for id, svc := range s.services {
@@ -336,10 +348,11 @@ func getServiceName(id string) string {
 }
 
 // newServiceStateMachine returns a new wrapped service
-func newServiceStateMachine(serviceType string, service service.Service) *serviceStateMachine {
+func newServiceStateMachine(serviceType string, service service.Service, active bool) *serviceStateMachine {
 	return &serviceStateMachine{
 		Type:    serviceType,
 		service: service,
+		active:  active,
 	}
 }
 
@@ -348,6 +361,14 @@ type serviceStateMachine struct {
 	StateMachine
 	Type    string
 	service service.Service
+	active  bool
+}
+
+// activate activates the state machine
+func (s *serviceStateMachine) activate() {
+	if !s.active {
+		s.active = true
+	}
 }
 
 func (s *serviceStateMachine) Snapshot(writer io.Writer) error {
@@ -363,6 +384,7 @@ func (s *serviceStateMachine) CanDelete(index uint64) bool {
 }
 
 func (s *serviceStateMachine) Command(bytes []byte, ch chan<- Output) {
+	s.activate()
 	resultCh := make(chan service.Result)
 	go func() {
 		for result := range resultCh {
