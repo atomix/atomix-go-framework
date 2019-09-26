@@ -447,7 +447,7 @@ func (s *SessionizedService) sequenceQuery(query *SessionQueryRequest, ch chan<-
 		sequenceNumber := query.Context.LastSequenceNumber
 		if sequenceNumber > session.commandSequence {
 			util.SessionEntry(s.Context.Node(), s.context.Namespace(), s.context.Name(), query.Context.SessionID).
-				Tracef("Query ID %s greater than last ID %d", sequenceNumber, session.commandSequence)
+				Tracef("Query ID %d greater than last ID %d", sequenceNumber, session.commandSequence)
 			session.scheduleQuery(sequenceNumber, func() {
 				s.applyQuery(query, session, ch)
 			})
