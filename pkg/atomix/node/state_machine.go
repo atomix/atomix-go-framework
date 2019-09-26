@@ -200,26 +200,28 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 			}
 
 			// Create a channel for the raw service results
-			var serviceCh chan Output
-			if ch != nil {
-				serviceCh = make(chan Output)
+			serviceCh := make(chan Output)
 
-				// Start a goroutine to encode the raw service results in a ServiceResponse
-				go func() {
+			// Start a goroutine to encode the raw service results in a ServiceResponse
+			go func() {
+				if ch != nil {
 					defer close(ch)
-					for result := range serviceCh {
-						if result.Failed() {
-							ch <- result
-						} else {
-							ch <- newOutput(proto.Marshal(&service.ServiceResponse{
-								Response: &service.ServiceResponse_Command{
-									Command: result.Value,
-								},
-							}))
-						}
+				}
+				for result := range serviceCh {
+					if ch == nil {
+						continue
 					}
-				}()
-			}
+					if result.Failed() {
+						ch <- result
+					} else {
+						ch <- newOutput(proto.Marshal(&service.ServiceResponse{
+							Response: &service.ServiceResponse_Command{
+								Command: result.Value,
+							},
+						}))
+					}
+				}
+			}()
 
 			// Execute the command on the service
 			svc.Command(r.Command, serviceCh)
@@ -285,26 +287,28 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
 			}
 
 			// Create a channel for the raw service results
-			var serviceCh chan Output
-			if ch != nil {
-				serviceCh = make(chan Output)
+			serviceCh := make(chan Output)
 
-				// Start a goroutine to encode the raw service results in a ServiceResponse
-				go func() {
+			// Start a goroutine to encode the raw service results in a ServiceResponse
+			go func() {
+				if ch != nil {
 					defer close(ch)
-					for result := range serviceCh {
-						if result.Failed() {
-							ch <- result
-						} else {
-							ch <- newOutput(proto.Marshal(&service.ServiceResponse{
-								Response: &service.ServiceResponse_Query{
-									Query: result.Value,
-								},
-							}))
-						}
+				}
+				for result := range serviceCh {
+					if ch == nil {
+						continue
 					}
-				}()
-			}
+					if result.Failed() {
+						ch <- result
+					} else {
+						ch <- newOutput(proto.Marshal(&service.ServiceResponse{
+							Response: &service.ServiceResponse_Query{
+								Query: result.Value,
+							},
+						}))
+					}
+				}
+			}()
 
 			// Execute the query on the service
 			svc.Query(r.Query, serviceCh)

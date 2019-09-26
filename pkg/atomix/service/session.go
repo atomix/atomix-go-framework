@@ -277,6 +277,8 @@ func (s *SessionizedService) applyCommand(request *SessionCommandRequest, ch cha
 	session, ok := s.sessions[request.Context.SessionID]
 	if !ok {
 		if ch != nil {
+			util.SessionEntry(s.Context.Node(), s.context.Namespace(), s.context.Name(), request.Context.SessionID).
+				Warn("Unknown session")
 			fail(ch, s.context.Index(), fmt.Errorf("unknown session %d", request.Context.SessionID))
 		}
 	} else {
@@ -306,6 +308,8 @@ func (s *SessionizedService) applySessionCommand(request *SessionCommandRequest,
 	session, ok := s.sessions[request.Context.SessionID]
 	if !ok {
 		if ch != nil {
+			util.SessionEntry(s.Context.Node(), s.context.Namespace(), s.context.Name(), request.Context.SessionID).
+				Warn("Unknown session")
 			fail(ch, s.context.Index(), fmt.Errorf("unknown session %d", request.Context.SessionID))
 		}
 	} else {
@@ -342,6 +346,8 @@ func (s *SessionizedService) applyKeepAlive(request *KeepAliveRequest, ch chan<-
 	session, ok := s.sessions[request.SessionID]
 	if !ok {
 		if ch != nil {
+			util.SessionEntry(s.Context.Node(), s.context.Namespace(), s.context.Name(), request.SessionID).
+				Warn("Unknown session")
 			fail(ch, s.context.Index(), fmt.Errorf("unknown session %d", request.SessionID))
 		}
 	} else {
@@ -382,6 +388,8 @@ func (s *SessionizedService) applyCloseSession(request *CloseSessionRequest, ch 
 	session, ok := s.sessions[request.SessionID]
 	if !ok {
 		if ch != nil {
+			util.SessionEntry(s.Context.Node(), s.context.Namespace(), s.context.Name(), request.SessionID).
+				Warn("Unknown session")
 			fail(ch, s.context.Index(), fmt.Errorf("unknown session %d", request.SessionID))
 		}
 	} else {
@@ -414,10 +422,14 @@ func (s *SessionizedService) Query(bytes []byte, ch chan<- Result) {
 	} else {
 		query := request.GetQuery()
 		if query.Context.LastIndex > s.Context.Index() {
+			util.SessionEntry(s.Context.Node(), s.context.Namespace(), s.context.Name(), query.Context.SessionID).
+				Tracef("Query index %d greater than last index %d", query.Context.LastIndex, s.Context.Index())
 			s.Scheduler.(*scheduler).ScheduleIndex(query.Context.LastIndex, func() {
 				s.sequenceQuery(query, ch)
 			})
 		} else {
+			util.SessionEntry(s.Context.Node(), s.context.Namespace(), s.context.Name(), query.Context.SessionID).
+				Tracef("Sequencing query %d <= %d", query.Context.LastIndex, s.Context.Index())
 			s.sequenceQuery(query, ch)
 		}
 	}
@@ -427,15 +439,21 @@ func (s *SessionizedService) sequenceQuery(query *SessionQueryRequest, ch chan<-
 	session, ok := s.sessions[query.Context.SessionID]
 	if !ok {
 		if ch != nil {
+			util.SessionEntry(s.Context.Node(), s.context.Namespace(), s.context.Name(), query.Context.SessionID).
+				Warn("Unknown session")
 			fail(ch, s.context.Index(), fmt.Errorf("unknown session %d", query.Context.SessionID))
 		}
 	} else {
 		sequenceNumber := query.Context.LastSequenceNumber
 		if sequenceNumber > session.commandSequence {
+			util.SessionEntry(s.Context.Node(), s.context.Namespace(), s.context.Name(), query.Context.SessionID).
+				Tracef("Query ID %s greater than last ID %d", sequenceNumber, session.commandSequence)
 			session.scheduleQuery(sequenceNumber, func() {
 				s.applyQuery(query, session, ch)
 			})
 		} else {
+			util.SessionEntry(s.Context.Node(), s.context.Namespace(), s.context.Name(), query.Context.SessionID).
+				Tracef("Executing query %d", sequenceNumber)
 			s.applyQuery(query, session, ch)
 		}
 	}
@@ -471,6 +489,8 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 
 	s.context.setQuery()
 	if err := s.Executor.Execute(query.Name, query.Input, queryCh); err != nil {
+		util.SessionEntry(s.Context.Node(), s.context.Namespace(), s.context.Name(), query.Context.SessionID).
+			Warnf("An application error occurred: %s", err)
 		fail(ch, s.context.Index(), err)
 	}
 }
@@ -553,9 +573,9 @@ func (s *Session) ChannelsOf(op string) []chan<- Result {
 }
 
 // addStream adds a stream at the given sequence number
-func (s *Session) addStream(sequence uint64, op string, outChan chan<- Result) chan<- Result {
+func (s *Session) addStream(id uint64, op string, outChan chan<- Result) chan<- Result {
 	stream := &sessionStream{
-		ID:      sequence,
+		ID:      id,
 		Type:    op,
 		session: s,
 		ctx:     s.ctx,
@@ -571,11 +591,11 @@ func (s *Session) addStream(sequence uint64, op string, outChan chan<- Result) c
 }
 
 // getStream returns a stream by the request sequence number
-func (s *Session) getStream(sequenceNumber uint64) *sessionStream {
+func (s *Session) getStream(id uint64) *sessionStream {
 	element := s.streams.Back()
 	for element != nil {
 		stream := element.Value.(*sessionStream)
-		if stream.ID == sequenceNumber {
+		if stream.ID == id {
 			return stream
 		}
 		element = element.Prev()
@@ -584,13 +604,13 @@ func (s *Session) getStream(sequenceNumber uint64) *sessionStream {
 }
 
 // ack acknowledges response streams up to the given request sequence number
-func (s *Session) ack(sequenceNumber uint64, streams map[uint64]uint64) {
+func (s *Session) ack(id uint64, streams map[uint64]uint64) {
 	element := s.streams.Front()
 	for element != nil {
 		stream := element.Value.(*sessionStream)
 
 		// If the stream ID is greater than the acknowledged sequence number, break out of the loop.
-		if stream.ID > sequenceNumber {
+		if stream.ID > id {
 			break
 		}
 
@@ -607,7 +627,7 @@ func (s *Session) ack(sequenceNumber uint64, streams map[uint64]uint64) {
 		}
 		element = next
 	}
-	s.ackSequence = sequenceNumber
+	s.ackSequence = id
 }
 
 // scheduleQuery schedules a query to be executed after the given sequence number
@@ -691,58 +711,7 @@ func (s *sessionStream) process() {
 		if s.closed {
 			return
 		}
-
-		// If the event is being published during a read operation, throw an exception.
-		if s.ctx.OperationType() != OpTypeCommand {
-			util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.session.ID, s.ID).
-				Debugf("Skipped response for operation type %s", s.ctx.OperationType())
-			continue
-		}
-
-		// If the client acked a sequence number greater than the current event sequence number since we know the
-		// client must have received it from another server.
-		s.responseID++
-		if s.completeID > s.responseID {
-			util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.session.ID, s.ID).
-				Debugf("Skipped completed result %d", s.responseID)
-			continue
-		}
-
-		// Record the last index sent on the stream
-		s.lastIndex = inResult.Index
-
-		// Create the stream result and add it to the results list.
-		if inResult.Succeeded() {
-			bytes, err := proto.Marshal(&SessionResponse{
-				Response: &SessionResponse_Command{
-					Command: &SessionCommandResponse{
-						Context: &SessionResponseContext{
-							StreamID: s.ID,
-							Index:    inResult.Index,
-							Sequence: s.responseID,
-						},
-						Output: inResult.Value,
-					},
-				},
-			})
-			inResult = newResult(inResult.Index, bytes, err)
-		}
-
-		outResult := sessionStreamResult{
-			id:     s.responseID,
-			result: inResult,
-		}
-		s.results.PushBack(outResult)
-		util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.session.ID, s.ID).
-			Tracef("Cached response %d", s.responseID)
-
-		// If the out channel is set, send the result
-		if s.outChan != nil {
-			out := outResult.result
-			util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.session.ID, s.ID).
-				Tracef("Sending response %d %v", s.responseID, out)
-			s.outChan <- out
-		}
+		s.processResult(inResult)
 	}
 
 	util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.session.ID, s.ID).
@@ -752,6 +721,68 @@ func (s *sessionStream) process() {
 	ch := s.outChan
 	if ch != nil {
 		close(ch)
+	}
+}
+
+// processResult processes a single stream result
+func (s *sessionStream) processResult(inResult Result) {
+	defer func() {
+		if err := recover(); err != nil {
+			util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.session.ID, s.ID).
+				Errorf("Recovered from panic %v", err)
+		}
+	}()
+
+	// If the event is being published during a read operation, throw an exception.
+	if s.ctx.OperationType() != OpTypeCommand {
+		util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.session.ID, s.ID).
+			Debugf("Skipped response for operation type %s", s.ctx.OperationType())
+		return
+	}
+
+	// If the client acked a sequence number greater than the current event sequence number since we know the
+	// client must have received it from another server.
+	s.responseID++
+	if s.completeID > s.responseID {
+		util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.session.ID, s.ID).
+			Debugf("Skipped completed result %d", s.responseID)
+		return
+	}
+
+	// Record the last index sent on the stream
+	s.lastIndex = inResult.Index
+
+	// Create the stream result and add it to the results list.
+	if inResult.Succeeded() {
+		bytes, err := proto.Marshal(&SessionResponse{
+			Response: &SessionResponse_Command{
+				Command: &SessionCommandResponse{
+					Context: &SessionResponseContext{
+						StreamID: s.ID,
+						Index:    inResult.Index,
+						Sequence: s.responseID,
+					},
+					Output: inResult.Value,
+				},
+			},
+		})
+		inResult = newResult(inResult.Index, bytes, err)
+	}
+
+	outResult := sessionStreamResult{
+		id:     s.responseID,
+		result: inResult,
+	}
+	s.results.PushBack(outResult)
+	util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.session.ID, s.ID).
+		Tracef("Cached response %d", s.responseID)
+
+	// If the out channel is set, send the result
+	if s.outChan != nil {
+		out := outResult.result
+		util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.session.ID, s.ID).
+			Tracef("Sending response %d %v", s.responseID, out)
+		s.outChan <- out
 	}
 }
 
