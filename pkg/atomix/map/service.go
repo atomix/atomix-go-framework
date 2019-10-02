@@ -100,6 +100,7 @@ func (m *Service) Put(value []byte, ch chan<- service.Result) {
 			Version: m.Context.Index(),
 			TTL:     request.TTL,
 			Created: m.Context.Timestamp(),
+			Updated: m.Context.Timestamp(),
 		}
 		m.entries[request.Key] = newValue
 
@@ -108,10 +109,12 @@ func (m *Service) Put(value []byte, ch chan<- service.Result) {
 
 		// Publish an event to listener streams.
 		m.sendEvent(&ListenResponse{
-			Type:       ListenResponse_INSERTED,
-			Key:        request.Key,
-			NewValue:   newValue.Value,
-			NewVersion: newValue.Version,
+			Type:    ListenResponse_INSERTED,
+			Key:     request.Key,
+			Value:   newValue.Value,
+			Version: newValue.Version,
+			Created: newValue.Created,
+			Updated: newValue.Updated,
 		})
 
 		ch <- m.NewResult(proto.Marshal(&PutResponse{
@@ -146,7 +149,8 @@ func (m *Service) Put(value []byte, ch chan<- service.Result) {
 		Value:   request.Value,
 		Version: m.Context.Index(),
 		TTL:     request.TTL,
-		Created: m.Context.Timestamp(),
+		Created: oldValue.Created,
+		Updated: m.Context.Timestamp(),
 	}
 	m.entries[request.Key] = newValue
 
@@ -155,18 +159,20 @@ func (m *Service) Put(value []byte, ch chan<- service.Result) {
 
 	// Publish an event to listener streams.
 	m.sendEvent(&ListenResponse{
-		Type:       ListenResponse_UPDATED,
-		Key:        request.Key,
-		OldValue:   oldValue.Value,
-		OldVersion: oldValue.Version,
-		NewValue:   newValue.Value,
-		NewVersion: newValue.Version,
+		Type:    ListenResponse_UPDATED,
+		Key:     request.Key,
+		Value:   newValue.Value,
+		Version: newValue.Version,
+		Created: newValue.Created,
+		Updated: newValue.Updated,
 	})
 
 	ch <- m.NewResult(proto.Marshal(&PutResponse{
 		Status:          UpdateStatus_OK,
 		PreviousValue:   oldValue.Value,
 		PreviousVersion: oldValue.Version,
+		Created:         newValue.Created,
+		Updated:         newValue.Updated,
 	}))
 }
 
@@ -210,7 +216,8 @@ func (m *Service) Replace(value []byte, ch chan<- service.Result) {
 		Value:   request.NewValue,
 		Version: m.Context.Index(),
 		TTL:     request.TTL,
-		Created: m.Context.Timestamp(),
+		Created: oldValue.Created,
+		Updated: m.Context.Timestamp(),
 	}
 	m.entries[request.Key] = newValue
 
@@ -219,12 +226,12 @@ func (m *Service) Replace(value []byte, ch chan<- service.Result) {
 
 	// Publish an event to listener streams.
 	m.sendEvent(&ListenResponse{
-		Type:       ListenResponse_UPDATED,
-		Key:        request.Key,
-		OldValue:   oldValue.Value,
-		OldVersion: oldValue.Version,
-		NewValue:   newValue.Value,
-		NewVersion: newValue.Version,
+		Type:    ListenResponse_UPDATED,
+		Key:     request.Key,
+		Value:   newValue.Value,
+		Version: newValue.Version,
+		Created: newValue.Created,
+		Updated: newValue.Updated,
 	})
 
 	ch <- m.NewResult(proto.Marshal(&ReplaceResponse{
@@ -232,6 +239,8 @@ func (m *Service) Replace(value []byte, ch chan<- service.Result) {
 		PreviousValue:   oldValue.Value,
 		PreviousVersion: oldValue.Version,
 		NewVersion:      newValue.Version,
+		Created:         newValue.Created,
+		Updated:         newValue.Updated,
 	}))
 }
 
@@ -269,16 +278,20 @@ func (m *Service) Remove(bytes []byte, ch chan<- service.Result) {
 
 	// Publish an event to listener streams.
 	m.sendEvent(&ListenResponse{
-		Type:       ListenResponse_REMOVED,
-		Key:        request.Key,
-		OldValue:   value.Value,
-		OldVersion: value.Version,
+		Type:    ListenResponse_REMOVED,
+		Key:     request.Key,
+		Value:   value.Value,
+		Version: value.Version,
+		Created: value.Created,
+		Updated: value.Updated,
 	})
 
 	ch <- m.NewResult(proto.Marshal(&ReplaceResponse{
 		Status:          UpdateStatus_OK,
 		PreviousValue:   value.Value,
 		PreviousVersion: value.Version,
+		Created:         value.Created,
+		Updated:         value.Updated,
 	}))
 }
 
@@ -299,6 +312,8 @@ func (m *Service) Get(bytes []byte, ch chan<- service.Result) {
 		ch <- m.NewResult(proto.Marshal(&GetResponse{
 			Value:   value.Value,
 			Version: value.Version,
+			Created: value.Created,
+			Updated: value.Updated,
 		}))
 	}
 }
@@ -345,10 +360,12 @@ func (m *Service) Events(bytes []byte, ch chan<- service.Result) {
 	if request.Replay {
 		for key, value := range m.entries {
 			ch <- m.NewResult(proto.Marshal(&ListenResponse{
-				Type:       ListenResponse_NONE,
-				Key:        key,
-				NewValue:   value.Value,
-				NewVersion: value.Version,
+				Type:    ListenResponse_NONE,
+				Key:     key,
+				Value:   value.Value,
+				Version: value.Version,
+				Created: value.Created,
+				Updated: value.Updated,
 			}))
 		}
 	}
@@ -372,10 +389,12 @@ func (m *Service) scheduleTTL(key string, value *MapEntryValue) {
 		m.timers[key] = m.Scheduler.ScheduleOnce(value.Created.Add(*value.TTL).Sub(m.Context.Timestamp()), func() {
 			delete(m.entries, key)
 			m.sendEvent(&ListenResponse{
-				Type:       ListenResponse_REMOVED,
-				Key:        key,
-				OldValue:   value.Value,
-				OldVersion: uint64(value.Version),
+				Type:    ListenResponse_REMOVED,
+				Key:     key,
+				Value:   value.Value,
+				Version: uint64(value.Version),
+				Created: value.Created,
+				Updated: value.Updated,
 			})
 		})
 	}

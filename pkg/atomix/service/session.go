@@ -296,9 +296,13 @@ func (s *SessionizedService) applyCommand(request *SessionCommandRequest, ch cha
 			}
 		} else if sequenceNumber > session.nextCommandSequence() {
 			session.scheduleCommand(sequenceNumber, func() {
+				util.SessionEntry(s.Context.Node(), s.context.Namespace(), s.context.Name(), request.Context.SessionID).
+					Tracef("Executing command %d", sequenceNumber)
 				s.applySessionCommand(request, ch)
 			})
 		} else {
+			util.SessionEntry(s.Context.Node(), s.context.Namespace(), s.context.Name(), request.Context.SessionID).
+				Tracef("Executing command %d", sequenceNumber)
 			s.applySessionCommand(request, ch)
 		}
 	}
@@ -351,6 +355,9 @@ func (s *SessionizedService) applyKeepAlive(request *KeepAliveRequest, ch chan<-
 			fail(ch, s.context.Index(), fmt.Errorf("unknown session %d", request.SessionID))
 		}
 	} else {
+		util.SessionEntry(s.Context.Node(), s.context.Namespace(), s.context.Name(), request.SessionID).
+			Tracef("Recording keep-alive %v", request)
+
 		// Update the session's last updated timestamp to prevent it from expiring
 		session.LastUpdated = s.Context.Timestamp()
 
@@ -449,6 +456,8 @@ func (s *SessionizedService) sequenceQuery(query *SessionQueryRequest, ch chan<-
 			util.SessionEntry(s.Context.Node(), s.context.Namespace(), s.context.Name(), query.Context.SessionID).
 				Tracef("Query ID %d greater than last ID %d", sequenceNumber, session.commandSequence)
 			session.scheduleQuery(sequenceNumber, func() {
+				util.SessionEntry(s.Context.Node(), s.context.Namespace(), s.context.Name(), query.Context.SessionID).
+					Tracef("Executing query %d", sequenceNumber)
 				s.applyQuery(query, session, ch)
 			})
 		} else {

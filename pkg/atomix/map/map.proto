@@ -32,7 +32,8 @@ message MapEntryValue {
     uint64 version = 1;
     bytes value = 2;
     google.protobuf.Timestamp created = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
-    google.protobuf.Duration ttl = 4 [(gogoproto.customname) = "TTL", (gogoproto.stdduration) = true];
+    google.protobuf.Timestamp updated = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    google.protobuf.Duration ttl = 5 [(gogoproto.customname) = "TTL", (gogoproto.stdduration) = true];
 }
 
 message ContainsKeyRequest {
@@ -67,6 +68,8 @@ message EntriesResponse {
     string key = 1;
     bytes value = 2;
     uint64 version = 3;
+    google.protobuf.Timestamp created = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    google.protobuf.Timestamp updated = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message PutRequest {
@@ -82,6 +85,8 @@ message PutResponse {
     bytes previous_value = 2;
     uint64 previous_version = 3;
     uint64 new_version = 4;
+    google.protobuf.Timestamp created = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    google.protobuf.Timestamp updated = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message ReplaceRequest {
@@ -97,6 +102,8 @@ message ReplaceResponse {
     bytes previous_value = 2;
     uint64 previous_version = 3;
     uint64 new_version = 4;
+    google.protobuf.Timestamp created = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    google.protobuf.Timestamp updated = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message GetRequest {
@@ -106,6 +113,8 @@ message GetRequest {
 message GetResponse {
     bytes value = 1;
     uint64 version = 2;
+    google.protobuf.Timestamp created = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    google.protobuf.Timestamp updated = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message RemoveRequest {
@@ -118,6 +127,8 @@ message RemoveResponse {
     UpdateStatus status = 1;
     bytes previous_value = 2;
     uint64 previous_version = 3;
+    google.protobuf.Timestamp created = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    google.protobuf.Timestamp updated = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message ClearRequest {
@@ -133,10 +144,10 @@ message ListenRequest {
 message ListenResponse {
     Type type = 1;
     string key = 2;
-    bytes old_value = 3;
-    uint64 old_version = 4;
-    bytes new_value = 5;
-    uint64 new_version = 6;
+    bytes value = 3;
+    uint64 version = 4;
+    google.protobuf.Timestamp created = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    google.protobuf.Timestamp updated = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 
     enum Type {
         NONE = 0;

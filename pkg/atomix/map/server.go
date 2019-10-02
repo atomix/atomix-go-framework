@@ -184,6 +184,8 @@ func (m *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResp
 	response := &api.PutResponse{
 		Header:          header,
 		Status:          getResponseStatus(putResponse.Status),
+		Created:         putResponse.Created,
+		Updated:         putResponse.Updated,
 		PreviousValue:   putResponse.PreviousValue,
 		PreviousVersion: int64(putResponse.PreviousVersion),
 	}
@@ -210,16 +212,18 @@ func (m *Server) Replace(ctx context.Context, request *api.ReplaceRequest) (*api
 		return nil, err
 	}
 
-	serviceResponse := &ReplaceResponse{}
-	if err = proto.Unmarshal(out, serviceResponse); err != nil {
+	replaceResponse := &ReplaceResponse{}
+	if err = proto.Unmarshal(out, replaceResponse); err != nil {
 		return nil, err
 	}
 
 	response := &api.ReplaceResponse{
 		Header:          header,
-		Status:          getResponseStatus(serviceResponse.Status),
-		PreviousValue:   serviceResponse.PreviousValue,
-		PreviousVersion: int64(serviceResponse.PreviousVersion),
+		Status:          getResponseStatus(replaceResponse.Status),
+		Created:         replaceResponse.Created,
+		Updated:         replaceResponse.Updated,
+		PreviousValue:   replaceResponse.PreviousValue,
+		PreviousVersion: int64(replaceResponse.PreviousVersion),
 	}
 	log.Tracef("Sending ReplaceResponse %+v", response)
 	return response, nil
@@ -240,15 +244,17 @@ func (m *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 		return nil, err
 	}
 
-	serviceResponse := &GetResponse{}
-	if err = proto.Unmarshal(out, serviceResponse); err != nil {
+	getResponse := &GetResponse{}
+	if err = proto.Unmarshal(out, getResponse); err != nil {
 		return nil, err
 	}
 
 	response := &api.GetResponse{
 		Header:  header,
-		Value:   serviceResponse.Value,
-		Version: int64(serviceResponse.Version),
+		Value:   getResponse.Value,
+		Version: int64(getResponse.Version),
+		Created: getResponse.Created,
+		Updated: getResponse.Updated,
 	}
 	log.Tracef("Sending GetRequest %+v", response)
 	return response, nil
@@ -336,13 +342,13 @@ func (m *Server) Events(request *api.EventRequest, srv api.MapService_EventsServ
 			return err
 		}
 		eventResponse := &api.EventResponse{
-			Header:     result.Header,
-			Type:       getEventType(response.Type),
-			Key:        response.Key,
-			OldValue:   response.OldValue,
-			OldVersion: int64(response.OldVersion),
-			NewValue:   response.NewValue,
-			NewVersion: int64(response.NewVersion),
+			Header:  result.Header,
+			Type:    getEventType(response.Type),
+			Key:     response.Key,
+			Value:   response.Value,
+			Version: int64(response.Version),
+			Created: response.Created,
+			Updated: response.Updated,
 		}
 		log.Tracef("Sending EventResponse %+v", response)
 		if err = srv.Send(eventResponse); err != nil {
@@ -380,6 +386,8 @@ func (m *Server) Entries(request *api.EntriesRequest, srv api.MapService_Entries
 			Key:     response.Key,
 			Value:   response.Value,
 			Version: int64(response.Version),
+			Created: response.Created,
+			Updated: response.Updated,
 		}
 		log.Tracef("Sending EntriesResponse %+v", response)
 		if err = srv.Send(entriesResponse); err != nil {
