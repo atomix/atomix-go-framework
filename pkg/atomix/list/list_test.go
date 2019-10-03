@@ -42,7 +42,7 @@ func TestList(t *testing.T) {
 	_, err = list.Get(context.TODO(), 0)
 	assert.EqualError(t, err, "index out of bounds")
 
-	err = list.Append(context.TODO(), "foo")
+	err = list.Append(context.TODO(), []byte("foo"))
 	assert.NoError(t, err)
 
 	size, err = list.Len(context.TODO())
@@ -51,35 +51,35 @@ func TestList(t *testing.T) {
 
 	value, err := list.Get(context.TODO(), 0)
 	assert.NoError(t, err)
-	assert.Equal(t, "foo", value)
+	assert.Equal(t, "foo", string(value))
 
-	err = list.Append(context.TODO(), "bar")
+	err = list.Append(context.TODO(), []byte("bar"))
 	assert.NoError(t, err)
 
 	size, err = list.Len(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, 2, size)
 
-	err = list.Insert(context.TODO(), 1, "baz")
+	err = list.Insert(context.TODO(), 1, []byte("baz"))
 	assert.NoError(t, err)
 
 	size, err = list.Len(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, 3, size)
 
-	ch := make(chan string)
+	ch := make(chan []byte)
 	err = list.Items(context.TODO(), ch)
 	assert.NoError(t, err)
 
 	value, ok := <-ch
 	assert.True(t, ok)
-	assert.Equal(t, "foo", value)
+	assert.Equal(t, "foo", string(value))
 	value, ok = <-ch
 	assert.True(t, ok)
-	assert.Equal(t, "baz", value)
+	assert.Equal(t, "baz", string(value))
 	value, ok = <-ch
 	assert.True(t, ok)
-	assert.Equal(t, "bar", value)
+	assert.Equal(t, "bar", string(value))
 
 	_, ok = <-ch
 	assert.False(t, ok)
@@ -93,42 +93,42 @@ func TestList(t *testing.T) {
 		event := <-events
 		assert.Equal(t, client.EventInserted, event.Type)
 		assert.Equal(t, 3, event.Index)
-		assert.Equal(t, "Hello world!", event.Value)
+		assert.Equal(t, "Hello world!", string(event.Value))
 
 		event = <-events
 		assert.Equal(t, client.EventInserted, event.Type)
 		assert.Equal(t, 2, event.Index)
-		assert.Equal(t, "Hello world again!", event.Value)
+		assert.Equal(t, "Hello world again!", string(event.Value))
 
 		event = <-events
 		assert.Equal(t, client.EventRemoved, event.Type)
 		assert.Equal(t, 1, event.Index)
-		assert.Equal(t, "baz", event.Value)
+		assert.Equal(t, "baz", string(event.Value))
 
 		event = <-events
 		assert.Equal(t, client.EventRemoved, event.Type)
 		assert.Equal(t, 1, event.Index)
-		assert.Equal(t, "Hello world again!", event.Value)
+		assert.Equal(t, "Hello world again!", string(event.Value))
 
 		event = <-events
 		assert.Equal(t, client.EventInserted, event.Type)
 		assert.Equal(t, 1, event.Index)
-		assert.Equal(t, "Not hello world!", event.Value)
+		assert.Equal(t, "Not hello world!", string(event.Value))
 
 		close(done)
 	}()
 
-	err = list.Append(context.TODO(), "Hello world!")
+	err = list.Append(context.TODO(), []byte("Hello world!"))
 	assert.NoError(t, err)
 
-	err = list.Insert(context.TODO(), 2, "Hello world again!")
+	err = list.Insert(context.TODO(), 2, []byte("Hello world again!"))
 	assert.NoError(t, err)
 
 	value, err = list.Remove(context.TODO(), 1)
 	assert.NoError(t, err)
-	assert.Equal(t, "baz", value)
+	assert.Equal(t, "baz", string(value))
 
-	err = list.Set(context.TODO(), 1, "Not hello world!")
+	err = list.Set(context.TODO(), 1, []byte("Not hello world!"))
 	assert.NoError(t, err)
 
 	<-done
