@@ -266,15 +266,24 @@ func (s *Server) Events(request *api.EventRequest, stream api.LeaderElectionServ
 		if err = proto.Unmarshal(result.Value, response); err != nil {
 			return err
 		}
-		eventResponse := &api.EventResponse{
-			Header: result.Header,
-			Type:   getEventType(response.Type),
-			Term: &api.Term{
-				ID:         response.Term.ID,
-				Timestamp:  response.Term.Timestamp,
-				Leader:     response.Term.Leader,
-				Candidates: response.Term.Candidates,
-			},
+
+		var eventResponse *api.EventResponse
+		if response.Type == ListenResponse_OPEN {
+			eventResponse = &api.EventResponse{
+				Header: result.Header,
+				Type:   api.EventResponse_OPEN,
+			}
+		} else {
+			eventResponse = &api.EventResponse{
+				Header: result.Header,
+				Type:   api.EventResponse_CHANGED,
+				Term: &api.Term{
+					ID:         response.Term.ID,
+					Timestamp:  response.Term.Timestamp,
+					Leader:     response.Term.Leader,
+					Candidates: response.Term.Candidates,
+				},
+			}
 		}
 		log.Tracef("Sending EventResponse %+v", response)
 		if err = stream.Send(eventResponse); err != nil {
@@ -337,13 +346,4 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 	}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil
-}
-
-func getEventType(eventType ListenResponse_Type) api.EventResponse_Type {
-	switch eventType {
-	case ListenResponse_CHANGED:
-		return api.EventResponse_CHANGED
-	default:
-		return api.EventResponse_OPEN
-	}
 }
