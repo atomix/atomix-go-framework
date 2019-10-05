@@ -312,6 +312,8 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 
 func getEventType(eventType ListenResponse_Type) api.EventResponse_Type {
 	switch eventType {
+	case ListenResponse_NONE:
+		return api.EventResponse_NONE
 	case ListenResponse_ADDED:
 		return api.EventResponse_ADDED
 	case ListenResponse_REMOVED:
