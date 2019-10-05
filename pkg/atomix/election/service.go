@@ -53,6 +53,8 @@ func (e *Service) init() {
 	e.Executor.Register("Evict", e.Evict)
 	e.Executor.Register("GetTerm", e.GetTerm)
 	e.Executor.Register("Events", e.Events)
+	e.SessionizedService.OnExpire(e.OnExpire)
+	e.SessionizedService.OnClose(e.OnClose)
 }
 
 // Backup backs up the list service
@@ -77,6 +79,45 @@ func (e *Service) Restore(bytes []byte) error {
 	e.leader = snapshot.Leader
 	e.candidates = snapshot.Candidates
 	return nil
+}
+
+// OnExpire is called when a session is expired by the server
+func (e *Service) OnExpire(session *service.Session) {
+	e.close(session)
+}
+
+// OnClose is called when a session is closed by the client
+func (e *Service) OnClose(session *service.Session) {
+	e.close(session)
+}
+
+// close elects a new leader when a session is closed
+func (e *Service) close(session *service.Session) {
+	candidates := make([]*ElectionRegistration, 0, len(e.candidates))
+	for _, candidate := range e.candidates {
+		if candidate.SessionID != session.ID {
+			candidates = append(candidates, candidate)
+		}
+	}
+
+	if len(candidates) != len(e.candidates) {
+		e.candidates = candidates
+
+		if e.leader.SessionID == session.ID {
+			e.leader = nil
+			if len(e.candidates) > 0 {
+				e.leader = e.candidates[0]
+				e.term++
+				timestamp := e.Context.Timestamp()
+				e.timestamp = &timestamp
+			}
+		}
+
+		e.sendEvent(&ListenResponse{
+			Type: ListenResponse_CHANGED,
+			Term: e.getTerm(),
+		})
+	}
 }
 
 // getTerm returns the current election term

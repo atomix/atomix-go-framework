@@ -40,6 +40,9 @@ func NewSessionizedService(parent Context) *SessionizedService {
 		context:  ctx,
 		parent:   parent,
 		sessions: make(map[uint64]*Session),
+		onOpen:   func(session *Session) {},
+		onExpire: func(session *Session) {},
+		onClose:  func(session *Session) {},
 	}
 }
 
@@ -51,6 +54,9 @@ type SessionizedService struct {
 	parent   Context
 	sessions map[uint64]*Session
 	session  *Session
+	onOpen   func(*Session)
+	onExpire func(*Session)
+	onClose  func(*Session)
 }
 
 // Session returns the currently active session
@@ -331,7 +337,8 @@ func (s *SessionizedService) applySessionCommand(request *SessionCommandRequest,
 func (s *SessionizedService) applyOpenSession(request *OpenSessionRequest, ch chan<- Result) {
 	session := newSession(s.Context, request.Timeout)
 	s.sessions[session.ID] = session
-	s.OnOpen(session)
+	s.onOpen(session)
+	println(fmt.Sprintf("Open session %d", s.Context.Index()))
 	if ch != nil {
 		bytes, err := proto.Marshal(&SessionResponse{
 			Response: &SessionResponse_OpenSession{
@@ -386,7 +393,7 @@ func (s *SessionizedService) expireSessions() {
 		if session.timedOut(s.Context.Timestamp()) {
 			session.close()
 			delete(s.sessions, id)
-			s.OnExpire(session)
+			s.onExpire(session)
 		}
 	}
 }
@@ -403,7 +410,7 @@ func (s *SessionizedService) applyCloseSession(request *CloseSessionRequest, ch 
 		// Close the session and notify the service.
 		delete(s.sessions, session.ID)
 		session.close()
-		s.OnClose(session)
+		s.onClose(session)
 
 		// Send the response
 		if ch != nil {
@@ -505,18 +512,18 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 }
 
 // OnOpen is called when a session is opened
-func (s *SessionizedService) OnOpen(session *Session) {
-
+func (s *SessionizedService) OnOpen(f func(*Session)) {
+	s.onOpen = f
 }
 
 // OnExpire is called when a session is expired by the server
-func (s *SessionizedService) OnExpire(session *Session) {
-
+func (s *SessionizedService) OnExpire(f func(*Session)) {
+	s.onExpire = f
 }
 
 // OnClose is called when a session is closed by the client
-func (s *SessionizedService) OnClose(session *Session) {
-
+func (s *SessionizedService) OnClose(f func(*Session)) {
+	s.onClose = f
 }
 
 func newSession(ctx Context, timeout *time.Duration) *Session {

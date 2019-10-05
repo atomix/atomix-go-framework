@@ -57,6 +57,8 @@ func (l *Service) init() {
 	l.Executor.Register("lock", l.Lock)
 	l.Executor.Register("unlock", l.Unlock)
 	l.Executor.Register("islocked", l.IsLocked)
+	l.SessionizedService.OnExpire(l.OnExpire)
+	l.SessionizedService.OnClose(l.OnClose)
 }
 
 // Backup backs up the lock service
