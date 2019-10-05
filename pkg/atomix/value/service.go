@@ -126,7 +126,10 @@ func (v *Service) Get(bytes []byte, ch chan<- service.Result) {
 
 // Events registers a channel on which to send events
 func (v *Service) Events(bytes []byte, ch chan<- service.Result) {
-	// Keep the stream open
+	// Immediately send an OPEN event but keep the channel open
+	ch <- v.NewResult(proto.Marshal(&ListenResponse{
+		Type: ListenResponse_OPEN,
+	}))
 }
 
 func (v *Service) sendEvent(event *ListenResponse) {

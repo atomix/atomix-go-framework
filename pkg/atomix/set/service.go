@@ -164,6 +164,11 @@ func (s *Service) Events(bytes []byte, ch chan<- service.Result) {
 		close(ch)
 	}
 
+	// Send an OPEN response to notify the client the stream is open
+	ch <- s.NewResult(proto.Marshal(&ListenResponse{
+		Type: ListenResponse_OPEN,
+	}))
+
 	if request.Replay {
 		for value := range s.values {
 			ch <- s.NewResult(proto.Marshal(&ListenResponse{

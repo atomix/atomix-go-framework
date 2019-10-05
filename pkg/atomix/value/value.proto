@@ -57,5 +57,6 @@ message ListenResponse {
 
     enum Type {
         UPDATED = 0;
+        OPEN = 1;
     }
 }

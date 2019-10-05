@@ -390,7 +390,10 @@ func (e *Service) GetTerm(bytes []byte, ch chan<- service.Result) {
 
 // Events registers the given channel to receive election events
 func (e *Service) Events(bytes []byte, ch chan<- service.Result) {
-	// Keep the stream open
+	// Immediately send an OPEN event but keep the channel open
+	ch <- e.NewResult(proto.Marshal(&ListenResponse{
+		Type: ListenResponse_OPEN,
+	}))
 }
 
 func (e *Service) sendEvent(event *ListenResponse) {
