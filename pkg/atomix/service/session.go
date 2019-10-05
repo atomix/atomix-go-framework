@@ -338,7 +338,6 @@ func (s *SessionizedService) applyOpenSession(request *OpenSessionRequest, ch ch
 	session := newSession(s.Context, request.Timeout)
 	s.sessions[session.ID] = session
 	s.onOpen(session)
-	println(fmt.Sprintf("Open session %d", s.Context.Index()))
 	if ch != nil {
 		bytes, err := proto.Marshal(&SessionResponse{
 			Response: &SessionResponse_OpenSession{
