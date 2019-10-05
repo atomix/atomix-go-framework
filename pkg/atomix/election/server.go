@@ -268,7 +268,7 @@ func (s *Server) Events(request *api.EventRequest, stream api.LeaderElectionServ
 		}
 		eventResponse := &api.EventResponse{
 			Header: result.Header,
-			Type:   api.EventResponse_CHANGED,
+			Type:   getEventType(response.Type),
 			Term: &api.Term{
 				ID:         response.Term.ID,
 				Timestamp:  response.Term.Timestamp,
@@ -337,4 +337,13 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 	}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil
+}
+
+func getEventType(eventType ListenResponse_Type) api.EventResponse_Type {
+	switch eventType {
+	case ListenResponse_CHANGED:
+		return api.EventResponse_CHANGED
+	default:
+		return api.EventResponse_OPEN
+	}
 }

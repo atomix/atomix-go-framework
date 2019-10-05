@@ -130,7 +130,7 @@ func (s *Server) Events(request *api.EventRequest, stream api.ValueService_Event
 		}
 		eventResponse := &api.EventResponse{
 			Header:          result.Header,
-			Type:            api.EventResponse_UPDATED,
+			Type:            getEventType(response.Type),
 			PreviousValue:   response.PreviousValue,
 			PreviousVersion: response.PreviousVersion,
 			NewValue:        response.NewValue,
@@ -197,4 +197,13 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 	}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil
+}
+
+func getEventType(eventType ListenResponse_Type) api.EventResponse_Type {
+	switch eventType {
+	case ListenResponse_UPDATED:
+		return api.EventResponse_UPDATED
+	default:
+		return api.EventResponse_OPEN
+	}
 }

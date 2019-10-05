@@ -422,6 +422,7 @@ func getEventType(eventType ListenResponse_Type) api.EventResponse_Type {
 		return api.EventResponse_UPDATED
 	case ListenResponse_REMOVED:
 		return api.EventResponse_REMOVED
+	default:
+		return api.EventResponse_OPEN
 	}
-	return api.EventResponse_UPDATED
 }
