@@ -125,7 +125,7 @@ func (m *Service) Put(value []byte, ch chan<- service.Result) {
 
 	// If the version is -1 then reject the request.
 	// If the version is positive then compare the version to the current version.
-	if request.IfEmpty || (request.Version > 0 && request.Version != oldValue.Version) {
+	if request.IfEmpty || (!request.IfEmpty && request.Version > 0 && request.Version != oldValue.Version) {
 		ch <- m.NewResult(proto.Marshal(&PutResponse{
 			Status:          UpdateStatus_PRECONDITION_FAILED,
 			PreviousValue:   oldValue.Value,
