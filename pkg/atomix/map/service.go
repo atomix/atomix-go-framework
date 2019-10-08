@@ -87,7 +87,7 @@ func (m *Service) Put(value []byte, ch chan<- service.Result) {
 	oldValue := m.entries[request.Key]
 	if oldValue == nil {
 		// If the version is positive then reject the request.
-		if request.Version > 0 {
+		if !request.IfEmpty && request.Version > 0 {
 			ch <- m.NewResult(proto.Marshal(&PutResponse{
 				Status: UpdateStatus_PRECONDITION_FAILED,
 			}))
