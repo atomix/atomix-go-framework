@@ -247,6 +247,18 @@ func (m *Service) Put(value []byte, ch chan<- service.Result) {
 	m.entries[newEntry.Key] = newEntry
 	m.indexes[newEntry.Index] = newEntry
 
+	// Update links for previous and next entries
+	if newEntry.Prev != nil {
+		oldEntry.Prev.Next = newEntry
+	} else {
+		m.firstEntry = newEntry
+	}
+	if newEntry.Next != nil {
+		oldEntry.Next.Prev = newEntry
+	} else {
+		m.lastEntry = newEntry
+	}
+
 	// Schedule the timeout for the value if necessary.
 	m.scheduleTTL(request.Key, newEntry)
 
@@ -328,16 +340,20 @@ func (m *Service) Replace(value []byte, ch chan<- service.Result) {
 		Next: oldEntry.Next,
 	}
 
-	// Update links for previous and next entries
-	if newEntry.Prev != nil {
-		newEntry.Prev.Next = newEntry
-	}
-	if newEntry.Next != nil {
-		newEntry.Next.Prev = newEntry
-	}
-
 	m.entries[newEntry.Key] = newEntry
 	m.indexes[newEntry.Index] = newEntry
+
+	// Update links for previous and next entries
+	if newEntry.Prev != nil {
+		oldEntry.Prev.Next = newEntry
+	} else {
+		m.firstEntry = newEntry
+	}
+	if newEntry.Next != nil {
+		oldEntry.Next.Prev = newEntry
+	} else {
+		m.lastEntry = newEntry
+	}
 
 	// Schedule the timeout for the value if necessary.
 	m.scheduleTTL(request.Key, newEntry)
@@ -499,6 +515,8 @@ func (m *Service) Clear(value []byte, ch chan<- service.Result) {
 	defer close(ch)
 	m.entries = make(map[string]*LinkedMapEntryValue)
 	m.indexes = make(map[uint64]*LinkedMapEntryValue)
+	m.firstEntry = nil
+	m.lastEntry = nil
 	ch <- m.NewResult(proto.Marshal(&ClearResponse{}))
 }
 
