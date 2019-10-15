@@ -16,7 +16,7 @@ package indexedmap
 
 import (
 	"context"
-	client "github.com/atomix/atomix-go-client/pkg/client/map"
+	client "github.com/atomix/atomix-go-client/pkg/client/indexedmap"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-node/pkg/atomix/test"
@@ -26,7 +26,7 @@ import (
 	"time"
 )
 
-func TestMap(t *testing.T) {
+func TestIndexedMap(t *testing.T) {
 	node, conn := test.StartTestNode()
 	defer node.Stop()
 
