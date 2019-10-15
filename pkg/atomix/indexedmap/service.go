@@ -166,7 +166,7 @@ func (m *Service) Put(value []byte, ch chan<- service.Result) {
 				Updated: m.Context.Timestamp(),
 			},
 		}
-		m.entries[request.Key] = newEntry
+		m.entries[newEntry.Key] = newEntry
 		m.indexes[newEntry.Index] = newEntry
 
 		// Set the first entry if not set
@@ -244,7 +244,7 @@ func (m *Service) Put(value []byte, ch chan<- service.Result) {
 		Prev: oldEntry.Prev,
 		Next: oldEntry.Next,
 	}
-	m.entries[request.Key] = newEntry
+	m.entries[newEntry.Key] = newEntry
 	m.indexes[newEntry.Index] = newEntry
 
 	// Schedule the timeout for the value if necessary.
@@ -336,7 +336,7 @@ func (m *Service) Replace(value []byte, ch chan<- service.Result) {
 		newEntry.Next.Prev = newEntry
 	}
 
-	m.entries[request.Key] = newEntry
+	m.entries[newEntry.Key] = newEntry
 	m.indexes[newEntry.Index] = newEntry
 
 	// Schedule the timeout for the value if necessary.
@@ -398,7 +398,7 @@ func (m *Service) Remove(bytes []byte, ch chan<- service.Result) {
 	}
 
 	// Delete the entry from the map.
-	delete(m.entries, request.Key)
+	delete(m.entries, entry.Key)
 	delete(m.indexes, entry.Index)
 
 	// Cancel any TTLs.
