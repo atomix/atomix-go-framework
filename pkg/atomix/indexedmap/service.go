@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package _map //nolint:golint
+package indexedmap
 
 import (
 	"bytes"
@@ -22,14 +22,15 @@ import (
 )
 
 func init() {
-	node.RegisterService("map", newService)
+	node.RegisterService("indexedmap", newService)
 }
 
 // newService returns a new Service
 func newService(context service.Context) service.Service {
 	service := &Service{
 		SessionizedService: service.NewSessionizedService(context),
-		entries:            make(map[string]*MapEntryValue),
+		entries:            make(map[string]*LinkedMapEntryValue),
+		indexes:            make(map[uint64]*LinkedMapEntryValue),
 		timers:             make(map[string]service.Timer),
 	}
 	service.init()
@@ -39,8 +40,12 @@ func newService(context service.Context) service.Service {
 // Service is a state machine for a map primitive
 type Service struct {
 	*service.SessionizedService
-	entries map[string]*MapEntryValue
-	timers  map[string]service.Timer
+	lastIndex  uint64
+	entries    map[string]*LinkedMapEntryValue
+	indexes    map[uint64]*LinkedMapEntryValue
+	firstEntry *LinkedMapEntryValue
+	lastEntry  *LinkedMapEntryValue
+	timers     map[string]service.Timer
 }
 
 // init initializes the map service
@@ -56,10 +61,24 @@ func (m *Service) init() {
 	m.Executor.Register("entries", m.Entries)
 }
 
+// LinkedMapEntryValue is a doubly linked MapEntryValue
+type LinkedMapEntryValue struct {
+	*MapEntryValue
+	Prev *LinkedMapEntryValue
+	Next *LinkedMapEntryValue
+}
+
 // Backup backs up the map service
 func (m *Service) Backup() ([]byte, error) {
+	entries := make([]*MapEntryValue, len(m.entries))
+	entry := m.firstEntry
+	for entry != nil {
+		entries = append(entries, entry.MapEntryValue)
+		entry = entry.Next
+	}
 	snapshot := &MapSnapshot{
-		Entries: m.entries,
+		Index:   m.lastIndex,
+		Entries: entries,
 	}
 	return proto.Marshal(snapshot)
 }
@@ -70,7 +89,32 @@ func (m *Service) Restore(bytes []byte) error {
 	if err := proto.Unmarshal(bytes, snapshot); err != nil {
 		return err
 	}
-	m.entries = snapshot.Entries
+
+	m.lastIndex = snapshot.Index
+	m.firstEntry = nil
+	m.lastEntry = nil
+	m.entries = make(map[string]*LinkedMapEntryValue)
+	m.indexes = make(map[uint64]*LinkedMapEntryValue)
+
+	var prevEntry *LinkedMapEntryValue
+	for _, entry := range snapshot.Entries {
+		linkedEntry := &LinkedMapEntryValue{
+			MapEntryValue: entry,
+		}
+		if m.firstEntry == nil {
+			m.firstEntry = linkedEntry
+		}
+		m.entries[linkedEntry.Key] = linkedEntry
+		m.indexes[linkedEntry.Index] = linkedEntry
+		if prevEntry != nil {
+			prevEntry.Next = linkedEntry
+			linkedEntry.Prev = prevEntry
+		}
+		prevEntry = linkedEntry
+		m.lastEntry = linkedEntry
+	}
+
+	// TODO: Restore TTLs!
 	return nil
 }
 
@@ -84,8 +128,20 @@ func (m *Service) Put(value []byte, ch chan<- service.Result) {
 		return
 	}
 
-	oldValue := m.entries[request.Key]
-	if oldValue == nil {
+	var oldEntry *LinkedMapEntryValue
+	if request.Index > 0 {
+		oldEntry = m.indexes[request.Index]
+		if oldEntry == nil {
+			ch <- m.NewResult(proto.Marshal(&PutResponse{
+				Status: UpdateStatus_PRECONDITION_FAILED,
+			}))
+			return
+		}
+	} else {
+		oldEntry = m.entries[request.Key]
+	}
+
+	if oldEntry == nil {
 		// If the version is positive then reject the request.
 		if !request.IfEmpty && request.Version > 0 {
 			ch <- m.NewResult(proto.Marshal(&PutResponse{
@@ -94,85 +150,125 @@ func (m *Service) Put(value []byte, ch chan<- service.Result) {
 			return
 		}
 
+		// Increment the index for a new entry
+		m.lastIndex++
+		nextIndex := m.lastIndex
+
 		// Create a new entry value and set it in the map.
-		newValue := &MapEntryValue{
-			Value:   request.Value,
-			Version: m.Context.Index(),
-			TTL:     request.TTL,
-			Created: m.Context.Timestamp(),
-			Updated: m.Context.Timestamp(),
+		newEntry := &LinkedMapEntryValue{
+			MapEntryValue: &MapEntryValue{
+				Index:   nextIndex,
+				Key:     request.Key,
+				Value:   request.Value,
+				Version: m.Context.Index(),
+				TTL:     request.TTL,
+				Created: m.Context.Timestamp(),
+				Updated: m.Context.Timestamp(),
+			},
 		}
-		m.entries[request.Key] = newValue
+		m.entries[request.Key] = newEntry
+		m.indexes[newEntry.Index] = newEntry
+
+		// Set the first entry if not set
+		if m.firstEntry == nil {
+			m.firstEntry = newEntry
+		}
+
+		// If the last entry is set, link it to the new entry
+		if m.lastEntry != nil {
+			m.lastEntry.Next = newEntry
+			newEntry.Prev = m.lastEntry
+		}
+
+		// Update the last entry
+		m.lastEntry = newEntry
 
 		// Schedule the timeout for the value if necessary.
-		m.scheduleTTL(request.Key, newValue)
+		m.scheduleTTL(request.Key, newEntry)
 
 		// Publish an event to listener streams.
 		m.sendEvent(&ListenResponse{
 			Type:    ListenResponse_INSERTED,
 			Key:     request.Key,
-			Value:   newValue.Value,
-			Version: newValue.Version,
-			Created: newValue.Created,
-			Updated: newValue.Updated,
+			Index:   newEntry.Index,
+			Value:   newEntry.Value,
+			Version: newEntry.Version,
+			Created: newEntry.Created,
+			Updated: newEntry.Updated,
 		})
 
 		ch <- m.NewResult(proto.Marshal(&PutResponse{
 			Status: UpdateStatus_OK,
+			Index:  newEntry.Index,
+			Key:    newEntry.Key,
 		}))
 		return
 	}
 
 	// If the version is -1 then reject the request.
 	// If the version is positive then compare the version to the current version.
-	if request.IfEmpty || (!request.IfEmpty && request.Version > 0 && request.Version != oldValue.Version) {
+	if request.IfEmpty || (!request.IfEmpty && request.Version > 0 && request.Version != oldEntry.Version) {
 		ch <- m.NewResult(proto.Marshal(&PutResponse{
 			Status:          UpdateStatus_PRECONDITION_FAILED,
-			PreviousValue:   oldValue.Value,
-			PreviousVersion: oldValue.Version,
+			Index:           oldEntry.Index,
+			Key:             oldEntry.Key,
+			PreviousValue:   oldEntry.Value,
+			PreviousVersion: oldEntry.Version,
 		}))
 		return
 	}
 
 	// If the value is equal to the current value, return a no-op.
-	if bytes.Equal(oldValue.Value, request.Value) {
+	if bytes.Equal(oldEntry.Value, request.Value) {
 		ch <- m.NewResult(proto.Marshal(&PutResponse{
 			Status:          UpdateStatus_NOOP,
-			PreviousValue:   oldValue.Value,
-			PreviousVersion: oldValue.Version,
+			Index:           oldEntry.Index,
+			Key:             oldEntry.Key,
+			PreviousValue:   oldEntry.Value,
+			PreviousVersion: oldEntry.Version,
 		}))
 		return
 	}
 
 	// Create a new entry value and set it in the map.
-	newValue := &MapEntryValue{
-		Value:   request.Value,
-		Version: m.Context.Index(),
-		TTL:     request.TTL,
-		Created: oldValue.Created,
-		Updated: m.Context.Timestamp(),
+	newEntry := &LinkedMapEntryValue{
+		MapEntryValue: &MapEntryValue{
+			Index:   oldEntry.Index,
+			Key:     oldEntry.Key,
+			Value:   request.Value,
+			Version: m.Context.Index(),
+			TTL:     request.TTL,
+			Created: oldEntry.Created,
+			Updated: m.Context.Timestamp(),
+		},
+		Prev: oldEntry.Prev,
+		Next: oldEntry.Next,
 	}
-	m.entries[request.Key] = newValue
+	m.entries[request.Key] = newEntry
+	m.indexes[newEntry.Index] = newEntry
 
 	// Schedule the timeout for the value if necessary.
-	m.scheduleTTL(request.Key, newValue)
+	m.scheduleTTL(request.Key, newEntry)
 
 	// Publish an event to listener streams.
 	m.sendEvent(&ListenResponse{
 		Type:    ListenResponse_UPDATED,
 		Key:     request.Key,
-		Value:   newValue.Value,
-		Version: newValue.Version,
-		Created: newValue.Created,
-		Updated: newValue.Updated,
+		Index:   newEntry.Index,
+		Value:   newEntry.Value,
+		Version: newEntry.Version,
+		Created: newEntry.Created,
+		Updated: newEntry.Updated,
 	})
 
 	ch <- m.NewResult(proto.Marshal(&PutResponse{
 		Status:          UpdateStatus_OK,
-		PreviousValue:   oldValue.Value,
-		PreviousVersion: oldValue.Version,
-		Created:         newValue.Created,
-		Updated:         newValue.Updated,
+		Index:           newEntry.Index,
+		Key:             newEntry.Key,
+		PreviousValue:   oldEntry.Value,
+		PreviousVersion: oldEntry.Version,
+		Created:         newEntry.Created,
+		Updated:         newEntry.Updated,
 	}))
 }
 
@@ -186,8 +282,14 @@ func (m *Service) Replace(value []byte, ch chan<- service.Result) {
 		return
 	}
 
-	oldValue, ok := m.entries[request.Key]
-	if !ok {
+	var oldEntry *LinkedMapEntryValue
+	if request.Index > 0 {
+		oldEntry = m.indexes[request.Index]
+	} else {
+		oldEntry = m.entries[request.Key]
+	}
+
+	if oldEntry == nil {
 		ch <- m.NewResult(proto.Marshal(&ReplaceResponse{
 			Status: UpdateStatus_PRECONDITION_FAILED,
 		}))
@@ -195,7 +297,7 @@ func (m *Service) Replace(value []byte, ch chan<- service.Result) {
 	}
 
 	// If the version was specified and does not match the entry version, fail the replace.
-	if request.PreviousVersion != 0 && request.PreviousVersion != oldValue.Version {
+	if request.PreviousVersion != 0 && request.PreviousVersion != oldEntry.Version {
 		ch <- m.NewResult(proto.Marshal(&ReplaceResponse{
 			Status: UpdateStatus_PRECONDITION_FAILED,
 		}))
@@ -203,7 +305,7 @@ func (m *Service) Replace(value []byte, ch chan<- service.Result) {
 	}
 
 	// If the value was specified and does not match the entry value, fail the replace.
-	if len(request.PreviousValue) != 0 && bytes.Equal(request.PreviousValue, oldValue.Value) {
+	if len(request.PreviousValue) != 0 && bytes.Equal(request.PreviousValue, oldEntry.Value) {
 		ch <- m.NewResult(proto.Marshal(&ReplaceResponse{
 			Status: UpdateStatus_PRECONDITION_FAILED,
 		}))
@@ -212,35 +314,54 @@ func (m *Service) Replace(value []byte, ch chan<- service.Result) {
 
 	// If we've made it this far, update the entry.
 	// Create a new entry value and set it in the map.
-	newValue := &MapEntryValue{
-		Value:   request.NewValue,
-		Version: m.Context.Index(),
-		TTL:     request.TTL,
-		Created: oldValue.Created,
-		Updated: m.Context.Timestamp(),
+	newEntry := &LinkedMapEntryValue{
+		MapEntryValue: &MapEntryValue{
+			Index:   oldEntry.Index,
+			Key:     oldEntry.Key,
+			Value:   request.NewValue,
+			Version: m.Context.Index(),
+			TTL:     request.TTL,
+			Created: oldEntry.Created,
+			Updated: m.Context.Timestamp(),
+		},
+		Prev: oldEntry.Prev,
+		Next: oldEntry.Next,
 	}
-	m.entries[request.Key] = newValue
+
+	// Update links for previous and next entries
+	if newEntry.Prev != nil {
+		newEntry.Prev.Next = newEntry
+	}
+	if newEntry.Next != nil {
+		newEntry.Next.Prev = newEntry
+	}
+
+	m.entries[request.Key] = newEntry
+	m.indexes[newEntry.Index] = newEntry
 
 	// Schedule the timeout for the value if necessary.
-	m.scheduleTTL(request.Key, newValue)
+	m.scheduleTTL(request.Key, newEntry)
 
 	// Publish an event to listener streams.
 	m.sendEvent(&ListenResponse{
 		Type:    ListenResponse_UPDATED,
 		Key:     request.Key,
-		Value:   newValue.Value,
-		Version: newValue.Version,
-		Created: newValue.Created,
-		Updated: newValue.Updated,
+		Index:   newEntry.Index,
+		Value:   newEntry.Value,
+		Version: newEntry.Version,
+		Created: newEntry.Created,
+		Updated: newEntry.Updated,
 	})
 
 	ch <- m.NewResult(proto.Marshal(&ReplaceResponse{
 		Status:          UpdateStatus_OK,
-		PreviousValue:   oldValue.Value,
-		PreviousVersion: oldValue.Version,
-		NewVersion:      newValue.Version,
-		Created:         newValue.Created,
-		Updated:         newValue.Updated,
+		Index:           newEntry.Index,
+		Key:             newEntry.Key,
+		PreviousValue:   oldEntry.Value,
+		PreviousVersion: oldEntry.Version,
+		NewVersion:      newEntry.Version,
+		Created:         newEntry.Created,
+		Updated:         newEntry.Updated,
 	}))
 }
 
@@ -254,8 +375,14 @@ func (m *Service) Remove(bytes []byte, ch chan<- service.Result) {
 		return
 	}
 
-	value, ok := m.entries[request.Key]
-	if !ok {
+	var entry *LinkedMapEntryValue
+	if request.Index > 0 {
+		entry = m.indexes[request.Index]
+	} else {
+		entry = m.entries[request.Key]
+	}
+
+	if entry == nil {
 		ch <- m.NewResult(proto.Marshal(&RemoveResponse{
 			Status: UpdateStatus_NOOP,
 		}))
@@ -263,7 +390,7 @@ func (m *Service) Remove(bytes []byte, ch chan<- service.Result) {
 	}
 
 	// If the request version is set, verify that the request version matches the entry version.
-	if request.Version > 0 && request.Version != value.Version {
+	if request.Version > 0 && request.Version != entry.Version {
 		ch <- m.NewResult(proto.Marshal(&RemoveResponse{
 			Status: UpdateStatus_PRECONDITION_FAILED,
 		}))
@@ -272,26 +399,42 @@ func (m *Service) Remove(bytes []byte, ch chan<- service.Result) {
 
 	// Delete the entry from the map.
 	delete(m.entries, request.Key)
+	delete(m.indexes, entry.Index)
 
 	// Cancel any TTLs.
 	m.cancelTTL(request.Key)
+
+	// Update links for previous and next entries
+	if entry.Prev != nil {
+		entry.Prev.Next = entry.Next
+	} else {
+		m.firstEntry = entry.Next
+	}
+	if entry.Next != nil {
+		entry.Next.Prev = entry.Prev
+	} else {
+		m.lastEntry = entry.Prev
+	}
 
 	// Publish an event to listener streams.
 	m.sendEvent(&ListenResponse{
 		Type:    ListenResponse_REMOVED,
 		Key:     request.Key,
-		Value:   value.Value,
-		Version: value.Version,
-		Created: value.Created,
-		Updated: value.Updated,
+		Index:   entry.Index,
+		Value:   entry.Value,
+		Version: entry.Version,
+		Created: entry.Created,
+		Updated: entry.Updated,
 	})
 
 	ch <- m.NewResult(proto.Marshal(&ReplaceResponse{
 		Status:          UpdateStatus_OK,
-		PreviousValue:   value.Value,
-		PreviousVersion: value.Version,
-		Created:         value.Created,
-		Updated:         value.Updated,
+		Index:           entry.Index,
+		Key:             entry.Key,
+		PreviousValue:   entry.Value,
+		PreviousVersion: entry.Version,
+		Created:         entry.Created,
+		Updated:         entry.Updated,
 	}))
 }
 
@@ -305,15 +448,24 @@ func (m *Service) Get(bytes []byte, ch chan<- service.Result) {
 		return
 	}
 
-	value, ok := m.entries[request.Key]
+	var entry *LinkedMapEntryValue
+	var ok bool
+	if request.Index > 0 {
+		entry, ok = m.indexes[request.Index]
+	} else {
+		entry, ok = m.entries[request.Key]
+	}
+
 	if !ok {
 		ch <- m.NewResult(proto.Marshal(&GetResponse{}))
 	} else {
 		ch <- m.NewResult(proto.Marshal(&GetResponse{
-			Value:   value.Value,
-			Version: value.Version,
-			Created: value.Created,
-			Updated: value.Updated,
+			Index:   entry.Index,
+			Key:     entry.Key,
+			Value:   entry.Value,
+			Version: entry.Version,
+			Created: entry.Created,
+			Updated: entry.Updated,
 		}))
 	}
 }
@@ -345,7 +497,8 @@ func (m *Service) Size(bytes []byte, ch chan<- service.Result) {
 // Clear removes all entries from the map
 func (m *Service) Clear(value []byte, ch chan<- service.Result) {
 	defer close(ch)
-	m.entries = make(map[string]*MapEntryValue)
+	m.entries = make(map[string]*LinkedMapEntryValue)
+	m.indexes = make(map[uint64]*LinkedMapEntryValue)
 	ch <- m.NewResult(proto.Marshal(&ClearResponse{}))
 }
 
@@ -363,15 +516,18 @@ func (m *Service) Events(bytes []byte, ch chan<- service.Result) {
 	}))
 
 	if request.Replay {
-		for key, value := range m.entries {
+		entry := m.firstEntry
+		for entry != nil {
 			ch <- m.NewResult(proto.Marshal(&ListenResponse{
 				Type:    ListenResponse_NONE,
-				Key:     key,
-				Value:   value.Value,
-				Version: value.Version,
-				Created: value.Created,
-				Updated: value.Updated,
+				Key:     entry.Key,
+				Index:   entry.Index,
+				Value:   entry.Value,
+				Version: entry.Version,
+				Created: entry.Created,
+				Updated: entry.Updated,
 			}))
+			entry = entry.Next
 		}
 	}
 }
@@ -379,29 +535,47 @@ func (m *Service) Events(bytes []byte, ch chan<- service.Result) {
 // Entries returns a stream of entries to the client
 func (m *Service) Entries(value []byte, ch chan<- service.Result) {
 	defer close(ch)
-	for key, entry := range m.entries {
+	entry := m.firstEntry
+	for entry != nil {
 		ch <- m.NewResult(proto.Marshal(&EntriesResponse{
-			Key:     key,
+			Key:     entry.Key,
+			Index:   entry.Index,
 			Value:   entry.Value,
 			Version: entry.Version,
 			Created: entry.Created,
 			Updated: entry.Updated,
 		}))
+		entry = entry.Next
 	}
 }
 
-func (m *Service) scheduleTTL(key string, value *MapEntryValue) {
+func (m *Service) scheduleTTL(key string, entry *LinkedMapEntryValue) {
 	m.cancelTTL(key)
-	if value.TTL != nil {
-		m.timers[key] = m.Scheduler.ScheduleOnce(value.Created.Add(*value.TTL).Sub(m.Context.Timestamp()), func() {
+	if entry.TTL != nil {
+		m.timers[key] = m.Scheduler.ScheduleOnce(entry.Created.Add(*entry.TTL).Sub(m.Context.Timestamp()), func() {
 			delete(m.entries, key)
+			delete(m.indexes, entry.Index)
+
+			// Update links for previous and next entries
+			if entry.Prev != nil {
+				entry.Prev.Next = entry.Next
+			} else {
+				m.firstEntry = entry.Next
+			}
+			if entry.Next != nil {
+				entry.Next.Prev = entry.Prev
+			} else {
+				m.lastEntry = entry.Prev
+			}
+
 			m.sendEvent(&ListenResponse{
 				Type:    ListenResponse_REMOVED,
 				Key:     key,
-				Value:   value.Value,
-				Version: uint64(value.Version),
-				Created: value.Created,
-				Updated: value.Updated,
+				Index:   entry.Index,
+				Value:   entry.Value,
+				Version: uint64(entry.Version),
+				Created: entry.Created,
+				Updated: entry.Updated,
 			})
 		})
 	}

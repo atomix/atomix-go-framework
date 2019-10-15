@@ -23,6 +23,9 @@ import (
 	// Register the election primitive
 	_ "github.com/atomix/atomix-go-node/pkg/atomix/election"
 
+	// Register the indexedmap primitive
+	_ "github.com/atomix/atomix-go-node/pkg/atomix/indexedmap"
+
 	// Register the list primitive
 	_ "github.com/atomix/atomix-go-node/pkg/atomix/list"
 
