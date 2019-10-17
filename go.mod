@@ -4,7 +4,7 @@ go 1.12
 
 require (
 	cloud.google.com/go v0.43.0 // indirect
-	github.com/atomix/atomix-api v0.0.0-20191014233757-4786daa5a314
+	github.com/atomix/atomix-api v0.0.0-20191017192115-4d6a4f8e87a3
 	github.com/atomix/atomix-go-client v0.0.0-20191015003555-98ae5ccbe7bd
 	github.com/atomix/atomix-go-local v0.0.0-20191015003449-684edaca8be2
 	github.com/gogo/protobuf v1.2.1

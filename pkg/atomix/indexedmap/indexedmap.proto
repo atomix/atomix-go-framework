@@ -130,6 +130,56 @@ message GetResponse {
     google.protobuf.Timestamp updated = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
+message FirstEntryRequest {
+}
+
+message FirstEntryResponse {
+    uint64 index = 1;
+    string key = 2;
+    bytes value = 3;
+    uint64 version = 4;
+    google.protobuf.Timestamp created = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    google.protobuf.Timestamp updated = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+}
+
+message LastEntryRequest {
+}
+
+message LastEntryResponse {
+    uint64 index = 1;
+    string key = 2;
+    bytes value = 3;
+    uint64 version = 4;
+    google.protobuf.Timestamp created = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    google.protobuf.Timestamp updated = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+}
+
+message PrevEntryRequest {
+    uint64 index = 1;
+}
+
+message PrevEntryResponse {
+    uint64 index = 1;
+    string key = 2;
+    bytes value = 3;
+    uint64 version = 4;
+    google.protobuf.Timestamp created = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    google.protobuf.Timestamp updated = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+}
+
+message NextEntryRequest {
+    uint64 index = 1;
+}
+
+message NextEntryResponse {
+    uint64 index = 1;
+    string key = 2;
+    bytes value = 3;
+    uint64 version = 4;
+    google.protobuf.Timestamp created = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    google.protobuf.Timestamp updated = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+}
+
 message RemoveRequest {
     uint64 index = 1;
     string key = 2;

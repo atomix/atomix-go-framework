@@ -265,7 +265,135 @@ func (m *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 		Created: getResponse.Created,
 		Updated: getResponse.Updated,
 	}
-	log.Tracef("Sending GetRequest %+v", response)
+	log.Tracef("Sending GetResponse %+v", response)
+	return response, nil
+}
+
+// FirstEntry gets the first entry in the map
+func (m *Server) FirstEntry(ctx context.Context, request *api.FirstEntryRequest) (*api.FirstEntryResponse, error) {
+	log.Tracef("Received FirstEntryRequest %+v", request)
+	in, err := proto.Marshal(&FirstEntryRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	out, header, err := m.Query(ctx, "firstEntry", in, request.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	firstEntryResponse := &FirstEntryResponse{}
+	if err = proto.Unmarshal(out, firstEntryResponse); err != nil {
+		return nil, err
+	}
+
+	response := &api.FirstEntryResponse{
+		Header:  header,
+		Index:   int64(firstEntryResponse.Index),
+		Key:     firstEntryResponse.Key,
+		Value:   firstEntryResponse.Value,
+		Version: int64(firstEntryResponse.Version),
+		Created: firstEntryResponse.Created,
+		Updated: firstEntryResponse.Updated,
+	}
+	log.Tracef("Sending FirstEntryResponse %+v", response)
+	return response, nil
+}
+
+// LastEntry gets the last entry in the map
+func (m *Server) LastEntry(ctx context.Context, request *api.LastEntryRequest) (*api.LastEntryResponse, error) {
+	log.Tracef("Received LastEntryRequest %+v", request)
+	in, err := proto.Marshal(&LastEntryRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	out, header, err := m.Query(ctx, "lastEntry", in, request.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	lastEntryResponse := &LastEntryResponse{}
+	if err = proto.Unmarshal(out, lastEntryResponse); err != nil {
+		return nil, err
+	}
+
+	response := &api.LastEntryResponse{
+		Header:  header,
+		Index:   int64(lastEntryResponse.Index),
+		Key:     lastEntryResponse.Key,
+		Value:   lastEntryResponse.Value,
+		Version: int64(lastEntryResponse.Version),
+		Created: lastEntryResponse.Created,
+		Updated: lastEntryResponse.Updated,
+	}
+	log.Tracef("Sending LastEntryResponse %+v", response)
+	return response, nil
+}
+
+// PrevEntry gets the previous entry in the map
+func (m *Server) PrevEntry(ctx context.Context, request *api.PrevEntryRequest) (*api.PrevEntryResponse, error) {
+	log.Tracef("Received PrevEntryRequest %+v", request)
+	in, err := proto.Marshal(&PrevEntryRequest{
+		Index: uint64(request.Index),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	out, header, err := m.Query(ctx, "prevEntry", in, request.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	prevEntryResponse := &PrevEntryResponse{}
+	if err = proto.Unmarshal(out, prevEntryResponse); err != nil {
+		return nil, err
+	}
+
+	response := &api.PrevEntryResponse{
+		Header:  header,
+		Index:   int64(prevEntryResponse.Index),
+		Key:     prevEntryResponse.Key,
+		Value:   prevEntryResponse.Value,
+		Version: int64(prevEntryResponse.Version),
+		Created: prevEntryResponse.Created,
+		Updated: prevEntryResponse.Updated,
+	}
+	log.Tracef("Sending PrevEntryResponse %+v", response)
+	return response, nil
+}
+
+// NextEntry gets the next entry in the map
+func (m *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (*api.NextEntryResponse, error) {
+	log.Tracef("Received NextEntryRequest %+v", request)
+	in, err := proto.Marshal(&NextEntryRequest{
+		Index: uint64(request.Index),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	out, header, err := m.Query(ctx, "nextEntry", in, request.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	nextEntryResponse := &NextEntryResponse{}
+	if err = proto.Unmarshal(out, nextEntryResponse); err != nil {
+		return nil, err
+	}
+
+	response := &api.NextEntryResponse{
+		Header:  header,
+		Index:   int64(nextEntryResponse.Index),
+		Key:     nextEntryResponse.Key,
+		Value:   nextEntryResponse.Value,
+		Version: int64(nextEntryResponse.Version),
+		Created: nextEntryResponse.Created,
+		Updated: nextEntryResponse.Updated,
+	}
+	log.Tracef("Sending NextEntryResponse %+v", response)
 	return response, nil
 }
 

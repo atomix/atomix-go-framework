@@ -54,6 +54,10 @@ func (m *Service) init() {
 	m.Executor.Register("replace", m.Replace)
 	m.Executor.Register("remove", m.Remove)
 	m.Executor.Register("get", m.Get)
+	m.Executor.Register("firstEntry", m.FirstEntry)
+	m.Executor.Register("lastEntry", m.LastEntry)
+	m.Executor.Register("prevEntry", m.PrevEntry)
+	m.Executor.Register("nextEntry", m.NextEntry)
 	m.Executor.Register("exists", m.ContainsKey)
 	m.Executor.Register("size", m.Size)
 	m.Executor.Register("clear", m.Clear)
@@ -476,6 +480,124 @@ func (m *Service) Get(bytes []byte, ch chan<- service.Result) {
 		ch <- m.NewResult(proto.Marshal(&GetResponse{}))
 	} else {
 		ch <- m.NewResult(proto.Marshal(&GetResponse{
+			Index:   entry.Index,
+			Key:     entry.Key,
+			Value:   entry.Value,
+			Version: entry.Version,
+			Created: entry.Created,
+			Updated: entry.Updated,
+		}))
+	}
+}
+
+// FirstEntry gets the first entry from the map
+func (m *Service) FirstEntry(bytes []byte, ch chan<- service.Result) {
+	defer close(ch)
+
+	request := &FirstEntryRequest{}
+	if err := proto.Unmarshal(bytes, request); err != nil {
+		ch <- m.NewFailure(err)
+		return
+	}
+
+	if m.firstEntry == nil {
+		ch <- m.NewResult(proto.Marshal(&FirstEntryResponse{}))
+	} else {
+		ch <- m.NewResult(proto.Marshal(&FirstEntryResponse{
+			Index:   m.firstEntry.Index,
+			Key:     m.firstEntry.Key,
+			Value:   m.firstEntry.Value,
+			Version: m.firstEntry.Version,
+			Created: m.firstEntry.Created,
+			Updated: m.firstEntry.Updated,
+		}))
+	}
+}
+
+// LastEntry gets the last entry from the map
+func (m *Service) LastEntry(bytes []byte, ch chan<- service.Result) {
+	defer close(ch)
+
+	request := &LastEntryRequest{}
+	if err := proto.Unmarshal(bytes, request); err != nil {
+		ch <- m.NewFailure(err)
+		return
+	}
+
+	if m.lastEntry == nil {
+		ch <- m.NewResult(proto.Marshal(&LastEntryResponse{}))
+	} else {
+		ch <- m.NewResult(proto.Marshal(&LastEntryResponse{
+			Index:   m.lastEntry.Index,
+			Key:     m.lastEntry.Key,
+			Value:   m.lastEntry.Value,
+			Version: m.lastEntry.Version,
+			Created: m.lastEntry.Created,
+			Updated: m.lastEntry.Updated,
+		}))
+	}
+}
+
+// PrevEntry gets the previous entry from the map
+func (m *Service) PrevEntry(bytes []byte, ch chan<- service.Result) {
+	defer close(ch)
+
+	request := &PrevEntryRequest{}
+	if err := proto.Unmarshal(bytes, request); err != nil {
+		ch <- m.NewFailure(err)
+		return
+	}
+
+	entry, ok := m.indexes[request.Index]
+	if !ok {
+		for _, e := range m.indexes {
+			if entry == nil || (e.Index < request.Index && e.Index > entry.Index) {
+				entry = e
+			}
+		}
+	} else {
+		entry = entry.Prev
+	}
+
+	if entry == nil {
+		ch <- m.NewResult(proto.Marshal(&PrevEntryResponse{}))
+	} else {
+		ch <- m.NewResult(proto.Marshal(&PrevEntryResponse{
+			Index:   entry.Index,
+			Key:     entry.Key,
+			Value:   entry.Value,
+			Version: entry.Version,
+			Created: entry.Created,
+			Updated: entry.Updated,
+		}))
+	}
+}
+
+// NextEntry gets the next entry from the map
+func (m *Service) NextEntry(bytes []byte, ch chan<- service.Result) {
+	defer close(ch)
+
+	request := &NextEntryRequest{}
+	if err := proto.Unmarshal(bytes, request); err != nil {
+		ch <- m.NewFailure(err)
+		return
+	}
+
+	entry, ok := m.indexes[request.Index]
+	if !ok {
+		for _, e := range m.indexes {
+			if entry == nil || (e.Index > request.Index && e.Index < entry.Index) {
+				entry = e
+			}
+		}
+	} else {
+		entry = entry.Next
+	}
+
+	if entry == nil {
+		ch <- m.NewResult(proto.Marshal(&NextEntryResponse{}))
+	} else {
+		ch <- m.NewResult(proto.Marshal(&NextEntryResponse{
 			Index:   entry.Index,
 			Key:     entry.Key,
 			Value:   entry.Value,

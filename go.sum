@@ -50,6 +50,8 @@ github.com/atomix/atomix-api v0.0.0-20191014231250-ef6a7c63056f h1:gVs7AfUgZHHfB
 github.com/atomix/atomix-api v0.0.0-20191014231250-ef6a7c63056f/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
 github.com/atomix/atomix-api v0.0.0-20191014233757-4786daa5a314 h1:P5nVDVOjAOF9JDkw+q9MhThb5MO2isfPH/FMH5x/d4Y=
 github.com/atomix/atomix-api v0.0.0-20191014233757-4786daa5a314/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
+github.com/atomix/atomix-api v0.0.0-20191017192115-4d6a4f8e87a3 h1:iKZxEUGEJ1ZfWDu3Co8kRXBYCSlBphDw4eyWRuNH7NY=
+github.com/atomix/atomix-api v0.0.0-20191017192115-4d6a4f8e87a3/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
 github.com/atomix/atomix-go-client v0.0.0-20190827234201-188602d4e780 h1:8BNchDc9p3c4qcfhZsPVhiH7N1mcdF2qLRRJF28oxbA=
 github.com/atomix/atomix-go-client v0.0.0-20190827234201-188602d4e780/go.mod h1:/UAIApUE5+Ghzu8oBVcYUoz6nCosrRPa0eUlluBtKz0=
 github.com/atomix/atomix-go-client v0.0.0-20191002225823-f79e349b2bde h1:yncpvtNgavQcDHshMsEXAbLL9K+vMgGTnzsybbIeLIw=
