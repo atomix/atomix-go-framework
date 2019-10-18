@@ -748,13 +748,6 @@ func (s *sessionStream) processResult(inResult Result) {
 		}
 	}()
 
-	// If the event is being published during a read operation, throw an exception.
-	if s.ctx.OperationType() != OpTypeCommand {
-		util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.session.ID, s.ID).
-			Debugf("Skipped response for operation type %s", s.ctx.OperationType())
-		return
-	}
-
 	// If the client acked a sequence number greater than the current event sequence number since we know the
 	// client must have received it from another server.
 	s.responseID++
