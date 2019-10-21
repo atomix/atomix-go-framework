@@ -3,7 +3,7 @@ module github.com/atomix/atomix-go-node
 go 1.12
 
 require (
-	github.com/atomix/atomix-api v0.0.0-20191017192115-4d6a4f8e87a3
+	github.com/atomix/atomix-api v0.0.0-20191021183656-837bfda65c82
 	github.com/atomix/atomix-go-client v0.0.0-20191018192841-3644d110cbec
 	github.com/atomix/atomix-go-local v0.0.0-20191018192811-4de2cabe75ef
 	github.com/gogo/protobuf v1.2.1

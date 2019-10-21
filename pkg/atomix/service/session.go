@@ -555,11 +555,17 @@ type Session struct {
 	commandCallbacks map[uint64]func()
 	queryCallbacks   map[uint64]*list.List
 	streams          *list.List
+	streamID         uint64
 }
 
 // timedOut returns a boolean indicating whether the session is timed out
 func (s *Session) timedOut(time time.Time) bool {
 	return s.LastUpdated.UnixNano() > 0 && time.Sub(s.LastUpdated) > s.Timeout
+}
+
+// StreamID returns the ID of the current stream
+func (s *Session) StreamID() uint64 {
+	return s.streamID
 }
 
 // Channels returns a slice of all open channels of any type owned by the session
@@ -571,6 +577,19 @@ func (s *Session) Channels() []chan<- Result {
 		element = element.Next()
 	}
 	return channels
+}
+
+// Channel returns the given channel
+func (s *Session) Channel(id uint64) chan<- Result {
+	element := s.streams.Front()
+	for element != nil {
+		stream := element.Value.(*sessionStream)
+		if stream.ID == id {
+			return stream.inChan
+		}
+		element = element.Next()
+	}
+	return nil
 }
 
 // ChannelsOf returns a slice of all open channels for the given named operation owned by the session
@@ -599,6 +618,7 @@ func (s *Session) addStream(id uint64, op string, outChan chan<- Result) chan<- 
 		results: list.New(),
 	}
 	s.streams.PushBack(stream)
+	s.streamID = id
 	util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.ID, stream.ID).
 		Trace("Stream open")
 	go stream.process()

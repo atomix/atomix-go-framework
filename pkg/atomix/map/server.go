@@ -322,6 +322,7 @@ func (m *Server) Events(request *api.EventRequest, srv api.MapService_EventsServ
 	log.Tracef("Received EventRequest %+v", request)
 	in, err := proto.Marshal(&ListenRequest{
 		Replay: request.Replay,
+		Key:    request.Key,
 	})
 	if err != nil {
 		return err

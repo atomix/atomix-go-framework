@@ -462,6 +462,8 @@ func (m *Server) Events(request *api.EventRequest, srv api.IndexedMapService_Eve
 	log.Tracef("Received EventRequest %+v", request)
 	in, err := proto.Marshal(&ListenRequest{
 		Replay: request.Replay,
+		Key:    request.Key,
+		Index:  uint64(request.Index),
 	})
 	if err != nil {
 		return err

@@ -25,6 +25,14 @@ import "gogoproto/gogo.proto";
 // Map snapshot
 message MapSnapshot {
     map<string, MapEntryValue> entries = 1;
+    repeated Listener listeners = 2;
+}
+
+// Listener is a map listener
+message Listener {
+    uint64 session_id = 1;
+    uint64 stream_id = 2;
+    string key = 3;
 }
 
 // Map entry value
@@ -139,6 +147,7 @@ message ClearResponse {
 
 message ListenRequest {
     bool replay = 1;
+    string key = 2;
 }
 
 message ListenResponse {

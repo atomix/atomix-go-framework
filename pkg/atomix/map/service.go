@@ -31,6 +31,7 @@ func newService(context service.Context) service.Service {
 		SessionizedService: service.NewSessionizedService(context),
 		entries:            make(map[string]*MapEntryValue),
 		timers:             make(map[string]service.Timer),
+		listeners:          make(map[uint64]map[uint64]listener),
 	}
 	service.init()
 	return service
@@ -39,8 +40,9 @@ func newService(context service.Context) service.Service {
 // Service is a state machine for a map primitive
 type Service struct {
 	*service.SessionizedService
-	entries map[string]*MapEntryValue
-	timers  map[string]service.Timer
+	entries   map[string]*MapEntryValue
+	timers    map[string]service.Timer
+	listeners map[uint64]map[uint64]listener
 }
 
 // init initializes the map service
@@ -58,8 +60,20 @@ func (m *Service) init() {
 
 // Backup backs up the map service
 func (m *Service) Backup() ([]byte, error) {
+	listeners := make([]*Listener, 0)
+	for sessionID, sessionListeners := range m.listeners {
+		for streamID, sessionListener := range sessionListeners {
+			listeners = append(listeners, &Listener{
+				SessionId: sessionID,
+				StreamId:  streamID,
+				Key:       sessionListener.key,
+			})
+		}
+	}
+
 	snapshot := &MapSnapshot{
-		Entries: m.entries,
+		Entries:   m.entries,
+		Listeners: listeners,
 	}
 	return proto.Marshal(snapshot)
 }
@@ -71,6 +85,18 @@ func (m *Service) Restore(bytes []byte) error {
 		return err
 	}
 	m.entries = snapshot.Entries
+	m.listeners = make(map[uint64]map[uint64]listener)
+	for _, snapshotListener := range snapshot.Listeners {
+		sessionListeners, ok := m.listeners[snapshotListener.SessionId]
+		if !ok {
+			sessionListeners = make(map[uint64]listener)
+			m.listeners[snapshotListener.SessionId] = sessionListeners
+		}
+		sessionListeners[snapshotListener.StreamId] = listener{
+			key: snapshotListener.Key,
+			ch:  m.Sessions()[snapshotListener.SessionId].Channel(snapshotListener.StreamId),
+		}
+	}
 	return nil
 }
 
@@ -362,6 +388,19 @@ func (m *Service) Events(bytes []byte, ch chan<- service.Result) {
 		Type: ListenResponse_OPEN,
 	}))
 
+	// Create and populate the listener
+	l := listener{
+		key: request.Key,
+		ch:  ch,
+	}
+	listeners, ok := m.listeners[m.Session().ID]
+	if !ok {
+		listeners = make(map[uint64]listener)
+		m.listeners[m.Session().ID] = listeners
+	}
+	listeners[m.Session().StreamID()] = l
+
+	// If replay was requested, send existing entries
 	if request.Replay {
 		for key, value := range m.entries {
 			ch <- m.NewResult(proto.Marshal(&ListenResponse{
@@ -416,9 +455,23 @@ func (m *Service) cancelTTL(key string) {
 
 func (m *Service) sendEvent(event *ListenResponse) {
 	bytes, _ := proto.Marshal(event)
-	for _, session := range m.Sessions() {
-		for _, ch := range session.ChannelsOf("events") {
-			ch <- m.NewSuccess(bytes)
+	for sessionID, listeners := range m.listeners {
+		session := m.Sessions()[sessionID]
+		if session != nil {
+			for _, listener := range listeners {
+				if listener.key != "" {
+					if event.Key == listener.key {
+						listener.ch <- m.NewSuccess(bytes)
+					}
+				} else {
+					listener.ch <- m.NewSuccess(bytes)
+				}
+			}
 		}
 	}
+}
+
+type listener struct {
+	key string
+	ch  chan<- service.Result
 }

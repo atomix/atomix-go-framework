@@ -32,6 +32,7 @@ func newService(context service.Context) service.Service {
 		entries:            make(map[string]*LinkedMapEntryValue),
 		indexes:            make(map[uint64]*LinkedMapEntryValue),
 		timers:             make(map[string]service.Timer),
+		listeners:          make(map[uint64]map[uint64]listener),
 	}
 	service.init()
 	return service
@@ -46,6 +47,7 @@ type Service struct {
 	firstEntry *LinkedMapEntryValue
 	lastEntry  *LinkedMapEntryValue
 	timers     map[string]service.Timer
+	listeners  map[uint64]map[uint64]listener
 }
 
 // init initializes the map service
@@ -80,9 +82,23 @@ func (m *Service) Backup() ([]byte, error) {
 		entries = append(entries, entry.MapEntryValue)
 		entry = entry.Next
 	}
+
+	listeners := make([]*Listener, 0)
+	for sessionID, sessionListeners := range m.listeners {
+		for streamID, sessionListener := range sessionListeners {
+			listeners = append(listeners, &Listener{
+				SessionId: sessionID,
+				StreamId:  streamID,
+				Key:       sessionListener.key,
+				Index:     sessionListener.index,
+			})
+		}
+	}
+
 	snapshot := &MapSnapshot{
-		Index:   m.lastIndex,
-		Entries: entries,
+		Index:     m.lastIndex,
+		Entries:   entries,
+		Listeners: listeners,
 	}
 	return proto.Marshal(snapshot)
 }
@@ -116,6 +132,19 @@ func (m *Service) Restore(bytes []byte) error {
 		}
 		prevEntry = linkedEntry
 		m.lastEntry = linkedEntry
+	}
+
+	m.listeners = make(map[uint64]map[uint64]listener)
+	for _, snapshotListener := range snapshot.Listeners {
+		sessionListeners, ok := m.listeners[snapshotListener.SessionId]
+		if !ok {
+			sessionListeners = make(map[uint64]listener)
+			m.listeners[snapshotListener.SessionId] = sessionListeners
+		}
+		sessionListeners[snapshotListener.StreamId] = listener{
+			key: snapshotListener.Key,
+			ch:  m.Sessions()[snapshotListener.SessionId].Channel(snapshotListener.StreamId),
+		}
 	}
 
 	// TODO: Restore TTLs!
@@ -655,6 +684,19 @@ func (m *Service) Events(bytes []byte, ch chan<- service.Result) {
 		Type: ListenResponse_OPEN,
 	}))
 
+	// Create and populate the listener
+	l := listener{
+		key:   request.Key,
+		index: request.Index,
+		ch:    ch,
+	}
+	listeners, ok := m.listeners[m.Session().ID]
+	if !ok {
+		listeners = make(map[uint64]listener)
+		m.listeners[m.Session().ID] = listeners
+	}
+	listeners[m.Session().StreamID()] = l
+
 	if request.Replay {
 		entry := m.firstEntry
 		for entry != nil {
@@ -730,9 +772,28 @@ func (m *Service) cancelTTL(key string) {
 
 func (m *Service) sendEvent(event *ListenResponse) {
 	bytes, _ := proto.Marshal(event)
-	for _, session := range m.Sessions() {
-		for _, ch := range session.ChannelsOf("events") {
-			ch <- m.NewSuccess(bytes)
+	for sessionID, listeners := range m.listeners {
+		session := m.Sessions()[sessionID]
+		if session != nil {
+			for _, listener := range listeners {
+				if listener.key != "" {
+					if event.Key == listener.key {
+						listener.ch <- m.NewSuccess(bytes)
+					}
+				} else if listener.index > 0 {
+					if event.Index == listener.index {
+						listener.ch <- m.NewSuccess(bytes)
+					}
+				} else {
+					listener.ch <- m.NewSuccess(bytes)
+				}
+			}
 		}
 	}
+}
+
+type listener struct {
+	key   string
+	index uint64
+	ch    chan<- service.Result
 }
