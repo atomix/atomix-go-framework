@@ -468,7 +468,7 @@ func (m *Service) Remove(bytes []byte, ch chan<- service.Result) {
 	// Publish an event to listener streams.
 	m.sendEvent(&ListenResponse{
 		Type:    ListenResponse_REMOVED,
-		Key:     request.Key,
+		Key:     entry.Key,
 		Index:   entry.Index,
 		Value:   entry.Value,
 		Version: entry.Version,
