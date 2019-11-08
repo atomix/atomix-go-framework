@@ -478,6 +478,9 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 	// If the result channel is non-nil, create a channel for transforming results.
 	var queryCh chan Result
 	if ch != nil {
+		index := s.Context.Index()
+		commandSequence := session.commandSequence
+
 		queryCh = make(chan Result)
 		go func() {
 			defer close(ch)
@@ -489,8 +492,8 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 						Response: &SessionResponse_Query{
 							Query: &SessionQueryResponse{
 								Context: &SessionResponseContext{
-									Index:    s.Context.Index(),
-									Sequence: session.commandSequence,
+									Index:    index,
+									Sequence: commandSequence,
 								},
 								Output: result.Value,
 							},
