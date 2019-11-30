@@ -105,8 +105,8 @@ func (s *SessionizedService) snapshotSessions(writer io.Writer) error {
 	}
 
 	snapshot := &SessionizedServiceSnapshot{
-		Index:     s.context.index,
-		Timestamp: uint64(s.context.time.UnixNano()),
+		Index:     s.context.Index(),
+		Timestamp: uint64(s.context.Timestamp().UnixNano()),
 		Sessions:  sessions,
 	}
 	bytes, err := proto.Marshal(snapshot)
@@ -180,9 +180,6 @@ func (s *SessionizedService) installSessions(reader io.Reader) error {
 	}
 
 	snapshot := &SessionizedServiceSnapshot{}
-	s.context.index = snapshot.Index
-	s.context.time = time.Unix(0, int64(snapshot.Timestamp))
-
 	err = proto.Unmarshal(bytes, snapshot)
 	if err != nil {
 		return err
@@ -253,7 +250,7 @@ func (s *SessionizedService) CanDelete(index uint64) bool {
 
 // Command handles a service command
 func (s *SessionizedService) Command(bytes []byte, ch chan<- Result) {
-	s.context.setCommand(s.parent.Timestamp())
+	s.context.setCommand()
 	request := &SessionRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		if ch != nil {

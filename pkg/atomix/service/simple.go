@@ -93,7 +93,7 @@ func (s *SimpleService) Install(reader io.Reader) error {
 
 // Command handles a service command
 func (s *SimpleService) Command(bytes []byte, ch chan<- Result) {
-	s.context.setCommand(s.parent.Timestamp())
+	s.context.setCommand()
 	command := &CommandRequest{}
 	if err := proto.Unmarshal(bytes, command); err != nil {
 		ch <- newFailure(s.context.Index(), err)

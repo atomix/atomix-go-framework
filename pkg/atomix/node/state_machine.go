@@ -58,28 +58,31 @@ type StateMachine interface {
 	Query(bytes []byte, ch chan<- Output)
 }
 
-func newOutput(value []byte, err error) Output {
+func newOutput(index uint64, value []byte, err error) Output {
 	return Output{
+		Index: index,
 		Value: value,
 		Error: err,
 	}
 }
 
-func newFailure(err error) Output {
+func newFailure(index uint64, err error) Output {
 	return Output{
+		Index: index,
 		Error: err,
 	}
 }
 
-func fail(ch chan<- Output, err error) {
+func fail(ch chan<- Output, index uint64, err error) {
 	if ch != nil {
-		ch <- newFailure(err)
+		ch <- newFailure(index, err)
 		close(ch)
 	}
 }
 
 // Output is a state machine operation output
 type Output struct {
+	Index uint64
 	Value []byte
 	Error error
 }
@@ -183,7 +186,7 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 	request := &service.ServiceRequest{}
 	err := proto.Unmarshal(bytes, request)
 	if err != nil {
-		fail(ch, err)
+		fail(ch, s.ctx.Index(), err)
 	} else {
 		switch r := request.Request.(type) {
 		case *service.ServiceRequest_Command:
@@ -192,7 +195,7 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 			if !ok {
 				serviceType := s.registry.getType(request.Id.Type)
 				if serviceType == nil {
-					fail(ch, fmt.Errorf("unknown service type %s", request.Id.Type))
+					fail(ch, s.ctx.Index(), fmt.Errorf("unknown service type %s", request.Id.Type))
 					return
 				}
 				svc = newServiceStateMachine(request.Id.Type, serviceType(newServiceContext(s.ctx, request.Id)), true)
@@ -214,11 +217,12 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 					if result.Failed() {
 						ch <- result
 					} else {
-						ch <- newOutput(proto.Marshal(&service.ServiceResponse{
+						out, err := proto.Marshal(&service.ServiceResponse{
 							Response: &service.ServiceResponse_Command{
 								Command: result.Value,
 							},
-						}))
+						})
+						ch <- newOutput(result.Index, out, err)
 					}
 				}
 			}()
@@ -230,37 +234,40 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 			if !ok {
 				serviceType := s.registry.getType(request.Id.Type)
 				if serviceType == nil {
-					fail(ch, fmt.Errorf("unknown service type %s", request.Id.Type))
+					fail(ch, s.ctx.Index(), fmt.Errorf("unknown service type %s", request.Id.Type))
 				} else {
 					svc := serviceType(newServiceContext(s.ctx, request.Id))
 					s.services[getQualifiedServiceName(request.Id)] = newServiceStateMachine(request.Id.Type, svc, true)
 
 					if ch != nil {
-						ch <- newOutput(proto.Marshal(&service.ServiceResponse{
+						out, err := proto.Marshal(&service.ServiceResponse{
 							Response: &service.ServiceResponse_Create{
 								Create: &service.CreateResponse{},
 							},
-						}))
+						})
+						ch <- newOutput(s.ctx.Index(), out, err)
 					}
 				}
 			} else {
 				if ch != nil {
-					ch <- newOutput(proto.Marshal(&service.ServiceResponse{
+					out, err := proto.Marshal(&service.ServiceResponse{
 						Response: &service.ServiceResponse_Create{
 							Create: &service.CreateResponse{},
 						},
-					}))
+					})
+					ch <- newOutput(s.ctx.Index(), out, err)
 				}
 			}
 		case *service.ServiceRequest_Delete:
 			delete(s.services, getQualifiedServiceName(request.Id))
 
 			if ch != nil {
-				ch <- newOutput(proto.Marshal(&service.ServiceResponse{
+				out, err := proto.Marshal(&service.ServiceResponse{
 					Response: &service.ServiceResponse_Delete{
 						Delete: &service.DeleteResponse{},
 					},
-				}))
+				})
+				ch <- newOutput(s.ctx.Index(), out, err)
 			}
 		}
 	}
@@ -270,7 +277,7 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
 	request := &service.ServiceRequest{}
 	err := proto.Unmarshal(bytes, request)
 	if err != nil {
-		fail(ch, err)
+		fail(ch, s.ctx.Index(), err)
 	} else {
 		switch r := request.Request.(type) {
 		case *service.ServiceRequest_Query:
@@ -279,7 +286,7 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
 			if !ok {
 				serviceType := s.registry.getType(request.Id.Type)
 				if serviceType == nil {
-					fail(ch, fmt.Errorf("unknown service type %s", request.Id.Type))
+					fail(ch, s.ctx.Index(), fmt.Errorf("unknown service type %s", request.Id.Type))
 					return
 				}
 				svc = newServiceStateMachine(request.Id.Type, serviceType(newServiceContext(s.ctx, request.Id)), false)
@@ -301,11 +308,12 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
 					if result.Failed() {
 						ch <- result
 					} else {
-						ch <- newOutput(proto.Marshal(&service.ServiceResponse{
+						out, err := proto.Marshal(&service.ServiceResponse{
 							Response: &service.ServiceResponse_Query{
 								Query: result.Value,
 							},
-						}))
+						})
+						ch <- newOutput(s.ctx.Index(), out, err)
 					}
 				}
 			}()
@@ -326,13 +334,14 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
 			}
 
 			if ch != nil {
-				ch <- newOutput(proto.Marshal(&service.ServiceResponse{
+				out, err := proto.Marshal(&service.ServiceResponse{
 					Response: &service.ServiceResponse_Metadata{
 						Metadata: &service.MetadataResponse{
 							Services: services,
 						},
 					},
-				}))
+				})
+				ch <- newOutput(s.ctx.Index(), out, err)
 				close(ch)
 			}
 		}
@@ -393,6 +402,7 @@ func (s *serviceStateMachine) Command(bytes []byte, ch chan<- Output) {
 	go func() {
 		for result := range resultCh {
 			ch <- Output{
+				Index: result.Index,
 				Value: result.Value,
 				Error: result.Error,
 			}
@@ -410,6 +420,7 @@ func (s *serviceStateMachine) Query(bytes []byte, ch chan<- Output) {
 	go func() {
 		for result := range resultCh {
 			ch <- Output{
+				Index: result.Index,
 				Value: result.Value,
 				Error: result.Error,
 			}

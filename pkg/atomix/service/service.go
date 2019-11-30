@@ -147,8 +147,6 @@ func (s *service) NewFailure(err error) Result {
 // mutableContext is an internal context implementation which supports per-service indexes
 type mutableContext struct {
 	parent Context
-	index  uint64
-	time   time.Time
 	op     OperationType
 }
 
@@ -165,20 +163,18 @@ func (c *mutableContext) Namespace() string {
 }
 
 func (c *mutableContext) Index() uint64 {
-	return c.index
+	return c.parent.Index()
 }
 
 func (c *mutableContext) Timestamp() time.Time {
-	return c.time
+	return c.parent.Timestamp()
 }
 
 func (c *mutableContext) OperationType() OperationType {
 	return c.op
 }
 
-func (c *mutableContext) setCommand(time time.Time) {
-	c.index = c.index + 1
-	c.time = time
+func (c *mutableContext) setCommand() {
 	c.op = OpTypeCommand
 }
 
