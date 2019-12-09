@@ -1,0 +1,189 @@
+// Copyright 2019-present Open Networking Foundation.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package leader
+
+import (
+	"github.com/atomix/atomix-go-node/pkg/atomix/node"
+	"github.com/atomix/atomix-go-node/pkg/atomix/service"
+	"github.com/golang/protobuf/proto"
+)
+
+func init() {
+	node.RegisterService("leaderlatch", newService)
+}
+
+// newService returns a new Service
+func newService(context service.Context) service.Service {
+	service := &Service{
+		SessionizedService: service.NewSessionizedService(context),
+		participants:       make([]*LatchParticipant, 0),
+	}
+	service.init()
+	return service
+}
+
+// Service is a state machine for an election primitive
+type Service struct {
+	*service.SessionizedService
+	leader       *LatchParticipant
+	latch        uint64
+	participants []*LatchParticipant
+}
+
+// init initializes the election service
+func (e *Service) init() {
+	e.Executor.Register("Latch", e.Latch)
+	e.Executor.Register("GetLatch", e.GetLatch)
+	e.Executor.Register("Events", e.Events)
+	e.SessionizedService.OnExpire(e.OnExpire)
+	e.SessionizedService.OnClose(e.OnClose)
+}
+
+// Backup backs up the list service
+func (e *Service) Backup() ([]byte, error) {
+	snapshot := &LatchSnapshot{
+		Latch:        e.latch,
+		Leader:       e.leader,
+		Participants: e.participants,
+	}
+	return proto.Marshal(snapshot)
+}
+
+// Restore restores the list service
+func (e *Service) Restore(bytes []byte) error {
+	snapshot := &LatchSnapshot{}
+	if err := proto.Unmarshal(bytes, snapshot); err != nil {
+		return err
+	}
+	e.latch = snapshot.Latch
+	e.leader = snapshot.Leader
+	e.participants = snapshot.Participants
+	return nil
+}
+
+// OnExpire is called when a session is expired by the server
+func (e *Service) OnExpire(session *service.Session) {
+	e.close(session)
+}
+
+// OnClose is called when a session is closed by the client
+func (e *Service) OnClose(session *service.Session) {
+	e.close(session)
+}
+
+// close elects a new leader when a session is closed
+func (e *Service) close(session *service.Session) {
+	candidates := make([]*LatchParticipant, 0, len(e.participants))
+	for _, candidate := range e.participants {
+		if candidate.SessionID != session.ID {
+			candidates = append(candidates, candidate)
+		}
+	}
+
+	if len(candidates) != len(e.participants) {
+		e.participants = candidates
+
+		if e.leader.SessionID == session.ID {
+			e.leader = nil
+			if len(e.participants) > 0 {
+				e.leader = e.participants[0]
+				e.latch++
+			}
+		}
+
+		e.sendEvent(&ListenResponse{
+			Type:  ListenResponse_CHANGED,
+			Latch: e.getLatch(),
+		})
+	}
+}
+
+// getLatch returns the current election latch
+func (e *Service) getLatch() *Latch {
+	var leader string
+	if e.leader != nil {
+		leader = e.leader.ID
+	}
+	return &Latch{
+		ID:           e.latch,
+		Leader:       leader,
+		Participants: e.getParticipants(),
+	}
+}
+
+// getParticipants returns a slice of candidate IDs
+func (e *Service) getParticipants() []string {
+	candidates := make([]string, len(e.participants))
+	for i, candidate := range e.participants {
+		candidates[i] = candidate.ID
+	}
+	return candidates
+}
+
+// Latch attempts to acquire the latch
+func (e *Service) Latch(bytes []byte, ch chan<- service.Result) {
+	defer close(ch)
+
+	request := &LatchRequest{}
+	if err := proto.Unmarshal(bytes, request); err != nil {
+		ch <- e.NewFailure(err)
+		return
+	}
+
+	reg := &LatchParticipant{
+		ID:        request.ID,
+		SessionID: e.Session().ID,
+	}
+
+	e.participants = append(e.participants, reg)
+	if e.leader == nil {
+		e.leader = reg
+		e.latch++
+	}
+
+	e.sendEvent(&ListenResponse{
+		Type:  ListenResponse_CHANGED,
+		Latch: e.getLatch(),
+	})
+
+	ch <- e.NewResult(proto.Marshal(&LatchResponse{
+		Latch: e.getLatch(),
+	}))
+}
+
+// GetLatch gets the current latch
+func (e *Service) GetLatch(bytes []byte, ch chan<- service.Result) {
+	defer close(ch)
+	ch <- e.NewResult(proto.Marshal(&GetResponse{
+		Latch: e.getLatch(),
+	}))
+}
+
+// Events registers the given channel to receive election events
+func (e *Service) Events(bytes []byte, ch chan<- service.Result) {
+	// Immediately send an OPEN event but keep the channel open
+	ch <- e.NewResult(proto.Marshal(&ListenResponse{
+		Type: ListenResponse_OPEN,
+	}))
+}
+
+func (e *Service) sendEvent(event *ListenResponse) {
+	bytes, err := proto.Marshal(event)
+	for _, session := range e.Sessions() {
+		for _, ch := range session.ChannelsOf("Events") {
+			ch <- e.NewResult(bytes, err)
+		}
+	}
+}

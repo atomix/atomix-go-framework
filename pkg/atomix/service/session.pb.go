@@ -25,7 +25,7 @@ var _ = time.Kitchen
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
 // Sessionized service snapshot
 type SessionizedServiceSnapshot struct {
@@ -292,19 +292,19 @@ type isSessionRequest_Request interface {
 }
 
 type SessionRequest_OpenSession struct {
-	OpenSession *OpenSessionRequest `protobuf:"bytes,1,opt,name=open_session,json=openSession,proto3,oneof"`
+	OpenSession *OpenSessionRequest `protobuf:"bytes,1,opt,name=open_session,json=openSession,proto3,oneof" json:"open_session,omitempty"`
 }
 type SessionRequest_KeepAlive struct {
-	KeepAlive *KeepAliveRequest `protobuf:"bytes,2,opt,name=keep_alive,json=keepAlive,proto3,oneof"`
+	KeepAlive *KeepAliveRequest `protobuf:"bytes,2,opt,name=keep_alive,json=keepAlive,proto3,oneof" json:"keep_alive,omitempty"`
 }
 type SessionRequest_CloseSession struct {
-	CloseSession *CloseSessionRequest `protobuf:"bytes,3,opt,name=close_session,json=closeSession,proto3,oneof"`
+	CloseSession *CloseSessionRequest `protobuf:"bytes,3,opt,name=close_session,json=closeSession,proto3,oneof" json:"close_session,omitempty"`
 }
 type SessionRequest_Command struct {
-	Command *SessionCommandRequest `protobuf:"bytes,4,opt,name=command,proto3,oneof"`
+	Command *SessionCommandRequest `protobuf:"bytes,4,opt,name=command,proto3,oneof" json:"command,omitempty"`
 }
 type SessionRequest_Query struct {
-	Query *SessionQueryRequest `protobuf:"bytes,5,opt,name=query,proto3,oneof"`
+	Query *SessionQueryRequest `protobuf:"bytes,5,opt,name=query,proto3,oneof" json:"query,omitempty"`
 }
 
 func (*SessionRequest_OpenSession) isSessionRequest_Request()  {}
@@ -355,135 +355,15 @@ func (m *SessionRequest) GetQuery() *SessionQueryRequest {
 	return nil
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*SessionRequest) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _SessionRequest_OneofMarshaler, _SessionRequest_OneofUnmarshaler, _SessionRequest_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*SessionRequest) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*SessionRequest_OpenSession)(nil),
 		(*SessionRequest_KeepAlive)(nil),
 		(*SessionRequest_CloseSession)(nil),
 		(*SessionRequest_Command)(nil),
 		(*SessionRequest_Query)(nil),
 	}
-}
-
-func _SessionRequest_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*SessionRequest)
-	// request
-	switch x := m.Request.(type) {
-	case *SessionRequest_OpenSession:
-		_ = b.EncodeVarint(1<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.OpenSession); err != nil {
-			return err
-		}
-	case *SessionRequest_KeepAlive:
-		_ = b.EncodeVarint(2<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.KeepAlive); err != nil {
-			return err
-		}
-	case *SessionRequest_CloseSession:
-		_ = b.EncodeVarint(3<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.CloseSession); err != nil {
-			return err
-		}
-	case *SessionRequest_Command:
-		_ = b.EncodeVarint(4<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.Command); err != nil {
-			return err
-		}
-	case *SessionRequest_Query:
-		_ = b.EncodeVarint(5<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.Query); err != nil {
-			return err
-		}
-	case nil:
-	default:
-		return fmt.Errorf("SessionRequest.Request has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _SessionRequest_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*SessionRequest)
-	switch tag {
-	case 1: // request.open_session
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(OpenSessionRequest)
-		err := b.DecodeMessage(msg)
-		m.Request = &SessionRequest_OpenSession{msg}
-		return true, err
-	case 2: // request.keep_alive
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(KeepAliveRequest)
-		err := b.DecodeMessage(msg)
-		m.Request = &SessionRequest_KeepAlive{msg}
-		return true, err
-	case 3: // request.close_session
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(CloseSessionRequest)
-		err := b.DecodeMessage(msg)
-		m.Request = &SessionRequest_CloseSession{msg}
-		return true, err
-	case 4: // request.command
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(SessionCommandRequest)
-		err := b.DecodeMessage(msg)
-		m.Request = &SessionRequest_Command{msg}
-		return true, err
-	case 5: // request.query
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(SessionQueryRequest)
-		err := b.DecodeMessage(msg)
-		m.Request = &SessionRequest_Query{msg}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _SessionRequest_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*SessionRequest)
-	// request
-	switch x := m.Request.(type) {
-	case *SessionRequest_OpenSession:
-		s := proto.Size(x.OpenSession)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *SessionRequest_KeepAlive:
-		s := proto.Size(x.KeepAlive)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *SessionRequest_CloseSession:
-		s := proto.Size(x.CloseSession)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *SessionRequest_Command:
-		s := proto.Size(x.Command)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *SessionRequest_Query:
-		s := proto.Size(x.Query)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
 }
 
 type SessionResponse struct {
@@ -536,19 +416,19 @@ type isSessionResponse_Response interface {
 }
 
 type SessionResponse_OpenSession struct {
-	OpenSession *OpenSessionResponse `protobuf:"bytes,1,opt,name=open_session,json=openSession,proto3,oneof"`
+	OpenSession *OpenSessionResponse `protobuf:"bytes,1,opt,name=open_session,json=openSession,proto3,oneof" json:"open_session,omitempty"`
 }
 type SessionResponse_KeepAlive struct {
-	KeepAlive *KeepAliveResponse `protobuf:"bytes,2,opt,name=keep_alive,json=keepAlive,proto3,oneof"`
+	KeepAlive *KeepAliveResponse `protobuf:"bytes,2,opt,name=keep_alive,json=keepAlive,proto3,oneof" json:"keep_alive,omitempty"`
 }
 type SessionResponse_CloseSession struct {
-	CloseSession *CloseSessionResponse `protobuf:"bytes,3,opt,name=close_session,json=closeSession,proto3,oneof"`
+	CloseSession *CloseSessionResponse `protobuf:"bytes,3,opt,name=close_session,json=closeSession,proto3,oneof" json:"close_session,omitempty"`
 }
 type SessionResponse_Command struct {
-	Command *SessionCommandResponse `protobuf:"bytes,4,opt,name=command,proto3,oneof"`
+	Command *SessionCommandResponse `protobuf:"bytes,4,opt,name=command,proto3,oneof" json:"command,omitempty"`
 }
 type SessionResponse_Query struct {
-	Query *SessionQueryResponse `protobuf:"bytes,5,opt,name=query,proto3,oneof"`
+	Query *SessionQueryResponse `protobuf:"bytes,5,opt,name=query,proto3,oneof" json:"query,omitempty"`
 }
 
 func (*SessionResponse_OpenSession) isSessionResponse_Response()  {}
@@ -599,135 +479,15 @@ func (m *SessionResponse) GetQuery() *SessionQueryResponse {
 	return nil
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*SessionResponse) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _SessionResponse_OneofMarshaler, _SessionResponse_OneofUnmarshaler, _SessionResponse_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*SessionResponse) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*SessionResponse_OpenSession)(nil),
 		(*SessionResponse_KeepAlive)(nil),
 		(*SessionResponse_CloseSession)(nil),
 		(*SessionResponse_Command)(nil),
 		(*SessionResponse_Query)(nil),
 	}
-}
-
-func _SessionResponse_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*SessionResponse)
-	// response
-	switch x := m.Response.(type) {
-	case *SessionResponse_OpenSession:
-		_ = b.EncodeVarint(1<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.OpenSession); err != nil {
-			return err
-		}
-	case *SessionResponse_KeepAlive:
-		_ = b.EncodeVarint(2<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.KeepAlive); err != nil {
-			return err
-		}
-	case *SessionResponse_CloseSession:
-		_ = b.EncodeVarint(3<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.CloseSession); err != nil {
-			return err
-		}
-	case *SessionResponse_Command:
-		_ = b.EncodeVarint(4<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.Command); err != nil {
-			return err
-		}
-	case *SessionResponse_Query:
-		_ = b.EncodeVarint(5<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.Query); err != nil {
-			return err
-		}
-	case nil:
-	default:
-		return fmt.Errorf("SessionResponse.Response has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _SessionResponse_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*SessionResponse)
-	switch tag {
-	case 1: // response.open_session
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(OpenSessionResponse)
-		err := b.DecodeMessage(msg)
-		m.Response = &SessionResponse_OpenSession{msg}
-		return true, err
-	case 2: // response.keep_alive
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(KeepAliveResponse)
-		err := b.DecodeMessage(msg)
-		m.Response = &SessionResponse_KeepAlive{msg}
-		return true, err
-	case 3: // response.close_session
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(CloseSessionResponse)
-		err := b.DecodeMessage(msg)
-		m.Response = &SessionResponse_CloseSession{msg}
-		return true, err
-	case 4: // response.command
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(SessionCommandResponse)
-		err := b.DecodeMessage(msg)
-		m.Response = &SessionResponse_Command{msg}
-		return true, err
-	case 5: // response.query
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(SessionQueryResponse)
-		err := b.DecodeMessage(msg)
-		m.Response = &SessionResponse_Query{msg}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _SessionResponse_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*SessionResponse)
-	// response
-	switch x := m.Response.(type) {
-	case *SessionResponse_OpenSession:
-		s := proto.Size(x.OpenSession)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *SessionResponse_KeepAlive:
-		s := proto.Size(x.KeepAlive)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *SessionResponse_CloseSession:
-		s := proto.Size(x.CloseSession)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *SessionResponse_Command:
-		s := proto.Size(x.Command)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *SessionResponse_Query:
-		s := proto.Size(x.Query)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
 }
 
 type OpenSessionRequest struct {
@@ -1726,7 +1486,8 @@ func (m *SessionRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 }
 
 func (m *SessionRequest_OpenSession) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SessionRequest_OpenSession) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -1746,7 +1507,8 @@ func (m *SessionRequest_OpenSession) MarshalToSizedBuffer(dAtA []byte) (int, err
 	return len(dAtA) - i, nil
 }
 func (m *SessionRequest_KeepAlive) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SessionRequest_KeepAlive) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -1766,7 +1528,8 @@ func (m *SessionRequest_KeepAlive) MarshalToSizedBuffer(dAtA []byte) (int, error
 	return len(dAtA) - i, nil
 }
 func (m *SessionRequest_CloseSession) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SessionRequest_CloseSession) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -1786,7 +1549,8 @@ func (m *SessionRequest_CloseSession) MarshalToSizedBuffer(dAtA []byte) (int, er
 	return len(dAtA) - i, nil
 }
 func (m *SessionRequest_Command) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SessionRequest_Command) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -1806,7 +1570,8 @@ func (m *SessionRequest_Command) MarshalToSizedBuffer(dAtA []byte) (int, error) 
 	return len(dAtA) - i, nil
 }
 func (m *SessionRequest_Query) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SessionRequest_Query) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -1858,7 +1623,8 @@ func (m *SessionResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 }
 
 func (m *SessionResponse_OpenSession) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SessionResponse_OpenSession) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -1878,7 +1644,8 @@ func (m *SessionResponse_OpenSession) MarshalToSizedBuffer(dAtA []byte) (int, er
 	return len(dAtA) - i, nil
 }
 func (m *SessionResponse_KeepAlive) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SessionResponse_KeepAlive) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -1898,7 +1665,8 @@ func (m *SessionResponse_KeepAlive) MarshalToSizedBuffer(dAtA []byte) (int, erro
 	return len(dAtA) - i, nil
 }
 func (m *SessionResponse_CloseSession) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SessionResponse_CloseSession) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -1918,7 +1686,8 @@ func (m *SessionResponse_CloseSession) MarshalToSizedBuffer(dAtA []byte) (int, e
 	return len(dAtA) - i, nil
 }
 func (m *SessionResponse_Command) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SessionResponse_Command) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -1938,7 +1707,8 @@ func (m *SessionResponse_Command) MarshalToSizedBuffer(dAtA []byte) (int, error)
 	return len(dAtA) - i, nil
 }
 func (m *SessionResponse_Query) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *SessionResponse_Query) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -5373,6 +5143,7 @@ func (m *PrimitiveEvent) Unmarshal(dAtA []byte) error {
 func skipSession(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0
+	depth := 0
 	for iNdEx < l {
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
@@ -5404,10 +5175,8 @@ func skipSession(dAtA []byte) (n int, err error) {
 					break
 				}
 			}
-			return iNdEx, nil
 		case 1:
 			iNdEx += 8
-			return iNdEx, nil
 		case 2:
 			var length int
 			for shift := uint(0); ; shift += 7 {
@@ -5428,55 +5197,30 @@ func skipSession(dAtA []byte) (n int, err error) {
 				return 0, ErrInvalidLengthSession
 			}
 			iNdEx += length
-			if iNdEx < 0 {
-				return 0, ErrInvalidLengthSession
-			}
-			return iNdEx, nil
 		case 3:
-			for {
-				var innerWire uint64
-				var start int = iNdEx
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return 0, ErrIntOverflowSession
-					}
-					if iNdEx >= l {
-						return 0, io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					innerWire |= (uint64(b) & 0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-				innerWireType := int(innerWire & 0x7)
-				if innerWireType == 4 {
-					break
-				}
-				next, err := skipSession(dAtA[start:])
-				if err != nil {
-					return 0, err
-				}
-				iNdEx = start + next
-				if iNdEx < 0 {
-					return 0, ErrInvalidLengthSession
-				}
-			}
-			return iNdEx, nil
+			depth++
 		case 4:
-			return iNdEx, nil
+			if depth == 0 {
+				return 0, ErrUnexpectedEndOfGroupSession
+			}
+			depth--
 		case 5:
 			iNdEx += 4
-			return iNdEx, nil
 		default:
 			return 0, fmt.Errorf("proto: illegal wireType %d", wireType)
 		}
+		if iNdEx < 0 {
+			return 0, ErrInvalidLengthSession
+		}
+		if depth == 0 {
+			return iNdEx, nil
+		}
 	}
-	panic("unreachable")
+	return 0, io.ErrUnexpectedEOF
 }
 
 var (
-	ErrInvalidLengthSession = fmt.Errorf("proto: negative length found during unmarshaling")
-	ErrIntOverflowSession   = fmt.Errorf("proto: integer overflow")
+	ErrInvalidLengthSession        = fmt.Errorf("proto: negative length found during unmarshaling")
+	ErrIntOverflowSession          = fmt.Errorf("proto: integer overflow")
+	ErrUnexpectedEndOfGroupSession = fmt.Errorf("proto: unexpected end of group")
 )

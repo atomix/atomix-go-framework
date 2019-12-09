@@ -26,6 +26,9 @@ import (
 	// Register the indexedmap primitive
 	_ "github.com/atomix/atomix-go-node/pkg/atomix/indexedmap"
 
+	// Register the leader latch primitive
+	_ "github.com/atomix/atomix-go-node/pkg/atomix/leader"
+
 	// Register the list primitive
 	_ "github.com/atomix/atomix-go-node/pkg/atomix/list"
 

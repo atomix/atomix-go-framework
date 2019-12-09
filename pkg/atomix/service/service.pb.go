@@ -25,7 +25,7 @@ var _ = time.Kitchen
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
 type ServiceId struct {
 	Type      string `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
@@ -243,19 +243,19 @@ type isServiceRequest_Request interface {
 }
 
 type ServiceRequest_Create struct {
-	Create *CreateRequest `protobuf:"bytes,2,opt,name=create,proto3,oneof"`
+	Create *CreateRequest `protobuf:"bytes,2,opt,name=create,proto3,oneof" json:"create,omitempty"`
 }
 type ServiceRequest_Delete struct {
-	Delete *DeleteRequest `protobuf:"bytes,3,opt,name=delete,proto3,oneof"`
+	Delete *DeleteRequest `protobuf:"bytes,3,opt,name=delete,proto3,oneof" json:"delete,omitempty"`
 }
 type ServiceRequest_Metadata struct {
-	Metadata *MetadataRequest `protobuf:"bytes,4,opt,name=metadata,proto3,oneof"`
+	Metadata *MetadataRequest `protobuf:"bytes,4,opt,name=metadata,proto3,oneof" json:"metadata,omitempty"`
 }
 type ServiceRequest_Command struct {
-	Command []byte `protobuf:"bytes,5,opt,name=command,proto3,oneof"`
+	Command []byte `protobuf:"bytes,5,opt,name=command,proto3,oneof" json:"command,omitempty"`
 }
 type ServiceRequest_Query struct {
-	Query []byte `protobuf:"bytes,6,opt,name=query,proto3,oneof"`
+	Query []byte `protobuf:"bytes,6,opt,name=query,proto3,oneof" json:"query,omitempty"`
 }
 
 func (*ServiceRequest_Create) isServiceRequest_Request()   {}
@@ -313,127 +313,15 @@ func (m *ServiceRequest) GetQuery() []byte {
 	return nil
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*ServiceRequest) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _ServiceRequest_OneofMarshaler, _ServiceRequest_OneofUnmarshaler, _ServiceRequest_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*ServiceRequest) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*ServiceRequest_Create)(nil),
 		(*ServiceRequest_Delete)(nil),
 		(*ServiceRequest_Metadata)(nil),
 		(*ServiceRequest_Command)(nil),
 		(*ServiceRequest_Query)(nil),
 	}
-}
-
-func _ServiceRequest_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*ServiceRequest)
-	// request
-	switch x := m.Request.(type) {
-	case *ServiceRequest_Create:
-		_ = b.EncodeVarint(2<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.Create); err != nil {
-			return err
-		}
-	case *ServiceRequest_Delete:
-		_ = b.EncodeVarint(3<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.Delete); err != nil {
-			return err
-		}
-	case *ServiceRequest_Metadata:
-		_ = b.EncodeVarint(4<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.Metadata); err != nil {
-			return err
-		}
-	case *ServiceRequest_Command:
-		_ = b.EncodeVarint(5<<3 | proto.WireBytes)
-		_ = b.EncodeRawBytes(x.Command)
-	case *ServiceRequest_Query:
-		_ = b.EncodeVarint(6<<3 | proto.WireBytes)
-		_ = b.EncodeRawBytes(x.Query)
-	case nil:
-	default:
-		return fmt.Errorf("ServiceRequest.Request has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _ServiceRequest_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*ServiceRequest)
-	switch tag {
-	case 2: // request.create
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(CreateRequest)
-		err := b.DecodeMessage(msg)
-		m.Request = &ServiceRequest_Create{msg}
-		return true, err
-	case 3: // request.delete
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(DeleteRequest)
-		err := b.DecodeMessage(msg)
-		m.Request = &ServiceRequest_Delete{msg}
-		return true, err
-	case 4: // request.metadata
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(MetadataRequest)
-		err := b.DecodeMessage(msg)
-		m.Request = &ServiceRequest_Metadata{msg}
-		return true, err
-	case 5: // request.command
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeRawBytes(true)
-		m.Request = &ServiceRequest_Command{x}
-		return true, err
-	case 6: // request.query
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeRawBytes(true)
-		m.Request = &ServiceRequest_Query{x}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _ServiceRequest_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*ServiceRequest)
-	// request
-	switch x := m.Request.(type) {
-	case *ServiceRequest_Create:
-		s := proto.Size(x.Create)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *ServiceRequest_Delete:
-		s := proto.Size(x.Delete)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *ServiceRequest_Metadata:
-		s := proto.Size(x.Metadata)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *ServiceRequest_Command:
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(len(x.Command)))
-		n += len(x.Command)
-	case *ServiceRequest_Query:
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(len(x.Query)))
-		n += len(x.Query)
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
 }
 
 type ServiceResponse struct {
@@ -486,19 +374,19 @@ type isServiceResponse_Response interface {
 }
 
 type ServiceResponse_Create struct {
-	Create *CreateResponse `protobuf:"bytes,1,opt,name=create,proto3,oneof"`
+	Create *CreateResponse `protobuf:"bytes,1,opt,name=create,proto3,oneof" json:"create,omitempty"`
 }
 type ServiceResponse_Delete struct {
-	Delete *DeleteResponse `protobuf:"bytes,2,opt,name=delete,proto3,oneof"`
+	Delete *DeleteResponse `protobuf:"bytes,2,opt,name=delete,proto3,oneof" json:"delete,omitempty"`
 }
 type ServiceResponse_Metadata struct {
-	Metadata *MetadataResponse `protobuf:"bytes,3,opt,name=metadata,proto3,oneof"`
+	Metadata *MetadataResponse `protobuf:"bytes,3,opt,name=metadata,proto3,oneof" json:"metadata,omitempty"`
 }
 type ServiceResponse_Command struct {
-	Command []byte `protobuf:"bytes,4,opt,name=command,proto3,oneof"`
+	Command []byte `protobuf:"bytes,4,opt,name=command,proto3,oneof" json:"command,omitempty"`
 }
 type ServiceResponse_Query struct {
-	Query []byte `protobuf:"bytes,5,opt,name=query,proto3,oneof"`
+	Query []byte `protobuf:"bytes,5,opt,name=query,proto3,oneof" json:"query,omitempty"`
 }
 
 func (*ServiceResponse_Create) isServiceResponse_Response()   {}
@@ -549,127 +437,15 @@ func (m *ServiceResponse) GetQuery() []byte {
 	return nil
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*ServiceResponse) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _ServiceResponse_OneofMarshaler, _ServiceResponse_OneofUnmarshaler, _ServiceResponse_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*ServiceResponse) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*ServiceResponse_Create)(nil),
 		(*ServiceResponse_Delete)(nil),
 		(*ServiceResponse_Metadata)(nil),
 		(*ServiceResponse_Command)(nil),
 		(*ServiceResponse_Query)(nil),
 	}
-}
-
-func _ServiceResponse_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*ServiceResponse)
-	// response
-	switch x := m.Response.(type) {
-	case *ServiceResponse_Create:
-		_ = b.EncodeVarint(1<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.Create); err != nil {
-			return err
-		}
-	case *ServiceResponse_Delete:
-		_ = b.EncodeVarint(2<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.Delete); err != nil {
-			return err
-		}
-	case *ServiceResponse_Metadata:
-		_ = b.EncodeVarint(3<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.Metadata); err != nil {
-			return err
-		}
-	case *ServiceResponse_Command:
-		_ = b.EncodeVarint(4<<3 | proto.WireBytes)
-		_ = b.EncodeRawBytes(x.Command)
-	case *ServiceResponse_Query:
-		_ = b.EncodeVarint(5<<3 | proto.WireBytes)
-		_ = b.EncodeRawBytes(x.Query)
-	case nil:
-	default:
-		return fmt.Errorf("ServiceResponse.Response has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _ServiceResponse_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*ServiceResponse)
-	switch tag {
-	case 1: // response.create
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(CreateResponse)
-		err := b.DecodeMessage(msg)
-		m.Response = &ServiceResponse_Create{msg}
-		return true, err
-	case 2: // response.delete
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(DeleteResponse)
-		err := b.DecodeMessage(msg)
-		m.Response = &ServiceResponse_Delete{msg}
-		return true, err
-	case 3: // response.metadata
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(MetadataResponse)
-		err := b.DecodeMessage(msg)
-		m.Response = &ServiceResponse_Metadata{msg}
-		return true, err
-	case 4: // response.command
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeRawBytes(true)
-		m.Response = &ServiceResponse_Command{x}
-		return true, err
-	case 5: // response.query
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeRawBytes(true)
-		m.Response = &ServiceResponse_Query{x}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _ServiceResponse_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*ServiceResponse)
-	// response
-	switch x := m.Response.(type) {
-	case *ServiceResponse_Create:
-		s := proto.Size(x.Create)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *ServiceResponse_Delete:
-		s := proto.Size(x.Delete)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *ServiceResponse_Metadata:
-		s := proto.Size(x.Metadata)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *ServiceResponse_Command:
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(len(x.Command)))
-		n += len(x.Command)
-	case *ServiceResponse_Query:
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(len(x.Query)))
-		n += len(x.Query)
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
 }
 
 type CreateRequest struct {
@@ -1551,7 +1327,8 @@ func (m *ServiceRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 }
 
 func (m *ServiceRequest_Create) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *ServiceRequest_Create) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -1571,7 +1348,8 @@ func (m *ServiceRequest_Create) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *ServiceRequest_Delete) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *ServiceRequest_Delete) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -1591,7 +1369,8 @@ func (m *ServiceRequest_Delete) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *ServiceRequest_Metadata) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *ServiceRequest_Metadata) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -1611,7 +1390,8 @@ func (m *ServiceRequest_Metadata) MarshalToSizedBuffer(dAtA []byte) (int, error)
 	return len(dAtA) - i, nil
 }
 func (m *ServiceRequest_Command) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *ServiceRequest_Command) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -1626,7 +1406,8 @@ func (m *ServiceRequest_Command) MarshalToSizedBuffer(dAtA []byte) (int, error) 
 	return len(dAtA) - i, nil
 }
 func (m *ServiceRequest_Query) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *ServiceRequest_Query) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -1673,7 +1454,8 @@ func (m *ServiceResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 }
 
 func (m *ServiceResponse_Create) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *ServiceResponse_Create) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -1693,7 +1475,8 @@ func (m *ServiceResponse_Create) MarshalToSizedBuffer(dAtA []byte) (int, error) 
 	return len(dAtA) - i, nil
 }
 func (m *ServiceResponse_Delete) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *ServiceResponse_Delete) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -1713,7 +1496,8 @@ func (m *ServiceResponse_Delete) MarshalToSizedBuffer(dAtA []byte) (int, error) 
 	return len(dAtA) - i, nil
 }
 func (m *ServiceResponse_Metadata) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *ServiceResponse_Metadata) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -1733,7 +1517,8 @@ func (m *ServiceResponse_Metadata) MarshalToSizedBuffer(dAtA []byte) (int, error
 	return len(dAtA) - i, nil
 }
 func (m *ServiceResponse_Command) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *ServiceResponse_Command) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -1748,7 +1533,8 @@ func (m *ServiceResponse_Command) MarshalToSizedBuffer(dAtA []byte) (int, error)
 	return len(dAtA) - i, nil
 }
 func (m *ServiceResponse_Query) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *ServiceResponse_Query) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -4812,6 +4598,7 @@ func (m *StreamContext) Unmarshal(dAtA []byte) error {
 func skipService(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0
+	depth := 0
 	for iNdEx < l {
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
@@ -4843,10 +4630,8 @@ func skipService(dAtA []byte) (n int, err error) {
 					break
 				}
 			}
-			return iNdEx, nil
 		case 1:
 			iNdEx += 8
-			return iNdEx, nil
 		case 2:
 			var length int
 			for shift := uint(0); ; shift += 7 {
@@ -4867,55 +4652,30 @@ func skipService(dAtA []byte) (n int, err error) {
 				return 0, ErrInvalidLengthService
 			}
 			iNdEx += length
-			if iNdEx < 0 {
-				return 0, ErrInvalidLengthService
-			}
-			return iNdEx, nil
 		case 3:
-			for {
-				var innerWire uint64
-				var start int = iNdEx
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return 0, ErrIntOverflowService
-					}
-					if iNdEx >= l {
-						return 0, io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					innerWire |= (uint64(b) & 0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-				innerWireType := int(innerWire & 0x7)
-				if innerWireType == 4 {
-					break
-				}
-				next, err := skipService(dAtA[start:])
-				if err != nil {
-					return 0, err
-				}
-				iNdEx = start + next
-				if iNdEx < 0 {
-					return 0, ErrInvalidLengthService
-				}
-			}
-			return iNdEx, nil
+			depth++
 		case 4:
-			return iNdEx, nil
+			if depth == 0 {
+				return 0, ErrUnexpectedEndOfGroupService
+			}
+			depth--
 		case 5:
 			iNdEx += 4
-			return iNdEx, nil
 		default:
 			return 0, fmt.Errorf("proto: illegal wireType %d", wireType)
 		}
+		if iNdEx < 0 {
+			return 0, ErrInvalidLengthService
+		}
+		if depth == 0 {
+			return iNdEx, nil
+		}
 	}
-	panic("unreachable")
+	return 0, io.ErrUnexpectedEOF
 }
 
 var (
-	ErrInvalidLengthService = fmt.Errorf("proto: negative length found during unmarshaling")
-	ErrIntOverflowService   = fmt.Errorf("proto: integer overflow")
+	ErrInvalidLengthService        = fmt.Errorf("proto: negative length found during unmarshaling")
+	ErrIntOverflowService          = fmt.Errorf("proto: integer overflow")
+	ErrUnexpectedEndOfGroupService = fmt.Errorf("proto: unexpected end of group")
 )
