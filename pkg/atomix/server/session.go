@@ -31,8 +31,8 @@ type SessionizedServer struct {
 	Type   string
 }
 
-// Write sends a write to the service
-func (s *SessionizedServer) Write(ctx context.Context, request []byte, header *headers.RequestHeader) ([]byte, error) {
+// write sends a write to the service
+func (s *SessionizedServer) write(ctx context.Context, request []byte, header *headers.RequestHeader) ([]byte, error) {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,
@@ -77,8 +77,8 @@ func (s *SessionizedServer) Write(ctx context.Context, request []byte, header *h
 	return serviceResponse.GetCommand(), nil
 }
 
-// WriteStream sends a streaming write to the service
-func (s *SessionizedServer) WriteStream(request []byte, header *headers.RequestHeader, ch chan<- streams.Result) error {
+// writeStream sends a streaming write to the service
+func (s *SessionizedServer) writeStream(request []byte, header *headers.RequestHeader, ch chan<- streams.Result) error {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,
@@ -125,8 +125,8 @@ func (s *SessionizedServer) WriteStream(request []byte, header *headers.RequestH
 	return nil
 }
 
-// Read sends a read to the service
-func (s *SessionizedServer) Read(ctx context.Context, request []byte, header *headers.RequestHeader) ([]byte, error) {
+// read sends a read to the service
+func (s *SessionizedServer) read(ctx context.Context, request []byte, header *headers.RequestHeader) ([]byte, error) {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,
@@ -170,8 +170,8 @@ func (s *SessionizedServer) Read(ctx context.Context, request []byte, header *he
 	return serviceResponse.GetQuery(), nil
 }
 
-// ReadStream sends a streaming read to the service
-func (s *SessionizedServer) ReadStream(request []byte, header *headers.RequestHeader, ch chan<- streams.Result) error {
+// readStream sends a streaming read to the service
+func (s *SessionizedServer) readStream(request []byte, header *headers.RequestHeader, ch chan<- streams.Result) error {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,
@@ -220,6 +220,14 @@ func (s *SessionizedServer) ReadStream(request []byte, header *headers.RequestHe
 
 // Command submits a command to the service
 func (s *SessionizedServer) Command(ctx context.Context, name string, input []byte, header *headers.RequestHeader) ([]byte, *headers.ResponseHeader, error) {
+	// If the client requires a leader and is not the leader, return an error
+	if s.Client.MustLeader() && !s.Client.IsLeader() {
+		return nil, &headers.ResponseHeader{
+			Status: headers.ResponseStatus_NOT_LEADER,
+			Leader: s.Client.Leader(),
+		}, nil
+	}
+
 	sessionRequest := &service.SessionRequest{
 		Request: &service.SessionRequest_Command{
 			Command: &service.SessionCommandRequest{
@@ -238,7 +246,7 @@ func (s *SessionizedServer) Command(ctx context.Context, name string, input []by
 		return nil, nil, err
 	}
 
-	bytes, err = s.Write(ctx, bytes, header)
+	bytes, err = s.write(ctx, bytes, header)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -261,6 +269,18 @@ func (s *SessionizedServer) Command(ctx context.Context, name string, input []by
 
 // CommandStream submits a streaming command to the service
 func (s *SessionizedServer) CommandStream(name string, input []byte, header *headers.RequestHeader, ch chan<- SessionOutput) error {
+	// If the client requires a leader and is not the leader, return an error
+	if s.Client.MustLeader() && !s.Client.IsLeader() {
+		ch <- SessionOutput{
+			Header: &headers.ResponseHeader{
+				Status: headers.ResponseStatus_NOT_LEADER,
+				Leader: s.Client.Leader(),
+			},
+		}
+		close(ch)
+		return nil
+	}
+
 	sessionRequest := &service.SessionRequest{
 		Request: &service.SessionRequest_Command{
 			Command: &service.SessionCommandRequest{
@@ -280,7 +300,7 @@ func (s *SessionizedServer) CommandStream(name string, input []byte, header *hea
 	}
 
 	resultCh := make(chan streams.Result)
-	if err = s.WriteStream(bytes, header, resultCh); err != nil {
+	if err = s.writeStream(bytes, header, resultCh); err != nil {
 		return err
 	}
 
@@ -324,6 +344,14 @@ func (s *SessionizedServer) CommandStream(name string, input []byte, header *hea
 
 // Query submits a query to the service
 func (s *SessionizedServer) Query(ctx context.Context, name string, input []byte, header *headers.RequestHeader) ([]byte, *headers.ResponseHeader, error) {
+	// If the client requires a leader and is not the leader, return an error
+	if s.Client.MustLeader() && !s.Client.IsLeader() {
+		return nil, &headers.ResponseHeader{
+			Status: headers.ResponseStatus_NOT_LEADER,
+			Leader: s.Client.Leader(),
+		}, nil
+	}
+
 	sessionRequest := &service.SessionRequest{
 		Request: &service.SessionRequest_Query{
 			Query: &service.SessionQueryRequest{
@@ -343,7 +371,7 @@ func (s *SessionizedServer) Query(ctx context.Context, name string, input []byte
 		return nil, nil, err
 	}
 
-	bytes, err = s.Read(ctx, bytes, header)
+	bytes, err = s.read(ctx, bytes, header)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -364,6 +392,18 @@ func (s *SessionizedServer) Query(ctx context.Context, name string, input []byte
 
 // QueryStream submits a streaming query to the service
 func (s *SessionizedServer) QueryStream(name string, input []byte, header *headers.RequestHeader, ch chan<- SessionOutput) error {
+	// If the client requires a leader and is not the leader, return an error
+	if s.Client.MustLeader() && !s.Client.IsLeader() {
+		ch <- SessionOutput{
+			Header: &headers.ResponseHeader{
+				Status: headers.ResponseStatus_NOT_LEADER,
+				Leader: s.Client.Leader(),
+			},
+		}
+		close(ch)
+		return nil
+	}
+
 	sessionRequest := &service.SessionRequest{
 		Request: &service.SessionRequest_Query{
 			Query: &service.SessionQueryRequest{
@@ -384,7 +424,7 @@ func (s *SessionizedServer) QueryStream(name string, input []byte, header *heade
 	}
 
 	resultCh := make(chan streams.Result)
-	if err = s.ReadStream(bytes, header, resultCh); err != nil {
+	if err = s.readStream(bytes, header, resultCh); err != nil {
 		return err
 	}
 
@@ -439,7 +479,7 @@ func (s *SessionizedServer) OpenSession(ctx context.Context, header *headers.Req
 		return 0, err
 	}
 
-	bytes, err = s.Write(ctx, bytes, header)
+	bytes, err = s.write(ctx, bytes, header)
 	if err != nil {
 		return 0, err
 	}
@@ -475,7 +515,7 @@ func (s *SessionizedServer) KeepAliveSession(ctx context.Context, header *header
 		return err
 	}
 
-	bytes, err = s.Write(ctx, bytes, header)
+	bytes, err = s.write(ctx, bytes, header)
 	if err != nil {
 		return err
 	}
@@ -499,7 +539,7 @@ func (s *SessionizedServer) CloseSession(ctx context.Context, header *headers.Re
 		return err
 	}
 
-	bytes, err = s.Write(ctx, bytes, header)
+	bytes, err = s.write(ctx, bytes, header)
 	if err != nil {
 		return err
 	}

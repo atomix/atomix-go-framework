@@ -108,11 +108,7 @@ func (s *encodingStream) Send(result Result) {
 	if result.Failed() {
 		s.stream.Send(result)
 	} else {
-		bytes, err := s.encoder(result.Value)
-		s.stream.Send(Result{
-			Value: bytes,
-			Error: err,
-		})
+		s.Value(result.Value)
 	}
 }
 
@@ -120,7 +116,7 @@ func (s *encodingStream) Result(value []byte, err error) {
 	if err != nil {
 		s.stream.Error(err)
 	} else {
-		s.stream.Value(value)
+		s.Value(value)
 	}
 }
 

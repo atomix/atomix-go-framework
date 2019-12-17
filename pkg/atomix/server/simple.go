@@ -32,6 +32,14 @@ type SimpleServer struct {
 
 // Command submits a command to the service
 func (s *SimpleServer) Command(ctx context.Context, name string, input []byte, header *headers.RequestHeader) ([]byte, *headers.ResponseHeader, error) {
+	// If the client requires a leader and is not the leader, return an error
+	if s.Client.MustLeader() && !s.Client.IsLeader() {
+		return nil, &headers.ResponseHeader{
+			Status: headers.ResponseStatus_NOT_LEADER,
+			Leader: s.Client.Leader(),
+		}, nil
+	}
+
 	commandRequest := &service.CommandRequest{
 		Context: &service.RequestContext{
 			Index: header.Index,
@@ -45,7 +53,7 @@ func (s *SimpleServer) Command(ctx context.Context, name string, input []byte, h
 		return nil, nil, err
 	}
 
-	bytes, err = s.Write(ctx, bytes, header)
+	bytes, err = s.write(ctx, bytes, header)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -63,8 +71,8 @@ func (s *SimpleServer) Command(ctx context.Context, name string, input []byte, h
 	return commandResponse.Output, responseHeader, nil
 }
 
-// Write sends a write to the service
-func (s *SimpleServer) Write(ctx context.Context, request []byte, header *headers.RequestHeader) ([]byte, error) {
+// write sends a write to the service
+func (s *SimpleServer) write(ctx context.Context, request []byte, header *headers.RequestHeader) ([]byte, error) {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,
@@ -111,6 +119,14 @@ func (s *SimpleServer) Write(ctx context.Context, request []byte, header *header
 
 // Query submits a query to the service
 func (s *SimpleServer) Query(ctx context.Context, name string, input []byte, header *headers.RequestHeader) ([]byte, *headers.ResponseHeader, error) {
+	// If the client requires a leader and is not the leader, return an error
+	if s.Client.MustLeader() && !s.Client.IsLeader() {
+		return nil, &headers.ResponseHeader{
+			Status: headers.ResponseStatus_NOT_LEADER,
+			Leader: s.Client.Leader(),
+		}, nil
+	}
+
 	queryRequest := &service.QueryRequest{
 		Context: &service.RequestContext{
 			Index: header.Index,
@@ -124,7 +140,7 @@ func (s *SimpleServer) Query(ctx context.Context, name string, input []byte, hea
 		return nil, nil, err
 	}
 
-	bytes, err = s.Read(ctx, bytes, header)
+	bytes, err = s.read(ctx, bytes, header)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -142,8 +158,8 @@ func (s *SimpleServer) Query(ctx context.Context, name string, input []byte, hea
 	return queryResponse.Output, responseHeader, nil
 }
 
-// Read sends a read to the service
-func (s *SimpleServer) Read(ctx context.Context, request []byte, header *headers.RequestHeader) ([]byte, error) {
+// read sends a read to the service
+func (s *SimpleServer) read(ctx context.Context, request []byte, header *headers.RequestHeader) ([]byte, error) {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,

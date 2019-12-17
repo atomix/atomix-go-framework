@@ -21,6 +21,15 @@ import (
 
 // Client is the interface for protocol clients
 type Client interface {
+	// MustLeader returns whether the client can only be used on the leader
+	MustLeader() bool
+
+	// IsLeader returns whether the client is the leader
+	IsLeader() bool
+
+	// Leader returns the current leader
+	Leader() string
+
 	// Write sends a write request
 	Write(ctx context.Context, input []byte, stream stream.Stream) error
 
