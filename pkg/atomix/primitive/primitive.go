@@ -19,6 +19,7 @@ import (
 	api "github.com/atomix/atomix-api/proto/atomix/primitive"
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
+	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 )
@@ -58,8 +59,8 @@ func (s *primitiveServer) GetPrimitives(ctx context.Context, request *api.GetPri
 		return nil, err
 	}
 
-	ch := make(chan node.Output)
-	if err := s.client.Read(ctx, in, ch); err != nil {
+	ch := make(chan stream.Result)
+	if err := s.client.Read(ctx, in, stream.NewChannelStream(ch)); err != nil {
 		return nil, err
 	}
 

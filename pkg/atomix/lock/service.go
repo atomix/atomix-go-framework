@@ -18,12 +18,13 @@ import (
 	"container/list"
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
+	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	"time"
 )
 
 func init() {
-	node.RegisterService("lock", newService)
+	node.RegisterService(lockType, newService)
 }
 
 // newService returns a new Service
@@ -49,14 +50,14 @@ type lockHolder struct {
 	index   uint64
 	session uint64
 	expire  *time.Time
-	ch      chan<- service.Result
+	stream  stream.Stream
 }
 
 // init initializes the lock service
 func (l *Service) init() {
-	l.Executor.Register("lock", l.Lock)
-	l.Executor.Register("unlock", l.Unlock)
-	l.Executor.Register("islocked", l.IsLocked)
+	l.Executor.RegisterStream(opLock, l.Lock)
+	l.Executor.RegisterUnary(opUnlock, l.Unlock)
+	l.Executor.RegisterUnary(opIsLocked, l.IsLocked)
 	l.SessionizedService.OnExpire(l.OnExpire)
 	l.SessionizedService.OnClose(l.OnClose)
 }
@@ -126,11 +127,11 @@ func (l *Service) Restore(bytes []byte) error {
 }
 
 // Lock attempts to acquire the lock for the current session
-func (l *Service) Lock(bytes []byte, ch chan<- service.Result) {
+func (l *Service) Lock(bytes []byte, stream stream.Stream) {
 	request := &LockRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- l.NewFailure(err)
-		close(ch)
+		stream.Error(err)
+		stream.Close()
 		return
 	}
 
@@ -143,20 +144,20 @@ func (l *Service) Lock(bytes []byte, ch chan<- service.Result) {
 		l.lock = &lockHolder{
 			index:   l.Context.Index(),
 			session: session.ID,
-			ch:      ch,
+			stream:  stream,
 		}
 
-		ch <- l.NewResult(proto.Marshal(&LockResponse{
+		stream.Result(proto.Marshal(&LockResponse{
 			Index:    int64(l.Context.Index()),
 			Acquired: true,
 		}))
-		close(ch)
+		stream.Close()
 	} else if request.Timeout != nil && int64(*request.Timeout) == 0 {
 		// If the timeout is 0, that indicates this is a tryLock request. Immediately fail the request.
-		ch <- l.NewResult(proto.Marshal(&LockResponse{
+		stream.Result(proto.Marshal(&LockResponse{
 			Acquired: false,
 		}))
-		close(ch)
+		stream.Close()
 	} else if request.Timeout != nil {
 		// If a timeout exists, add the request to the queue and set a timer. Note that the lock request expiration
 		// time is based on the *state machine* time - not the system time - to ensure consistency across servers.
@@ -166,7 +167,7 @@ func (l *Service) Lock(bytes []byte, ch chan<- service.Result) {
 			index:   index,
 			session: session.ID,
 			expire:  &expire,
-			ch:      ch,
+			stream:  stream,
 		}
 		element := l.queue.PushBack(holder)
 		l.timers[index] = l.Scheduler.ScheduleOnce(*request.Timeout, func() {
@@ -175,30 +176,27 @@ func (l *Service) Lock(bytes []byte, ch chan<- service.Result) {
 			// state machine commands, so there's no need to use a lock here.
 			delete(l.timers, index)
 			l.queue.Remove(element)
-			ch <- l.NewResult(proto.Marshal(&LockResponse{
+			stream.Result(proto.Marshal(&LockResponse{
 				Acquired: false,
 			}))
-			close(ch)
+			stream.Close()
 		})
 	} else {
 		// If the lock is -1, just add the request to the queue with no expiration.
 		holder := &lockHolder{
 			index:   l.Context.Index(),
 			session: session.ID,
-			ch:      ch,
+			stream:  stream,
 		}
 		l.queue.PushBack(holder)
 	}
 }
 
 // Unlock releases the current lock
-func (l *Service) Unlock(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (l *Service) Unlock(bytes []byte) ([]byte, error) {
 	request := &UnlockRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- l.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	session := l.Session()
@@ -224,10 +222,9 @@ func (l *Service) Unlock(bytes []byte, ch chan<- service.Result) {
 				element = next
 			}
 
-			ch <- l.NewResult(proto.Marshal(&UnlockResponse{
+			return proto.Marshal(&UnlockResponse{
 				Succeeded: unlocked,
-			}))
-			return
+			})
 		}
 
 		// The lock has been released. Populate the lock from the queue.
@@ -245,39 +242,36 @@ func (l *Service) Unlock(bytes []byte, ch chan<- service.Result) {
 
 			l.lock = lock
 
-			lock.ch <- l.NewResult(proto.Marshal(&LockResponse{
+			lock.stream.Result(proto.Marshal(&LockResponse{
 				Index:    int64(lock.index),
 				Acquired: true,
 			}))
-			close(lock.ch)
+			lock.stream.Close()
 		} else {
 			l.lock = nil
 		}
 
-		ch <- l.NewResult(proto.Marshal(&UnlockResponse{
+		return proto.Marshal(&UnlockResponse{
 			Succeeded: true,
-		}))
+		})
 	} else {
-		ch <- l.NewResult(proto.Marshal(&UnlockResponse{
+		return proto.Marshal(&UnlockResponse{
 			Succeeded: false,
-		}))
+		})
 	}
 }
 
 // IsLocked checks whether the lock is held by a specific session
-func (l *Service) IsLocked(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (l *Service) IsLocked(bytes []byte) ([]byte, error) {
 	request := &IsLockedRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- l.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	locked := l.lock != nil && (request.Index == 0 || l.lock.index == uint64(request.Index))
-	ch <- l.NewResult(proto.Marshal(&IsLockedResponse{
+	return proto.Marshal(&IsLockedResponse{
 		Locked: locked,
-	}))
+	})
 }
 
 // OnExpire releases the lock when the owning session expires
@@ -326,11 +320,11 @@ func (l *Service) releaseLock(session *service.Session) {
 
 			l.lock = lock
 
-			lock.ch <- l.NewResult(proto.Marshal(&LockResponse{
+			lock.stream.Result(proto.Marshal(&LockResponse{
 				Index:    int64(lock.index),
 				Acquired: true,
 			}))
-			close(lock.ch)
+			lock.stream.Close()
 		}
 	}
 }

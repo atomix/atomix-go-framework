@@ -37,7 +37,7 @@ func registerServer(server *grpc.Server, protocol node.Protocol) {
 func newServer(client node.Client) api.LockServiceServer {
 	return &Server{
 		SessionizedServer: &server.SessionizedServer{
-			Type:   "lock",
+			Type:   lockType,
 			Client: client,
 		},
 	}
@@ -113,7 +113,7 @@ func (s *Server) Lock(ctx context.Context, request *api.LockRequest) (*api.LockR
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, "lock", in, request.Header)
+	out, header, err := s.Command(ctx, opLock, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func (s *Server) Unlock(ctx context.Context, request *api.UnlockRequest) (*api.U
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, "unlock", in, request.Header)
+	out, header, err := s.Command(ctx, opUnlock, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +169,7 @@ func (s *Server) IsLocked(ctx context.Context, request *api.IsLockedRequest) (*a
 		return nil, err
 	}
 
-	out, header, err := s.Query(ctx, "islocked", in, request.Header)
+	out, header, err := s.Query(ctx, opIsLocked, in, request.Header)
 	if err != nil {
 		return nil, err
 	}

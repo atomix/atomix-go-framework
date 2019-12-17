@@ -20,6 +20,7 @@ import (
 	"github.com/atomix/atomix-api/proto/atomix/headers"
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
+	streams "github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/gogo/protobuf/proto"
 )
 
@@ -81,10 +82,10 @@ func (s *SimpleServer) Write(ctx context.Context, request []byte, header *header
 	}
 
 	// Create a write channel
-	ch := make(chan node.Output)
+	ch := make(chan streams.Result)
 
 	// Write the request
-	if err := s.Client.Write(ctx, bytes, ch); err != nil {
+	if err := s.Client.Write(ctx, bytes, streams.NewChannelStream(ch)); err != nil {
 		return nil, err
 	}
 
@@ -160,10 +161,10 @@ func (s *SimpleServer) Read(ctx context.Context, request []byte, header *headers
 	}
 
 	// Create a read channel
-	ch := make(chan node.Output)
+	ch := make(chan streams.Result)
 
 	// Read the request
-	if err := s.Client.Read(ctx, bytes, ch); err != nil {
+	if err := s.Client.Read(ctx, bytes, streams.NewChannelStream(ch)); err != nil {
 		return nil, err
 	}
 
@@ -205,10 +206,10 @@ func (s *SimpleServer) Open(ctx context.Context, header *headers.RequestHeader) 
 	}
 
 	// Create a write channel
-	ch := make(chan node.Output)
+	ch := make(chan streams.Result)
 
 	// Write the request
-	if err := s.Client.Write(ctx, bytes, ch); err != nil {
+	if err := s.Client.Write(ctx, bytes, streams.NewChannelStream(ch)); err != nil {
 		return err
 	}
 
@@ -251,10 +252,10 @@ func (s *SimpleServer) Delete(ctx context.Context, header *headers.RequestHeader
 	}
 
 	// Create a write channel
-	ch := make(chan node.Output)
+	ch := make(chan streams.Result)
 
 	// Write the request
-	if err := s.Client.Write(ctx, bytes, ch); err != nil {
+	if err := s.Client.Write(ctx, bytes, streams.NewChannelStream(ch)); err != nil {
 		return err
 	}
 

@@ -15,6 +15,7 @@
 package service
 
 import (
+	streams "github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"io"
 	"time"
 )
@@ -63,10 +64,10 @@ type Service interface {
 	CanDelete(index uint64) bool
 
 	// Command applies a command to the state machine
-	Command(bytes []byte, ch chan<- Result)
+	Command(bytes []byte, stream streams.Stream)
 
 	// Query applies a query to the state machine
-	Query(bytes []byte, ch chan<- Result)
+	Query(bytes []byte, stream streams.Stream)
 
 	// Backup must be implemented by services to return the serialized state of the service
 	Backup() ([]byte, error)
@@ -75,73 +76,11 @@ type Service interface {
 	Restore(bytes []byte) error
 }
 
-func newResult(index uint64, value []byte, err error) Result {
-	return Result{
-		Index: index,
-		Value: value,
-		Error: err,
-	}
-}
-
-func newFailure(index uint64, err error) Result {
-	return Result{
-		Index: index,
-		Error: err,
-	}
-}
-
-func fail(ch chan<- Result, index uint64, err error) {
-	ch <- newFailure(index, err)
-	close(ch)
-}
-
-// Result is a state machine operation result
-type Result struct {
-	Index uint64
-	Value []byte
-	Error error
-}
-
-// Failed returns a boolean indicating whether the operation failed
-func (r Result) Failed() bool {
-	return r.Error != nil
-}
-
-// Succeeded returns a boolean indicating whether the operation was successful
-func (r Result) Succeeded() bool {
-	return !r.Failed()
-}
-
 // service is an internal base for service implementations
 type service struct {
 	Scheduler Scheduler
 	Executor  Executor
 	Context   Context
-}
-
-// NewResult returns a new result with the given output and error
-func (s *service) NewResult(value []byte, err error) Result {
-	return Result{
-		Index: s.Context.Index(),
-		Value: value,
-		Error: err,
-	}
-}
-
-// NewSuccess returns a new successful result with the given output
-func (s *service) NewSuccess(value []byte) Result {
-	return Result{
-		Index: s.Context.Index(),
-		Value: value,
-	}
-}
-
-// NewFailure returns a new failure result with the given error
-func (s *service) NewFailure(err error) Result {
-	return Result{
-		Index: s.Context.Index(),
-		Error: err,
-	}
 }
 
 // mutableContext is an internal context implementation which supports per-service indexes

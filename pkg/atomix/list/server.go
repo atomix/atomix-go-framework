@@ -37,7 +37,7 @@ func registerServer(server *grpc.Server, protocol node.Protocol) {
 func newServer(client node.Client) api.ListServiceServer {
 	return &Server{
 		SessionizedServer: &server.SessionizedServer{
-			Type:   "list",
+			Type:   listType,
 			Client: client,
 		},
 	}
@@ -110,7 +110,7 @@ func (s *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeR
 		return nil, err
 	}
 
-	out, header, err := s.Query(ctx, "size", in, request.Header)
+	out, header, err := s.Query(ctx, opSize, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func (s *Server) Contains(ctx context.Context, request *api.ContainsRequest) (*a
 		return nil, err
 	}
 
-	out, header, err := s.Query(ctx, "contains", in, request.Header)
+	out, header, err := s.Query(ctx, opContains, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +166,7 @@ func (s *Server) Append(ctx context.Context, request *api.AppendRequest) (*api.A
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, "append", in, request.Header)
+	out, header, err := s.Command(ctx, opAppend, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +195,7 @@ func (s *Server) Insert(ctx context.Context, request *api.InsertRequest) (*api.I
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, "insert", in, request.Header)
+	out, header, err := s.Command(ctx, opInsert, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +224,7 @@ func (s *Server) Set(ctx context.Context, request *api.SetRequest) (*api.SetResp
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, "set", in, request.Header)
+	out, header, err := s.Command(ctx, opSet, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -252,7 +252,7 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 		return nil, err
 	}
 
-	out, header, err := s.Query(ctx, "get", in, request.Header)
+	out, header, err := s.Query(ctx, opGet, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +281,7 @@ func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, "remove", in, request.Header)
+	out, header, err := s.Command(ctx, opRemove, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -308,7 +308,7 @@ func (s *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.Cle
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, "clear", in, request.Header)
+	out, header, err := s.Command(ctx, opClear, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -336,7 +336,7 @@ func (s *Server) Events(request *api.EventRequest, srv api.ListService_EventsSer
 	}
 
 	ch := make(chan server.SessionOutput)
-	if err := s.CommandStream("events", in, request.Header, ch); err != nil {
+	if err := s.CommandStream(opEvents, in, request.Header, ch); err != nil {
 		return err
 	}
 
@@ -375,7 +375,7 @@ func (s *Server) Iterate(request *api.IterateRequest, srv api.ListService_Iterat
 	}
 
 	ch := make(chan server.SessionOutput)
-	if err := s.QueryStream("iterate", in, request.Header, ch); err != nil {
+	if err := s.QueryStream(opIterate, in, request.Header, ch); err != nil {
 		return err
 	}
 

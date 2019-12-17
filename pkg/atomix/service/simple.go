@@ -17,6 +17,7 @@ package service
 import (
 	"encoding/binary"
 	"errors"
+	streams "github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	"io"
 )
@@ -92,41 +93,25 @@ func (s *SimpleService) Install(reader io.Reader) error {
 }
 
 // Command handles a service command
-func (s *SimpleService) Command(bytes []byte, ch chan<- Result) {
+func (s *SimpleService) Command(bytes []byte, stream streams.Stream) {
 	s.context.setCommand()
 	command := &CommandRequest{}
 	if err := proto.Unmarshal(bytes, command); err != nil {
-		ch <- newFailure(s.context.Index(), err)
+		stream.Error(err)
+		stream.Close()
 	} else {
 		s.scheduler.runScheduledTasks(s.Context.Timestamp())
-
-		// If the channel is non-nil, create a channel to pass to the service command and mutate the results.
-		var commandCh chan Result
-		if ch != nil {
-			commandCh = make(chan Result)
-			go func() {
-				defer close(ch)
-				for result := range commandCh {
-					if result.Failed() {
-						ch <- result
-					} else {
-						bytes, err := proto.Marshal(&CommandResponse{
-							Context: &ResponseContext{
-								Index: s.Context.Index(),
-							},
-							Output: result.Value,
-						})
-						ch <- newResult(result.Index, bytes, err)
-					}
-				}
-			}()
-		}
-
-		if err := s.Executor.Execute(command.Name, command.Command, commandCh); err != nil {
-			if ch != nil {
-				ch <- newFailure(s.context.Index(), err)
-				close(commandCh)
-			}
+		stream := streams.NewEncodingStream(stream, func(value []byte) ([]byte, error) {
+			return proto.Marshal(&CommandResponse{
+				Context: &ResponseContext{
+					Index: s.Context.Index(),
+				},
+				Output: value,
+			})
+		})
+		if err := s.Executor.Execute(command.Name, command.Command, stream); err != nil {
+			stream.Error(err)
+			stream.Close()
 			return
 		}
 
@@ -136,48 +121,34 @@ func (s *SimpleService) Command(bytes []byte, ch chan<- Result) {
 }
 
 // Query handles a service query
-func (s *SimpleService) Query(bytes []byte, ch chan<- Result) {
+func (s *SimpleService) Query(bytes []byte, stream streams.Stream) {
 	query := &QueryRequest{}
 	if err := proto.Unmarshal(bytes, query); err != nil {
-		if ch != nil {
-			ch <- newFailure(s.context.Index(), err)
-		}
+		stream.Error(err)
+		stream.Close()
 	} else {
-		// If the channel is non-nil, create a channel to pass to the service query and mutate the results.
-		var queryCh chan Result
-		if ch != nil {
-			queryCh = make(chan Result)
-			go func() {
-				defer close(ch)
-				for result := range queryCh {
-					if result.Failed() {
-						ch <- result
-					} else {
-						bytes, err := proto.Marshal(&QueryResponse{
-							Context: &ResponseContext{
-								Index: s.Context.Index(),
-							},
-							Output: result.Value,
-						})
-						ch <- newResult(result.Index, bytes, err)
-					}
-				}
-			}()
-		}
+		stream := streams.NewEncodingStream(stream, func(value []byte) ([]byte, error) {
+			return proto.Marshal(&QueryResponse{
+				Context: &ResponseContext{
+					Index: s.Context.Index(),
+				},
+				Output: value,
+			})
+		})
 
 		if query.Context.Index > s.Context.Index() {
 			s.Scheduler.ScheduleIndex(query.Context.Index, func() {
 				s.context.setQuery()
-				if err := s.Executor.Execute(query.Name, query.Query, queryCh); err != nil {
-					ch <- newFailure(s.context.Index(), err)
-					close(queryCh)
+				if err := s.Executor.Execute(query.Name, query.Query, stream); err != nil {
+					stream.Error(err)
+					stream.Close()
 				}
 			})
 		} else {
 			s.context.setQuery()
-			if err := s.Executor.Execute(query.Name, query.Query, queryCh); err != nil {
-				ch <- newFailure(s.context.Index(), err)
-				close(queryCh)
+			if err := s.Executor.Execute(query.Name, query.Query, stream); err != nil {
+				stream.Error(err)
+				stream.Close()
 			}
 		}
 	}

@@ -37,7 +37,7 @@ func registerServer(server *grpc.Server, protocol node.Protocol) {
 func newServer(client node.Client) api.ValueServiceServer {
 	return &Server{
 		SessionizedServer: &server.SessionizedServer{
-			Type:   "value",
+			Type:   valueType,
 			Client: client,
 		},
 	}
@@ -60,7 +60,7 @@ func (s *Server) Set(ctx context.Context, request *api.SetRequest) (*api.SetResp
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, "set", in, request.Header)
+	out, header, err := s.Command(ctx, opSet, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 		return nil, err
 	}
 
-	out, header, err := s.Query(ctx, "get", in, request.Header)
+	out, header, err := s.Query(ctx, opGet, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ func (s *Server) Events(request *api.EventRequest, stream api.ValueService_Event
 	}
 
 	ch := make(chan server.SessionOutput)
-	if err := s.CommandStream("events", in, request.Header, ch); err != nil {
+	if err := s.CommandStream(opEvents, in, request.Header, ch); err != nil {
 		return err
 	}
 

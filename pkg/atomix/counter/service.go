@@ -21,7 +21,7 @@ import (
 )
 
 func init() {
-	node.RegisterService("counter", newService)
+	node.RegisterService(counterType, newService)
 }
 
 // newService returns a new Service
@@ -41,11 +41,11 @@ type Service struct {
 
 // init initializes the list service
 func (c *Service) init() {
-	c.Executor.Register("get", c.Get)
-	c.Executor.Register("set", c.Set)
-	c.Executor.Register("increment", c.Increment)
-	c.Executor.Register("decrement", c.Decrement)
-	c.Executor.Register("cas", c.CAS)
+	c.Executor.RegisterUnary(opGet, c.Get)
+	c.Executor.RegisterUnary(opSet, c.Set)
+	c.Executor.RegisterUnary(opIncrement, c.Increment)
+	c.Executor.RegisterUnary(opDecrement, c.Decrement)
+	c.Executor.RegisterUnary(opCAS, c.CAS)
 }
 
 // Backup backs up the list service
@@ -67,77 +67,68 @@ func (c *Service) Restore(bytes []byte) error {
 }
 
 // Get gets the current value of the counter
-func (c *Service) Get(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-	ch <- c.NewResult(proto.Marshal(&GetResponse{
+func (c *Service) Get(bytes []byte) ([]byte, error) {
+	return proto.Marshal(&GetResponse{
 		Value: c.value,
-	}))
+	})
 }
 
 // Set sets the value of the counter
-func (c *Service) Set(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
+func (c *Service) Set(bytes []byte) ([]byte, error) {
 	request := &SetRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- c.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	c.value = request.Value
-	ch <- c.NewResult(proto.Marshal(&SetResponse{}))
+	return proto.Marshal(&SetResponse{})
 }
 
 // Increment increments the value of the counter by a delta
-func (c *Service) Increment(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
+func (c *Service) Increment(bytes []byte) ([]byte, error) {
 	request := &IncrementRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- c.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	prevValue := c.value
 	c.value += request.Delta
-	ch <- c.NewResult(proto.Marshal(&IncrementResponse{
+	return proto.Marshal(&IncrementResponse{
 		PreviousValue: prevValue,
 		NextValue:     c.value,
-	}))
+	})
 }
 
 // Decrement decrements the value of the counter by a delta
-func (c *Service) Decrement(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
+func (c *Service) Decrement(bytes []byte) ([]byte, error) {
 	request := &DecrementRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- c.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	prevValue := c.value
 	c.value -= request.Delta
-	ch <- c.NewResult(proto.Marshal(&IncrementResponse{
+	return proto.Marshal(&IncrementResponse{
 		PreviousValue: prevValue,
 		NextValue:     c.value,
-	}))
+	})
 }
 
 // CAS updates the value of the counter if it matches a current value
-func (c *Service) CAS(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
+func (c *Service) CAS(bytes []byte) ([]byte, error) {
 	request := &CheckAndSetRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- c.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	if c.value == request.Expect {
 		c.value = request.Update
-		ch <- c.NewResult(proto.Marshal(&CheckAndSetResponse{
+		return proto.Marshal(&CheckAndSetResponse{
 			Succeeded: true,
-		}))
+		})
 	} else {
-		ch <- c.NewResult(proto.Marshal(&CheckAndSetResponse{
+		return proto.Marshal(&CheckAndSetResponse{
 			Succeeded: false,
-		}))
+		})
 	}
 }

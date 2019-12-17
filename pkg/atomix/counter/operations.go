@@ -12,18 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package node
+package counter
 
-import (
-	"context"
-	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
+const counterType = "Counter"
+
+const (
+	opGet       = "Get"
+	opSet       = "Set"
+	opIncrement = "Increment"
+	opDecrement = "Decrement"
+	opCAS       = "CAS"
 )
-
-// Client is the interface for protocol clients
-type Client interface {
-	// Write sends a write request
-	Write(ctx context.Context, input []byte, stream stream.Stream) error
-
-	// Read sends a read request
-	Read(ctx context.Context, input []byte, stream stream.Stream) error
-}

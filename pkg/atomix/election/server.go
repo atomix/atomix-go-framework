@@ -37,7 +37,7 @@ func registerServer(server *grpc.Server, protocol node.Protocol) {
 func newServer(client node.Client) api.LeaderElectionServiceServer {
 	return &Server{
 		SessionizedServer: &server.SessionizedServer{
-			Type:   "election",
+			Type:   electionType,
 			Client: client,
 		},
 	}
@@ -58,7 +58,7 @@ func (s *Server) Enter(ctx context.Context, request *api.EnterRequest) (*api.Ent
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, "Enter", in, request.Header)
+	out, header, err := s.Command(ctx, opEnter, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func (s *Server) Withdraw(ctx context.Context, request *api.WithdrawRequest) (*a
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, "Withdraw", in, request.Header)
+	out, header, err := s.Command(ctx, opWithdraw, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +124,7 @@ func (s *Server) Anoint(ctx context.Context, request *api.AnointRequest) (*api.A
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, "Anoint", in, request.Header)
+	out, header, err := s.Command(ctx, opAnoint, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +157,7 @@ func (s *Server) Promote(ctx context.Context, request *api.PromoteRequest) (*api
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, "Promote", in, request.Header)
+	out, header, err := s.Command(ctx, opPromote, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +190,7 @@ func (s *Server) Evict(ctx context.Context, request *api.EvictRequest) (*api.Evi
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, "Evict", in, request.Header)
+	out, header, err := s.Command(ctx, opEvict, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +221,7 @@ func (s *Server) GetTerm(ctx context.Context, request *api.GetTermRequest) (*api
 		return nil, err
 	}
 
-	out, header, err := s.Query(ctx, "GetTerm", in, request.Header)
+	out, header, err := s.Query(ctx, opGetTerm, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +253,7 @@ func (s *Server) Events(request *api.EventRequest, stream api.LeaderElectionServ
 	}
 
 	ch := make(chan server.SessionOutput)
-	if err := s.CommandStream("Events", in, request.Header, ch); err != nil {
+	if err := s.CommandStream(opEvents, in, request.Header, ch); err != nil {
 		return err
 	}
 

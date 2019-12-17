@@ -17,11 +17,12 @@ package value
 import (
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
+	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 )
 
 func init() {
-	node.RegisterService("value", newService)
+	node.RegisterService(valueType, newService)
 }
 
 // newService returns a new Service
@@ -42,9 +43,9 @@ type Service struct {
 
 // init initializes the list service
 func (v *Service) init() {
-	v.Executor.Register("set", v.Set)
-	v.Executor.Register("get", v.Get)
-	v.Executor.Register("events", v.Events)
+	v.Executor.RegisterUnary(opSet, v.Set)
+	v.Executor.RegisterUnary(opGet, v.Get)
+	v.Executor.RegisterStream(opEvents, v.Events)
 }
 
 // Backup backs up the value service
@@ -68,25 +69,22 @@ func (v *Service) Restore(bytes []byte) error {
 }
 
 // Set sets the value
-func (v *Service) Set(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (v *Service) Set(bytes []byte) ([]byte, error) {
 	request := &SetRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- v.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	if request.ExpectVersion > 0 && request.ExpectVersion != v.version {
-		ch <- v.NewResult(proto.Marshal(&SetResponse{
+		return proto.Marshal(&SetResponse{
 			Version:   v.version,
 			Succeeded: false,
-		}))
+		})
 	} else if request.ExpectValue != nil && len(request.ExpectValue) > 0 && (v.value == nil || !slicesEqual(v.value, request.ExpectValue)) {
-		ch <- v.NewResult(proto.Marshal(&SetResponse{
+		return proto.Marshal(&SetResponse{
 			Version:   v.version,
 			Succeeded: false,
-		}))
+		})
 	} else {
 		prevValue := v.value
 		prevVersion := v.version
@@ -101,33 +99,30 @@ func (v *Service) Set(bytes []byte, ch chan<- service.Result) {
 			NewVersion:      v.version,
 		})
 
-		ch <- v.NewResult(proto.Marshal(&SetResponse{
+		return proto.Marshal(&SetResponse{
 			Version:   v.version,
 			Succeeded: true,
-		}))
+		})
 	}
 }
 
 // Get gets the current value
-func (v *Service) Get(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (v *Service) Get(bytes []byte) ([]byte, error) {
 	request := &GetRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- v.NewFailure(err)
-		return
+		return nil, err
 	}
 
-	ch <- v.NewResult(proto.Marshal(&GetResponse{
+	return proto.Marshal(&GetResponse{
 		Value:   v.value,
 		Version: v.version,
-	}))
+	})
 }
 
 // Events registers a channel on which to send events
-func (v *Service) Events(bytes []byte, ch chan<- service.Result) {
+func (v *Service) Events(bytes []byte, stream stream.Stream) {
 	// Immediately send an OPEN event but keep the channel open
-	ch <- v.NewResult(proto.Marshal(&ListenResponse{
+	stream.Result(proto.Marshal(&ListenResponse{
 		Type: ListenResponse_OPEN,
 	}))
 }
@@ -135,8 +130,8 @@ func (v *Service) Events(bytes []byte, ch chan<- service.Result) {
 func (v *Service) sendEvent(event *ListenResponse) {
 	bytes, err := proto.Marshal(event)
 	for _, session := range v.Sessions() {
-		for _, ch := range session.ChannelsOf("events") {
-			ch <- v.NewResult(bytes, err)
+		for _, stream := range session.StreamsOf(opEvents) {
+			stream.Result(bytes, err)
 		}
 	}
 }

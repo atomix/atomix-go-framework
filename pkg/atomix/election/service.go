@@ -17,12 +17,13 @@ package election
 import (
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
+	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	"time"
 )
 
 func init() {
-	node.RegisterService("election", newService)
+	node.RegisterService(electionType, newService)
 }
 
 // newService returns a new Service
@@ -46,13 +47,13 @@ type Service struct {
 
 // init initializes the election service
 func (e *Service) init() {
-	e.Executor.Register("Enter", e.Enter)
-	e.Executor.Register("Withdraw", e.Withdraw)
-	e.Executor.Register("Anoint", e.Anoint)
-	e.Executor.Register("Promote", e.Promote)
-	e.Executor.Register("Evict", e.Evict)
-	e.Executor.Register("GetTerm", e.GetTerm)
-	e.Executor.Register("Events", e.Events)
+	e.Executor.RegisterUnary(opEnter, e.Enter)
+	e.Executor.RegisterUnary(opWithdraw, e.Withdraw)
+	e.Executor.RegisterUnary(opAnoint, e.Anoint)
+	e.Executor.RegisterUnary(opPromote, e.Promote)
+	e.Executor.RegisterUnary(opEvict, e.Evict)
+	e.Executor.RegisterUnary(opGetTerm, e.GetTerm)
+	e.Executor.RegisterStream(opEvents, e.Events)
 	e.SessionizedService.OnExpire(e.OnExpire)
 	e.SessionizedService.OnClose(e.OnClose)
 }
@@ -144,13 +145,10 @@ func (e *Service) getCandidates() []string {
 }
 
 // Enter enters a candidate in the election
-func (e *Service) Enter(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (e *Service) Enter(bytes []byte) ([]byte, error) {
 	request := &EnterRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- e.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	reg := &ElectionRegistration{
@@ -171,19 +169,16 @@ func (e *Service) Enter(bytes []byte, ch chan<- service.Result) {
 		Term: e.getTerm(),
 	})
 
-	ch <- e.NewResult(proto.Marshal(&EnterResponse{
+	return proto.Marshal(&EnterResponse{
 		Term: e.getTerm(),
-	}))
+	})
 }
 
 // Withdraw withdraws a candidate from the election
-func (e *Service) Withdraw(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (e *Service) Withdraw(bytes []byte) ([]byte, error) {
 	request := &WithdrawRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- e.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	candidates := make([]*ElectionRegistration, 0, len(e.candidates))
@@ -212,26 +207,22 @@ func (e *Service) Withdraw(bytes []byte, ch chan<- service.Result) {
 		})
 	}
 
-	ch <- e.NewResult(proto.Marshal(&WithdrawResponse{
+	return proto.Marshal(&WithdrawResponse{
 		Term: e.getTerm(),
-	}))
+	})
 }
 
 // Anoint assigns leadership to a candidate
-func (e *Service) Anoint(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (e *Service) Anoint(bytes []byte) ([]byte, error) {
 	request := &AnointRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- e.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	if e.leader != nil && e.leader.ID == request.ID {
-		ch <- e.NewResult(proto.Marshal(&AnointResponse{
+		return proto.Marshal(&AnointResponse{
 			Term: e.getTerm(),
-		}))
-		return
+		})
 	}
 
 	var leader *ElectionRegistration
@@ -243,10 +234,9 @@ func (e *Service) Anoint(bytes []byte, ch chan<- service.Result) {
 	}
 
 	if leader == nil {
-		ch <- e.NewResult(proto.Marshal(&AnointResponse{
+		return proto.Marshal(&AnointResponse{
 			Term: e.getTerm(),
-		}))
-		return
+		})
 	}
 
 	candidates := make([]*ElectionRegistration, 0, len(e.candidates))
@@ -268,26 +258,22 @@ func (e *Service) Anoint(bytes []byte, ch chan<- service.Result) {
 		Term: e.getTerm(),
 	})
 
-	ch <- e.NewResult(proto.Marshal(&AnointResponse{
+	return proto.Marshal(&AnointResponse{
 		Term: e.getTerm(),
-	}))
+	})
 }
 
 // Promote increases the priority of a candidate
-func (e *Service) Promote(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (e *Service) Promote(bytes []byte) ([]byte, error) {
 	request := &PromoteRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- e.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	if e.leader != nil && e.leader.ID == request.ID {
-		ch <- e.NewResult(proto.Marshal(&PromoteResponse{
+		return proto.Marshal(&PromoteResponse{
 			Term: e.getTerm(),
-		}))
-		return
+		})
 	}
 
 	var index int
@@ -301,10 +287,9 @@ func (e *Service) Promote(bytes []byte, ch chan<- service.Result) {
 	}
 
 	if promote == nil {
-		ch <- e.NewResult(proto.Marshal(&PromoteResponse{
+		return proto.Marshal(&PromoteResponse{
 			Term: e.getTerm(),
-		}))
-		return
+		})
 	}
 
 	candidates := make([]*ElectionRegistration, len(e.candidates))
@@ -334,19 +319,16 @@ func (e *Service) Promote(bytes []byte, ch chan<- service.Result) {
 		Term: e.getTerm(),
 	})
 
-	ch <- e.NewResult(proto.Marshal(&AnointResponse{
+	return proto.Marshal(&AnointResponse{
 		Term: e.getTerm(),
-	}))
+	})
 }
 
 // Evict removes a candidate from the election
-func (e *Service) Evict(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (e *Service) Evict(bytes []byte) ([]byte, error) {
 	request := &EvictRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- e.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	candidates := make([]*ElectionRegistration, 0, len(e.candidates))
@@ -375,23 +357,22 @@ func (e *Service) Evict(bytes []byte, ch chan<- service.Result) {
 		})
 	}
 
-	ch <- e.NewResult(proto.Marshal(&WithdrawResponse{
+	return proto.Marshal(&WithdrawResponse{
 		Term: e.getTerm(),
-	}))
+	})
 }
 
 // GetTerm gets the current election term
-func (e *Service) GetTerm(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-	ch <- e.NewResult(proto.Marshal(&GetTermResponse{
+func (e *Service) GetTerm(bytes []byte) ([]byte, error) {
+	return proto.Marshal(&GetTermResponse{
 		Term: e.getTerm(),
-	}))
+	})
 }
 
 // Events registers the given channel to receive election events
-func (e *Service) Events(bytes []byte, ch chan<- service.Result) {
+func (e *Service) Events(bytes []byte, stream stream.Stream) {
 	// Immediately send an OPEN event but keep the channel open
-	ch <- e.NewResult(proto.Marshal(&ListenResponse{
+	stream.Result(proto.Marshal(&ListenResponse{
 		Type: ListenResponse_OPEN,
 	}))
 }
@@ -399,8 +380,8 @@ func (e *Service) Events(bytes []byte, ch chan<- service.Result) {
 func (e *Service) sendEvent(event *ListenResponse) {
 	bytes, err := proto.Marshal(event)
 	for _, session := range e.Sessions() {
-		for _, ch := range session.ChannelsOf("Events") {
-			ch <- e.NewResult(bytes, err)
+		for _, stream := range session.StreamsOf(opEvents) {
+			stream.Result(bytes, err)
 		}
 	}
 }

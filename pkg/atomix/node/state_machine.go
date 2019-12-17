@@ -18,6 +18,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
+	streams "github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	"io"
 	"strings"
@@ -52,49 +53,10 @@ type StateMachine interface {
 	CanDelete(index uint64) bool
 
 	// Command applies a command to the state machine
-	Command(bytes []byte, ch chan<- Output)
+	Command(bytes []byte, stream streams.Stream)
 
 	// Query applies a query to the state machine
-	Query(bytes []byte, ch chan<- Output)
-}
-
-func newOutput(index uint64, value []byte, err error) Output {
-	return Output{
-		Index: index,
-		Value: value,
-		Error: err,
-	}
-}
-
-func newFailure(index uint64, err error) Output {
-	return Output{
-		Index: index,
-		Error: err,
-	}
-}
-
-func fail(ch chan<- Output, index uint64, err error) {
-	if ch != nil {
-		ch <- newFailure(index, err)
-		close(ch)
-	}
-}
-
-// Output is a state machine operation output
-type Output struct {
-	Index uint64
-	Value []byte
-	Error error
-}
-
-// Failed returns a boolean indicating whether the operation failed
-func (r Output) Failed() bool {
-	return r.Error != nil
-}
-
-// Succeeded returns a boolean indicating whether the operation was successful
-func (r Output) Succeeded() bool {
-	return !r.Failed()
+	Query(bytes []byte, stream streams.Stream)
 }
 
 // NewPrimitiveStateMachine returns a new primitive state machine
@@ -182,11 +144,12 @@ func (s *primitiveStateMachine) Install(reader io.Reader) error {
 	return nil
 }
 
-func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
+func (s *primitiveStateMachine) Command(bytes []byte, stream streams.Stream) {
 	request := &service.ServiceRequest{}
 	err := proto.Unmarshal(bytes, request)
 	if err != nil {
-		fail(ch, s.ctx.Index(), err)
+		stream.Error(err)
+		stream.Close()
 	} else {
 		switch r := request.Request.(type) {
 		case *service.ServiceRequest_Command:
@@ -195,89 +158,64 @@ func (s *primitiveStateMachine) Command(bytes []byte, ch chan<- Output) {
 			if !ok {
 				serviceType := s.registry.getType(request.Id.Type)
 				if serviceType == nil {
-					fail(ch, s.ctx.Index(), fmt.Errorf("unknown service type %s", request.Id.Type))
+					stream.Error(fmt.Errorf("unknown service type %s", request.Id.Type))
+					stream.Close()
 					return
 				}
 				svc = newServiceStateMachine(request.Id.Type, serviceType(newServiceContext(s.ctx, request.Id)), true)
 				s.services[getQualifiedServiceName(request.Id)] = svc
 			}
 
-			// Create a channel for the raw service results
-			serviceCh := make(chan Output)
-
-			// Start a goroutine to encode the raw service results in a ServiceResponse
-			go func() {
-				if ch != nil {
-					defer close(ch)
-				}
-				for result := range serviceCh {
-					if ch == nil {
-						continue
-					}
-					if result.Failed() {
-						ch <- result
-					} else {
-						out, err := proto.Marshal(&service.ServiceResponse{
-							Response: &service.ServiceResponse_Command{
-								Command: result.Value,
-							},
-						})
-						ch <- newOutput(result.Index, out, err)
-					}
-				}
-			}()
-
 			// Execute the command on the service
-			svc.Command(r.Command, serviceCh)
+			svc.Command(r.Command, streams.NewEncodingStream(stream, func(value []byte) ([]byte, error) {
+				return proto.Marshal(&service.ServiceResponse{
+					Response: &service.ServiceResponse_Command{
+						Command: value,
+					},
+				})
+			}))
 		case *service.ServiceRequest_Create:
 			_, ok := s.services[getQualifiedServiceName(request.Id)]
 			if !ok {
 				serviceType := s.registry.getType(request.Id.Type)
 				if serviceType == nil {
-					fail(ch, s.ctx.Index(), fmt.Errorf("unknown service type %s", request.Id.Type))
+					stream.Error(fmt.Errorf("unknown service type %s", request.Id.Type))
 				} else {
 					svc := serviceType(newServiceContext(s.ctx, request.Id))
 					s.services[getQualifiedServiceName(request.Id)] = newServiceStateMachine(request.Id.Type, svc, true)
-
-					if ch != nil {
-						out, err := proto.Marshal(&service.ServiceResponse{
-							Response: &service.ServiceResponse_Create{
-								Create: &service.CreateResponse{},
-							},
-						})
-						ch <- newOutput(s.ctx.Index(), out, err)
-					}
-				}
-			} else {
-				if ch != nil {
-					out, err := proto.Marshal(&service.ServiceResponse{
+					stream.Result(proto.Marshal(&service.ServiceResponse{
 						Response: &service.ServiceResponse_Create{
 							Create: &service.CreateResponse{},
 						},
-					})
-					ch <- newOutput(s.ctx.Index(), out, err)
+					}))
 				}
+			} else {
+				stream.Result(proto.Marshal(&service.ServiceResponse{
+					Response: &service.ServiceResponse_Create{
+						Create: &service.CreateResponse{},
+					},
+				}))
 			}
+			stream.Close()
 		case *service.ServiceRequest_Delete:
 			delete(s.services, getQualifiedServiceName(request.Id))
 
-			if ch != nil {
-				out, err := proto.Marshal(&service.ServiceResponse{
-					Response: &service.ServiceResponse_Delete{
-						Delete: &service.DeleteResponse{},
-					},
-				})
-				ch <- newOutput(s.ctx.Index(), out, err)
-			}
+			stream.Result(proto.Marshal(&service.ServiceResponse{
+				Response: &service.ServiceResponse_Delete{
+					Delete: &service.DeleteResponse{},
+				},
+			}))
+			stream.Close()
 		}
 	}
 }
 
-func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
+func (s *primitiveStateMachine) Query(bytes []byte, stream streams.Stream) {
 	request := &service.ServiceRequest{}
 	err := proto.Unmarshal(bytes, request)
 	if err != nil {
-		fail(ch, s.ctx.Index(), err)
+		stream.Error(err)
+		stream.Close()
 	} else {
 		switch r := request.Request.(type) {
 		case *service.ServiceRequest_Query:
@@ -286,40 +224,22 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
 			if !ok {
 				serviceType := s.registry.getType(request.Id.Type)
 				if serviceType == nil {
-					fail(ch, s.ctx.Index(), fmt.Errorf("unknown service type %s", request.Id.Type))
+					stream.Error(fmt.Errorf("unknown service type %s", request.Id.Type))
+					stream.Close()
 					return
 				}
 				svc = newServiceStateMachine(request.Id.Type, serviceType(newServiceContext(s.ctx, request.Id)), false)
 				s.services[getQualifiedServiceName(request.Id)] = svc
 			}
 
-			// Create a channel for the raw service results
-			serviceCh := make(chan Output)
-
-			// Start a goroutine to encode the raw service results in a ServiceResponse
-			go func() {
-				if ch != nil {
-					defer close(ch)
-				}
-				for result := range serviceCh {
-					if ch == nil {
-						continue
-					}
-					if result.Failed() {
-						ch <- result
-					} else {
-						out, err := proto.Marshal(&service.ServiceResponse{
-							Response: &service.ServiceResponse_Query{
-								Query: result.Value,
-							},
-						})
-						ch <- newOutput(s.ctx.Index(), out, err)
-					}
-				}
-			}()
-
 			// Execute the query on the service
-			svc.Query(r.Query, serviceCh)
+			svc.Query(r.Query, streams.NewEncodingStream(stream, func(value []byte) ([]byte, error) {
+				return proto.Marshal(&service.ServiceResponse{
+					Response: &service.ServiceResponse_Query{
+						Query: value,
+					},
+				})
+			}))
 		case *service.ServiceRequest_Metadata:
 			services := make([]*service.ServiceId, 0, len(s.services))
 			for id, svc := range s.services {
@@ -333,17 +253,18 @@ func (s *primitiveStateMachine) Query(bytes []byte, ch chan<- Output) {
 				}
 			}
 
-			if ch != nil {
-				out, err := proto.Marshal(&service.ServiceResponse{
-					Response: &service.ServiceResponse_Metadata{
-						Metadata: &service.MetadataResponse{
-							Services: services,
-						},
+			out, err := proto.Marshal(&service.ServiceResponse{
+				Response: &service.ServiceResponse_Metadata{
+					Metadata: &service.MetadataResponse{
+						Services: services,
 					},
-				})
-				ch <- newOutput(s.ctx.Index(), out, err)
-				close(ch)
-			}
+				},
+			})
+			stream.Send(streams.Result{
+				Value: out,
+				Error: err,
+			})
+			stream.Close()
 		}
 	}
 }
@@ -396,41 +317,13 @@ func (s *serviceStateMachine) CanDelete(index uint64) bool {
 	return s.service.CanDelete(index)
 }
 
-func (s *serviceStateMachine) Command(bytes []byte, ch chan<- Output) {
+func (s *serviceStateMachine) Command(bytes []byte, stream streams.Stream) {
 	s.activate()
-	resultCh := make(chan service.Result)
-	go func() {
-		for result := range resultCh {
-			ch <- Output{
-				Index: result.Index,
-				Value: result.Value,
-				Error: result.Error,
-			}
-		}
-		defer func() {
-			_ = recover()
-		}()
-		close(ch)
-	}()
-	s.service.Command(bytes, resultCh)
+	s.service.Command(bytes, stream)
 }
 
-func (s *serviceStateMachine) Query(bytes []byte, ch chan<- Output) {
-	resultCh := make(chan service.Result)
-	go func() {
-		for result := range resultCh {
-			ch <- Output{
-				Index: result.Index,
-				Value: result.Value,
-				Error: result.Error,
-			}
-		}
-		defer func() {
-			_ = recover()
-		}()
-		close(ch)
-	}()
-	s.service.Query(bytes, resultCh)
+func (s *serviceStateMachine) Query(bytes []byte, stream streams.Stream) {
+	s.service.Query(bytes, stream)
 }
 
 func newServiceContext(ctx Context, serviceID *service.ServiceId) service.Context {

@@ -17,11 +17,12 @@ package list
 import (
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
+	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 )
 
 func init() {
-	node.RegisterService("list", newService)
+	node.RegisterService(listType, newService)
 }
 
 // newService returns a new Service
@@ -42,16 +43,16 @@ type Service struct {
 
 // init initializes the list service
 func (l *Service) init() {
-	l.Executor.Register("size", l.Size)
-	l.Executor.Register("contains", l.Contains)
-	l.Executor.Register("append", l.Append)
-	l.Executor.Register("insert", l.Insert)
-	l.Executor.Register("get", l.Get)
-	l.Executor.Register("set", l.Set)
-	l.Executor.Register("remove", l.Remove)
-	l.Executor.Register("clear", l.Clear)
-	l.Executor.Register("events", l.Events)
-	l.Executor.Register("iterate", l.Iterate)
+	l.Executor.RegisterUnary(opSize, l.Size)
+	l.Executor.RegisterUnary(opContains, l.Contains)
+	l.Executor.RegisterUnary(opAppend, l.Append)
+	l.Executor.RegisterUnary(opInsert, l.Insert)
+	l.Executor.RegisterUnary(opGet, l.Get)
+	l.Executor.RegisterUnary(opSet, l.Set)
+	l.Executor.RegisterUnary(opRemove, l.Remove)
+	l.Executor.RegisterUnary(opClear, l.Clear)
+	l.Executor.RegisterStream(opEvents, l.Events)
+	l.Executor.RegisterStream(opIterate, l.Iterate)
 }
 
 // Backup backs up the list service
@@ -73,45 +74,37 @@ func (l *Service) Restore(bytes []byte) error {
 }
 
 // Size gets the size of the list
-func (l *Service) Size(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-	ch <- l.NewResult(proto.Marshal(&SizeResponse{
+func (l *Service) Size(bytes []byte) ([]byte, error) {
+	return proto.Marshal(&SizeResponse{
 		Size_: int32(len(l.values)),
-	}))
+	})
 }
 
 // Contains checks whether the list contains a value
-func (l *Service) Contains(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (l *Service) Contains(bytes []byte) ([]byte, error) {
 	request := &ContainsRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- l.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	for _, value := range l.values {
 		if value == request.Value {
-			ch <- l.NewResult(proto.Marshal(&ContainsResponse{
+			return proto.Marshal(&ContainsResponse{
 				Contains: true,
-			}))
-			return
+			})
 		}
 	}
 
-	ch <- l.NewResult(proto.Marshal(&ContainsResponse{
+	return proto.Marshal(&ContainsResponse{
 		Contains: false,
-	}))
+	})
 }
 
 // Append adds a value to the end of the list
-func (l *Service) Append(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (l *Service) Append(bytes []byte) ([]byte, error) {
 	request := &AppendRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- l.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	index := len(l.values)
@@ -123,27 +116,23 @@ func (l *Service) Append(bytes []byte, ch chan<- service.Result) {
 		Value: request.Value,
 	})
 
-	ch <- l.NewResult(proto.Marshal(&AppendResponse{
+	return proto.Marshal(&AppendResponse{
 		Status: ResponseStatus_OK,
-	}))
+	})
 }
 
 // Insert inserts a value at a specific index in the list
-func (l *Service) Insert(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (l *Service) Insert(bytes []byte) ([]byte, error) {
 	request := &InsertRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- l.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	index := request.Index
 	if index >= uint32(len(l.values)) {
-		ch <- l.NewResult(proto.Marshal(&InsertResponse{
+		return proto.Marshal(&InsertResponse{
 			Status: ResponseStatus_OUT_OF_BOUNDS,
-		}))
-		return
+		})
 	}
 
 	intIndex := int(index)
@@ -163,27 +152,23 @@ func (l *Service) Insert(bytes []byte, ch chan<- service.Result) {
 		Value: request.Value,
 	})
 
-	ch <- l.NewResult(proto.Marshal(&InsertResponse{
+	return proto.Marshal(&InsertResponse{
 		Status: ResponseStatus_OK,
-	}))
+	})
 }
 
 // Set sets the value at a specific index in the list
-func (l *Service) Set(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (l *Service) Set(bytes []byte) ([]byte, error) {
 	request := &SetRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- l.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	index := request.Index
 	if index >= uint32(len(l.values)) {
-		ch <- l.NewResult(proto.Marshal(&InsertResponse{
+		return proto.Marshal(&InsertResponse{
 			Status: ResponseStatus_OUT_OF_BOUNDS,
-		}))
-		return
+		})
 	}
 
 	oldValue := l.values[index]
@@ -200,52 +185,44 @@ func (l *Service) Set(bytes []byte, ch chan<- service.Result) {
 		Value: request.Value,
 	})
 
-	ch <- l.NewResult(proto.Marshal(&SetResponse{
+	return proto.Marshal(&SetResponse{
 		Status: ResponseStatus_OK,
-	}))
+	})
 }
 
 // Get gets the value at a specific index in the list
-func (l *Service) Get(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (l *Service) Get(bytes []byte) ([]byte, error) {
 	request := &GetRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- l.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	index := request.Index
 	if index >= uint32(len(l.values)) {
-		ch <- l.NewResult(proto.Marshal(&GetResponse{
+		return proto.Marshal(&GetResponse{
 			Status: ResponseStatus_OUT_OF_BOUNDS,
-		}))
-		return
+		})
 	}
 
 	value := l.values[index]
-	ch <- l.NewResult(proto.Marshal(&GetResponse{
+	return proto.Marshal(&GetResponse{
 		Status: ResponseStatus_OK,
 		Value:  value,
-	}))
+	})
 }
 
 // Remove removes an index from the list
-func (l *Service) Remove(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (l *Service) Remove(bytes []byte) ([]byte, error) {
 	request := &RemoveRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- l.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	index := request.Index
 	if index >= uint32(len(l.values)) {
-		ch <- l.NewResult(proto.Marshal(&RemoveResponse{
+		return proto.Marshal(&RemoveResponse{
 			Status: ResponseStatus_OUT_OF_BOUNDS,
-		}))
-		return
+		})
 	}
 
 	value := l.values[index]
@@ -257,35 +234,35 @@ func (l *Service) Remove(bytes []byte, ch chan<- service.Result) {
 		Value: value,
 	})
 
-	ch <- l.NewResult(proto.Marshal(&RemoveResponse{
+	return proto.Marshal(&RemoveResponse{
 		Status: ResponseStatus_OK,
 		Value:  value,
-	}))
+	})
 }
 
 // Clear removes all indexes from the list
-func (l *Service) Clear(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
+func (l *Service) Clear(bytes []byte) ([]byte, error) {
 	l.values = make([]string, 0)
-	ch <- l.NewResult(proto.Marshal(&ClearResponse{}))
+	return proto.Marshal(&ClearResponse{})
 }
 
 // Events registers a channel to send list change events
-func (l *Service) Events(bytes []byte, ch chan<- service.Result) {
+func (l *Service) Events(bytes []byte, stream stream.Stream) {
 	request := &ListenRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- l.NewFailure(err)
-		close(ch)
+		stream.Error(err)
+		stream.Close()
+		return
 	}
 
 	// Send an OPEN response to notify the client the stream is open
-	ch <- l.NewResult(proto.Marshal(&ListenResponse{
+	stream.Result(proto.Marshal(&ListenResponse{
 		Type: ListenResponse_OPEN,
 	}))
 
 	if request.Replay {
 		for index, value := range l.values {
-			ch <- l.NewResult(proto.Marshal(&ListenResponse{
+			stream.Result(proto.Marshal(&ListenResponse{
 				Type:  ListenResponse_NONE,
 				Index: uint32(index),
 				Value: value,
@@ -295,10 +272,10 @@ func (l *Service) Events(bytes []byte, ch chan<- service.Result) {
 }
 
 // Iterate sends all current values on the given channel
-func (l *Service) Iterate(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
+func (l *Service) Iterate(bytes []byte, stream stream.Stream) {
+	defer stream.Close()
 	for _, value := range l.values {
-		ch <- l.NewResult(proto.Marshal(&IterateResponse{
+		stream.Result(proto.Marshal(&IterateResponse{
 			Value: value,
 		}))
 	}
@@ -307,8 +284,8 @@ func (l *Service) Iterate(bytes []byte, ch chan<- service.Result) {
 func (l *Service) sendEvent(event *ListenResponse) {
 	bytes, err := proto.Marshal(event)
 	for _, session := range l.Sessions() {
-		for _, ch := range session.ChannelsOf("events") {
-			ch <- l.NewResult(bytes, err)
+		for _, stream := range session.StreamsOf(opEvents) {
+			stream.Result(bytes, err)
 		}
 	}
 }

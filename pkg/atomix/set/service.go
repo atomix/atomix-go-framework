@@ -17,11 +17,12 @@ package set
 import (
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
+	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 )
 
 func init() {
-	node.RegisterService("set", newService)
+	node.RegisterService(setType, newService)
 }
 
 // newService returns a new Service
@@ -42,13 +43,13 @@ type Service struct {
 
 // init initializes the list service
 func (s *Service) init() {
-	s.Executor.Register("size", s.Size)
-	s.Executor.Register("contains", s.Contains)
-	s.Executor.Register("add", s.Add)
-	s.Executor.Register("remove", s.Remove)
-	s.Executor.Register("clear", s.Clear)
-	s.Executor.Register("events", s.Events)
-	s.Executor.Register("iterate", s.Iterate)
+	s.Executor.RegisterUnary(opSize, s.Size)
+	s.Executor.RegisterUnary(opContains, s.Contains)
+	s.Executor.RegisterUnary(opAdd, s.Add)
+	s.Executor.RegisterUnary(opRemove, s.Remove)
+	s.Executor.RegisterUnary(opClear, s.Clear)
+	s.Executor.RegisterStream(opEvents, s.Events)
+	s.Executor.RegisterStream(opIterate, s.Iterate)
 }
 
 // Backup backs up the list service
@@ -70,37 +71,30 @@ func (s *Service) Restore(bytes []byte) error {
 }
 
 // Size gets the number of elements in the set
-func (s *Service) Size(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-	ch <- s.NewResult(proto.Marshal(&SizeResponse{
+func (s *Service) Size(bytes []byte) ([]byte, error) {
+	return proto.Marshal(&SizeResponse{
 		Size_: int32(len(s.values)),
-	}))
+	})
 }
 
 // Contains checks whether the set contains an element
-func (s *Service) Contains(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (s *Service) Contains(bytes []byte) ([]byte, error) {
 	request := &ContainsRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- s.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	_, ok := s.values[request.Value]
-	ch <- s.NewResult(proto.Marshal(&ContainsResponse{
+	return proto.Marshal(&ContainsResponse{
 		Contains: ok,
-	}))
+	})
 }
 
 // Add adds an element to the set
-func (s *Service) Add(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (s *Service) Add(bytes []byte) ([]byte, error) {
 	request := &AddRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- s.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	if _, ok := s.values[request.Value]; !ok {
@@ -111,24 +105,21 @@ func (s *Service) Add(bytes []byte, ch chan<- service.Result) {
 			Value: request.Value,
 		})
 
-		ch <- s.NewResult(proto.Marshal(&AddResponse{
+		return proto.Marshal(&AddResponse{
 			Added: true,
-		}))
+		})
 	} else {
-		ch <- s.NewResult(proto.Marshal(&AddResponse{
+		return proto.Marshal(&AddResponse{
 			Added: false,
-		}))
+		})
 	}
 }
 
 // Remove removes an element from the set
-func (s *Service) Remove(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (s *Service) Remove(bytes []byte) ([]byte, error) {
 	request := &RemoveRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- s.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	if _, ok := s.values[request.Value]; ok {
@@ -139,39 +130,39 @@ func (s *Service) Remove(bytes []byte, ch chan<- service.Result) {
 			Value: request.Value,
 		})
 
-		ch <- s.NewResult(proto.Marshal(&RemoveResponse{
+		return proto.Marshal(&RemoveResponse{
 			Removed: true,
-		}))
+		})
 	} else {
-		ch <- s.NewResult(proto.Marshal(&RemoveResponse{
+		return proto.Marshal(&RemoveResponse{
 			Removed: false,
-		}))
+		})
 	}
 }
 
 // Clear removes all elements from the set
-func (s *Service) Clear(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
+func (s *Service) Clear(bytes []byte) ([]byte, error) {
 	s.values = make(map[string]bool)
-	ch <- s.NewResult(proto.Marshal(&ClearResponse{}))
+	return proto.Marshal(&ClearResponse{})
 }
 
 // Events registers a channel on which to send set change events
-func (s *Service) Events(bytes []byte, ch chan<- service.Result) {
+func (s *Service) Events(bytes []byte, stream stream.Stream) {
 	request := &ListenRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- s.NewFailure(err)
-		close(ch)
+		stream.Error(err)
+		stream.Close()
+		return
 	}
 
 	// Send an OPEN response to notify the client the stream is open
-	ch <- s.NewResult(proto.Marshal(&ListenResponse{
+	stream.Result(proto.Marshal(&ListenResponse{
 		Type: ListenResponse_OPEN,
 	}))
 
 	if request.Replay {
 		for value := range s.values {
-			ch <- s.NewResult(proto.Marshal(&ListenResponse{
+			stream.Result(proto.Marshal(&ListenResponse{
 				Type:  ListenResponse_NONE,
 				Value: value,
 			}))
@@ -180,10 +171,10 @@ func (s *Service) Events(bytes []byte, ch chan<- service.Result) {
 }
 
 // Iterate sends all current set elements on the given channel
-func (s *Service) Iterate(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
+func (s *Service) Iterate(bytes []byte, stream stream.Stream) {
+	defer stream.Close()
 	for value := range s.values {
-		ch <- s.NewResult(proto.Marshal(&IterateResponse{
+		stream.Result(proto.Marshal(&IterateResponse{
 			Value: value,
 		}))
 	}
@@ -192,8 +183,8 @@ func (s *Service) Iterate(bytes []byte, ch chan<- service.Result) {
 func (s *Service) sendEvent(event *ListenResponse) {
 	bytes, err := proto.Marshal(event)
 	for _, session := range s.Sessions() {
-		for _, ch := range session.ChannelsOf("events") {
-			ch <- s.NewResult(bytes, err)
+		for _, stream := range session.StreamsOf(opEvents) {
+			stream.Result(bytes, err)
 		}
 	}
 }

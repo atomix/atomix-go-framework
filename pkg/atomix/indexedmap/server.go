@@ -37,7 +37,7 @@ func registerServer(server *grpc.Server, protocol node.Protocol) {
 func newServer(client node.Client) api.IndexedMapServiceServer {
 	return &Server{
 		SessionizedServer: &server.SessionizedServer{
-			Type:   "indexedmap",
+			Type:   indexMapType,
 			Client: client,
 		},
 	}
@@ -111,7 +111,7 @@ func (m *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeR
 		return nil, err
 	}
 
-	out, header, err := m.Query(ctx, "size", in, request.Header)
+	out, header, err := m.Query(ctx, opSize, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func (m *Server) Exists(ctx context.Context, request *api.ExistsRequest) (*api.E
 		return nil, err
 	}
 
-	out, header, err := m.Query(ctx, "exists", in, request.Header)
+	out, header, err := m.Query(ctx, opExists, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +172,7 @@ func (m *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResp
 		return nil, err
 	}
 
-	out, header, err := m.Command(ctx, "put", in, request.Header)
+	out, header, err := m.Command(ctx, opPut, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func (m *Server) Replace(ctx context.Context, request *api.ReplaceRequest) (*api
 		return nil, err
 	}
 
-	out, header, err := m.Command(ctx, "replace", in, request.Header)
+	out, header, err := m.Command(ctx, opReplace, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +246,7 @@ func (m *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 		return nil, err
 	}
 
-	out, header, err := m.Query(ctx, "get", in, request.Header)
+	out, header, err := m.Query(ctx, opGet, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +277,7 @@ func (m *Server) FirstEntry(ctx context.Context, request *api.FirstEntryRequest)
 		return nil, err
 	}
 
-	out, header, err := m.Query(ctx, "firstEntry", in, request.Header)
+	out, header, err := m.Query(ctx, opFirstEntry, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -308,7 +308,7 @@ func (m *Server) LastEntry(ctx context.Context, request *api.LastEntryRequest) (
 		return nil, err
 	}
 
-	out, header, err := m.Query(ctx, "lastEntry", in, request.Header)
+	out, header, err := m.Query(ctx, opLastEntry, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +341,7 @@ func (m *Server) PrevEntry(ctx context.Context, request *api.PrevEntryRequest) (
 		return nil, err
 	}
 
-	out, header, err := m.Query(ctx, "prevEntry", in, request.Header)
+	out, header, err := m.Query(ctx, opPrevEntry, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -374,7 +374,7 @@ func (m *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (
 		return nil, err
 	}
 
-	out, header, err := m.Query(ctx, "nextEntry", in, request.Header)
+	out, header, err := m.Query(ctx, opNextEntry, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -410,7 +410,7 @@ func (m *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 		return nil, err
 	}
 
-	out, header, err := m.Command(ctx, "remove", in, request.Header)
+	out, header, err := m.Command(ctx, opRemove, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -440,7 +440,7 @@ func (m *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.Cle
 		return nil, err
 	}
 
-	out, header, err := m.Command(ctx, "clear", in, request.Header)
+	out, header, err := m.Command(ctx, opClear, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -470,7 +470,7 @@ func (m *Server) Events(request *api.EventRequest, srv api.IndexedMapService_Eve
 	}
 
 	ch := make(chan server.SessionOutput)
-	if err := m.CommandStream("events", in, request.Header, ch); err != nil {
+	if err := m.CommandStream(opEvents, in, request.Header, ch); err != nil {
 		return err
 	}
 
@@ -511,7 +511,7 @@ func (m *Server) Entries(request *api.EntriesRequest, srv api.IndexedMapService_
 	}
 
 	ch := make(chan server.SessionOutput)
-	if err := m.QueryStream("entries", in, request.Header, ch); err != nil {
+	if err := m.QueryStream(opEntries, in, request.Header, ch); err != nil {
 		return err
 	}
 

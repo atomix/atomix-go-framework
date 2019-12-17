@@ -18,11 +18,12 @@ import (
 	"bytes"
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
+	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 )
 
 func init() {
-	node.RegisterService("map", newService)
+	node.RegisterService(mapType, newService)
 }
 
 // newService returns a new Service
@@ -47,15 +48,15 @@ type Service struct {
 
 // init initializes the map service
 func (m *Service) init() {
-	m.Executor.Register("put", m.Put)
-	m.Executor.Register("replace", m.Replace)
-	m.Executor.Register("remove", m.Remove)
-	m.Executor.Register("get", m.Get)
-	m.Executor.Register("exists", m.ContainsKey)
-	m.Executor.Register("size", m.Size)
-	m.Executor.Register("clear", m.Clear)
-	m.Executor.Register("events", m.Events)
-	m.Executor.Register("entries", m.Entries)
+	m.Executor.RegisterUnary(opPut, m.Put)
+	m.Executor.RegisterUnary(opReplace, m.Replace)
+	m.Executor.RegisterUnary(opRemove, m.Remove)
+	m.Executor.RegisterUnary(opGet, m.Get)
+	m.Executor.RegisterUnary(opExists, m.Exists)
+	m.Executor.RegisterUnary(opSize, m.Size)
+	m.Executor.RegisterUnary(opClear, m.Clear)
+	m.Executor.RegisterStream(opEvents, m.Events)
+	m.Executor.RegisterStream(opEntries, m.Entries)
 }
 
 // Backup backs up the map service
@@ -93,31 +94,27 @@ func (m *Service) Restore(bytes []byte) error {
 			m.listeners[snapshotListener.SessionId] = sessionListeners
 		}
 		sessionListeners[snapshotListener.StreamId] = listener{
-			key: snapshotListener.Key,
-			ch:  m.Sessions()[snapshotListener.SessionId].Channel(snapshotListener.StreamId),
+			key:    snapshotListener.Key,
+			stream: m.Sessions()[snapshotListener.SessionId].Stream(snapshotListener.StreamId),
 		}
 	}
 	return nil
 }
 
 // Put puts a key/value pair in the map
-func (m *Service) Put(value []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (m *Service) Put(value []byte) ([]byte, error) {
 	request := &PutRequest{}
 	if err := proto.Unmarshal(value, request); err != nil {
-		ch <- m.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	oldValue := m.entries[request.Key]
 	if oldValue == nil {
 		// If the version is positive then reject the request.
 		if !request.IfEmpty && request.Version > 0 {
-			ch <- m.NewResult(proto.Marshal(&PutResponse{
+			return proto.Marshal(&PutResponse{
 				Status: UpdateStatus_PRECONDITION_FAILED,
-			}))
-			return
+			})
 		}
 
 		// Create a new entry value and set it in the map.
@@ -143,31 +140,28 @@ func (m *Service) Put(value []byte, ch chan<- service.Result) {
 			Updated: newValue.Updated,
 		})
 
-		ch <- m.NewResult(proto.Marshal(&PutResponse{
+		return proto.Marshal(&PutResponse{
 			Status: UpdateStatus_OK,
-		}))
-		return
+		})
 	}
 
 	// If the version is -1 then reject the request.
 	// If the version is positive then compare the version to the current version.
 	if request.IfEmpty || (!request.IfEmpty && request.Version > 0 && request.Version != oldValue.Version) {
-		ch <- m.NewResult(proto.Marshal(&PutResponse{
+		return proto.Marshal(&PutResponse{
 			Status:          UpdateStatus_PRECONDITION_FAILED,
 			PreviousValue:   oldValue.Value,
 			PreviousVersion: oldValue.Version,
-		}))
-		return
+		})
 	}
 
 	// If the value is equal to the current value, return a no-op.
 	if bytes.Equal(oldValue.Value, request.Value) {
-		ch <- m.NewResult(proto.Marshal(&PutResponse{
+		return proto.Marshal(&PutResponse{
 			Status:          UpdateStatus_NOOP,
 			PreviousValue:   oldValue.Value,
 			PreviousVersion: oldValue.Version,
-		}))
-		return
+		})
 	}
 
 	// Create a new entry value and set it in the map.
@@ -193,47 +187,41 @@ func (m *Service) Put(value []byte, ch chan<- service.Result) {
 		Updated: newValue.Updated,
 	})
 
-	ch <- m.NewResult(proto.Marshal(&PutResponse{
+	return proto.Marshal(&PutResponse{
 		Status:          UpdateStatus_OK,
 		PreviousValue:   oldValue.Value,
 		PreviousVersion: oldValue.Version,
 		Created:         newValue.Created,
 		Updated:         newValue.Updated,
-	}))
+	})
 }
 
 // Replace replaces a key/value pair in the map
-func (m *Service) Replace(value []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (m *Service) Replace(value []byte) ([]byte, error) {
 	request := &ReplaceRequest{}
 	if err := proto.Unmarshal(value, request); err != nil {
-		ch <- m.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	oldValue, ok := m.entries[request.Key]
 	if !ok {
-		ch <- m.NewResult(proto.Marshal(&ReplaceResponse{
+		return proto.Marshal(&ReplaceResponse{
 			Status: UpdateStatus_PRECONDITION_FAILED,
-		}))
-		return
+		})
 	}
 
 	// If the version was specified and does not match the entry version, fail the replace.
 	if request.PreviousVersion != 0 && request.PreviousVersion != oldValue.Version {
-		ch <- m.NewResult(proto.Marshal(&ReplaceResponse{
+		return proto.Marshal(&ReplaceResponse{
 			Status: UpdateStatus_PRECONDITION_FAILED,
-		}))
-		return
+		})
 	}
 
 	// If the value was specified and does not match the entry value, fail the replace.
 	if len(request.PreviousValue) != 0 && bytes.Equal(request.PreviousValue, oldValue.Value) {
-		ch <- m.NewResult(proto.Marshal(&ReplaceResponse{
+		return proto.Marshal(&ReplaceResponse{
 			Status: UpdateStatus_PRECONDITION_FAILED,
-		}))
-		return
+		})
 	}
 
 	// If we've made it this far, update the entry.
@@ -260,40 +248,35 @@ func (m *Service) Replace(value []byte, ch chan<- service.Result) {
 		Updated: newValue.Updated,
 	})
 
-	ch <- m.NewResult(proto.Marshal(&ReplaceResponse{
+	return proto.Marshal(&ReplaceResponse{
 		Status:          UpdateStatus_OK,
 		PreviousValue:   oldValue.Value,
 		PreviousVersion: oldValue.Version,
 		NewVersion:      newValue.Version,
 		Created:         newValue.Created,
 		Updated:         newValue.Updated,
-	}))
+	})
 }
 
 // Remove removes a key/value pair from the map
-func (m *Service) Remove(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (m *Service) Remove(bytes []byte) ([]byte, error) {
 	request := &RemoveRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- m.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	value, ok := m.entries[request.Key]
 	if !ok {
-		ch <- m.NewResult(proto.Marshal(&RemoveResponse{
+		return proto.Marshal(&RemoveResponse{
 			Status: UpdateStatus_NOOP,
-		}))
-		return
+		})
 	}
 
 	// If the request version is set, verify that the request version matches the entry version.
 	if request.Version > 0 && request.Version != value.Version {
-		ch <- m.NewResult(proto.Marshal(&RemoveResponse{
+		return proto.Marshal(&RemoveResponse{
 			Status: UpdateStatus_PRECONDITION_FAILED,
-		}))
-		return
+		})
 	}
 
 	// Delete the entry from the map.
@@ -312,86 +295,79 @@ func (m *Service) Remove(bytes []byte, ch chan<- service.Result) {
 		Updated: value.Updated,
 	})
 
-	ch <- m.NewResult(proto.Marshal(&ReplaceResponse{
+	return proto.Marshal(&ReplaceResponse{
 		Status:          UpdateStatus_OK,
 		PreviousValue:   value.Value,
 		PreviousVersion: value.Version,
 		Created:         value.Created,
 		Updated:         value.Updated,
-	}))
+	})
 }
 
 // Get gets a value from the map
-func (m *Service) Get(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (m *Service) Get(bytes []byte) ([]byte, error) {
 	request := &GetRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- m.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	value, ok := m.entries[request.Key]
 	if !ok {
-		ch <- m.NewResult(proto.Marshal(&GetResponse{}))
+		return proto.Marshal(&GetResponse{})
 	} else {
-		ch <- m.NewResult(proto.Marshal(&GetResponse{
+		return proto.Marshal(&GetResponse{
 			Value:   value.Value,
 			Version: value.Version,
 			Created: value.Created,
 			Updated: value.Updated,
-		}))
+		})
 	}
 }
 
-// ContainsKey checks if the map contains a key
-func (m *Service) ContainsKey(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+// Exists checks if the map contains a key
+func (m *Service) Exists(bytes []byte) ([]byte, error) {
 	request := &ContainsKeyRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- m.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	_, ok := m.entries[request.Key]
-	ch <- m.NewResult(proto.Marshal(&ContainsKeyResponse{
+	return proto.Marshal(&ContainsKeyResponse{
 		ContainsKey: ok,
-	}))
+	})
 }
 
 // Size returns the size of the map
-func (m *Service) Size(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-	ch <- m.NewResult(proto.Marshal(&SizeResponse{
+func (m *Service) Size(bytes []byte) ([]byte, error) {
+	return proto.Marshal(&SizeResponse{
 		Size_: int32(len(m.entries)),
-	}))
+	})
 }
 
 // Clear removes all entries from the map
-func (m *Service) Clear(value []byte, ch chan<- service.Result) {
-	defer close(ch)
+func (m *Service) Clear(value []byte) ([]byte, error) {
 	m.entries = make(map[string]*MapEntryValue)
-	ch <- m.NewResult(proto.Marshal(&ClearResponse{}))
+	return proto.Marshal(&ClearResponse{})
 }
 
 // Events sends change events to the client
-func (m *Service) Events(bytes []byte, ch chan<- service.Result) {
+func (m *Service) Events(bytes []byte, stream stream.Stream) {
 	request := &ListenRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- m.NewFailure(err)
-		close(ch)
+		stream.Error(err)
+		stream.Close()
+		return
 	}
 
 	// Send an OPEN response to notify the client the stream is open
-	ch <- m.NewResult(proto.Marshal(&ListenResponse{
+	stream.Result(proto.Marshal(&ListenResponse{
 		Type: ListenResponse_OPEN,
 	}))
 
 	// Create and populate the listener
 	l := listener{
-		key: request.Key,
-		ch:  ch,
+		key:    request.Key,
+		stream: stream,
 	}
 	listeners, ok := m.listeners[m.Session().ID]
 	if !ok {
@@ -403,7 +379,7 @@ func (m *Service) Events(bytes []byte, ch chan<- service.Result) {
 	// If replay was requested, send existing entries
 	if request.Replay {
 		for key, value := range m.entries {
-			ch <- m.NewResult(proto.Marshal(&ListenResponse{
+			stream.Result(proto.Marshal(&ListenResponse{
 				Type:    ListenResponse_NONE,
 				Key:     key,
 				Value:   value.Value,
@@ -416,10 +392,10 @@ func (m *Service) Events(bytes []byte, ch chan<- service.Result) {
 }
 
 // Entries returns a stream of entries to the client
-func (m *Service) Entries(value []byte, ch chan<- service.Result) {
-	defer close(ch)
+func (m *Service) Entries(value []byte, stream stream.Stream) {
+	defer stream.Close()
 	for key, entry := range m.entries {
-		ch <- m.NewResult(proto.Marshal(&EntriesResponse{
+		stream.Result(proto.Marshal(&EntriesResponse{
 			Key:     key,
 			Value:   entry.Value,
 			Version: entry.Version,
@@ -461,10 +437,10 @@ func (m *Service) sendEvent(event *ListenResponse) {
 			for _, listener := range listeners {
 				if listener.key != "" {
 					if event.Key == listener.key {
-						listener.ch <- m.NewSuccess(bytes)
+						listener.stream.Value(bytes)
 					}
 				} else {
-					listener.ch <- m.NewSuccess(bytes)
+					listener.stream.Value(bytes)
 				}
 			}
 		}
@@ -472,6 +448,6 @@ func (m *Service) sendEvent(event *ListenResponse) {
 }
 
 type listener struct {
-	key string
-	ch  chan<- service.Result
+	key    string
+	stream stream.Stream
 }

@@ -17,11 +17,12 @@ package leader
 import (
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
+	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 )
 
 func init() {
-	node.RegisterService("leaderlatch", newService)
+	node.RegisterService(leaderLatchType, newService)
 }
 
 // newService returns a new Service
@@ -44,9 +45,9 @@ type Service struct {
 
 // init initializes the election service
 func (e *Service) init() {
-	e.Executor.Register("Latch", e.Latch)
-	e.Executor.Register("GetLatch", e.GetLatch)
-	e.Executor.Register("Events", e.Events)
+	e.Executor.RegisterUnary(opLatch, e.Latch)
+	e.Executor.RegisterUnary(opGetLatch, e.GetLatch)
+	e.Executor.RegisterStream(opEvents, e.Events)
 	e.SessionizedService.OnExpire(e.OnExpire)
 	e.SessionizedService.OnClose(e.OnClose)
 }
@@ -133,13 +134,10 @@ func (e *Service) getParticipants() []string {
 }
 
 // Latch attempts to acquire the latch
-func (e *Service) Latch(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (e *Service) Latch(bytes []byte) ([]byte, error) {
 	request := &LatchRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- e.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	reg := &LatchParticipant{
@@ -158,23 +156,22 @@ func (e *Service) Latch(bytes []byte, ch chan<- service.Result) {
 		Latch: e.getLatch(),
 	})
 
-	ch <- e.NewResult(proto.Marshal(&LatchResponse{
+	return proto.Marshal(&LatchResponse{
 		Latch: e.getLatch(),
-	}))
+	})
 }
 
 // GetLatch gets the current latch
-func (e *Service) GetLatch(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-	ch <- e.NewResult(proto.Marshal(&GetResponse{
+func (e *Service) GetLatch(bytes []byte) ([]byte, error) {
+	return proto.Marshal(&GetResponse{
 		Latch: e.getLatch(),
-	}))
+	})
 }
 
 // Events registers the given channel to receive election events
-func (e *Service) Events(bytes []byte, ch chan<- service.Result) {
+func (e *Service) Events(bytes []byte, stream stream.Stream) {
 	// Immediately send an OPEN event but keep the channel open
-	ch <- e.NewResult(proto.Marshal(&ListenResponse{
+	stream.Result(proto.Marshal(&ListenResponse{
 		Type: ListenResponse_OPEN,
 	}))
 }
@@ -182,8 +179,8 @@ func (e *Service) Events(bytes []byte, ch chan<- service.Result) {
 func (e *Service) sendEvent(event *ListenResponse) {
 	bytes, err := proto.Marshal(event)
 	for _, session := range e.Sessions() {
-		for _, ch := range session.ChannelsOf("Events") {
-			ch <- e.NewResult(bytes, err)
+		for _, stream := range session.StreamsOf(opEvents) {
+			stream.Result(bytes, err)
 		}
 	}
 }

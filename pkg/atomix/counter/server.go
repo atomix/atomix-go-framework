@@ -37,7 +37,7 @@ func registerServer(server *grpc.Server, protocol node.Protocol) {
 func newServer(client node.Client) api.CounterServiceServer {
 	return &Server{
 		SimpleServer: &server.SimpleServer{
-			Type:   "counter",
+			Type:   counterType,
 			Client: client,
 		},
 	}
@@ -73,7 +73,7 @@ func (s *Server) Set(ctx context.Context, request *api.SetRequest) (*api.SetResp
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, "set", in, request.Header)
+	out, header, err := s.Command(ctx, opSet, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 		return nil, err
 	}
 
-	out, header, err := s.Query(ctx, "get", in, request.Header)
+	out, header, err := s.Query(ctx, opGet, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +128,7 @@ func (s *Server) Increment(ctx context.Context, request *api.IncrementRequest) (
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, "increment", in, request.Header)
+	out, header, err := s.Command(ctx, opIncrement, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +158,7 @@ func (s *Server) Decrement(ctx context.Context, request *api.DecrementRequest) (
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, "decrement", in, request.Header)
+	out, header, err := s.Command(ctx, opDecrement, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +189,7 @@ func (s *Server) CheckAndSet(ctx context.Context, request *api.CheckAndSetReques
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, "cas", in, request.Header)
+	out, header, err := s.Command(ctx, opCAS, in, request.Header)
 	if err != nil {
 		return nil, err
 	}

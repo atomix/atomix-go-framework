@@ -18,11 +18,12 @@ import (
 	"bytes"
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
+	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 )
 
 func init() {
-	node.RegisterService("indexedmap", newService)
+	node.RegisterService(indexMapType, newService)
 }
 
 // newService returns a new Service
@@ -52,19 +53,19 @@ type Service struct {
 
 // init initializes the map service
 func (m *Service) init() {
-	m.Executor.Register("put", m.Put)
-	m.Executor.Register("replace", m.Replace)
-	m.Executor.Register("remove", m.Remove)
-	m.Executor.Register("get", m.Get)
-	m.Executor.Register("firstEntry", m.FirstEntry)
-	m.Executor.Register("lastEntry", m.LastEntry)
-	m.Executor.Register("prevEntry", m.PrevEntry)
-	m.Executor.Register("nextEntry", m.NextEntry)
-	m.Executor.Register("exists", m.ContainsKey)
-	m.Executor.Register("size", m.Size)
-	m.Executor.Register("clear", m.Clear)
-	m.Executor.Register("events", m.Events)
-	m.Executor.Register("entries", m.Entries)
+	m.Executor.RegisterUnary(opPut, m.Put)
+	m.Executor.RegisterUnary(opReplace, m.Replace)
+	m.Executor.RegisterUnary(opRemove, m.Remove)
+	m.Executor.RegisterUnary(opGet, m.Get)
+	m.Executor.RegisterUnary(opFirstEntry, m.FirstEntry)
+	m.Executor.RegisterUnary(opLastEntry, m.LastEntry)
+	m.Executor.RegisterUnary(opPrevEntry, m.PrevEntry)
+	m.Executor.RegisterUnary(opNextEntry, m.NextEntry)
+	m.Executor.RegisterUnary(opExists, m.Exists)
+	m.Executor.RegisterUnary(opSize, m.Size)
+	m.Executor.RegisterUnary(opClear, m.Clear)
+	m.Executor.RegisterStream(opEvents, m.Events)
+	m.Executor.RegisterStream(opEntries, m.Entries)
 }
 
 // LinkedMapEntryValue is a doubly linked MapEntryValue
@@ -142,8 +143,8 @@ func (m *Service) Restore(bytes []byte) error {
 			m.listeners[snapshotListener.SessionId] = sessionListeners
 		}
 		sessionListeners[snapshotListener.StreamId] = listener{
-			key: snapshotListener.Key,
-			ch:  m.Sessions()[snapshotListener.SessionId].Channel(snapshotListener.StreamId),
+			key:    snapshotListener.Key,
+			stream: m.Sessions()[snapshotListener.SessionId].Stream(snapshotListener.StreamId),
 		}
 	}
 
@@ -152,23 +153,19 @@ func (m *Service) Restore(bytes []byte) error {
 }
 
 // Put puts a key/value pair in the map
-func (m *Service) Put(value []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (m *Service) Put(value []byte) ([]byte, error) {
 	request := &PutRequest{}
 	if err := proto.Unmarshal(value, request); err != nil {
-		ch <- m.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	var oldEntry *LinkedMapEntryValue
 	if request.Index > 0 {
 		oldEntry = m.indexes[request.Index]
 		if oldEntry == nil {
-			ch <- m.NewResult(proto.Marshal(&PutResponse{
+			return proto.Marshal(&PutResponse{
 				Status: UpdateStatus_PRECONDITION_FAILED,
-			}))
-			return
+			})
 		}
 	} else {
 		oldEntry = m.entries[request.Key]
@@ -177,10 +174,9 @@ func (m *Service) Put(value []byte, ch chan<- service.Result) {
 	if oldEntry == nil {
 		// If the version is positive then reject the request.
 		if !request.IfEmpty && request.Version > 0 {
-			ch <- m.NewResult(proto.Marshal(&PutResponse{
+			return proto.Marshal(&PutResponse{
 				Status: UpdateStatus_PRECONDITION_FAILED,
-			}))
-			return
+			})
 		}
 
 		// Increment the index for a new entry
@@ -230,37 +226,34 @@ func (m *Service) Put(value []byte, ch chan<- service.Result) {
 			Updated: newEntry.Updated,
 		})
 
-		ch <- m.NewResult(proto.Marshal(&PutResponse{
+		return proto.Marshal(&PutResponse{
 			Status: UpdateStatus_OK,
 			Index:  newEntry.Index,
 			Key:    newEntry.Key,
-		}))
-		return
+		})
 	}
 
 	// If the version is -1 then reject the request.
 	// If the version is positive then compare the version to the current version.
 	if request.IfEmpty || (!request.IfEmpty && request.Version > 0 && request.Version != oldEntry.Version) {
-		ch <- m.NewResult(proto.Marshal(&PutResponse{
+		return proto.Marshal(&PutResponse{
 			Status:          UpdateStatus_PRECONDITION_FAILED,
 			Index:           oldEntry.Index,
 			Key:             oldEntry.Key,
 			PreviousValue:   oldEntry.Value,
 			PreviousVersion: oldEntry.Version,
-		}))
-		return
+		})
 	}
 
 	// If the value is equal to the current value, return a no-op.
 	if bytes.Equal(oldEntry.Value, request.Value) {
-		ch <- m.NewResult(proto.Marshal(&PutResponse{
+		return proto.Marshal(&PutResponse{
 			Status:          UpdateStatus_NOOP,
 			Index:           oldEntry.Index,
 			Key:             oldEntry.Key,
 			PreviousValue:   oldEntry.Value,
 			PreviousVersion: oldEntry.Version,
-		}))
-		return
+		})
 	}
 
 	// Create a new entry value and set it in the map.
@@ -306,7 +299,7 @@ func (m *Service) Put(value []byte, ch chan<- service.Result) {
 		Updated: newEntry.Updated,
 	})
 
-	ch <- m.NewResult(proto.Marshal(&PutResponse{
+	return proto.Marshal(&PutResponse{
 		Status:          UpdateStatus_OK,
 		Index:           newEntry.Index,
 		Key:             newEntry.Key,
@@ -314,17 +307,14 @@ func (m *Service) Put(value []byte, ch chan<- service.Result) {
 		PreviousVersion: oldEntry.Version,
 		Created:         newEntry.Created,
 		Updated:         newEntry.Updated,
-	}))
+	})
 }
 
 // Replace replaces a key/value pair in the map
-func (m *Service) Replace(value []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (m *Service) Replace(value []byte) ([]byte, error) {
 	request := &ReplaceRequest{}
 	if err := proto.Unmarshal(value, request); err != nil {
-		ch <- m.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	var oldEntry *LinkedMapEntryValue
@@ -335,26 +325,23 @@ func (m *Service) Replace(value []byte, ch chan<- service.Result) {
 	}
 
 	if oldEntry == nil {
-		ch <- m.NewResult(proto.Marshal(&ReplaceResponse{
+		return proto.Marshal(&ReplaceResponse{
 			Status: UpdateStatus_PRECONDITION_FAILED,
-		}))
-		return
+		})
 	}
 
 	// If the version was specified and does not match the entry version, fail the replace.
 	if request.PreviousVersion != 0 && request.PreviousVersion != oldEntry.Version {
-		ch <- m.NewResult(proto.Marshal(&ReplaceResponse{
+		return proto.Marshal(&ReplaceResponse{
 			Status: UpdateStatus_PRECONDITION_FAILED,
-		}))
-		return
+		})
 	}
 
 	// If the value was specified and does not match the entry value, fail the replace.
 	if len(request.PreviousValue) != 0 && bytes.Equal(request.PreviousValue, oldEntry.Value) {
-		ch <- m.NewResult(proto.Marshal(&ReplaceResponse{
+		return proto.Marshal(&ReplaceResponse{
 			Status: UpdateStatus_PRECONDITION_FAILED,
-		}))
-		return
+		})
 	}
 
 	// If we've made it this far, update the entry.
@@ -402,7 +389,7 @@ func (m *Service) Replace(value []byte, ch chan<- service.Result) {
 		Updated: newEntry.Updated,
 	})
 
-	ch <- m.NewResult(proto.Marshal(&ReplaceResponse{
+	return proto.Marshal(&ReplaceResponse{
 		Status:          UpdateStatus_OK,
 		Index:           newEntry.Index,
 		Key:             newEntry.Key,
@@ -411,17 +398,14 @@ func (m *Service) Replace(value []byte, ch chan<- service.Result) {
 		NewVersion:      newEntry.Version,
 		Created:         newEntry.Created,
 		Updated:         newEntry.Updated,
-	}))
+	})
 }
 
 // Remove removes a key/value pair from the map
-func (m *Service) Remove(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (m *Service) Remove(bytes []byte) ([]byte, error) {
 	request := &RemoveRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- m.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	var entry *LinkedMapEntryValue
@@ -432,18 +416,16 @@ func (m *Service) Remove(bytes []byte, ch chan<- service.Result) {
 	}
 
 	if entry == nil {
-		ch <- m.NewResult(proto.Marshal(&RemoveResponse{
+		return proto.Marshal(&RemoveResponse{
 			Status: UpdateStatus_NOOP,
-		}))
-		return
+		})
 	}
 
 	// If the request version is set, verify that the request version matches the entry version.
 	if request.Version > 0 && request.Version != entry.Version {
-		ch <- m.NewResult(proto.Marshal(&RemoveResponse{
+		return proto.Marshal(&RemoveResponse{
 			Status: UpdateStatus_PRECONDITION_FAILED,
-		}))
-		return
+		})
 	}
 
 	// Delete the entry from the map.
@@ -476,7 +458,7 @@ func (m *Service) Remove(bytes []byte, ch chan<- service.Result) {
 		Updated: entry.Updated,
 	})
 
-	ch <- m.NewResult(proto.Marshal(&ReplaceResponse{
+	return proto.Marshal(&ReplaceResponse{
 		Status:          UpdateStatus_OK,
 		Index:           entry.Index,
 		Key:             entry.Key,
@@ -484,17 +466,14 @@ func (m *Service) Remove(bytes []byte, ch chan<- service.Result) {
 		PreviousVersion: entry.Version,
 		Created:         entry.Created,
 		Updated:         entry.Updated,
-	}))
+	})
 }
 
 // Get gets a value from the map
-func (m *Service) Get(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (m *Service) Get(bytes []byte) ([]byte, error) {
 	request := &GetRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- m.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	var entry *LinkedMapEntryValue
@@ -506,75 +485,66 @@ func (m *Service) Get(bytes []byte, ch chan<- service.Result) {
 	}
 
 	if !ok {
-		ch <- m.NewResult(proto.Marshal(&GetResponse{}))
+		return proto.Marshal(&GetResponse{})
 	} else {
-		ch <- m.NewResult(proto.Marshal(&GetResponse{
+		return proto.Marshal(&GetResponse{
 			Index:   entry.Index,
 			Key:     entry.Key,
 			Value:   entry.Value,
 			Version: entry.Version,
 			Created: entry.Created,
 			Updated: entry.Updated,
-		}))
+		})
 	}
 }
 
 // FirstEntry gets the first entry from the map
-func (m *Service) FirstEntry(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (m *Service) FirstEntry(bytes []byte) ([]byte, error) {
 	request := &FirstEntryRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- m.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	if m.firstEntry == nil {
-		ch <- m.NewResult(proto.Marshal(&FirstEntryResponse{}))
+		return proto.Marshal(&FirstEntryResponse{})
 	} else {
-		ch <- m.NewResult(proto.Marshal(&FirstEntryResponse{
+		return proto.Marshal(&FirstEntryResponse{
 			Index:   m.firstEntry.Index,
 			Key:     m.firstEntry.Key,
 			Value:   m.firstEntry.Value,
 			Version: m.firstEntry.Version,
 			Created: m.firstEntry.Created,
 			Updated: m.firstEntry.Updated,
-		}))
+		})
 	}
 }
 
 // LastEntry gets the last entry from the map
-func (m *Service) LastEntry(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (m *Service) LastEntry(bytes []byte) ([]byte, error) {
 	request := &LastEntryRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- m.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	if m.lastEntry == nil {
-		ch <- m.NewResult(proto.Marshal(&LastEntryResponse{}))
+		return proto.Marshal(&LastEntryResponse{})
 	} else {
-		ch <- m.NewResult(proto.Marshal(&LastEntryResponse{
+		return proto.Marshal(&LastEntryResponse{
 			Index:   m.lastEntry.Index,
 			Key:     m.lastEntry.Key,
 			Value:   m.lastEntry.Value,
 			Version: m.lastEntry.Version,
 			Created: m.lastEntry.Created,
 			Updated: m.lastEntry.Updated,
-		}))
+		})
 	}
 }
 
 // PrevEntry gets the previous entry from the map
-func (m *Service) PrevEntry(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (m *Service) PrevEntry(bytes []byte) ([]byte, error) {
 	request := &PrevEntryRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- m.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	entry, ok := m.indexes[request.Index]
@@ -589,27 +559,24 @@ func (m *Service) PrevEntry(bytes []byte, ch chan<- service.Result) {
 	}
 
 	if entry == nil {
-		ch <- m.NewResult(proto.Marshal(&PrevEntryResponse{}))
+		return proto.Marshal(&PrevEntryResponse{})
 	} else {
-		ch <- m.NewResult(proto.Marshal(&PrevEntryResponse{
+		return proto.Marshal(&PrevEntryResponse{
 			Index:   entry.Index,
 			Key:     entry.Key,
 			Value:   entry.Value,
 			Version: entry.Version,
 			Created: entry.Created,
 			Updated: entry.Updated,
-		}))
+		})
 	}
 }
 
 // NextEntry gets the next entry from the map
-func (m *Service) NextEntry(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+func (m *Service) NextEntry(bytes []byte) ([]byte, error) {
 	request := &NextEntryRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- m.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	entry, ok := m.indexes[request.Index]
@@ -624,71 +591,67 @@ func (m *Service) NextEntry(bytes []byte, ch chan<- service.Result) {
 	}
 
 	if entry == nil {
-		ch <- m.NewResult(proto.Marshal(&NextEntryResponse{}))
+		return proto.Marshal(&NextEntryResponse{})
 	} else {
-		ch <- m.NewResult(proto.Marshal(&NextEntryResponse{
+		return proto.Marshal(&NextEntryResponse{
 			Index:   entry.Index,
 			Key:     entry.Key,
 			Value:   entry.Value,
 			Version: entry.Version,
 			Created: entry.Created,
 			Updated: entry.Updated,
-		}))
+		})
 	}
 }
 
-// ContainsKey checks if the map contains a key
-func (m *Service) ContainsKey(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-
+// Exists checks if the map contains a key
+func (m *Service) Exists(bytes []byte) ([]byte, error) {
 	request := &ContainsKeyRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- m.NewFailure(err)
-		return
+		return nil, err
 	}
 
 	_, ok := m.entries[request.Key]
-	ch <- m.NewResult(proto.Marshal(&ContainsKeyResponse{
+	return proto.Marshal(&ContainsKeyResponse{
 		ContainsKey: ok,
-	}))
+	})
 }
 
 // Size returns the size of the map
-func (m *Service) Size(bytes []byte, ch chan<- service.Result) {
-	defer close(ch)
-	ch <- m.NewResult(proto.Marshal(&SizeResponse{
+func (m *Service) Size(bytes []byte) ([]byte, error) {
+	return proto.Marshal(&SizeResponse{
 		Size_: int32(len(m.entries)),
-	}))
+	})
 }
 
 // Clear removes all entries from the map
-func (m *Service) Clear(value []byte, ch chan<- service.Result) {
-	defer close(ch)
+func (m *Service) Clear(value []byte) ([]byte, error) {
 	m.entries = make(map[string]*LinkedMapEntryValue)
 	m.indexes = make(map[uint64]*LinkedMapEntryValue)
 	m.firstEntry = nil
 	m.lastEntry = nil
-	ch <- m.NewResult(proto.Marshal(&ClearResponse{}))
+	return proto.Marshal(&ClearResponse{})
 }
 
 // Events sends change events to the client
-func (m *Service) Events(bytes []byte, ch chan<- service.Result) {
+func (m *Service) Events(bytes []byte, stream stream.Stream) {
 	request := &ListenRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
-		ch <- m.NewFailure(err)
-		close(ch)
+		stream.Error(err)
+		stream.Close()
+		return
 	}
 
 	// Send an OPEN response to notify the client the stream is open
-	ch <- m.NewResult(proto.Marshal(&ListenResponse{
+	stream.Result(proto.Marshal(&ListenResponse{
 		Type: ListenResponse_OPEN,
 	}))
 
 	// Create and populate the listener
 	l := listener{
-		key:   request.Key,
-		index: request.Index,
-		ch:    ch,
+		key:    request.Key,
+		index:  request.Index,
+		stream: stream,
 	}
 	listeners, ok := m.listeners[m.Session().ID]
 	if !ok {
@@ -700,7 +663,7 @@ func (m *Service) Events(bytes []byte, ch chan<- service.Result) {
 	if request.Replay {
 		entry := m.firstEntry
 		for entry != nil {
-			ch <- m.NewResult(proto.Marshal(&ListenResponse{
+			stream.Result(proto.Marshal(&ListenResponse{
 				Type:    ListenResponse_NONE,
 				Key:     entry.Key,
 				Index:   entry.Index,
@@ -715,11 +678,11 @@ func (m *Service) Events(bytes []byte, ch chan<- service.Result) {
 }
 
 // Entries returns a stream of entries to the client
-func (m *Service) Entries(value []byte, ch chan<- service.Result) {
-	defer close(ch)
+func (m *Service) Entries(value []byte, stream stream.Stream) {
+	defer stream.Close()
 	entry := m.firstEntry
 	for entry != nil {
-		ch <- m.NewResult(proto.Marshal(&EntriesResponse{
+		stream.Result(proto.Marshal(&EntriesResponse{
 			Key:     entry.Key,
 			Index:   entry.Index,
 			Value:   entry.Value,
@@ -778,14 +741,14 @@ func (m *Service) sendEvent(event *ListenResponse) {
 			for _, listener := range listeners {
 				if listener.key != "" {
 					if event.Key == listener.key {
-						listener.ch <- m.NewSuccess(bytes)
+						listener.stream.Value(bytes)
 					}
 				} else if listener.index > 0 {
 					if event.Index == listener.index {
-						listener.ch <- m.NewSuccess(bytes)
+						listener.stream.Value(bytes)
 					}
 				} else {
-					listener.ch <- m.NewSuccess(bytes)
+					listener.stream.Value(bytes)
 				}
 			}
 		}
@@ -793,7 +756,7 @@ func (m *Service) sendEvent(event *ListenResponse) {
 }
 
 type listener struct {
-	key   string
-	index uint64
-	ch    chan<- service.Result
+	key    string
+	index  uint64
+	stream stream.Stream
 }
