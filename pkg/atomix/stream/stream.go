@@ -41,7 +41,8 @@ func NewChannelStream(ch chan<- Result) Stream {
 
 // channelStream is a channel-based stream
 type channelStream struct {
-	ch chan<- Result
+	ch     chan<- Result
+	closed bool
 }
 
 func (s *channelStream) Send(result Result) {
@@ -64,7 +65,10 @@ func (s *channelStream) Error(err error) {
 }
 
 func (s *channelStream) Close() {
-	close(s.ch)
+	if !s.closed {
+		close(s.ch)
+		s.closed = true
+	}
 }
 
 // NewNilStream returns a disconnected stream

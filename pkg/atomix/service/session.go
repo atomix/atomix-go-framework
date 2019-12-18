@@ -544,8 +544,8 @@ func (s *Session) Stream(id uint64) streams.Stream {
 // StreamsOf returns a slice of all open streams for the given named operation owned by the session
 func (s *Session) StreamsOf(op string) []streams.Stream {
 	streams := make([]streams.Stream, 0, len(s.streams))
-	for _, stream := range streams {
-		if stream.(*sessionStream).Type == op {
+	for _, stream := range s.streams {
+		if stream.Type == op {
 			streams = append(streams, stream)
 		}
 	}
