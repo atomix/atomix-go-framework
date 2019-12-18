@@ -16,6 +16,7 @@ package node
 
 import (
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
+	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -26,7 +27,7 @@ func TestPrimitiveStateMachine(t *testing.T) {
 	ctx := &TestContext{}
 	sm := NewPrimitiveStateMachine(GetRegistry(), ctx)
 
-	ch := make(chan Output)
+	ch := make(chan stream.Result)
 	go ctx.command(sm, newOpenSessionRequest(t), ch)
 	out := <-ch
 	assert.True(t, out.Succeeded())
@@ -34,7 +35,7 @@ func TestPrimitiveStateMachine(t *testing.T) {
 	assert.NotEqual(t, 0, openSessionResponse.SessionID)
 	sessionID := openSessionResponse.SessionID
 
-	ch = make(chan Output)
+	ch = make(chan stream.Result)
 	bytes, err := proto.Marshal(&SetRequest{
 		Value: "Hello world!",
 	})
@@ -46,7 +47,7 @@ func TestPrimitiveStateMachine(t *testing.T) {
 	setResponse := &SetResponse{}
 	assert.NoError(t, proto.Unmarshal(commandResponse.Output, setResponse))
 
-	ch = make(chan Output)
+	ch = make(chan stream.Result)
 	bytes, err = proto.Marshal(&GetRequest{})
 	assert.NoError(t, err)
 	go ctx.query(sm, newQueryRequest(t, sessionID, commandResponse.Context.Index, 1, "get", bytes), ch)
@@ -182,13 +183,13 @@ func (c *TestContext) OperationType() service.OperationType {
 	return c.operation
 }
 
-func (c *TestContext) command(sm StateMachine, input []byte, ch chan<- Output) {
+func (c *TestContext) command(sm StateMachine, input []byte, ch chan<- stream.Result) {
 	c.index++
 	c.operation = service.OpTypeCommand
-	sm.Command(input, ch)
+	sm.Command(input, stream.NewChannelStream(ch))
 }
 
-func (c *TestContext) query(sm StateMachine, input []byte, ch chan<- Output) {
+func (c *TestContext) query(sm StateMachine, input []byte, ch chan<- stream.Result) {
 	c.operation = service.OpTypeQuery
-	sm.Query(input, ch)
+	sm.Query(input, stream.NewChannelStream(ch))
 }

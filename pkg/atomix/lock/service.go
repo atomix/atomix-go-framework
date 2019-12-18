@@ -254,11 +254,10 @@ func (l *Service) Unlock(bytes []byte) ([]byte, error) {
 		return proto.Marshal(&UnlockResponse{
 			Succeeded: true,
 		})
-	} else {
-		return proto.Marshal(&UnlockResponse{
-			Succeeded: false,
-		})
 	}
+	return proto.Marshal(&UnlockResponse{
+		Succeeded: false,
+	})
 }
 
 // IsLocked checks whether the lock is held by a specific session

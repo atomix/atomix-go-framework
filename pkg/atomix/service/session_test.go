@@ -15,6 +15,7 @@
 package service
 
 import (
+	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -25,26 +26,26 @@ func TestSessionService(t *testing.T) {
 	context := &TestContext{}
 	service := newTestService(context)
 
-	ch := make(chan Result)
+	ch := make(chan stream.Result)
 	go context.command(service, newOpenSession(), ch)
 	out := <-ch
 	assert.True(t, out.Succeeded())
 	sessionID := getOpenSession(out.Value).SessionID
 
 	setRequest1 := newCommand(sessionID, 1, "set", newSet("Hello world!"))
-	ch1 := make(chan Result)
+	ch1 := make(chan stream.Result)
 	go context.command(service, setRequest1, ch1)
 	out1 := <-ch1
 	assert.True(t, out1.Succeeded())
 
 	setRequest3 := newCommand(sessionID, 3, "set", newSet("Hello world 3"))
-	ch3 := make(chan Result)
+	ch3 := make(chan stream.Result)
 	go context.command(service, setRequest3, ch3)
 
 	time.Sleep(100 * time.Millisecond)
 
 	setRequest2 := newCommand(sessionID, 2, "set", newSet("Hello world 2"))
-	ch2 := make(chan Result)
+	ch2 := make(chan stream.Result)
 	go context.command(service, setRequest2, ch2)
 
 	out2 := <-ch2
@@ -124,8 +125,8 @@ func (c *TestContext) OperationType() OperationType {
 	return c.operation
 }
 
-func (c *TestContext) command(service Service, input []byte, ch chan<- Result) {
+func (c *TestContext) command(service Service, input []byte, ch chan<- stream.Result) {
 	c.index++
 	c.operation = OpTypeCommand
-	service.Command(input, ch)
+	service.Command(input, stream.NewChannelStream(ch))
 }

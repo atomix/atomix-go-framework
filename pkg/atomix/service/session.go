@@ -527,7 +527,7 @@ func (s *Session) StreamID() uint64 {
 	return s.streamID
 }
 
-// Channels returns a slice of all open channels of any type owned by the session
+// Streams returns a slice of all open streams of any type owned by the session
 func (s *Session) Streams() []streams.Stream {
 	streams := make([]streams.Stream, 0, len(s.streams))
 	for _, stream := range s.streams {

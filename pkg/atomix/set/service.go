@@ -108,11 +108,10 @@ func (s *Service) Add(bytes []byte) ([]byte, error) {
 		return proto.Marshal(&AddResponse{
 			Added: true,
 		})
-	} else {
-		return proto.Marshal(&AddResponse{
-			Added: false,
-		})
 	}
+	return proto.Marshal(&AddResponse{
+		Added: false,
+	})
 }
 
 // Remove removes an element from the set
@@ -133,11 +132,10 @@ func (s *Service) Remove(bytes []byte) ([]byte, error) {
 		return proto.Marshal(&RemoveResponse{
 			Removed: true,
 		})
-	} else {
-		return proto.Marshal(&RemoveResponse{
-			Removed: false,
-		})
 	}
+	return proto.Marshal(&RemoveResponse{
+		Removed: false,
+	})
 }
 
 // Clear removes all elements from the set

@@ -126,9 +126,8 @@ func (c *Service) CAS(bytes []byte) ([]byte, error) {
 		return proto.Marshal(&CheckAndSetResponse{
 			Succeeded: true,
 		})
-	} else {
-		return proto.Marshal(&CheckAndSetResponse{
-			Succeeded: false,
-		})
 	}
+	return proto.Marshal(&CheckAndSetResponse{
+		Succeeded: false,
+	})
 }

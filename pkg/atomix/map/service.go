@@ -314,14 +314,13 @@ func (m *Service) Get(bytes []byte) ([]byte, error) {
 	value, ok := m.entries[request.Key]
 	if !ok {
 		return proto.Marshal(&GetResponse{})
-	} else {
-		return proto.Marshal(&GetResponse{
-			Value:   value.Value,
-			Version: value.Version,
-			Created: value.Created,
-			Updated: value.Updated,
-		})
 	}
+	return proto.Marshal(&GetResponse{
+		Value:   value.Value,
+		Version: value.Version,
+		Created: value.Created,
+		Updated: value.Updated,
+	})
 }
 
 // Exists checks if the map contains a key
