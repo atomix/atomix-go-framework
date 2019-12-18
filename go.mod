@@ -5,7 +5,7 @@ go 1.12
 require (
 	github.com/atomix/atomix-api v0.0.0-20191217054529-55159c51ab6e
 	github.com/atomix/atomix-go-client v0.0.0-20191018192841-3644d110cbec
-	github.com/atomix/atomix-go-local v0.0.0-20191018192811-4de2cabe75ef
+	github.com/atomix/atomix-go-local v0.0.0-20191218214123-a72c188f976e
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.3.2
 	github.com/sirupsen/logrus v1.4.2
