@@ -95,12 +95,8 @@ func (s *SessionizedServer) writeStream(request []byte, header *headers.RequestH
 		return err
 	}
 
-	streamCh := make(chan streams.Result)
-	if err := s.Client.Write(context.TODO(), bytes, streams.NewChannelStream(streamCh)); err != nil {
-		return err
-	}
-
 	// Create a goroutine to convert the results into raw form
+	streamCh := make(chan streams.Result)
 	go func() {
 		defer close(ch)
 		for result := range streamCh {
@@ -121,8 +117,7 @@ func (s *SessionizedServer) writeStream(request []byte, header *headers.RequestH
 			}
 		}
 	}()
-
-	return nil
+	return s.Client.Write(context.TODO(), bytes, streams.NewChannelStream(streamCh))
 }
 
 // read sends a read to the service
@@ -188,12 +183,8 @@ func (s *SessionizedServer) readStream(request []byte, header *headers.RequestHe
 		return err
 	}
 
-	streamCh := make(chan streams.Result)
-	if err := s.Client.Read(context.TODO(), bytes, streams.NewChannelStream(streamCh)); err != nil {
-		return err
-	}
-
 	// Create a goroutine to convert the results into raw form
+	streamCh := make(chan streams.Result)
 	go func() {
 		defer close(ch)
 		for result := range streamCh {
@@ -214,8 +205,7 @@ func (s *SessionizedServer) readStream(request []byte, header *headers.RequestHe
 			}
 		}
 	}()
-
-	return nil
+	return s.Client.Read(context.TODO(), bytes, streams.NewChannelStream(streamCh))
 }
 
 // Command submits a command to the service
@@ -300,10 +290,6 @@ func (s *SessionizedServer) CommandStream(name string, input []byte, header *hea
 	}
 
 	resultCh := make(chan streams.Result)
-	if err = s.writeStream(bytes, header, resultCh); err != nil {
-		return err
-	}
-
 	go func() {
 		defer close(ch)
 		for result := range resultCh {
@@ -338,8 +324,7 @@ func (s *SessionizedServer) CommandStream(name string, input []byte, header *hea
 			}
 		}
 	}()
-
-	return nil
+	return s.writeStream(bytes, header, resultCh)
 }
 
 // Query submits a query to the service
@@ -424,10 +409,6 @@ func (s *SessionizedServer) QueryStream(name string, input []byte, header *heade
 	}
 
 	resultCh := make(chan streams.Result)
-	if err = s.readStream(bytes, header, resultCh); err != nil {
-		return err
-	}
-
 	go func() {
 		defer close(ch)
 		for result := range resultCh {
@@ -460,8 +441,7 @@ func (s *SessionizedServer) QueryStream(name string, input []byte, header *heade
 			}
 		}
 	}()
-
-	return nil
+	return s.readStream(bytes, header, resultCh)
 }
 
 // OpenSession opens a new session
