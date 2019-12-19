@@ -97,9 +97,10 @@ func (n *Node) Start() error {
 	members := make(map[string]cluster.Member)
 	for _, member := range n.config.Members {
 		members[member.ID] = cluster.Member{
-			ID:   member.ID,
-			Host: member.Host,
-			Port: int(member.Port),
+			ID:           member.ID,
+			Host:         member.Host,
+			ProtocolPort: int(member.ProtocolPort),
+			APIPort:      int(member.APIPort),
 		}
 	}
 

@@ -51,12 +51,13 @@ type Server struct {
 // Create opens a new session
 func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
-	if err := s.Open(ctx, request.Header); err != nil {
+	header, err := s.Open(ctx, request.Header)
+	if err != nil {
 		return nil, err
 	}
 
 	response := &api.CreateResponse{
-		Header: &headers.ResponseHeader{},
+		Header: header,
 	}
 	log.Tracef("Sending CreateResponse %+v", response)
 	return response, nil
@@ -211,9 +212,15 @@ func (s *Server) CheckAndSet(ctx context.Context, request *api.CheckAndSetReques
 func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if request.Delete {
-		if err := s.Delete(ctx, request.Header); err != nil {
+		header, err := s.Delete(ctx, request.Header)
+		if err != nil {
 			return nil, err
 		}
+		response := &api.CloseResponse{
+			Header: header,
+		}
+		log.Tracef("Sending CloseResponse %+v", response)
+		return response, nil
 	}
 
 	response := &api.CloseResponse{

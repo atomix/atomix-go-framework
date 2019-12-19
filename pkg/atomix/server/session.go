@@ -445,7 +445,15 @@ func (s *SessionizedServer) QueryStream(name string, input []byte, header *heade
 }
 
 // OpenSession opens a new session
-func (s *SessionizedServer) OpenSession(ctx context.Context, header *headers.RequestHeader, timeout *time.Duration) (uint64, error) {
+func (s *SessionizedServer) OpenSession(ctx context.Context, header *headers.RequestHeader, timeout *time.Duration) (*headers.ResponseHeader, error) {
+	// If the client requires a leader and is not the leader, return an error
+	if s.Client.MustLeader() && !s.Client.IsLeader() {
+		return &headers.ResponseHeader{
+			Status: headers.ResponseStatus_NOT_LEADER,
+			Leader: s.Client.Leader(),
+		}, nil
+	}
+
 	sessionRequest := &service.SessionRequest{
 		Request: &service.SessionRequest_OpenSession{
 			OpenSession: &service.OpenSessionRequest{
@@ -456,25 +464,37 @@ func (s *SessionizedServer) OpenSession(ctx context.Context, header *headers.Req
 
 	bytes, err := proto.Marshal(sessionRequest)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	bytes, err = s.write(ctx, bytes, header)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	sessionResponse := &service.SessionResponse{}
 	err = proto.Unmarshal(bytes, sessionResponse)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	return sessionResponse.GetOpenSession().SessionID, nil
+	sessionID := sessionResponse.GetOpenSession().SessionID
+	return &headers.ResponseHeader{
+		SessionID: sessionID,
+		Index:     sessionID,
+	}, nil
 }
 
 // KeepAliveSession keeps a session alive
-func (s *SessionizedServer) KeepAliveSession(ctx context.Context, header *headers.RequestHeader) error {
+func (s *SessionizedServer) KeepAliveSession(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
+	// If the client requires a leader and is not the leader, return an error
+	if s.Client.MustLeader() && !s.Client.IsLeader() {
+		return &headers.ResponseHeader{
+			Status: headers.ResponseStatus_NOT_LEADER,
+			Leader: s.Client.Leader(),
+		}, nil
+	}
+
 	streams := make(map[uint64]uint64)
 	for _, stream := range header.Streams {
 		streams[stream.StreamID] = stream.ResponseID
@@ -492,20 +512,34 @@ func (s *SessionizedServer) KeepAliveSession(ctx context.Context, header *header
 
 	bytes, err := proto.Marshal(sessionRequest)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	bytes, err = s.write(ctx, bytes, header)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	sessionResponse := &service.SessionResponse{}
-	return proto.Unmarshal(bytes, sessionResponse)
+	err = proto.Unmarshal(bytes, sessionResponse)
+	if err != nil {
+		return nil, err
+	}
+	return &headers.ResponseHeader{
+		SessionID: header.SessionID,
+	}, nil
 }
 
 // CloseSession closes a session
-func (s *SessionizedServer) CloseSession(ctx context.Context, header *headers.RequestHeader) error {
+func (s *SessionizedServer) CloseSession(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
+	// If the client requires a leader and is not the leader, return an error
+	if s.Client.MustLeader() && !s.Client.IsLeader() {
+		return &headers.ResponseHeader{
+			Status: headers.ResponseStatus_NOT_LEADER,
+			Leader: s.Client.Leader(),
+		}, nil
+	}
+
 	sessionRequest := &service.SessionRequest{
 		Request: &service.SessionRequest_CloseSession{
 			CloseSession: &service.CloseSessionRequest{
@@ -516,20 +550,34 @@ func (s *SessionizedServer) CloseSession(ctx context.Context, header *headers.Re
 
 	bytes, err := proto.Marshal(sessionRequest)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	bytes, err = s.write(ctx, bytes, header)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	sessionResponse := &service.SessionResponse{}
-	return proto.Unmarshal(bytes, sessionResponse)
+	err = proto.Unmarshal(bytes, sessionResponse)
+	if err != nil {
+		return nil, err
+	}
+	return &headers.ResponseHeader{
+		SessionID: header.SessionID,
+	}, nil
 }
 
 // Delete deletes the service
-func (s *SessionizedServer) Delete(ctx context.Context, header *headers.RequestHeader) error {
+func (s *SessionizedServer) Delete(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
+	// If the client requires a leader and is not the leader, return an error
+	if s.Client.MustLeader() && !s.Client.IsLeader() {
+		return &headers.ResponseHeader{
+			Status: headers.ResponseStatus_NOT_LEADER,
+			Leader: s.Client.Leader(),
+		}, nil
+	}
+
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,
@@ -543,7 +591,7 @@ func (s *SessionizedServer) Delete(ctx context.Context, header *headers.RequestH
 
 	bytes, err := proto.Marshal(serviceRequest)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Create a write channel
@@ -551,27 +599,27 @@ func (s *SessionizedServer) Delete(ctx context.Context, header *headers.RequestH
 
 	// Write the request
 	if err := s.Client.Write(ctx, bytes, streams.NewChannelStream(ch)); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Wait for the result
 	result, ok := <-ch
 	if !ok {
-		return errors.New("write channel closed")
+		return nil, errors.New("write channel closed")
 	}
 
 	// If the result failed, return the error
 	if result.Failed() {
-		return result.Error
+		return nil, result.Error
 	}
 
 	// Decode and return the response
 	serviceResponse := &service.ServiceResponse{}
 	err = proto.Unmarshal(result.Value, serviceResponse)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return &headers.ResponseHeader{}, nil
 }
 
 // SessionOutput is a result for session-supporting servers containing session header information

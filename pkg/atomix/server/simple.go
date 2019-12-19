@@ -204,7 +204,15 @@ func (s *SimpleServer) read(ctx context.Context, request []byte, header *headers
 }
 
 // Open opens a simple session
-func (s *SimpleServer) Open(ctx context.Context, header *headers.RequestHeader) error {
+func (s *SimpleServer) Open(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
+	// If the client requires a leader and is not the leader, return an error
+	if s.Client.MustLeader() && !s.Client.IsLeader() {
+		return &headers.ResponseHeader{
+			Status: headers.ResponseStatus_NOT_LEADER,
+			Leader: s.Client.Leader(),
+		}, nil
+	}
+
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,
@@ -218,7 +226,7 @@ func (s *SimpleServer) Open(ctx context.Context, header *headers.RequestHeader) 
 
 	bytes, err := proto.Marshal(serviceRequest)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Create a write channel
@@ -226,31 +234,39 @@ func (s *SimpleServer) Open(ctx context.Context, header *headers.RequestHeader) 
 
 	// Write the request
 	if err := s.Client.Write(ctx, bytes, streams.NewChannelStream(ch)); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Wait for the result
 	result, ok := <-ch
 	if !ok {
-		return errors.New("write channel closed")
+		return nil, errors.New("write channel closed")
 	}
 
 	// If the result failed, return the error
 	if result.Failed() {
-		return result.Error
+		return nil, result.Error
 	}
 
 	// Decode and return the response
 	serviceResponse := &service.ServiceResponse{}
 	err = proto.Unmarshal(result.Value, serviceResponse)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return &headers.ResponseHeader{}, nil
 }
 
 // Delete deletes the service
-func (s *SimpleServer) Delete(ctx context.Context, header *headers.RequestHeader) error {
+func (s *SimpleServer) Delete(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
+	// If the client requires a leader and is not the leader, return an error
+	if s.Client.MustLeader() && !s.Client.IsLeader() {
+		return &headers.ResponseHeader{
+			Status: headers.ResponseStatus_NOT_LEADER,
+			Leader: s.Client.Leader(),
+		}, nil
+	}
+
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,
@@ -264,7 +280,7 @@ func (s *SimpleServer) Delete(ctx context.Context, header *headers.RequestHeader
 
 	bytes, err := proto.Marshal(serviceRequest)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Create a write channel
@@ -272,25 +288,25 @@ func (s *SimpleServer) Delete(ctx context.Context, header *headers.RequestHeader
 
 	// Write the request
 	if err := s.Client.Write(ctx, bytes, streams.NewChannelStream(ch)); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Wait for the result
 	result, ok := <-ch
 	if !ok {
-		return errors.New("write channel closed")
+		return nil, errors.New("write channel closed")
 	}
 
 	// If the result failed, return the error
 	if result.Failed() {
-		return result.Error
+		return nil, result.Error
 	}
 
 	// Decode and return the response
 	serviceResponse := &service.ServiceResponse{}
 	err = proto.Unmarshal(result.Value, serviceResponse)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return &headers.ResponseHeader{}, nil
 }

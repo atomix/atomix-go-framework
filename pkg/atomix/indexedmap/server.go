@@ -16,7 +16,6 @@ package indexedmap
 
 import (
 	"context"
-	"github.com/atomix/atomix-api/proto/atomix/headers"
 	api "github.com/atomix/atomix-api/proto/atomix/indexedmap"
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/server"
@@ -50,54 +49,54 @@ type Server struct {
 }
 
 // Create opens a new session
-func (m *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
+func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
-	session, err := m.OpenSession(ctx, request.Header, request.Timeout)
+	header, err := s.OpenSession(ctx, request.Header, request.Timeout)
 	if err != nil {
 		return nil, err
 	}
 	response := &api.CreateResponse{
-		Header: &headers.ResponseHeader{
-			SessionID: session,
-			Index:     session,
-		},
+		Header: header,
 	}
 	log.Tracef("Sending CreateResponse %+v", response)
 	return response, nil
 }
 
 // KeepAlive keeps an existing session alive
-func (m *Server) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
+func (s *Server) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
 	log.Tracef("Received KeepAliveRequest %+v", request)
-	if err := m.KeepAliveSession(ctx, request.Header); err != nil {
+	header, err := s.KeepAliveSession(ctx, request.Header)
+	if err != nil {
 		return nil, err
 	}
 	response := &api.KeepAliveResponse{
-		Header: &headers.ResponseHeader{
-			SessionID: request.Header.SessionID,
-		},
+		Header: header,
 	}
 	log.Tracef("Sending KeepAliveResponse %+v", response)
 	return response, nil
 }
 
 // Close closes a session
-func (m *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
+func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if request.Delete {
-		if err := m.Delete(ctx, request.Header); err != nil {
+		header, err := s.Delete(ctx, request.Header)
+		if err != nil {
 			return nil, err
 		}
-	} else {
-		if err := m.CloseSession(ctx, request.Header); err != nil {
-			return nil, err
+		response := &api.CloseResponse{
+			Header: header,
 		}
+		log.Tracef("Sending CloseResponse %+v", response)
+		return response, nil
 	}
 
+	header, err := s.CloseSession(ctx, request.Header)
+	if err != nil {
+		return nil, err
+	}
 	response := &api.CloseResponse{
-		Header: &headers.ResponseHeader{
-			SessionID: request.Header.SessionID,
-		},
+		Header: header,
 	}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil

@@ -16,7 +16,6 @@ package _map //nolint:golint
 
 import (
 	"context"
-	"github.com/atomix/atomix-api/proto/atomix/headers"
 	api "github.com/atomix/atomix-api/proto/atomix/map"
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/server"
@@ -50,68 +49,68 @@ type Server struct {
 }
 
 // Create opens a new session
-func (m *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
+func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
-	session, err := m.OpenSession(ctx, request.Header, request.Timeout)
+	header, err := s.OpenSession(ctx, request.Header, request.Timeout)
 	if err != nil {
 		return nil, err
 	}
 	response := &api.CreateResponse{
-		Header: &headers.ResponseHeader{
-			SessionID: session,
-			Index:     session,
-		},
+		Header: header,
 	}
 	log.Tracef("Sending CreateResponse %+v", response)
 	return response, nil
 }
 
 // KeepAlive keeps an existing session alive
-func (m *Server) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
+func (s *Server) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
 	log.Tracef("Received KeepAliveRequest %+v", request)
-	if err := m.KeepAliveSession(ctx, request.Header); err != nil {
+	header, err := s.KeepAliveSession(ctx, request.Header)
+	if err != nil {
 		return nil, err
 	}
 	response := &api.KeepAliveResponse{
-		Header: &headers.ResponseHeader{
-			SessionID: request.Header.SessionID,
-		},
+		Header: header,
 	}
 	log.Tracef("Sending KeepAliveResponse %+v", response)
 	return response, nil
 }
 
 // Close closes a session
-func (m *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
+func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if request.Delete {
-		if err := m.Delete(ctx, request.Header); err != nil {
+		header, err := s.Delete(ctx, request.Header)
+		if err != nil {
 			return nil, err
 		}
-	} else {
-		if err := m.CloseSession(ctx, request.Header); err != nil {
-			return nil, err
+		response := &api.CloseResponse{
+			Header: header,
 		}
+		log.Tracef("Sending CloseResponse %+v", response)
+		return response, nil
 	}
 
+	header, err := s.CloseSession(ctx, request.Header)
+	if err != nil {
+		return nil, err
+	}
 	response := &api.CloseResponse{
-		Header: &headers.ResponseHeader{
-			SessionID: request.Header.SessionID,
-		},
+		Header: header,
 	}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil
 }
 
 // Size gets the number of entries in the map
-func (m *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeResponse, error) {
+func (s *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeResponse, error) {
 	log.Tracef("Received SizeRequest %+v", request)
 	in, err := proto.Marshal(&SizeRequest{})
 	if err != nil {
 		return nil, err
 	}
 
-	out, header, err := m.Query(ctx, opSize, in, request.Header)
+	out, header, err := s.Query(ctx, opSize, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +129,7 @@ func (m *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeR
 }
 
 // Exists checks whether the map contains a key
-func (m *Server) Exists(ctx context.Context, request *api.ExistsRequest) (*api.ExistsResponse, error) {
+func (s *Server) Exists(ctx context.Context, request *api.ExistsRequest) (*api.ExistsResponse, error) {
 	log.Tracef("Received ExistsRequest %+v", request)
 	in, err := proto.Marshal(&ContainsKeyRequest{
 		Key: request.Key,
@@ -139,7 +138,7 @@ func (m *Server) Exists(ctx context.Context, request *api.ExistsRequest) (*api.E
 		return nil, err
 	}
 
-	out, header, err := m.Query(ctx, opExists, in, request.Header)
+	out, header, err := s.Query(ctx, opExists, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +157,7 @@ func (m *Server) Exists(ctx context.Context, request *api.ExistsRequest) (*api.E
 }
 
 // Put puts a key/value pair into the map
-func (m *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResponse, error) {
+func (s *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResponse, error) {
 	log.Tracef("Received PutRequest %+v", request)
 	in, err := proto.Marshal(&PutRequest{
 		Key:     request.Key,
@@ -171,7 +170,7 @@ func (m *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResp
 		return nil, err
 	}
 
-	out, header, err := m.Command(ctx, opPut, in, request.Header)
+	out, header, err := s.Command(ctx, opPut, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +193,7 @@ func (m *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResp
 }
 
 // Replace replaces a key/value pair in the map
-func (m *Server) Replace(ctx context.Context, request *api.ReplaceRequest) (*api.ReplaceResponse, error) {
+func (s *Server) Replace(ctx context.Context, request *api.ReplaceRequest) (*api.ReplaceResponse, error) {
 	log.Tracef("Received ReplaceRequest %+v", request)
 	in, err := proto.Marshal(&ReplaceRequest{
 		Key:             request.Key,
@@ -207,7 +206,7 @@ func (m *Server) Replace(ctx context.Context, request *api.ReplaceRequest) (*api
 		return nil, err
 	}
 
-	out, header, err := m.Command(ctx, opReplace, in, request.Header)
+	out, header, err := s.Command(ctx, opReplace, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -230,7 +229,7 @@ func (m *Server) Replace(ctx context.Context, request *api.ReplaceRequest) (*api
 }
 
 // Get gets the value of a key
-func (m *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
+func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
 	log.Tracef("Received GetRequest %+v", request)
 	in, err := proto.Marshal(&GetRequest{
 		Key: request.Key,
@@ -239,7 +238,7 @@ func (m *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 		return nil, err
 	}
 
-	out, header, err := m.Query(ctx, opGet, in, request.Header)
+	out, header, err := s.Query(ctx, opGet, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +260,7 @@ func (m *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 }
 
 // Remove removes a key from the map
-func (m *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.RemoveResponse, error) {
+func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.RemoveResponse, error) {
 	log.Tracef("Received RemoveRequest %+v", request)
 	in, err := proto.Marshal(&RemoveRequest{
 		Key:     request.Key,
@@ -272,7 +271,7 @@ func (m *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 		return nil, err
 	}
 
-	out, header, err := m.Command(ctx, opRemove, in, request.Header)
+	out, header, err := s.Command(ctx, opRemove, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -293,14 +292,14 @@ func (m *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 }
 
 // Clear removes all keys from the map
-func (m *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.ClearResponse, error) {
+func (s *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.ClearResponse, error) {
 	log.Tracef("Received ClearRequest %+v", request)
 	in, err := proto.Marshal(&ClearRequest{})
 	if err != nil {
 		return nil, err
 	}
 
-	out, header, err := m.Command(ctx, opClear, in, request.Header)
+	out, header, err := s.Command(ctx, opClear, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -318,7 +317,7 @@ func (m *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.Cle
 }
 
 // Events listens for map change events
-func (m *Server) Events(request *api.EventRequest, srv api.MapService_EventsServer) error {
+func (s *Server) Events(request *api.EventRequest, srv api.MapService_EventsServer) error {
 	log.Tracef("Received EventRequest %+v", request)
 	in, err := proto.Marshal(&ListenRequest{
 		Replay: request.Replay,
@@ -329,7 +328,7 @@ func (m *Server) Events(request *api.EventRequest, srv api.MapService_EventsServ
 	}
 
 	ch := make(chan server.SessionOutput)
-	if err := m.CommandStream(opEvents, in, request.Header, ch); err != nil {
+	if err := s.CommandStream(opEvents, in, request.Header, ch); err != nil {
 		return err
 	}
 
@@ -361,7 +360,7 @@ func (m *Server) Events(request *api.EventRequest, srv api.MapService_EventsServ
 }
 
 // Entries lists all entries currently in the map
-func (m *Server) Entries(request *api.EntriesRequest, srv api.MapService_EntriesServer) error {
+func (s *Server) Entries(request *api.EntriesRequest, srv api.MapService_EntriesServer) error {
 	log.Tracef("Received EntriesRequest %+v", request)
 	in, err := proto.Marshal(&EntriesRequest{})
 	if err != nil {
@@ -369,7 +368,7 @@ func (m *Server) Entries(request *api.EntriesRequest, srv api.MapService_Entries
 	}
 
 	ch := make(chan server.SessionOutput)
-	if err := m.QueryStream(opEntries, in, request.Header, ch); err != nil {
+	if err := s.QueryStream(opEntries, in, request.Header, ch); err != nil {
 		return err
 	}
 
