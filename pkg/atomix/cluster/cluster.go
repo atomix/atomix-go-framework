@@ -22,7 +22,8 @@ type Cluster struct {
 
 // Member describes a single member of the Atomix cluster
 type Member struct {
-	ID   string
-	Host string
-	Port int
+	ID           string
+	Host         string
+	ProtocolPort int
+	APIPort      int
 }
