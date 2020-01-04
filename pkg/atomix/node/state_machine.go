@@ -77,6 +77,13 @@ type primitiveStateMachine struct {
 }
 
 func (s *primitiveStateMachine) Snapshot(writer io.Writer) error {
+	count := make([]byte, 4)
+	binary.BigEndian.PutUint32(count, uint32(len(s.services)))
+	_, err := writer.Write(count)
+	if err != nil {
+		return err
+	}
+
 	for id, svc := range s.services {
 		// If the service is not active, skip the snapshot
 		if !svc.active {
@@ -116,29 +123,36 @@ func (s *primitiveStateMachine) Snapshot(writer io.Writer) error {
 
 func (s *primitiveStateMachine) Install(reader io.Reader) error {
 	s.services = make(map[string]*serviceStateMachine)
-	lengthBytes := make([]byte, 4)
-	n, err := reader.Read(lengthBytes)
+
+	countBytes := make([]byte, 4)
+	n, err := reader.Read(countBytes)
 	if err != nil {
 		return err
+	} else if n <= 0 {
+		return nil
 	}
-	for n > 0 {
-		length := binary.BigEndian.Uint32(lengthBytes)
-		bytes := make([]byte, length)
-		_, err = reader.Read(bytes)
-		if err != nil {
-			return err
-		}
 
-		serviceID := &service.ServiceId{}
-		if err = proto.Unmarshal(bytes, serviceID); err != nil {
-			return err
-		}
-		svc := s.registry.services[serviceID.Type](newServiceContext(s.ctx, serviceID))
-		s.services[getQualifiedServiceName(serviceID)] = newServiceStateMachine(serviceID.Type, svc, true)
-
+	lengthBytes := make([]byte, 4)
+	count := int(binary.BigEndian.Uint32(countBytes))
+	for i := 0; i < count; i++ {
 		n, err = reader.Read(lengthBytes)
 		if err != nil {
 			return err
+		}
+		if n > 0 {
+			length := binary.BigEndian.Uint32(lengthBytes)
+			bytes := make([]byte, length)
+			_, err = reader.Read(bytes)
+			if err != nil {
+				return err
+			}
+
+			serviceID := &service.ServiceId{}
+			if err = proto.Unmarshal(bytes, serviceID); err != nil {
+				return err
+			}
+			svc := s.registry.services[serviceID.Type](newServiceContext(s.ctx, serviceID))
+			s.services[getQualifiedServiceName(serviceID)] = newServiceStateMachine(serviceID.Type, svc, true)
 		}
 	}
 	return nil
