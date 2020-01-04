@@ -128,7 +128,7 @@ func (s *SessionizedService) snapshotSessions(writer io.Writer) error {
 }
 
 func (s *SessionizedService) snapshotService(writer io.Writer) error {
-	bytes, err := s.Backup()
+	bytes, err := s.Executor.Backup()
 	if err != nil {
 		return err
 	}
@@ -228,7 +228,7 @@ func (s *SessionizedService) installService(reader io.Reader) error {
 	if err != nil {
 		return err
 	}
-	return s.Restore(bytes)
+	return s.Executor.Restore(bytes)
 }
 
 // CanDelete returns a boolean indicating whether entries up to the given index can be deleted

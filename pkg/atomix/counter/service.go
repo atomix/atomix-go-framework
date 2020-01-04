@@ -41,11 +41,13 @@ type Service struct {
 
 // init initializes the list service
 func (c *Service) init() {
-	c.Executor.RegisterUnary(opGet, c.Get)
-	c.Executor.RegisterUnary(opSet, c.Set)
-	c.Executor.RegisterUnary(opIncrement, c.Increment)
-	c.Executor.RegisterUnary(opDecrement, c.Decrement)
-	c.Executor.RegisterUnary(opCAS, c.CAS)
+	c.Executor.RegisterBackup(c.Backup)
+	c.Executor.RegisterRestore(c.Restore)
+	c.Executor.RegisterUnaryOp(opGet, c.Get)
+	c.Executor.RegisterUnaryOp(opSet, c.Set)
+	c.Executor.RegisterUnaryOp(opIncrement, c.Increment)
+	c.Executor.RegisterUnaryOp(opDecrement, c.Decrement)
+	c.Executor.RegisterUnaryOp(opCAS, c.CAS)
 }
 
 // Backup backs up the list service

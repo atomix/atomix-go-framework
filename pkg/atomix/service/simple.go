@@ -51,7 +51,7 @@ type SimpleService struct {
 
 // Snapshot takes a snapshot of the service
 func (s *SimpleService) Snapshot(writer io.Writer) error {
-	bytes, err := s.Backup()
+	bytes, err := s.Executor.Backup()
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func (s *SimpleService) Install(reader io.Reader) error {
 	if err != nil {
 		return err
 	}
-	return s.Restore(bytes)
+	return s.Executor.Restore(bytes)
 }
 
 // Command handles a service command

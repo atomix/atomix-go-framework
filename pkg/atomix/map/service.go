@@ -48,15 +48,17 @@ type Service struct {
 
 // init initializes the map service
 func (m *Service) init() {
-	m.Executor.RegisterUnary(opPut, m.Put)
-	m.Executor.RegisterUnary(opReplace, m.Replace)
-	m.Executor.RegisterUnary(opRemove, m.Remove)
-	m.Executor.RegisterUnary(opGet, m.Get)
-	m.Executor.RegisterUnary(opExists, m.Exists)
-	m.Executor.RegisterUnary(opSize, m.Size)
-	m.Executor.RegisterUnary(opClear, m.Clear)
-	m.Executor.RegisterStream(opEvents, m.Events)
-	m.Executor.RegisterStream(opEntries, m.Entries)
+	m.Executor.RegisterBackup(m.Backup)
+	m.Executor.RegisterRestore(m.Restore)
+	m.Executor.RegisterUnaryOp(opPut, m.Put)
+	m.Executor.RegisterUnaryOp(opReplace, m.Replace)
+	m.Executor.RegisterUnaryOp(opRemove, m.Remove)
+	m.Executor.RegisterUnaryOp(opGet, m.Get)
+	m.Executor.RegisterUnaryOp(opExists, m.Exists)
+	m.Executor.RegisterUnaryOp(opSize, m.Size)
+	m.Executor.RegisterUnaryOp(opClear, m.Clear)
+	m.Executor.RegisterStreamOp(opEvents, m.Events)
+	m.Executor.RegisterStreamOp(opEntries, m.Entries)
 }
 
 // Backup backs up the map service

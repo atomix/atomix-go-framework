@@ -55,9 +55,11 @@ type lockHolder struct {
 
 // init initializes the lock service
 func (l *Service) init() {
-	l.Executor.RegisterStream(opLock, l.Lock)
-	l.Executor.RegisterUnary(opUnlock, l.Unlock)
-	l.Executor.RegisterUnary(opIsLocked, l.IsLocked)
+	l.Executor.RegisterBackup(l.Backup)
+	l.Executor.RegisterRestore(l.Restore)
+	l.Executor.RegisterStreamOp(opLock, l.Lock)
+	l.Executor.RegisterUnaryOp(opUnlock, l.Unlock)
+	l.Executor.RegisterUnaryOp(opIsLocked, l.IsLocked)
 	l.SessionizedService.OnExpire(l.OnExpire)
 	l.SessionizedService.OnClose(l.OnClose)
 }

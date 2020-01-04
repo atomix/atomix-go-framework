@@ -43,9 +43,11 @@ type Service struct {
 
 // init initializes the list service
 func (v *Service) init() {
-	v.Executor.RegisterUnary(opSet, v.Set)
-	v.Executor.RegisterUnary(opGet, v.Get)
-	v.Executor.RegisterStream(opEvents, v.Events)
+	v.Executor.RegisterBackup(v.Backup)
+	v.Executor.RegisterRestore(v.Restore)
+	v.Executor.RegisterUnaryOp(opSet, v.Set)
+	v.Executor.RegisterUnaryOp(opGet, v.Get)
+	v.Executor.RegisterStreamOp(opEvents, v.Events)
 }
 
 // Backup backs up the value service

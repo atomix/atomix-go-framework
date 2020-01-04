@@ -68,12 +68,6 @@ type Service interface {
 
 	// Query applies a query to the state machine
 	Query(bytes []byte, stream streams.Stream)
-
-	// Backup must be implemented by services to return the serialized state of the service
-	Backup() ([]byte, error)
-
-	// Restore must be implemented by services to restore the state of the service from a serialized backup
-	Restore(bytes []byte) error
 }
 
 // service is an internal base for service implementations

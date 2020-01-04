@@ -35,8 +35,8 @@ type TestService struct {
 
 // init initializes the test service
 func (s *TestService) init() {
-	s.Executor.RegisterUnary("set", s.Set)
-	s.Executor.RegisterUnary("get", s.Get)
+	s.Executor.RegisterUnaryOp("set", s.Set)
+	s.Executor.RegisterUnaryOp("get", s.Get)
 }
 
 // Backup backs up the map service
