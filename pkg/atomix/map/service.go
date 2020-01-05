@@ -19,7 +19,9 @@ import (
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
+	"github.com/atomix/atomix-go-node/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
+	"io"
 )
 
 func init() {
@@ -48,8 +50,6 @@ type Service struct {
 
 // init initializes the map service
 func (m *Service) init() {
-	m.Executor.RegisterBackup(m.Backup)
-	m.Executor.RegisterRestore(m.Restore)
 	m.Executor.RegisterUnaryOp(opPut, m.Put)
 	m.Executor.RegisterUnaryOp(opReplace, m.Replace)
 	m.Executor.RegisterUnaryOp(opRemove, m.Remove)
@@ -61,8 +61,12 @@ func (m *Service) init() {
 	m.Executor.RegisterStreamOp(opEntries, m.Entries)
 }
 
-// Backup backs up the map service
-func (m *Service) Backup() ([]byte, error) {
+// Snapshot takes a snapshot of the service
+func (m *Service) Snapshot(writer io.Writer) error {
+	if err := m.SessionizedService.Snapshot(writer); err != nil {
+		return err
+	}
+
 	listeners := make([]*Listener, 0)
 	for sessionID, sessionListeners := range m.listeners {
 		for streamID, sessionListener := range sessionListeners {
@@ -74,22 +78,46 @@ func (m *Service) Backup() ([]byte, error) {
 		}
 	}
 
-	snapshot := &MapSnapshot{
-		Entries:   m.entries,
-		Listeners: listeners,
-	}
-	return proto.Marshal(snapshot)
-}
-
-// Restore restores the map service
-func (m *Service) Restore(bytes []byte) error {
-	snapshot := &MapSnapshot{}
-	if err := proto.Unmarshal(bytes, snapshot); err != nil {
+	if err := util.WriteVarInt(writer, len(listeners)); err != nil {
 		return err
 	}
-	m.entries = snapshot.Entries
+	if err := util.WriteSlice(writer, listeners, proto.Marshal); err != nil {
+		return err
+	}
+
+	return util.WriteMap(writer, m.entries, func(key string, value *MapEntryValue) ([]byte, error) {
+		return proto.Marshal(&MapEntry{
+			Key:   key,
+			Value: value,
+		})
+	})
+}
+
+// Install restores the service from a snapshot
+func (m *Service) Install(reader io.Reader) error {
+	if err := m.SessionizedService.Install(reader); err != nil {
+		return err
+	}
+
+	length, err := util.ReadVarInt(reader)
+	if err != nil {
+		return err
+	}
+
+	listeners := make([]*Listener, length)
+	err = util.ReadSlice(reader, listeners, func(data []byte) (*Listener, error) {
+		listener := &Listener{}
+		if err := proto.Unmarshal(data, listener); err != nil {
+			return nil, err
+		}
+		return listener, nil
+	})
+	if err != nil {
+		return err
+	}
+
 	m.listeners = make(map[uint64]map[uint64]listener)
-	for _, snapshotListener := range snapshot.Listeners {
+	for _, snapshotListener := range listeners {
 		sessionListeners, ok := m.listeners[snapshotListener.SessionId]
 		if !ok {
 			sessionListeners = make(map[uint64]listener)
@@ -100,6 +128,19 @@ func (m *Service) Restore(bytes []byte) error {
 			stream: m.Sessions()[snapshotListener.SessionId].Stream(snapshotListener.StreamId),
 		}
 	}
+
+	entries := make(map[string]*MapEntryValue)
+	err = util.ReadMap(reader, entries, func(data []byte) (string, *MapEntryValue, error) {
+		entry := &MapEntry{}
+		if err := proto.Unmarshal(data, entry); err != nil {
+			return "", nil, err
+		}
+		return entry.Key, entry.Value, nil
+	})
+	if err != nil {
+		return err
+	}
+	m.entries = entries
 	return nil
 }
 

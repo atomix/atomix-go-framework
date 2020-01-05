@@ -15,8 +15,6 @@
 package service
 
 import (
-	"encoding/binary"
-	"errors"
 	streams "github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	"io"
@@ -51,45 +49,12 @@ type SimpleService struct {
 
 // Snapshot takes a snapshot of the service
 func (s *SimpleService) Snapshot(writer io.Writer) error {
-	bytes, err := s.Executor.Backup()
-	if err != nil {
-		return err
-	}
-
-	length := make([]byte, 4)
-	binary.BigEndian.PutUint32(length, uint32(len(bytes)))
-
-	_, err = writer.Write(length)
-	if err != nil {
-		return err
-	}
-
-	_, err = writer.Write(bytes)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
 // Install installs a snapshot to the service
 func (s *SimpleService) Install(reader io.Reader) error {
-	lengthBytes := make([]byte, 4)
-	n, err := reader.Read(lengthBytes)
-	if err != nil {
-		return err
-	}
-
-	if n != 4 {
-		return errors.New("malformed snapshot")
-	}
-
-	length := binary.BigEndian.Uint32(lengthBytes)
-	bytes := make([]byte, length)
-	_, err = reader.Read(bytes)
-	if err != nil {
-		return err
-	}
-	return s.Executor.Restore(bytes)
+	return nil
 }
 
 // Command handles a service command

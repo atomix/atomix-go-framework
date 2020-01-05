@@ -18,7 +18,9 @@ import (
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
+	"github.com/atomix/atomix-go-node/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
+	"io"
 	"time"
 )
 
@@ -47,8 +49,6 @@ type Service struct {
 
 // init initializes the election service
 func (e *Service) init() {
-	e.Executor.RegisterBackup(e.Backup)
-	e.Executor.RegisterRestore(e.Restore)
 	e.Executor.RegisterUnaryOp(opEnter, e.Enter)
 	e.Executor.RegisterUnaryOp(opWithdraw, e.Withdraw)
 	e.Executor.RegisterUnaryOp(opAnoint, e.Anoint)
@@ -60,19 +60,36 @@ func (e *Service) init() {
 	e.SessionizedService.OnClose(e.OnClose)
 }
 
-// Backup backs up the list service
-func (e *Service) Backup() ([]byte, error) {
+// Snapshot takes a snapshot of the service
+func (e *Service) Snapshot(writer io.Writer) error {
+	if err := e.SessionizedService.Snapshot(writer); err != nil {
+		return err
+	}
+
 	snapshot := &ElectionSnapshot{
 		Term:       e.term,
 		Timestamp:  e.timestamp,
 		Leader:     e.leader,
 		Candidates: e.candidates,
 	}
-	return proto.Marshal(snapshot)
+	bytes, err := proto.Marshal(snapshot)
+	if err != nil {
+		return err
+	}
+	return util.WriteBytes(writer, bytes)
 }
 
-// Restore restores the list service
-func (e *Service) Restore(bytes []byte) error {
+// Install restores the service from a snapshot
+func (e *Service) Install(reader io.Reader) error {
+	if err := e.SessionizedService.Install(reader); err != nil {
+		return err
+	}
+
+	bytes, err := util.ReadBytes(reader)
+	if err != nil {
+		return err
+	}
+
 	snapshot := &ElectionSnapshot{}
 	if err := proto.Unmarshal(bytes, snapshot); err != nil {
 		return err

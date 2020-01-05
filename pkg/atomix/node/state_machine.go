@@ -122,7 +122,7 @@ func (s *primitiveStateMachine) Snapshot(writer io.Writer) error {
 }
 
 func (s *primitiveStateMachine) Install(reader io.Reader) error {
-	s.services = make(map[string]*serviceStateMachine)
+	services := make(map[string]*serviceStateMachine)
 
 	countBytes := make([]byte, 4)
 	n, err := reader.Read(countBytes)
@@ -151,10 +151,14 @@ func (s *primitiveStateMachine) Install(reader io.Reader) error {
 			if err = proto.Unmarshal(bytes, serviceID); err != nil {
 				return err
 			}
-			svc := s.registry.services[serviceID.Type](newServiceContext(s.ctx, serviceID))
-			s.services[getQualifiedServiceName(serviceID)] = newServiceStateMachine(serviceID.Type, svc, true)
+			svc := newServiceStateMachine(serviceID.Type, s.registry.services[serviceID.Type](newServiceContext(s.ctx, serviceID)), true)
+			services[getQualifiedServiceName(serviceID)] = svc
+			if err := svc.Install(reader); err != nil {
+				return err
+			}
 		}
 	}
+	s.services = services
 	return nil
 }
 

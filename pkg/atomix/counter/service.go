@@ -17,7 +17,9 @@ package counter
 import (
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
+	"github.com/atomix/atomix-go-node/pkg/atomix/util"
 	"github.com/gogo/protobuf/proto"
+	"io"
 )
 
 func init() {
@@ -41,8 +43,6 @@ type Service struct {
 
 // init initializes the list service
 func (c *Service) init() {
-	c.Executor.RegisterBackup(c.Backup)
-	c.Executor.RegisterRestore(c.Restore)
 	c.Executor.RegisterUnaryOp(opGet, c.Get)
 	c.Executor.RegisterUnaryOp(opSet, c.Set)
 	c.Executor.RegisterUnaryOp(opIncrement, c.Increment)
@@ -50,16 +50,33 @@ func (c *Service) init() {
 	c.Executor.RegisterUnaryOp(opCAS, c.CAS)
 }
 
-// Backup backs up the list service
-func (c *Service) Backup() ([]byte, error) {
+// Snapshot takes a snapshot of the service
+func (c *Service) Snapshot(writer io.Writer) error {
+	if err := c.SimpleService.Snapshot(writer); err != nil {
+		return err
+	}
+
 	snapshot := &CounterSnapshot{
 		Value: c.value,
 	}
-	return proto.Marshal(snapshot)
+	bytes, err := proto.Marshal(snapshot)
+	if err != nil {
+		return err
+	}
+	return util.WriteBytes(writer, bytes)
 }
 
-// Restore restores the list service
-func (c *Service) Restore(bytes []byte) error {
+// Install restores the service from a snapshot
+func (c *Service) Install(reader io.Reader) error {
+	if err := c.SimpleService.Install(reader); err != nil {
+		return err
+	}
+
+	bytes, err := util.ReadBytes(reader)
+	if err != nil {
+		return err
+	}
+
 	snapshot := &CounterSnapshot{}
 	if err := proto.Unmarshal(bytes, snapshot); err != nil {
 		return err

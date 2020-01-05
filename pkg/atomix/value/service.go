@@ -18,7 +18,9 @@ import (
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
+	"github.com/atomix/atomix-go-node/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
+	"io"
 )
 
 func init() {
@@ -43,30 +45,42 @@ type Service struct {
 
 // init initializes the list service
 func (v *Service) init() {
-	v.Executor.RegisterBackup(v.Backup)
-	v.Executor.RegisterRestore(v.Restore)
 	v.Executor.RegisterUnaryOp(opSet, v.Set)
 	v.Executor.RegisterUnaryOp(opGet, v.Get)
 	v.Executor.RegisterStreamOp(opEvents, v.Events)
 }
 
-// Backup backs up the value service
-func (v *Service) Backup() ([]byte, error) {
-	snapshot := &ValueSnapshot{
-		Value:   v.value,
-		Version: v.version,
-	}
-	return proto.Marshal(snapshot)
-}
-
-// Restore restores the value service
-func (v *Service) Restore(bytes []byte) error {
-	snapshot := &ValueSnapshot{}
-	if err := proto.Unmarshal(bytes, snapshot); err != nil {
+// Snapshot takes a snapshot of the service
+func (v *Service) Snapshot(writer io.Writer) error {
+	if err := v.SessionizedService.Snapshot(writer); err != nil {
 		return err
 	}
-	v.value = snapshot.Value
-	v.version = snapshot.Version
+
+	if err := util.WriteVarUint64(writer, v.version); err != nil {
+		return err
+	}
+	if err := util.WriteBytes(writer, v.value); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Install restores the service from a snapshot
+func (v *Service) Install(reader io.Reader) error {
+	if err := v.SessionizedService.Install(reader); err != nil {
+		return err
+	}
+
+	version, err := util.ReadVarUint64(reader)
+	if err != nil {
+		return err
+	}
+	v.version = version
+	value, err := util.ReadBytes(reader)
+	if err != nil {
+		return err
+	}
+	v.value = value
 	return nil
 }
 

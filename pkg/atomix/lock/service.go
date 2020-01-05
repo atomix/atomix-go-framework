@@ -19,7 +19,9 @@ import (
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
+	"github.com/atomix/atomix-go-node/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
+	"io"
 	"time"
 )
 
@@ -55,8 +57,6 @@ type lockHolder struct {
 
 // init initializes the lock service
 func (l *Service) init() {
-	l.Executor.RegisterBackup(l.Backup)
-	l.Executor.RegisterRestore(l.Restore)
 	l.Executor.RegisterStreamOp(opLock, l.Lock)
 	l.Executor.RegisterUnaryOp(opUnlock, l.Unlock)
 	l.Executor.RegisterUnaryOp(opIsLocked, l.IsLocked)
@@ -64,8 +64,12 @@ func (l *Service) init() {
 	l.SessionizedService.OnClose(l.OnClose)
 }
 
-// Backup backs up the lock service
-func (l *Service) Backup() ([]byte, error) {
+// Snapshot takes a snapshot of the service
+func (l *Service) Snapshot(writer io.Writer) error {
+	if err := l.SessionizedService.Snapshot(writer); err != nil {
+		return err
+	}
+
 	var lock *LockCall
 	if l.lock != nil {
 		lock = &LockCall{
@@ -91,11 +95,24 @@ func (l *Service) Backup() ([]byte, error) {
 		Lock:  lock,
 		Queue: queue,
 	}
-	return proto.Marshal(snapshot)
+	bytes, err := proto.Marshal(snapshot)
+	if err != nil {
+		return err
+	}
+	return util.WriteBytes(writer, bytes)
 }
 
-// Restore restores the lock service
-func (l *Service) Restore(bytes []byte) error {
+// Install restores the service from a snapshot
+func (l *Service) Install(reader io.Reader) error {
+	if err := l.SessionizedService.Install(reader); err != nil {
+		return err
+	}
+
+	bytes, err := util.ReadBytes(reader)
+	if err != nil {
+		return err
+	}
+
 	snapshot := &LockSnapshot{}
 	if err := proto.Unmarshal(bytes, snapshot); err != nil {
 		return err

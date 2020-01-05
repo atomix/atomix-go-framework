@@ -16,8 +16,6 @@ package service
 
 import (
 	"container/list"
-	"encoding/binary"
-	"errors"
 	"fmt"
 	streams "github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/atomix/atomix-go-node/pkg/atomix/util"
@@ -72,18 +70,11 @@ func (s *SessionizedService) Sessions() map[uint64]*Session {
 
 // Snapshot takes a snapshot of the service
 func (s *SessionizedService) Snapshot(writer io.Writer) error {
-	if err := s.snapshotSessions(writer); err != nil {
-		return err
-	}
-	if err := s.snapshotService(writer); err != nil {
-		return err
-	}
-	return nil
+	return s.snapshotSessions(writer)
 }
 
 func (s *SessionizedService) snapshotSessions(writer io.Writer) error {
-	sessions := make([]*SessionSnapshot, 0, len(s.sessions))
-	for _, session := range s.sessions {
+	return util.WriteMap(writer, s.sessions, func(id uint64, session *Session) ([]byte, error) {
 		streams := make([]*SessionStreamSnapshot, 0, len(session.streams))
 		for _, stream := range session.streams {
 			streams = append(streams, &SessionStreamSnapshot{
@@ -93,107 +84,43 @@ func (s *SessionizedService) snapshotSessions(writer io.Writer) error {
 				LastCompleted:  stream.completeID,
 			})
 		}
-		sessions = append(sessions, &SessionSnapshot{
+		snapshot := &SessionSnapshot{
 			SessionID:       session.ID,
 			Timeout:         session.Timeout,
 			Timestamp:       session.LastUpdated,
 			CommandSequence: session.commandSequence,
 			Streams:         streams,
-		})
-	}
-
-	snapshot := &SessionizedServiceSnapshot{
-		Index:     s.context.Index(),
-		Timestamp: uint64(s.context.Timestamp().UnixNano()),
-		Sessions:  sessions,
-	}
-	bytes, err := proto.Marshal(snapshot)
-	if err != nil {
-		return err
-	}
-
-	length := make([]byte, 4)
-	binary.BigEndian.PutUint32(length, uint32(len(bytes)))
-
-	_, err = writer.Write(length)
-	if err != nil {
-		return err
-	}
-
-	_, err = writer.Write(bytes)
-	if err != nil {
-		return err
-	}
-	return err
-}
-
-func (s *SessionizedService) snapshotService(writer io.Writer) error {
-	bytes, err := s.Executor.Backup()
-	if err != nil {
-		return err
-	}
-
-	length := make([]byte, 4)
-	binary.BigEndian.PutUint32(length, uint32(len(bytes)))
-
-	_, err = writer.Write(length)
-	if err != nil {
-		return err
-	}
-
-	_, err = writer.Write(bytes)
-	if err != nil {
-		return err
-	}
-	return nil
+		}
+		return proto.Marshal(snapshot)
+	})
 }
 
 // Install installs a snapshot of the service
 func (s *SessionizedService) Install(reader io.Reader) error {
-	if err := s.installSessions(reader); err != nil {
-		return err
-	}
-	if err := s.installService(reader); err != nil {
-		return err
-	}
-	return nil
+	return s.installSessions(reader)
 }
 
 func (s *SessionizedService) installSessions(reader io.Reader) error {
-	lengthBytes := make([]byte, 4)
-	n, err := reader.Read(lengthBytes)
-	if err != nil {
-		return err
-	}
-
-	if n != 4 {
-		return errors.New("malformed snapshot")
-	}
-
-	length := binary.BigEndian.Uint32(lengthBytes)
-	bytes := make([]byte, length)
-	_, err = reader.Read(bytes)
-	if err != nil {
-		return err
-	}
-
-	snapshot := &SessionizedServiceSnapshot{}
-	err = proto.Unmarshal(bytes, snapshot)
-	if err != nil {
-		return err
-	}
-
 	s.sessions = make(map[uint64]*Session)
-	for _, state := range snapshot.Sessions {
+	return util.ReadMap(reader, s.sessions, func(data []byte) (uint64, *Session, error) {
+		snapshot := &SessionSnapshot{}
+		if err := proto.Unmarshal(data, snapshot); err != nil {
+			return 0, nil, err
+		}
+
 		session := &Session{
-			ID:              state.SessionID,
-			Timeout:         time.Duration(state.Timeout),
-			LastUpdated:     state.Timestamp,
-			commandSequence: state.CommandSequence,
+			ID:               snapshot.SessionID,
+			Timeout:          time.Duration(snapshot.Timeout),
+			LastUpdated:      snapshot.Timestamp,
+			ctx:              s.Context,
+			commandSequence:  snapshot.CommandSequence,
+			commandCallbacks: make(map[uint64]func()),
+			queryCallbacks:   make(map[uint64]*list.List),
+			streams:          make(map[uint64]*sessionStream),
 		}
 
 		sessionStreams := make(map[uint64]*sessionStream)
-		for _, stream := range state.Streams {
+		for _, stream := range snapshot.Streams {
 			sessionStreams[stream.StreamId] = &sessionStream{
 				ID:         stream.StreamId,
 				Type:       stream.Type,
@@ -206,29 +133,8 @@ func (s *SessionizedService) installSessions(reader io.Reader) error {
 			}
 		}
 		session.streams = sessionStreams
-		s.sessions[session.ID] = session
-	}
-	return nil
-}
-
-func (s *SessionizedService) installService(reader io.Reader) error {
-	lengthBytes := make([]byte, 4)
-	n, err := reader.Read(lengthBytes)
-	if err != nil {
-		return err
-	}
-
-	if n != 4 {
-		return errors.New("malformed snapshot")
-	}
-
-	length := binary.BigEndian.Uint32(lengthBytes)
-	bytes := make([]byte, length)
-	_, err = reader.Read(bytes)
-	if err != nil {
-		return err
-	}
-	return s.Executor.Restore(bytes)
+		return session.ID, session, nil
+	})
 }
 
 // CanDelete returns a boolean indicating whether entries up to the given index can be deleted

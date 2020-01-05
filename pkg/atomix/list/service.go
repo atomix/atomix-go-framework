@@ -18,7 +18,9 @@ import (
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
+	"github.com/atomix/atomix-go-node/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
+	"io"
 )
 
 func init() {
@@ -43,8 +45,6 @@ type Service struct {
 
 // init initializes the list service
 func (l *Service) init() {
-	l.Executor.RegisterBackup(l.Backup)
-	l.Executor.RegisterRestore(l.Restore)
 	l.Executor.RegisterUnaryOp(opSize, l.Size)
 	l.Executor.RegisterUnaryOp(opContains, l.Contains)
 	l.Executor.RegisterUnaryOp(opAppend, l.Append)
@@ -57,22 +57,34 @@ func (l *Service) init() {
 	l.Executor.RegisterStreamOp(opIterate, l.Iterate)
 }
 
-// Backup backs up the list service
-func (l *Service) Backup() ([]byte, error) {
-	snapshot := &ListSnapshot{
-		Values: l.values,
-	}
-	return proto.Marshal(snapshot)
-}
-
-// Restore restores the list service
-func (l *Service) Restore(bytes []byte) error {
-	snapshot := &ListSnapshot{}
-	if err := proto.Unmarshal(bytes, snapshot); err != nil {
+// Snapshot takes a snapshot of the service
+func (l *Service) Snapshot(writer io.Writer) error {
+	if err := l.SessionizedService.Snapshot(writer); err != nil {
 		return err
 	}
-	l.values = snapshot.Values
-	return nil
+
+	if err := util.WriteVarInt(writer, len(l.values)); err != nil {
+		return err
+	}
+	return util.WriteSlice(writer, l.values, func(value string) ([]byte, error) {
+		return []byte(value), nil
+	})
+}
+
+// Install restores the service from a snapshot
+func (l *Service) Install(reader io.Reader) error {
+	if err := l.SessionizedService.Install(reader); err != nil {
+		return err
+	}
+
+	length, err := util.ReadVarInt(reader)
+	if err != nil {
+		return err
+	}
+	l.values = make([]string, length)
+	return util.ReadSlice(reader, l.values, func(data []byte) (string, error) {
+		return string(data), nil
+	})
 }
 
 // Size gets the size of the list

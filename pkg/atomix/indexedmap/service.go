@@ -19,7 +19,9 @@ import (
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
+	"github.com/atomix/atomix-go-node/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
+	"io"
 )
 
 func init() {
@@ -53,8 +55,6 @@ type Service struct {
 
 // init initializes the map service
 func (m *Service) init() {
-	m.Executor.RegisterBackup(m.Backup)
-	m.Executor.RegisterRestore(m.Restore)
 	m.Executor.RegisterUnaryOp(opPut, m.Put)
 	m.Executor.RegisterUnaryOp(opReplace, m.Replace)
 	m.Executor.RegisterUnaryOp(opRemove, m.Remove)
@@ -77,13 +77,10 @@ type LinkedMapEntryValue struct {
 	Next *LinkedMapEntryValue
 }
 
-// Backup backs up the map service
-func (m *Service) Backup() ([]byte, error) {
-	entries := make([]*MapEntryValue, len(m.entries))
-	entry := m.firstEntry
-	for entry != nil {
-		entries = append(entries, entry.MapEntryValue)
-		entry = entry.Next
+// Snapshot takes a snapshot of the service
+func (m *Service) Snapshot(writer io.Writer) error {
+	if err := m.SessionizedService.Snapshot(writer); err != nil {
+		return err
 	}
 
 	listeners := make([]*Listener, 0)
@@ -93,36 +90,97 @@ func (m *Service) Backup() ([]byte, error) {
 				SessionId: sessionID,
 				StreamId:  streamID,
 				Key:       sessionListener.key,
-				Index:     sessionListener.index,
 			})
 		}
 	}
 
-	snapshot := &MapSnapshot{
-		Index:     m.lastIndex,
-		Entries:   entries,
-		Listeners: listeners,
+	if err := util.WriteVarInt(writer, len(listeners)); err != nil {
+		return err
 	}
-	return proto.Marshal(snapshot)
+	if err := util.WriteSlice(writer, listeners, proto.Marshal); err != nil {
+		return err
+	}
+	if err := util.WriteVarUint64(writer, m.lastIndex); err != nil {
+		return err
+	}
+	if err := util.WriteVarInt(writer, len(m.entries)); err != nil {
+		return err
+	}
+	entry := m.firstEntry
+	for entry != nil {
+		if err := util.WriteValue(writer, entry.MapEntryValue, proto.Marshal); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-// Restore restores the map service
-func (m *Service) Restore(bytes []byte) error {
-	snapshot := &MapSnapshot{}
-	if err := proto.Unmarshal(bytes, snapshot); err != nil {
+// Install restores the service from a snapshot
+func (m *Service) Install(reader io.Reader) error {
+	if err := m.SessionizedService.Install(reader); err != nil {
 		return err
 	}
 
-	m.lastIndex = snapshot.Index
+	length, err := util.ReadVarInt(reader)
+	if err != nil {
+		return err
+	}
+
+	listeners := make([]*Listener, length)
+	err = util.ReadSlice(reader, listeners, func(data []byte) (*Listener, error) {
+		listener := &Listener{}
+		if err := proto.Unmarshal(data, listener); err != nil {
+			return nil, err
+		}
+		return listener, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	m.listeners = make(map[uint64]map[uint64]listener)
+	for _, snapshotListener := range listeners {
+		sessionListeners, ok := m.listeners[snapshotListener.SessionId]
+		if !ok {
+			sessionListeners = make(map[uint64]listener)
+			m.listeners[snapshotListener.SessionId] = sessionListeners
+		}
+		sessionListeners[snapshotListener.StreamId] = listener{
+			key:    snapshotListener.Key,
+			stream: m.Sessions()[snapshotListener.SessionId].Stream(snapshotListener.StreamId),
+		}
+	}
+
+	lastIndex, err := util.ReadVarUint64(reader)
+	if err != nil {
+		return err
+	}
+	m.lastIndex = lastIndex
+
+	entryCount, err := util.ReadVarInt(reader)
+	if err != nil {
+		return err
+	}
+
+	var prevEntry *LinkedMapEntryValue
 	m.firstEntry = nil
 	m.lastEntry = nil
 	m.entries = make(map[string]*LinkedMapEntryValue)
 	m.indexes = make(map[uint64]*LinkedMapEntryValue)
+	for i := 0; i < entryCount; i++ {
+		value, err := util.ReadValue(reader, func(data []byte) (*MapEntryValue, error) {
+			entry := &MapEntryValue{}
+			if err := proto.Unmarshal(data, entry); err != nil {
+				return nil, err
+			}
+			return entry, nil
+		})
+		if err != nil {
+			return err
+		}
 
-	var prevEntry *LinkedMapEntryValue
-	for _, entry := range snapshot.Entries {
 		linkedEntry := &LinkedMapEntryValue{
-			MapEntryValue: entry,
+			MapEntryValue: value.(*MapEntryValue),
 		}
 		if m.firstEntry == nil {
 			m.firstEntry = linkedEntry
@@ -136,21 +194,6 @@ func (m *Service) Restore(bytes []byte) error {
 		prevEntry = linkedEntry
 		m.lastEntry = linkedEntry
 	}
-
-	m.listeners = make(map[uint64]map[uint64]listener)
-	for _, snapshotListener := range snapshot.Listeners {
-		sessionListeners, ok := m.listeners[snapshotListener.SessionId]
-		if !ok {
-			sessionListeners = make(map[uint64]listener)
-			m.listeners[snapshotListener.SessionId] = sessionListeners
-		}
-		sessionListeners[snapshotListener.StreamId] = listener{
-			key:    snapshotListener.Key,
-			stream: m.Sessions()[snapshotListener.SessionId].Stream(snapshotListener.StreamId),
-		}
-	}
-
-	// TODO: Restore TTLs!
 	return nil
 }
 

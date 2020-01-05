@@ -18,7 +18,9 @@ import (
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
+	"github.com/atomix/atomix-go-node/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
+	"io"
 )
 
 func init() {
@@ -43,8 +45,6 @@ type Service struct {
 
 // init initializes the list service
 func (s *Service) init() {
-	s.Executor.RegisterBackup(s.Backup)
-	s.Executor.RegisterRestore(s.Restore)
 	s.Executor.RegisterUnaryOp(opSize, s.Size)
 	s.Executor.RegisterUnaryOp(opContains, s.Contains)
 	s.Executor.RegisterUnaryOp(opAdd, s.Add)
@@ -54,22 +54,27 @@ func (s *Service) init() {
 	s.Executor.RegisterStreamOp(opIterate, s.Iterate)
 }
 
-// Backup backs up the list service
-func (s *Service) Backup() ([]byte, error) {
-	snapshot := &SetSnapshot{
-		Values: s.values,
-	}
-	return proto.Marshal(snapshot)
-}
-
-// Restore restores the list service
-func (s *Service) Restore(bytes []byte) error {
-	snapshot := &SetSnapshot{}
-	if err := proto.Unmarshal(bytes, snapshot); err != nil {
+// Snapshot takes a snapshot of the service
+func (s *Service) Snapshot(writer io.Writer) error {
+	if err := s.SessionizedService.Snapshot(writer); err != nil {
 		return err
 	}
-	s.values = snapshot.Values
-	return nil
+
+	return util.WriteMap(writer, s.values, func(key string, value bool) ([]byte, error) {
+		return []byte(key), nil
+	})
+}
+
+// Install restores the service from a snapshot
+func (s *Service) Install(reader io.Reader) error {
+	if err := s.SessionizedService.Install(reader); err != nil {
+		return err
+	}
+
+	s.values = make(map[string]bool)
+	return util.ReadMap(reader, s.values, func(data []byte) (string, bool, error) {
+		return string(data), true, nil
+	})
 }
 
 // Size gets the number of elements in the set
