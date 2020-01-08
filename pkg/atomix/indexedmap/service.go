@@ -693,7 +693,7 @@ func (m *Service) Events(bytes []byte, stream stream.Stream) {
 	}))
 
 	// Create and populate the listener
-	l := listener{
+	lis := listener{
 		key:    request.Key,
 		index:  request.Index,
 		stream: stream,
@@ -703,12 +703,12 @@ func (m *Service) Events(bytes []byte, stream stream.Stream) {
 		listeners = make(map[uint64]listener)
 		m.listeners[m.Session().ID] = listeners
 	}
-	listeners[m.Session().StreamID()] = l
+	listeners[m.Session().StreamID()] = lis
 
 	if request.Replay {
 		entry := m.firstEntry
 		for entry != nil {
-			stream.Result(proto.Marshal(&ListenResponse{
+			bytes, err := proto.Marshal(&ListenResponse{
 				Type:    ListenResponse_NONE,
 				Key:     entry.Key,
 				Index:   entry.Index,
@@ -716,7 +716,23 @@ func (m *Service) Events(bytes []byte, stream stream.Stream) {
 				Version: entry.Version,
 				Created: entry.Created,
 				Updated: entry.Updated,
-			}))
+			})
+			if err != nil {
+				stream.Error(err)
+				continue
+			}
+
+			if lis.key != "" {
+				if entry.Key == lis.key {
+					lis.stream.Value(bytes)
+				}
+			} else if lis.index > 0 {
+				if entry.Index == lis.index {
+					lis.stream.Value(bytes)
+				}
+			} else {
+				lis.stream.Value(bytes)
+			}
 			entry = entry.Next
 		}
 	}
