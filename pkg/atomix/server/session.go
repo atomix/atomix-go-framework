@@ -117,7 +117,9 @@ func (s *SessionizedServer) writeStream(request []byte, header *headers.RequestH
 			}
 		}
 	}()
-	return s.Client.Write(context.TODO(), bytes, streams.NewChannelStream(streamCh))
+
+	go s.Client.Write(context.TODO(), bytes, streams.NewChannelStream(streamCh))
+	return nil
 }
 
 // read sends a read to the service
@@ -205,7 +207,9 @@ func (s *SessionizedServer) readStream(request []byte, header *headers.RequestHe
 			}
 		}
 	}()
-	return s.Client.Read(context.TODO(), bytes, streams.NewChannelStream(streamCh))
+
+	go s.Client.Read(context.TODO(), bytes, streams.NewChannelStream(streamCh))
+	return nil
 }
 
 // Command submits a command to the service
