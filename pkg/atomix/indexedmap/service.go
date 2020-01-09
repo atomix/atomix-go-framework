@@ -207,7 +207,7 @@ func (m *Service) Put(value []byte) ([]byte, error) {
 	var oldEntry *LinkedMapEntryValue
 	if request.Index > 0 {
 		oldEntry = m.indexes[request.Index]
-		if oldEntry == nil {
+		if oldEntry != nil && oldEntry.Key != request.Key {
 			return proto.Marshal(&PutResponse{
 				Status: UpdateStatus_PRECONDITION_FAILED,
 			})
@@ -225,13 +225,21 @@ func (m *Service) Put(value []byte) ([]byte, error) {
 		}
 
 		// Increment the index for a new entry
-		m.lastIndex++
-		nextIndex := m.lastIndex
+		var index uint64
+		if request.Index > 0 {
+			if request.Index > m.lastIndex {
+				m.lastIndex = request.Index
+			}
+			index = request.Index
+		} else {
+			m.lastIndex++
+			index = m.lastIndex
+		}
 
 		// Create a new entry value and set it in the map.
 		newEntry := &LinkedMapEntryValue{
 			MapEntryValue: &MapEntryValue{
-				Index:   nextIndex,
+				Index:   index,
 				Key:     request.Key,
 				Value:   request.Value,
 				Version: m.Context.Index(),
@@ -249,9 +257,19 @@ func (m *Service) Put(value []byte) ([]byte, error) {
 		}
 
 		// If the last entry is set, link it to the new entry
-		if m.lastEntry != nil {
-			m.lastEntry.Next = newEntry
-			newEntry.Prev = m.lastEntry
+		if request.Index > 0 {
+			if m.lastIndex == request.Index {
+				if m.lastEntry != nil {
+					m.lastEntry.Next = newEntry
+					newEntry.Prev = m.lastEntry
+				}
+				m.lastEntry = newEntry
+			}
+		} else {
+			if m.lastEntry != nil {
+				m.lastEntry.Next = newEntry
+				newEntry.Prev = m.lastEntry
+			}
 		}
 
 		// Update the last entry
