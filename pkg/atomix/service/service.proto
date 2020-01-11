@@ -112,12 +112,11 @@ message RequestContext {
 
 message ResponseContext {
     uint64 index = 1;
+    ResponseType type = 2;
 }
 
-message StreamResponse {
-    StreamContext context = 1;
-    bytes output = 2;
-}
-message StreamContext {
-    uint64 index = 1;
+enum ResponseType {
+    RESPONSE = 0;
+    OPEN_STREAM = 1;
+    CLOSE_STREAM = 2;
 }

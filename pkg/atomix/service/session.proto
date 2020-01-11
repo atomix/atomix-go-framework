@@ -21,6 +21,7 @@ package atomix.service;
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "gogoproto/gogo.proto";
+import "atomix/service/service.proto";
 
 // Sessionized service snapshot
 message SessionizedServiceSnapshot {
@@ -129,6 +130,7 @@ message SessionResponseContext {
     uint64 stream_id = 1 [(gogoproto.customname) = "StreamID"];
     uint64 index = 2;
     uint64 sequence = 3;
+    ResponseType type = 4;
 }
 
 message PrimitiveEvent {

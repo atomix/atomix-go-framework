@@ -15,6 +15,7 @@
 package service
 
 import (
+	"fmt"
 	streams "github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	"io"
@@ -66,7 +67,7 @@ func (s *SimpleService) Command(bytes []byte, stream streams.Stream) {
 		stream.Close()
 	} else {
 		s.scheduler.runScheduledTasks(s.Context.Timestamp())
-		stream := streams.NewEncodingStream(stream, func(value []byte) ([]byte, error) {
+		responseStream := streams.NewEncodingStream(stream, func(value []byte) ([]byte, error) {
 			return proto.Marshal(&CommandResponse{
 				Context: &ResponseContext{
 					Index: s.Context.Index(),
@@ -74,10 +75,35 @@ func (s *SimpleService) Command(bytes []byte, stream streams.Stream) {
 				Output: value,
 			})
 		})
-		if err := s.Executor.Execute(command.Name, command.Command, stream); err != nil {
-			stream.Error(err)
-			stream.Close()
+
+		operation := s.Executor.GetOperation(command.Name)
+		if operation == nil {
+			responseStream.Error(fmt.Errorf("unknown operation: %s", command.Name))
+			responseStream.Close()
 			return
+		}
+
+		if streamOp, ok := operation.(StreamingOperation); ok {
+			stream.Result(proto.Marshal(&CommandResponse{
+				Context: &ResponseContext{
+					Index: s.Context.Index(),
+					Type:  ResponseType_OPEN_STREAM,
+				},
+			}))
+
+			responseStream = streams.NewCloserStream(responseStream, func(_ streams.Stream) {
+				stream.Result(proto.Marshal(&CommandResponse{
+					Context: &ResponseContext{
+						Index: s.Context.Index(),
+						Type:  ResponseType_CLOSE_STREAM,
+					},
+				}))
+			})
+
+			streamOp.Execute(command.Command, responseStream)
+		} else if unaryOp, ok := operation.(UnaryOperation); ok {
+			stream.Result(unaryOp.Execute(command.Command))
+			stream.Close()
 		}
 
 		s.scheduler.runImmediateTasks()
@@ -92,29 +118,55 @@ func (s *SimpleService) Query(bytes []byte, stream streams.Stream) {
 		stream.Error(err)
 		stream.Close()
 	} else {
-		stream := streams.NewEncodingStream(stream, func(value []byte) ([]byte, error) {
-			return proto.Marshal(&QueryResponse{
-				Context: &ResponseContext{
-					Index: s.Context.Index(),
-				},
-				Output: value,
-			})
-		})
-
 		if query.Context.Index > s.Context.Index() {
 			s.Scheduler.ScheduleIndex(query.Context.Index, func() {
-				s.context.setQuery()
-				if err := s.Executor.Execute(query.Name, query.Query, stream); err != nil {
-					stream.Error(err)
-					stream.Close()
-				}
+				s.execute(query, stream)
 			})
 		} else {
-			s.context.setQuery()
-			if err := s.Executor.Execute(query.Name, query.Query, stream); err != nil {
-				stream.Error(err)
-				stream.Close()
-			}
+			s.execute(query, stream)
 		}
+	}
+}
+
+func (s *SimpleService) execute(query *QueryRequest, stream streams.Stream) {
+	s.context.setQuery()
+
+	responseStream := streams.NewEncodingStream(stream, func(value []byte) ([]byte, error) {
+		return proto.Marshal(&QueryResponse{
+			Context: &ResponseContext{
+				Index: s.Context.Index(),
+			},
+			Output: value,
+		})
+	})
+
+	operation := s.Executor.GetOperation(query.Name)
+	if operation == nil {
+		responseStream.Error(fmt.Errorf("unknown operation: %s", query.Name))
+		responseStream.Close()
+		return
+	}
+
+	if streamOp, ok := operation.(StreamingOperation); ok {
+		stream.Result(proto.Marshal(&CommandResponse{
+			Context: &ResponseContext{
+				Index: s.Context.Index(),
+				Type:  ResponseType_OPEN_STREAM,
+			},
+		}))
+
+		responseStream = streams.NewCloserStream(responseStream, func(_ streams.Stream) {
+			stream.Result(proto.Marshal(&CommandResponse{
+				Context: &ResponseContext{
+					Index: s.Context.Index(),
+					Type:  ResponseType_CLOSE_STREAM,
+				},
+			}))
+		})
+
+		streamOp.Execute(query.Query, responseStream)
+	} else if unaryOp, ok := operation.(UnaryOperation); ok {
+		stream.Result(unaryOp.Execute(query.Query))
+		stream.Close()
 	}
 }

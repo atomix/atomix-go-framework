@@ -185,12 +185,18 @@ func (s *SessionizedService) applyCommand(request *SessionCommandRequest, stream
 	} else {
 		sequenceNumber := request.Context.SequenceNumber
 		if sequenceNumber != 0 && sequenceNumber <= session.commandSequence {
-			streamCtx := session.getStream(sequenceNumber)
-			if stream != nil {
-				streamCtx.replay(streamCtx)
-			} else {
-				stream.Error(fmt.Errorf("sequence number %d has already been acknowledged", sequenceNumber))
+			result, ok := session.getResult(sequenceNumber)
+			if ok {
+				stream.Send(result)
 				stream.Close()
+			} else {
+				streamCtx := session.getStream(sequenceNumber)
+				if stream != nil {
+					streamCtx.replay(streamCtx)
+				} else {
+					stream.Error(fmt.Errorf("sequence number %d has already been acknowledged", sequenceNumber))
+					stream.Close()
+				}
 			}
 		} else if sequenceNumber > session.nextCommandSequence() {
 			session.scheduleCommand(sequenceNumber, func() {
@@ -215,9 +221,20 @@ func (s *SessionizedService) applySessionCommand(request *SessionCommandRequest,
 		stream.Close()
 	} else {
 		s.session = session
-		streamCtx := session.addStream(request.Context.SequenceNumber, request.Name, stream)
-		if err := s.Executor.Execute(request.Name, request.Input, streamCtx); err != nil {
-			stream.Error(err)
+
+		operation := s.Executor.GetOperation(request.Name)
+		if unaryOp, ok := operation.(UnaryOperation); ok {
+			output, err := unaryOp.Execute(request.Input)
+			result := streams.Result{
+				Value: output,
+				Error: err,
+			}
+			stream.Send(result)
+			session.addResult(request.Context.SequenceNumber, result)
+		} else if streamOp, ok := operation.(StreamingOperation); ok {
+			streamCtx := session.addStream(request.Context.SequenceNumber, request.Name, stream)
+			streamOp.Execute(request.Input, streamCtx)
+		} else {
 			stream.Close()
 		}
 		session.completeCommand(request.Context.SequenceNumber)
@@ -367,10 +384,45 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 	})
 
 	s.context.setQuery()
-	if err := s.Executor.Execute(query.Name, query.Input, stream); err != nil {
-		util.SessionEntry(s.Context.Node(), s.context.Namespace(), s.context.Name(), query.Context.SessionID).
-			Warnf("An application error occurred: %s", err)
-		stream.Error(err)
+
+	responseStream := streams.NewEncodingStream(stream, func(value []byte) ([]byte, error) {
+		return proto.Marshal(&QueryResponse{
+			Context: &ResponseContext{
+				Index: s.Context.Index(),
+			},
+			Output: value,
+		})
+	})
+
+	operation := s.Executor.GetOperation(query.Name)
+	if operation == nil {
+		responseStream.Error(fmt.Errorf("unknown operation: %s", query.Name))
+		responseStream.Close()
+		return
+	}
+
+	if unaryOp, ok := operation.(UnaryOperation); ok {
+		stream.Result(unaryOp.Execute(query.Input))
+		stream.Close()
+	} else if streamOp, ok := operation.(StreamingOperation); ok {
+		stream.Result(proto.Marshal(&CommandResponse{
+			Context: &ResponseContext{
+				Index: s.Context.Index(),
+				Type:  ResponseType_OPEN_STREAM,
+			},
+		}))
+
+		responseStream = streams.NewCloserStream(responseStream, func(_ streams.Stream) {
+			stream.Result(proto.Marshal(&CommandResponse{
+				Context: &ResponseContext{
+					Index: s.Context.Index(),
+					Type:  ResponseType_CLOSE_STREAM,
+				},
+			}))
+		})
+
+		streamOp.Execute(query.Input, responseStream)
+	} else {
 		stream.Close()
 	}
 }
@@ -419,6 +471,7 @@ type Session struct {
 	ackSequence      uint64
 	commandCallbacks map[uint64]func()
 	queryCallbacks   map[uint64]*list.List
+	results          map[uint64]streams.Result
 	streams          map[uint64]*sessionStream
 	streamID         uint64
 }
@@ -458,6 +511,17 @@ func (s *Session) StreamsOf(op string) []streams.Stream {
 	return streams
 }
 
+// getResult gets a unary result
+func (s *Session) getResult(id uint64) (streams.Result, bool) {
+	result, ok := s.results[id]
+	return result, ok
+}
+
+// addResult adds a unary result
+func (s *Session) addResult(id uint64, result streams.Result) {
+	s.results[id] = result
+}
+
 // addStream adds a stream at the given sequence number
 func (s *Session) addStream(id uint64, op string, outStream streams.Stream) streams.Stream {
 	stream := &sessionStream{
@@ -470,6 +534,7 @@ func (s *Session) addStream(id uint64, op string, outStream streams.Stream) stre
 	}
 	s.streams[id] = stream
 	s.streamID = id
+	stream.open()
 	util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.ID, id).
 		Trace("Stream open")
 	return stream
@@ -482,6 +547,12 @@ func (s *Session) getStream(id uint64) *sessionStream {
 
 // ack acknowledges response streams up to the given request sequence number
 func (s *Session) ack(id uint64, streams map[uint64]uint64) {
+	for responseId := range s.results {
+		if responseId > id {
+			continue
+		}
+		delete(s.results, responseId)
+	}
 	for streamID, stream := range s.streams {
 		// If the stream ID is greater than the acknowledged sequence number, skip it
 		if stream.ID > id {
@@ -557,7 +628,6 @@ type sessionStream struct {
 	ID         uint64
 	Type       string
 	session    *Session
-	closed     bool
 	responseID uint64
 	completeID uint64
 	lastIndex  uint64
@@ -573,7 +643,40 @@ type sessionStreamResult struct {
 	result streams.Result
 }
 
-func (s *sessionStream) Send(result streams.Result) {
+// open opens the stream
+func (s *sessionStream) open() {
+	s.updateClock()
+
+	bytes, err := proto.Marshal(&SessionResponse{
+		Response: &SessionResponse_Command{
+			Command: &SessionCommandResponse{
+				Context: &SessionResponseContext{
+					StreamID: s.ID,
+					Index:    s.lastIndex,
+					Sequence: s.responseID,
+					Type:     ResponseType_OPEN_STREAM,
+				},
+			},
+		},
+	})
+	result := streams.Result{
+		Value: bytes,
+		Error: err,
+	}
+
+	out := sessionStreamResult{
+		id:     s.responseID,
+		index:  s.ctx.Index(),
+		result: result,
+	}
+	s.results.PushBack(out)
+
+	util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.session.ID, s.ID).
+		Tracef("Sending stream open %d %v", s.responseID, out.result)
+	s.stream.Send(out.result)
+}
+
+func (s *sessionStream) updateClock() {
 	// If the client acked a sequence number greater than the current event sequence number since we know the
 	// client must have received it from another server.
 	s.responseID++
@@ -585,6 +688,10 @@ func (s *sessionStream) Send(result streams.Result) {
 
 	// Record the last index sent on the stream
 	s.lastIndex = s.ctx.Index()
+}
+
+func (s *sessionStream) Send(result streams.Result) {
+	s.updateClock()
 
 	// Create the stream result and add it to the results list.
 	if result.Succeeded() {
@@ -639,7 +746,35 @@ func (s *sessionStream) Error(err error) {
 func (s *sessionStream) Close() {
 	util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.session.ID, s.ID).
 		Trace("Stream closed")
-	s.closed = true
+	s.updateClock()
+
+	bytes, err := proto.Marshal(&SessionResponse{
+		Response: &SessionResponse_Command{
+			Command: &SessionCommandResponse{
+				Context: &SessionResponseContext{
+					StreamID: s.ID,
+					Index:    s.lastIndex,
+					Sequence: s.responseID,
+					Type:     ResponseType_CLOSE_STREAM,
+				},
+			},
+		},
+	})
+	result := streams.Result{
+		Value: bytes,
+		Error: err,
+	}
+
+	out := sessionStreamResult{
+		id:     s.responseID,
+		index:  s.ctx.Index(),
+		result: result,
+	}
+	s.results.PushBack(out)
+
+	util.StreamEntry(s.ctx.Node(), s.ctx.Namespace(), s.ctx.Name(), s.session.ID, s.ID).
+		Tracef("Sending stream close %d %v", s.responseID, out.result)
+	s.stream.Send(out.result)
 	s.stream.Close()
 }
 

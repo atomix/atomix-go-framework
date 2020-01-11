@@ -50,15 +50,15 @@ type Service struct {
 
 // init initializes the map service
 func (m *Service) init() {
-	m.Executor.RegisterUnaryOp(opPut, m.Put)
-	m.Executor.RegisterUnaryOp(opReplace, m.Replace)
-	m.Executor.RegisterUnaryOp(opRemove, m.Remove)
-	m.Executor.RegisterUnaryOp(opGet, m.Get)
-	m.Executor.RegisterUnaryOp(opExists, m.Exists)
-	m.Executor.RegisterUnaryOp(opSize, m.Size)
-	m.Executor.RegisterUnaryOp(opClear, m.Clear)
-	m.Executor.RegisterStreamOp(opEvents, m.Events)
-	m.Executor.RegisterStreamOp(opEntries, m.Entries)
+	m.Executor.RegisterUnaryOperation(opPut, m.Put)
+	m.Executor.RegisterUnaryOperation(opReplace, m.Replace)
+	m.Executor.RegisterUnaryOperation(opRemove, m.Remove)
+	m.Executor.RegisterUnaryOperation(opGet, m.Get)
+	m.Executor.RegisterUnaryOperation(opExists, m.Exists)
+	m.Executor.RegisterUnaryOperation(opSize, m.Size)
+	m.Executor.RegisterUnaryOperation(opClear, m.Clear)
+	m.Executor.RegisterStreamOperation(opEvents, m.Events)
+	m.Executor.RegisterStreamOperation(opEntries, m.Entries)
 }
 
 // Snapshot takes a snapshot of the service

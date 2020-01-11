@@ -45,16 +45,16 @@ type Service struct {
 
 // init initializes the list service
 func (l *Service) init() {
-	l.Executor.RegisterUnaryOp(opSize, l.Size)
-	l.Executor.RegisterUnaryOp(opContains, l.Contains)
-	l.Executor.RegisterUnaryOp(opAppend, l.Append)
-	l.Executor.RegisterUnaryOp(opInsert, l.Insert)
-	l.Executor.RegisterUnaryOp(opGet, l.Get)
-	l.Executor.RegisterUnaryOp(opSet, l.Set)
-	l.Executor.RegisterUnaryOp(opRemove, l.Remove)
-	l.Executor.RegisterUnaryOp(opClear, l.Clear)
-	l.Executor.RegisterStreamOp(opEvents, l.Events)
-	l.Executor.RegisterStreamOp(opIterate, l.Iterate)
+	l.Executor.RegisterUnaryOperation(opSize, l.Size)
+	l.Executor.RegisterUnaryOperation(opContains, l.Contains)
+	l.Executor.RegisterUnaryOperation(opAppend, l.Append)
+	l.Executor.RegisterUnaryOperation(opInsert, l.Insert)
+	l.Executor.RegisterUnaryOperation(opGet, l.Get)
+	l.Executor.RegisterUnaryOperation(opSet, l.Set)
+	l.Executor.RegisterUnaryOperation(opRemove, l.Remove)
+	l.Executor.RegisterUnaryOperation(opClear, l.Clear)
+	l.Executor.RegisterStreamOperation(opEvents, l.Events)
+	l.Executor.RegisterStreamOperation(opIterate, l.Iterate)
 }
 
 // Snapshot takes a snapshot of the service

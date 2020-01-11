@@ -141,6 +141,41 @@ func (s *encodingStream) Close() {
 	s.stream.Close()
 }
 
+// NewCloserStream returns a new stream that runs a function on close
+func NewCloserStream(stream Stream, f func(Stream)) Stream {
+	return &closerStream{
+		stream: stream,
+		closer: f,
+	}
+}
+
+// closerStream is a stream that runs a function on close
+type closerStream struct {
+	stream Stream
+	closer func(Stream)
+}
+
+func (s *closerStream) Send(result Result) {
+	s.stream.Send(result)
+}
+
+func (s *closerStream) Result(value []byte, err error) {
+	s.stream.Result(value, err)
+}
+
+func (s *closerStream) Value(value []byte) {
+	s.stream.Value(value)
+}
+
+func (s *closerStream) Error(err error) {
+	s.stream.Error(err)
+}
+
+func (s *closerStream) Close() {
+	s.closer(s)
+	s.stream.Close()
+}
+
 // Result is a stream result
 type Result struct {
 	Value []byte

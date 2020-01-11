@@ -15,51 +15,79 @@
 package service
 
 import (
-	"fmt"
 	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
 )
 
 // Executor executes primitive operations
 type Executor interface {
-	// RegisterUnaryOp registers a unary primitive operation
-	RegisterUnaryOp(op string, callback func([]byte) ([]byte, error))
+	// RegisterUnaryOperation registers a unary primitive operation
+	RegisterUnaryOperation(name string, callback func([]byte) ([]byte, error))
 
-	// RegisterStreamOp registers a new primitive operation
-	RegisterStreamOp(op string, callback func([]byte, stream.Stream))
+	// RegisterStreamOperation registers a new primitive operation
+	RegisterStreamOperation(name string, callback func([]byte, stream.Stream))
 
-	// Execute executes a primitive operation
-	Execute(name string, op []byte, stream stream.Stream) error
+	// GetOperation returns an operation by name
+	GetOperation(name string) Operation
+}
+
+// Operation is the base interface for primitive operations
+type Operation interface{}
+
+// UnaryOperation is a primitive operation that returns a result
+type UnaryOperation interface {
+	// Execute executes the operation
+	Execute(bytes []byte) ([]byte, error)
+}
+
+// StreamingOperation is a primitive operation that returns a stream
+type StreamingOperation interface {
+	// Execute executes the operation
+	Execute(bytes []byte, stream stream.Stream)
 }
 
 // newExecutor returns a new executor
 func newExecutor() Executor {
 	return &executor{
-		operations: make(map[string]func([]byte, stream.Stream)),
+		operations: make(map[string]Operation),
 	}
 }
 
 // executor is an implementation of the Executor interface
 type executor struct {
 	Executor
-	operations map[string]func([]byte, stream.Stream)
+	operations map[string]Operation
 }
 
-func (e *executor) RegisterUnaryOp(op string, callback func([]byte) ([]byte, error)) {
-	e.operations[op] = func(value []byte, stream stream.Stream) {
-		stream.Result(callback(value))
-		stream.Close()
+func (e *executor) RegisterUnaryOperation(name string, callback func([]byte) ([]byte, error)) {
+	e.operations[name] = &unaryOperation{
+		f: callback,
 	}
 }
 
-func (e *executor) RegisterStreamOp(op string, callback func([]byte, stream.Stream)) {
-	e.operations[op] = callback
+func (e *executor) RegisterStreamOperation(name string, callback func([]byte, stream.Stream)) {
+	e.operations[name] = &streamingOperation{
+		f: callback,
+	}
 }
 
-func (e *executor) Execute(name string, bytes []byte, stream stream.Stream) error {
-	op, ok := e.operations[name]
-	if !ok {
-		return fmt.Errorf("unknown operation %s", name)
-	}
-	op(bytes, stream)
-	return nil
+func (e *executor) GetOperation(name string) Operation {
+	return e.operations[name]
+}
+
+// unaryOperation is an implementation of the UnaryOperation interface
+type unaryOperation struct {
+	f func([]byte) ([]byte, error)
+}
+
+func (o *unaryOperation) Execute(bytes []byte) ([]byte, error) {
+	return o.f(bytes)
+}
+
+// streamingOperation is an implementation of the StreamingOperation interface
+type streamingOperation struct {
+	f func([]byte, stream.Stream)
+}
+
+func (o *streamingOperation) Execute(bytes []byte, stream stream.Stream) {
+	o.f(bytes, stream)
 }

@@ -226,18 +226,18 @@ message ListenResponse {
     uint64 version = 5;
     google.protobuf.Timestamp created = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
     google.protobuf.Timestamp updated = 7 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    int64 stream_id = 8;
 
     enum Type {
         NONE = 0;
         INSERTED = 1;
         UPDATED = 2;
         REMOVED = 3;
-        OPEN = 4;
     }
 }
 
 message UnlistenRequest {
-    int64 stream_id = 1;
+    uint64 stream_id = 1;
 }
 
 message UnlistenResponse {

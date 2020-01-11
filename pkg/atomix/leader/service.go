@@ -47,9 +47,9 @@ type Service struct {
 
 // init initializes the election service
 func (e *Service) init() {
-	e.Executor.RegisterUnaryOp(opLatch, e.Latch)
-	e.Executor.RegisterUnaryOp(opGetLatch, e.GetLatch)
-	e.Executor.RegisterStreamOp(opEvents, e.Events)
+	e.Executor.RegisterUnaryOperation(opLatch, e.Latch)
+	e.Executor.RegisterUnaryOperation(opGetLatch, e.GetLatch)
+	e.Executor.RegisterStreamOperation(opEvents, e.Events)
 	e.SessionizedService.OnExpire(e.OnExpire)
 	e.SessionizedService.OnClose(e.OnClose)
 }

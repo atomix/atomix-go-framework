@@ -78,7 +78,7 @@ func (s *SessionizedServer) write(ctx context.Context, request []byte, header *h
 }
 
 // writeStream sends a streaming write to the service
-func (s *SessionizedServer) writeStream(request []byte, header *headers.RequestHeader, ch chan<- streams.Result) error {
+func (s *SessionizedServer) writeStream(ctx context.Context, request []byte, header *headers.RequestHeader, ch chan<- streams.Result) error {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,
@@ -118,7 +118,7 @@ func (s *SessionizedServer) writeStream(request []byte, header *headers.RequestH
 		}
 	}()
 
-	go s.Client.Write(context.TODO(), bytes, streams.NewChannelStream(streamCh))
+	go s.Client.Write(ctx, bytes, streams.NewChannelStream(streamCh))
 	return nil
 }
 
@@ -168,7 +168,7 @@ func (s *SessionizedServer) read(ctx context.Context, request []byte, header *he
 }
 
 // readStream sends a streaming read to the service
-func (s *SessionizedServer) readStream(request []byte, header *headers.RequestHeader, ch chan<- streams.Result) error {
+func (s *SessionizedServer) readStream(ctx context.Context, request []byte, header *headers.RequestHeader, ch chan<- streams.Result) error {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,
@@ -208,7 +208,7 @@ func (s *SessionizedServer) readStream(request []byte, header *headers.RequestHe
 		}
 	}()
 
-	go s.Client.Read(context.TODO(), bytes, streams.NewChannelStream(streamCh))
+	go s.Client.Read(ctx, bytes, streams.NewChannelStream(streamCh))
 	return nil
 }
 
@@ -262,7 +262,7 @@ func (s *SessionizedServer) Command(ctx context.Context, name string, input []by
 }
 
 // CommandStream submits a streaming command to the service
-func (s *SessionizedServer) CommandStream(name string, input []byte, header *headers.RequestHeader, ch chan<- SessionOutput) error {
+func (s *SessionizedServer) CommandStream(ctx context.Context, name string, input []byte, header *headers.RequestHeader, ch chan<- SessionOutput) error {
 	// If the client requires a leader and is not the leader, return an error
 	if s.Client.MustLeader() && !s.Client.IsLeader() {
 		ch <- SessionOutput{
@@ -328,7 +328,7 @@ func (s *SessionizedServer) CommandStream(name string, input []byte, header *hea
 			}
 		}
 	}()
-	return s.writeStream(bytes, header, resultCh)
+	return s.writeStream(ctx, bytes, header, resultCh)
 }
 
 // Query submits a query to the service
@@ -380,7 +380,7 @@ func (s *SessionizedServer) Query(ctx context.Context, name string, input []byte
 }
 
 // QueryStream submits a streaming query to the service
-func (s *SessionizedServer) QueryStream(name string, input []byte, header *headers.RequestHeader, ch chan<- SessionOutput) error {
+func (s *SessionizedServer) QueryStream(ctx context.Context, name string, input []byte, header *headers.RequestHeader, ch chan<- SessionOutput) error {
 	// If the client requires a leader and is not the leader, return an error
 	if s.Client.MustLeader() && !s.Client.IsLeader() {
 		ch <- SessionOutput{
@@ -445,7 +445,7 @@ func (s *SessionizedServer) QueryStream(name string, input []byte, header *heade
 			}
 		}
 	}()
-	return s.readStream(bytes, header, resultCh)
+	return s.readStream(ctx, bytes, header, resultCh)
 }
 
 // OpenSession opens a new session

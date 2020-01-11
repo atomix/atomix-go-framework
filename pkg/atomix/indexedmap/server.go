@@ -469,7 +469,7 @@ func (m *Server) Events(request *api.EventRequest, srv api.IndexedMapService_Eve
 	}
 
 	ch := make(chan server.SessionOutput)
-	if err := m.CommandStream(opEvents, in, request.Header, ch); err != nil {
+	if err := m.CommandStream(srv.Context(), opEvents, in, request.Header, ch); err != nil {
 		return err
 	}
 
@@ -510,7 +510,7 @@ func (m *Server) Entries(request *api.EntriesRequest, srv api.IndexedMapService_
 	}
 
 	ch := make(chan server.SessionOutput)
-	if err := m.QueryStream(opEntries, in, request.Header, ch); err != nil {
+	if err := m.QueryStream(srv.Context(), opEntries, in, request.Header, ch); err != nil {
 		log.Errorf("EntriesRequest failed", err)
 		return err
 	}
