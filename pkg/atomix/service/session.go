@@ -369,7 +369,7 @@ func (s *SessionizedService) sequenceQuery(query *SessionQueryRequest, stream st
 func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Session, stream streams.WriteStream) {
 	index := s.Context.Index()
 	commandSequence := session.commandSequence
-	stream = streams.NewEncodingStream(stream, func(value []byte) ([]byte, error) {
+	stream = streams.NewEncodingStream(stream, func(value interface{}) (interface{}, error) {
 		return proto.Marshal(&SessionResponse{
 			Response: &SessionResponse_Query{
 				Query: &SessionQueryResponse{
@@ -377,7 +377,7 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 						Index:    index,
 						Sequence: commandSequence,
 					},
-					Output: value,
+					Output: value.([]byte),
 				},
 			},
 		})
@@ -385,12 +385,12 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 
 	s.context.setQuery()
 
-	responseStream := streams.NewEncodingStream(stream, func(value []byte) ([]byte, error) {
+	responseStream := streams.NewEncodingStream(stream, func(value interface{}) (interface{}, error) {
 		return proto.Marshal(&QueryResponse{
 			Context: &ResponseContext{
 				Index: s.Context.Index(),
 			},
-			Output: value,
+			Output: value.([]byte),
 		})
 	})
 
@@ -703,7 +703,7 @@ func (s *sessionStream) Send(result streams.Result) {
 						Index:    s.lastIndex,
 						Sequence: s.responseID,
 					},
-					Output: result.Value,
+					Output: result.Value.([]byte),
 				},
 			},
 		})
@@ -728,14 +728,14 @@ func (s *sessionStream) Send(result streams.Result) {
 	s.stream.Send(out.result)
 }
 
-func (s *sessionStream) Result(value []byte, err error) {
+func (s *sessionStream) Result(value interface{}, err error) {
 	s.Send(streams.Result{
 		Value: value,
 		Error: err,
 	})
 }
 
-func (s *sessionStream) Value(value []byte) {
+func (s *sessionStream) Value(value interface{}) {
 	s.Result(value, nil)
 }
 

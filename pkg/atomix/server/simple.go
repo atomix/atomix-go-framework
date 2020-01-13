@@ -89,16 +89,16 @@ func (s *SimpleServer) write(ctx context.Context, request []byte, header *header
 		return nil, err
 	}
 
-	// Create a write channel
-	ch := make(chan streams.Result)
+	// Create a unary stream
+	stream := streams.NewUnaryStream()
 
 	// Write the request
-	if err := s.Client.Write(ctx, bytes, streams.NewChannelStream(ch)); err != nil {
+	if err := s.Client.Write(ctx, bytes, stream); err != nil {
 		return nil, err
 	}
 
 	// Wait for the result
-	result, ok := <-ch
+	result, ok := stream.Receive()
 	if !ok {
 		return nil, errors.New("write channel closed")
 	}
@@ -110,7 +110,7 @@ func (s *SimpleServer) write(ctx context.Context, request []byte, header *header
 
 	// Decode and return the response
 	serviceResponse := &service.ServiceResponse{}
-	err = proto.Unmarshal(result.Value, serviceResponse)
+	err = proto.Unmarshal(result.Value.([]byte), serviceResponse)
 	if err != nil {
 		return nil, err
 	}
@@ -176,16 +176,16 @@ func (s *SimpleServer) read(ctx context.Context, request []byte, header *headers
 		return nil, err
 	}
 
-	// Create a read channel
-	ch := make(chan streams.Result)
+	// Create a unary stream
+	stream := streams.NewUnaryStream()
 
 	// Read the request
-	if err := s.Client.Read(ctx, bytes, streams.NewChannelStream(ch)); err != nil {
+	if err := s.Client.Read(ctx, bytes, stream); err != nil {
 		return nil, err
 	}
 
 	// Wait for the result
-	result, ok := <-ch
+	result, ok := stream.Receive()
 	if !ok {
 		return nil, errors.New("write channel closed")
 	}
@@ -196,7 +196,7 @@ func (s *SimpleServer) read(ctx context.Context, request []byte, header *headers
 	}
 
 	serviceResponse := &service.ServiceResponse{}
-	err = proto.Unmarshal(result.Value, serviceResponse)
+	err = proto.Unmarshal(result.Value.([]byte), serviceResponse)
 	if err != nil {
 		return nil, err
 	}
@@ -229,16 +229,16 @@ func (s *SimpleServer) Open(ctx context.Context, header *headers.RequestHeader) 
 		return nil, err
 	}
 
-	// Create a write channel
-	ch := make(chan streams.Result)
+	// Create a unary stream
+	stream := streams.NewUnaryStream()
 
 	// Write the request
-	if err := s.Client.Write(ctx, bytes, streams.NewChannelStream(ch)); err != nil {
+	if err := s.Client.Write(ctx, bytes, stream); err != nil {
 		return nil, err
 	}
 
 	// Wait for the result
-	result, ok := <-ch
+	result, ok := stream.Receive()
 	if !ok {
 		return nil, errors.New("write channel closed")
 	}
@@ -250,7 +250,7 @@ func (s *SimpleServer) Open(ctx context.Context, header *headers.RequestHeader) 
 
 	// Decode and return the response
 	serviceResponse := &service.ServiceResponse{}
-	err = proto.Unmarshal(result.Value, serviceResponse)
+	err = proto.Unmarshal(result.Value.([]byte), serviceResponse)
 	if err != nil {
 		return nil, err
 	}
@@ -283,16 +283,16 @@ func (s *SimpleServer) Delete(ctx context.Context, header *headers.RequestHeader
 		return nil, err
 	}
 
-	// Create a write channel
-	ch := make(chan streams.Result)
+	// Create a unary stream
+	stream := streams.NewUnaryStream()
 
 	// Write the request
-	if err := s.Client.Write(ctx, bytes, streams.NewChannelStream(ch)); err != nil {
+	if err := s.Client.Write(ctx, bytes, stream); err != nil {
 		return nil, err
 	}
 
 	// Wait for the result
-	result, ok := <-ch
+	result, ok := stream.Receive()
 	if !ok {
 		return nil, errors.New("write channel closed")
 	}
@@ -304,7 +304,7 @@ func (s *SimpleServer) Delete(ctx context.Context, header *headers.RequestHeader
 
 	// Decode and return the response
 	serviceResponse := &service.ServiceResponse{}
-	err = proto.Unmarshal(result.Value, serviceResponse)
+	err = proto.Unmarshal(result.Value.([]byte), serviceResponse)
 	if err != nil {
 		return nil, err
 	}

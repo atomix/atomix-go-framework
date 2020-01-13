@@ -67,12 +67,12 @@ func (s *SimpleService) Command(bytes []byte, stream streams.WriteStream) {
 		stream.Close()
 	} else {
 		s.scheduler.runScheduledTasks(s.Context.Timestamp())
-		responseStream := streams.NewEncodingStream(stream, func(value []byte) ([]byte, error) {
+		responseStream := streams.NewEncodingStream(stream, func(value interface{}) (interface{}, error) {
 			return proto.Marshal(&CommandResponse{
 				Context: &ResponseContext{
 					Index: s.Context.Index(),
 				},
-				Output: value,
+				Output: value.([]byte),
 			})
 		})
 
@@ -131,12 +131,12 @@ func (s *SimpleService) Query(bytes []byte, stream streams.WriteStream) {
 func (s *SimpleService) execute(query *QueryRequest, stream streams.WriteStream) {
 	s.context.setQuery()
 
-	responseStream := streams.NewEncodingStream(stream, func(value []byte) ([]byte, error) {
+	responseStream := streams.NewEncodingStream(stream, func(value interface{}) (interface{}, error) {
 		return proto.Marshal(&QueryResponse{
 			Context: &ResponseContext{
 				Index: s.Context.Index(),
 			},
-			Output: value,
+			Output: value.([]byte),
 		})
 	})
 

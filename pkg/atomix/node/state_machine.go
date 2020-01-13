@@ -185,10 +185,10 @@ func (s *primitiveStateMachine) Command(bytes []byte, stream streams.WriteStream
 			}
 
 			// Execute the command on the service
-			svc.Command(r.Command, streams.NewEncodingStream(stream, func(value []byte) ([]byte, error) {
+			svc.Command(r.Command, streams.NewEncodingStream(stream, func(value interface{}) (interface{}, error) {
 				return proto.Marshal(&service.ServiceResponse{
 					Response: &service.ServiceResponse_Command{
-						Command: value,
+						Command: value.([]byte),
 					},
 				})
 			}))
@@ -251,10 +251,10 @@ func (s *primitiveStateMachine) Query(bytes []byte, stream streams.WriteStream) 
 			}
 
 			// Execute the query on the service
-			svc.Query(r.Query, streams.NewEncodingStream(stream, func(value []byte) ([]byte, error) {
+			svc.Query(r.Query, streams.NewEncodingStream(stream, func(value interface{}) (interface{}, error) {
 				return proto.Marshal(&service.ServiceResponse{
 					Response: &service.ServiceResponse_Query{
-						Query: value,
+						Query: value.([]byte),
 					},
 				})
 			}))

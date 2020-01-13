@@ -22,6 +22,8 @@ import (
 	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func init() {
@@ -59,18 +61,21 @@ func (s *primitiveServer) GetPrimitives(ctx context.Context, request *api.GetPri
 		return nil, err
 	}
 
-	ch := make(chan stream.Result)
-	if err := s.client.Read(ctx, in, stream.NewChannelStream(ch)); err != nil {
+	stream := stream.NewUnaryStream()
+	if err := s.client.Read(ctx, in, stream); err != nil {
 		return nil, err
 	}
 
-	result := <-ch
+	result, ok := stream.Receive()
+	if !ok {
+		return nil, status.Error(codes.Internal, "stream closed")
+	}
 	if result.Failed() {
 		return nil, result.Error
 	}
 
 	response := &service.ServiceResponse{}
-	if err := proto.Unmarshal(result.Value, response); err != nil {
+	if err := proto.Unmarshal(result.Value.([]byte), response); err != nil {
 		return nil, err
 	}
 
