@@ -225,12 +225,12 @@ func (s *SessionizedService) applySessionCommand(request *SessionCommandRequest,
 		operation := s.Executor.GetOperation(request.Name)
 		if unaryOp, ok := operation.(UnaryOperation); ok {
 			output, err := unaryOp.Execute(request.Input)
-			result := streams.Result{
+			result := session.addResult(request.Context.SequenceNumber, streams.Result{
 				Value: output,
 				Error: err,
-			}
+			})
 			stream.Send(result)
-			session.addResult(request.Context.SequenceNumber, result)
+			stream.Close()
 		} else if streamOp, ok := operation.(StreamingOperation); ok {
 			streamCtx := session.addStream(request.Context.SequenceNumber, request.Name, stream)
 			streamOp.Execute(request.Input, streamCtx)
@@ -405,7 +405,7 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 		stream.Result(unaryOp.Execute(query.Input))
 		stream.Close()
 	} else if streamOp, ok := operation.(StreamingOperation); ok {
-		stream.Result(proto.Marshal(&CommandResponse{
+		stream.Result(proto.Marshal(&QueryResponse{
 			Context: &ResponseContext{
 				Index: s.Context.Index(),
 				Type:  ResponseType_OPEN_STREAM,
@@ -413,7 +413,7 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 		}))
 
 		responseStream = streams.NewCloserStream(responseStream, func(_ streams.WriteStream) {
-			stream.Result(proto.Marshal(&CommandResponse{
+			stream.Result(proto.Marshal(&QueryResponse{
 				Context: &ResponseContext{
 					Index: s.Context.Index(),
 					Type:  ResponseType_CLOSE_STREAM,
@@ -454,6 +454,7 @@ func newSession(ctx Context, timeout *time.Duration) *Session {
 		ctx:              ctx,
 		commandCallbacks: make(map[uint64]func()),
 		queryCallbacks:   make(map[uint64]*list.List),
+		results:          make(map[uint64]streams.Result),
 		streams:          make(map[uint64]*sessionStream),
 	}
 	util.SessionEntry(ctx.Node(), ctx.Namespace(), ctx.Name(), session.ID).
@@ -518,8 +519,27 @@ func (s *Session) getResult(id uint64) (streams.Result, bool) {
 }
 
 // addResult adds a unary result
-func (s *Session) addResult(id uint64, result streams.Result) {
+func (s *Session) addResult(id uint64, result streams.Result) streams.Result {
+	if result.Succeeded() {
+		bytes, err := proto.Marshal(&SessionResponse{
+			Response: &SessionResponse_Command{
+				Command: &SessionCommandResponse{
+					Context: &SessionResponseContext{
+						StreamID: s.ID,
+						Index:    s.ctx.Index(),
+						Sequence: 1,
+					},
+					Output: result.Value.([]byte),
+				},
+			},
+		})
+		result = streams.Result{
+			Value: bytes,
+			Error: err,
+		}
+	}
 	s.results[id] = result
+	return result
 }
 
 // addStream adds a stream at the given sequence number
