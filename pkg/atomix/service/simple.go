@@ -59,7 +59,7 @@ func (s *SimpleService) Install(reader io.Reader) error {
 }
 
 // Command handles a service command
-func (s *SimpleService) Command(bytes []byte, stream streams.Stream) {
+func (s *SimpleService) Command(bytes []byte, stream streams.WriteStream) {
 	s.context.setCommand()
 	command := &CommandRequest{}
 	if err := proto.Unmarshal(bytes, command); err != nil {
@@ -91,7 +91,7 @@ func (s *SimpleService) Command(bytes []byte, stream streams.Stream) {
 				},
 			}))
 
-			responseStream = streams.NewCloserStream(responseStream, func(_ streams.Stream) {
+			responseStream = streams.NewCloserStream(responseStream, func(_ streams.WriteStream) {
 				stream.Result(proto.Marshal(&CommandResponse{
 					Context: &ResponseContext{
 						Index: s.Context.Index(),
@@ -112,7 +112,7 @@ func (s *SimpleService) Command(bytes []byte, stream streams.Stream) {
 }
 
 // Query handles a service query
-func (s *SimpleService) Query(bytes []byte, stream streams.Stream) {
+func (s *SimpleService) Query(bytes []byte, stream streams.WriteStream) {
 	query := &QueryRequest{}
 	if err := proto.Unmarshal(bytes, query); err != nil {
 		stream.Error(err)
@@ -128,7 +128,7 @@ func (s *SimpleService) Query(bytes []byte, stream streams.Stream) {
 	}
 }
 
-func (s *SimpleService) execute(query *QueryRequest, stream streams.Stream) {
+func (s *SimpleService) execute(query *QueryRequest, stream streams.WriteStream) {
 	s.context.setQuery()
 
 	responseStream := streams.NewEncodingStream(stream, func(value []byte) ([]byte, error) {
@@ -155,7 +155,7 @@ func (s *SimpleService) execute(query *QueryRequest, stream streams.Stream) {
 			},
 		}))
 
-		responseStream = streams.NewCloserStream(responseStream, func(_ streams.Stream) {
+		responseStream = streams.NewCloserStream(responseStream, func(_ streams.WriteStream) {
 			stream.Result(proto.Marshal(&CommandResponse{
 				Context: &ResponseContext{
 					Index: s.Context.Index(),

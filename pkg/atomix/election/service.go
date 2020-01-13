@@ -389,7 +389,7 @@ func (e *Service) GetTerm(bytes []byte) ([]byte, error) {
 }
 
 // Events registers the given channel to receive election events
-func (e *Service) Events(bytes []byte, stream stream.Stream) {
+func (e *Service) Events(bytes []byte, stream stream.WriteStream) {
 	// Immediately send an OPEN event but keep the channel open
 	stream.Result(proto.Marshal(&ListenResponse{
 		Type: ListenResponse_OPEN,

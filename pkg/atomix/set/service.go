@@ -152,7 +152,7 @@ func (s *Service) Clear(bytes []byte) ([]byte, error) {
 }
 
 // Events registers a channel on which to send set change events
-func (s *Service) Events(bytes []byte, stream stream.Stream) {
+func (s *Service) Events(bytes []byte, stream stream.WriteStream) {
 	request := &ListenRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		stream.Error(err)
@@ -176,7 +176,7 @@ func (s *Service) Events(bytes []byte, stream stream.Stream) {
 }
 
 // Iterate sends all current set elements on the given channel
-func (s *Service) Iterate(bytes []byte, stream stream.Stream) {
+func (s *Service) Iterate(bytes []byte, stream stream.WriteStream) {
 	defer stream.Close()
 	for value := range s.values {
 		stream.Result(proto.Marshal(&IterateResponse{

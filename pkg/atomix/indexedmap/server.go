@@ -19,6 +19,7 @@ import (
 	api "github.com/atomix/atomix-api/proto/atomix/indexedmap"
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/server"
+	streams "github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -468,22 +469,28 @@ func (m *Server) Events(request *api.EventRequest, srv api.IndexedMapService_Eve
 		return err
 	}
 
-	ch := make(chan server.SessionOutput)
-	if err := m.CommandStream(srv.Context(), opEvents, in, request.Header, ch); err != nil {
+	stream := streams.NewBufferedStream()
+	if err := m.CommandStream(srv.Context(), opEvents, in, request.Header, stream); err != nil {
 		return err
 	}
 
-	for result := range ch {
+	for {
+		result, ok := stream.Receive()
+		if !ok {
+			break
+		}
+
 		if result.Failed() {
 			return result.Error
 		}
 
 		response := &ListenResponse{}
-		if err = proto.Unmarshal(result.Value, response); err != nil {
+		output := result.Value.(server.SessionOutput)
+		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}
 		eventResponse := &api.EventResponse{
-			Header:  result.Header,
+			Header:  output.Header,
 			Type:    getEventType(response.Type),
 			Index:   int64(response.Index),
 			Key:     response.Key,
@@ -509,24 +516,30 @@ func (m *Server) Entries(request *api.EntriesRequest, srv api.IndexedMapService_
 		return err
 	}
 
-	ch := make(chan server.SessionOutput)
-	if err := m.QueryStream(srv.Context(), opEntries, in, request.Header, ch); err != nil {
+	stream := streams.NewBufferedStream()
+	if err := m.QueryStream(srv.Context(), opEntries, in, request.Header, stream); err != nil {
 		log.Errorf("EntriesRequest failed", err)
 		return err
 	}
 
-	for result := range ch {
+	for {
+		result, ok := stream.Receive()
+		if !ok {
+			break
+		}
+
 		if result.Failed() {
 			log.Errorf("EntriesRequest failed", result.Error)
 			return result.Error
 		}
 
 		response := &EntriesResponse{}
-		if err = proto.Unmarshal(result.Value, response); err != nil {
+		output := result.Value.(server.SessionOutput)
+		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}
 		entriesResponse := &api.EntriesResponse{
-			Header:  result.Header,
+			Header:  output.Header,
 			Index:   int64(response.Index),
 			Key:     response.Key,
 			Value:   response.Value,

@@ -393,7 +393,7 @@ func (m *Service) Clear(value []byte) ([]byte, error) {
 }
 
 // Events sends change events to the client
-func (m *Service) Events(bytes []byte, stream stream.Stream) {
+func (m *Service) Events(bytes []byte, stream stream.WriteStream) {
 	request := &ListenRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		stream.Error(err)
@@ -434,7 +434,7 @@ func (m *Service) Events(bytes []byte, stream stream.Stream) {
 }
 
 // Entries returns a stream of entries to the client
-func (m *Service) Entries(value []byte, stream stream.Stream) {
+func (m *Service) Entries(value []byte, stream stream.WriteStream) {
 	defer stream.Close()
 	for key, entry := range m.entries {
 		stream.Result(proto.Marshal(&EntriesResponse{
@@ -491,5 +491,5 @@ func (m *Service) sendEvent(event *ListenResponse) {
 
 type listener struct {
 	key    string
-	stream stream.Stream
+	stream stream.WriteStream
 }

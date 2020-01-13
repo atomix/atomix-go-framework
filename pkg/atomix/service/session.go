@@ -149,7 +149,7 @@ func (s *SessionizedService) CanDelete(index uint64) bool {
 }
 
 // Command handles a service command
-func (s *SessionizedService) Command(bytes []byte, stream streams.Stream) {
+func (s *SessionizedService) Command(bytes []byte, stream streams.WriteStream) {
 	s.context.setCommand()
 	request := &SessionRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
@@ -175,7 +175,7 @@ func (s *SessionizedService) Command(bytes []byte, stream streams.Stream) {
 	}
 }
 
-func (s *SessionizedService) applyCommand(request *SessionCommandRequest, stream streams.Stream) {
+func (s *SessionizedService) applyCommand(request *SessionCommandRequest, stream streams.WriteStream) {
 	session, ok := s.sessions[request.Context.SessionID]
 	if !ok {
 		util.SessionEntry(s.Context.Node(), s.context.Namespace(), s.context.Name(), request.Context.SessionID).
@@ -212,7 +212,7 @@ func (s *SessionizedService) applyCommand(request *SessionCommandRequest, stream
 	}
 }
 
-func (s *SessionizedService) applySessionCommand(request *SessionCommandRequest, stream streams.Stream) {
+func (s *SessionizedService) applySessionCommand(request *SessionCommandRequest, stream streams.WriteStream) {
 	session, ok := s.sessions[request.Context.SessionID]
 	if !ok {
 		util.SessionEntry(s.Context.Node(), s.context.Namespace(), s.context.Name(), request.Context.SessionID).
@@ -241,7 +241,7 @@ func (s *SessionizedService) applySessionCommand(request *SessionCommandRequest,
 	}
 }
 
-func (s *SessionizedService) applyOpenSession(request *OpenSessionRequest, stream streams.Stream) {
+func (s *SessionizedService) applyOpenSession(request *OpenSessionRequest, stream streams.WriteStream) {
 	session := newSession(s.Context, request.Timeout)
 	s.sessions[session.ID] = session
 	s.onOpen(session)
@@ -256,7 +256,7 @@ func (s *SessionizedService) applyOpenSession(request *OpenSessionRequest, strea
 }
 
 // applyKeepAlive applies a KeepAliveRequest to the service
-func (s *SessionizedService) applyKeepAlive(request *KeepAliveRequest, stream streams.Stream) {
+func (s *SessionizedService) applyKeepAlive(request *KeepAliveRequest, stream streams.WriteStream) {
 	session, ok := s.sessions[request.SessionID]
 	if !ok {
 		util.SessionEntry(s.Context.Node(), s.context.Namespace(), s.context.Name(), request.SessionID).
@@ -296,7 +296,7 @@ func (s *SessionizedService) expireSessions() {
 	}
 }
 
-func (s *SessionizedService) applyCloseSession(request *CloseSessionRequest, stream streams.Stream) {
+func (s *SessionizedService) applyCloseSession(request *CloseSessionRequest, stream streams.WriteStream) {
 	session, ok := s.sessions[request.SessionID]
 	if !ok {
 		util.SessionEntry(s.Context.Node(), s.context.Namespace(), s.context.Name(), request.SessionID).
@@ -319,7 +319,7 @@ func (s *SessionizedService) applyCloseSession(request *CloseSessionRequest, str
 }
 
 // Query handles a service query
-func (s *SessionizedService) Query(bytes []byte, stream streams.Stream) {
+func (s *SessionizedService) Query(bytes []byte, stream streams.WriteStream) {
 	request := &SessionRequest{}
 	err := proto.Unmarshal(bytes, request)
 	if err != nil {
@@ -341,7 +341,7 @@ func (s *SessionizedService) Query(bytes []byte, stream streams.Stream) {
 	}
 }
 
-func (s *SessionizedService) sequenceQuery(query *SessionQueryRequest, stream streams.Stream) {
+func (s *SessionizedService) sequenceQuery(query *SessionQueryRequest, stream streams.WriteStream) {
 	session, ok := s.sessions[query.Context.SessionID]
 	if !ok {
 		util.SessionEntry(s.Context.Node(), s.context.Namespace(), s.context.Name(), query.Context.SessionID).
@@ -366,7 +366,7 @@ func (s *SessionizedService) sequenceQuery(query *SessionQueryRequest, stream st
 	}
 }
 
-func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Session, stream streams.Stream) {
+func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Session, stream streams.WriteStream) {
 	index := s.Context.Index()
 	commandSequence := session.commandSequence
 	stream = streams.NewEncodingStream(stream, func(value []byte) ([]byte, error) {
@@ -412,7 +412,7 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 			},
 		}))
 
-		responseStream = streams.NewCloserStream(responseStream, func(_ streams.Stream) {
+		responseStream = streams.NewCloserStream(responseStream, func(_ streams.WriteStream) {
 			stream.Result(proto.Marshal(&CommandResponse{
 				Context: &ResponseContext{
 					Index: s.Context.Index(),
@@ -487,8 +487,8 @@ func (s *Session) StreamID() uint64 {
 }
 
 // Streams returns a slice of all open streams of any type owned by the session
-func (s *Session) Streams() []streams.Stream {
-	streams := make([]streams.Stream, 0, len(s.streams))
+func (s *Session) Streams() []streams.WriteStream {
+	streams := make([]streams.WriteStream, 0, len(s.streams))
 	for _, stream := range s.streams {
 		streams = append(streams, stream)
 	}
@@ -496,13 +496,13 @@ func (s *Session) Streams() []streams.Stream {
 }
 
 // Stream returns the given stream
-func (s *Session) Stream(id uint64) streams.Stream {
+func (s *Session) Stream(id uint64) streams.WriteStream {
 	return s.streams[id]
 }
 
 // StreamsOf returns a slice of all open streams for the given named operation owned by the session
-func (s *Session) StreamsOf(op string) []streams.Stream {
-	streams := make([]streams.Stream, 0, len(s.streams))
+func (s *Session) StreamsOf(op string) []streams.WriteStream {
+	streams := make([]streams.WriteStream, 0, len(s.streams))
 	for _, stream := range s.streams {
 		if stream.Type == op {
 			streams = append(streams, stream)
@@ -523,7 +523,7 @@ func (s *Session) addResult(id uint64, result streams.Result) {
 }
 
 // addStream adds a stream at the given sequence number
-func (s *Session) addStream(id uint64, op string, outStream streams.Stream) streams.Stream {
+func (s *Session) addStream(id uint64, op string, outStream streams.WriteStream) streams.WriteStream {
 	stream := &sessionStream{
 		ID:      id,
 		Type:    op,
@@ -632,7 +632,7 @@ type sessionStream struct {
 	completeID uint64
 	lastIndex  uint64
 	ctx        Context
-	stream     streams.Stream
+	stream     streams.WriteStream
 	results    *list.List
 }
 
@@ -811,7 +811,7 @@ func (s *sessionStream) ack(id uint64) {
 }
 
 // replay resends results on the given channel
-func (s *sessionStream) replay(stream streams.Stream) {
+func (s *sessionStream) replay(stream streams.WriteStream) {
 	result := s.results.Front()
 	for result != nil {
 		response := result.Value.(sessionStreamResult)

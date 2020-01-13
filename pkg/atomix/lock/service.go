@@ -52,7 +52,7 @@ type lockHolder struct {
 	index   uint64
 	session uint64
 	expire  *time.Time
-	stream  stream.Stream
+	stream  stream.WriteStream
 }
 
 // init initializes the lock service
@@ -146,7 +146,7 @@ func (l *Service) Install(reader io.Reader) error {
 }
 
 // Lock attempts to acquire the lock for the current session
-func (l *Service) Lock(bytes []byte, stream stream.Stream) {
+func (l *Service) Lock(bytes []byte, stream stream.WriteStream) {
 	request := &LockRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		stream.Error(err)

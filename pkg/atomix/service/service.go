@@ -64,10 +64,10 @@ type Service interface {
 	CanDelete(index uint64) bool
 
 	// Command applies a command to the state machine
-	Command(bytes []byte, stream streams.Stream)
+	Command(bytes []byte, stream streams.WriteStream)
 
 	// Query applies a query to the state machine
-	Query(bytes []byte, stream streams.Stream)
+	Query(bytes []byte, stream streams.WriteStream)
 }
 
 // service is an internal base for service implementations

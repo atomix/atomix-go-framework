@@ -31,8 +31,8 @@ type Client interface {
 	Leader() string
 
 	// Write sends a write request
-	Write(ctx context.Context, input []byte, stream stream.Stream) error
+	Write(ctx context.Context, input []byte, stream stream.WriteStream) error
 
 	// Read sends a read request
-	Read(ctx context.Context, input []byte, stream stream.Stream) error
+	Read(ctx context.Context, input []byte, stream stream.WriteStream) error
 }

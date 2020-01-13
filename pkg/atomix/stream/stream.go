@@ -14,16 +14,27 @@
 
 package stream
 
-// Stream is a state machine output stream
-type Stream interface {
+import (
+	"container/list"
+	"sync"
+)
+
+// ReadStream is a state machine read stream
+type ReadStream interface {
+	// Receive receives the next result
+	Receive() (Result, bool)
+}
+
+// WriteStream is a state machine write stream
+type WriteStream interface {
 	// Send sends an output on the stream
 	Send(out Result)
 
 	// Result sends a result on the stream
-	Result(value []byte, err error)
+	Result(value interface{}, err error)
 
 	// Value sends a value on the stream
-	Value(value []byte)
+	Value(value interface{})
 
 	// Error sends an error on the stream
 	Error(err error)
@@ -32,8 +43,136 @@ type Stream interface {
 	Close()
 }
 
+// Stream is a read/write stream
+type Stream interface {
+	ReadStream
+	WriteStream
+}
+
+// NewUnaryStream returns a new read/write stream that expects one result
+func NewUnaryStream() Stream {
+	return &unaryStream{
+		cond: sync.NewCond(&sync.Mutex{}),
+	}
+}
+
+// unaryStream is a stream that expects one result
+type unaryStream struct {
+	result *Result
+	closed bool
+	cond   *sync.Cond
+}
+
+func (s *unaryStream) Receive() (Result, bool) {
+	s.cond.L.Lock()
+	defer s.cond.L.Unlock()
+	if s.result == nil {
+		s.cond.Wait()
+	}
+	result := s.result
+	s.result = nil
+	return *result, true
+}
+
+func (s *unaryStream) Send(result Result) {
+	s.cond.L.Lock()
+	defer s.cond.L.Unlock()
+	if s.closed {
+		panic("stream closed")
+	}
+	s.result = &result
+	s.closed = true
+	s.cond.Signal()
+}
+
+func (s *unaryStream) Result(value interface{}, err error) {
+	s.Send(Result{
+		Value: value,
+		Error: err,
+	})
+}
+
+func (s *unaryStream) Value(value interface{}) {
+	s.Send(Result{
+		Value: value,
+	})
+}
+
+func (s *unaryStream) Error(err error) {
+	s.Send(Result{
+		Error: err,
+	})
+}
+
+func (s *unaryStream) Close() {
+	s.cond.L.Lock()
+	defer s.cond.L.Unlock()
+	s.closed = true
+}
+
+// NewBufferedStream returns a new buffered read/write stream
+func NewBufferedStream() Stream {
+	return &bufferedStream{
+		buffer: list.New(),
+		cond:   sync.NewCond(&sync.Mutex{}),
+	}
+}
+
+// bufferedStream is a buffered read/write stream
+type bufferedStream struct {
+	buffer *list.List
+	closed bool
+	cond   *sync.Cond
+}
+
+func (s *bufferedStream) Receive() (Result, bool) {
+	s.cond.L.Lock()
+	defer s.cond.L.Unlock()
+	for s.buffer.Len() == 0 {
+		if s.closed {
+			return Result{}, false
+		}
+		s.cond.Wait()
+	}
+	result := s.buffer.Front().Value.(Result)
+	s.buffer.Remove(s.buffer.Front())
+	return result, true
+}
+
+func (s *bufferedStream) Send(result Result) {
+	s.cond.L.Lock()
+	defer s.cond.L.Unlock()
+	s.buffer.PushBack(result)
+	s.cond.Signal()
+}
+
+func (s *bufferedStream) Result(value interface{}, err error) {
+	s.Send(Result{
+		Value: value,
+		Error: err,
+	})
+}
+
+func (s *bufferedStream) Value(value interface{}) {
+	s.Send(Result{
+		Value: value,
+	})
+}
+
+func (s *bufferedStream) Error(err error) {
+	s.Send(Result{
+		Error: err,
+	})
+}
+
+func (s *bufferedStream) Close() {
+	s.cond.L.Lock()
+	defer s.cond.L.Unlock()
+	s.closed = true
+}
+
 // NewChannelStream returns a new channel-based stream
-func NewChannelStream(ch chan<- Result) Stream {
+func NewChannelStream(ch chan<- Result) WriteStream {
 	return &channelStream{
 		ch: ch,
 	}
@@ -49,14 +188,14 @@ func (s *channelStream) Send(result Result) {
 	s.ch <- result
 }
 
-func (s *channelStream) Result(value []byte, err error) {
+func (s *channelStream) Result(value interface{}, err error) {
 	s.Send(Result{
 		Value: value,
 		Error: err,
 	})
 }
 
-func (s *channelStream) Value(value []byte) {
+func (s *channelStream) Value(value interface{}) {
 	s.Result(value, nil)
 }
 
@@ -72,7 +211,7 @@ func (s *channelStream) Close() {
 }
 
 // NewNilStream returns a disconnected stream
-func NewNilStream() Stream {
+func NewNilStream() WriteStream {
 	return &nilStream{}
 }
 
@@ -82,10 +221,10 @@ type nilStream struct{}
 func (s *nilStream) Send(out Result) {
 }
 
-func (s *nilStream) Result(value []byte, err error) {
+func (s *nilStream) Result(value interface{}, err error) {
 }
 
-func (s *nilStream) Value(value []byte) {
+func (s *nilStream) Value(value interface{}) {
 }
 
 func (s *nilStream) Error(err error) {
@@ -95,20 +234,28 @@ func (s *nilStream) Close() {
 }
 
 // NewEncodingStream returns a new encoding stream
-func NewEncodingStream(stream Stream, encoder func([]byte) ([]byte, error)) Stream {
-	return &encodingStream{
-		stream:  stream,
-		encoder: encoder,
+func NewEncodingStream(stream WriteStream, encoder func(interface{}) (interface{}, error)) WriteStream {
+	return &transcodingStream{
+		stream:     stream,
+		transcoder: encoder,
 	}
 }
 
-// encodingStream is a stream that encodes output
-type encodingStream struct {
-	stream  Stream
-	encoder func([]byte) ([]byte, error)
+// NewDecodingStream returns a new decoding stream
+func NewDecodingStream(stream WriteStream, encoder func(interface{}) (interface{}, error)) WriteStream {
+	return &transcodingStream{
+		stream:     stream,
+		transcoder: encoder,
+	}
 }
 
-func (s *encodingStream) Send(result Result) {
+// transcodingStream is a stream that encodes output
+type transcodingStream struct {
+	stream     WriteStream
+	transcoder func(interface{}) (interface{}, error)
+}
+
+func (s *transcodingStream) Send(result Result) {
 	if result.Failed() {
 		s.stream.Send(result)
 	} else {
@@ -116,7 +263,7 @@ func (s *encodingStream) Send(result Result) {
 	}
 }
 
-func (s *encodingStream) Result(value []byte, err error) {
+func (s *transcodingStream) Result(value interface{}, err error) {
 	if err != nil {
 		s.stream.Error(err)
 	} else {
@@ -124,8 +271,8 @@ func (s *encodingStream) Result(value []byte, err error) {
 	}
 }
 
-func (s *encodingStream) Value(value []byte) {
-	bytes, err := s.encoder(value)
+func (s *transcodingStream) Value(value interface{}) {
+	bytes, err := s.transcoder(value)
 	if err != nil {
 		s.stream.Error(err)
 	} else {
@@ -133,16 +280,16 @@ func (s *encodingStream) Value(value []byte) {
 	}
 }
 
-func (s *encodingStream) Error(err error) {
+func (s *transcodingStream) Error(err error) {
 	s.stream.Error(err)
 }
 
-func (s *encodingStream) Close() {
+func (s *transcodingStream) Close() {
 	s.stream.Close()
 }
 
 // NewCloserStream returns a new stream that runs a function on close
-func NewCloserStream(stream Stream, f func(Stream)) Stream {
+func NewCloserStream(stream WriteStream, f func(WriteStream)) WriteStream {
 	return &closerStream{
 		stream: stream,
 		closer: f,
@@ -151,19 +298,19 @@ func NewCloserStream(stream Stream, f func(Stream)) Stream {
 
 // closerStream is a stream that runs a function on close
 type closerStream struct {
-	stream Stream
-	closer func(Stream)
+	stream WriteStream
+	closer func(WriteStream)
 }
 
 func (s *closerStream) Send(result Result) {
 	s.stream.Send(result)
 }
 
-func (s *closerStream) Result(value []byte, err error) {
+func (s *closerStream) Result(value interface{}, err error) {
 	s.stream.Result(value, err)
 }
 
-func (s *closerStream) Value(value []byte) {
+func (s *closerStream) Value(value interface{}) {
 	s.stream.Value(value)
 }
 
@@ -178,7 +325,7 @@ func (s *closerStream) Close() {
 
 // Result is a stream result
 type Result struct {
-	Value []byte
+	Value interface{}
 	Error error
 }
 

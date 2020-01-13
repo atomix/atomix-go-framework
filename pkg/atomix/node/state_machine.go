@@ -53,10 +53,10 @@ type StateMachine interface {
 	CanDelete(index uint64) bool
 
 	// Command applies a command to the state machine
-	Command(bytes []byte, stream streams.Stream)
+	Command(bytes []byte, stream streams.WriteStream)
 
 	// Query applies a query to the state machine
-	Query(bytes []byte, stream streams.Stream)
+	Query(bytes []byte, stream streams.WriteStream)
 }
 
 // NewPrimitiveStateMachine returns a new primitive state machine
@@ -162,7 +162,7 @@ func (s *primitiveStateMachine) Install(reader io.Reader) error {
 	return nil
 }
 
-func (s *primitiveStateMachine) Command(bytes []byte, stream streams.Stream) {
+func (s *primitiveStateMachine) Command(bytes []byte, stream streams.WriteStream) {
 	request := &service.ServiceRequest{}
 	err := proto.Unmarshal(bytes, request)
 	if err != nil {
@@ -228,7 +228,7 @@ func (s *primitiveStateMachine) Command(bytes []byte, stream streams.Stream) {
 	}
 }
 
-func (s *primitiveStateMachine) Query(bytes []byte, stream streams.Stream) {
+func (s *primitiveStateMachine) Query(bytes []byte, stream streams.WriteStream) {
 	request := &service.ServiceRequest{}
 	err := proto.Unmarshal(bytes, request)
 	if err != nil {
@@ -335,12 +335,12 @@ func (s *serviceStateMachine) CanDelete(index uint64) bool {
 	return s.service.CanDelete(index)
 }
 
-func (s *serviceStateMachine) Command(bytes []byte, stream streams.Stream) {
+func (s *serviceStateMachine) Command(bytes []byte, stream streams.WriteStream) {
 	s.activate()
 	s.service.Command(bytes, stream)
 }
 
-func (s *serviceStateMachine) Query(bytes []byte, stream streams.Stream) {
+func (s *serviceStateMachine) Query(bytes []byte, stream streams.WriteStream) {
 	s.service.Query(bytes, stream)
 }
 

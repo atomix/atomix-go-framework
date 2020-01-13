@@ -49,16 +49,16 @@ func (s *SessionizedServer) write(ctx context.Context, request []byte, header *h
 		return nil, err
 	}
 
-	// Create a write channel
-	ch := make(chan streams.Result)
+	// Create a unary stream
+	stream := streams.NewUnaryStream()
 
 	// Write the request
-	if err := s.Client.Write(ctx, bytes, streams.NewChannelStream(ch)); err != nil {
+	if err := s.Client.Write(ctx, bytes, stream); err != nil {
 		return nil, err
 	}
 
 	// Wait for the result
-	result, ok := <-ch
+	result, ok := stream.Receive()
 	if !ok {
 		return nil, errors.New("write channel closed")
 	}
@@ -70,7 +70,7 @@ func (s *SessionizedServer) write(ctx context.Context, request []byte, header *h
 
 	// Decode and return the response
 	serviceResponse := &service.ServiceResponse{}
-	err = proto.Unmarshal(result.Value, serviceResponse)
+	err = proto.Unmarshal(result.Value.([]byte), serviceResponse)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func (s *SessionizedServer) write(ctx context.Context, request []byte, header *h
 }
 
 // writeStream sends a streaming write to the service
-func (s *SessionizedServer) writeStream(ctx context.Context, request []byte, header *headers.RequestHeader, ch chan<- streams.Result) error {
+func (s *SessionizedServer) writeStream(ctx context.Context, request []byte, header *headers.RequestHeader, stream streams.WriteStream) error {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,
@@ -96,29 +96,17 @@ func (s *SessionizedServer) writeStream(ctx context.Context, request []byte, hea
 	}
 
 	// Create a goroutine to convert the results into raw form
-	streamCh := make(chan streams.Result)
-	go func() {
-		defer close(ch)
-		for result := range streamCh {
-			if result.Failed() {
-				ch <- result
-			} else {
-				serviceResponse := &service.ServiceResponse{}
-				err := proto.Unmarshal(result.Value, serviceResponse)
-				if err != nil {
-					ch <- streams.Result{
-						Error: err,
-					}
-				} else {
-					ch <- streams.Result{
-						Value: serviceResponse.GetCommand(),
-					}
-				}
-			}
+	stream = streams.NewEncodingStream(stream, func(value interface{}) (interface{}, error) {
+		serviceResponse := &service.ServiceResponse{}
+		err := proto.Unmarshal(value.([]byte), serviceResponse)
+		if err != nil {
+			return nil, err
+		} else {
+			return serviceResponse.GetCommand(), nil
 		}
-	}()
+	})
 
-	go s.Client.Write(ctx, bytes, streams.NewChannelStream(streamCh))
+	go s.Client.Write(ctx, bytes, stream)
 	return nil
 }
 
@@ -140,16 +128,16 @@ func (s *SessionizedServer) read(ctx context.Context, request []byte, header *he
 		return nil, err
 	}
 
-	// Create a read channel
-	ch := make(chan streams.Result)
+	// Create a unary stream
+	stream := streams.NewUnaryStream()
 
 	// Read the request
-	if err := s.Client.Read(ctx, bytes, streams.NewChannelStream(ch)); err != nil {
+	if err := s.Client.Read(ctx, bytes, stream); err != nil {
 		return nil, err
 	}
 
 	// Wait for the result
-	result, ok := <-ch
+	result, ok := stream.Receive()
 	if !ok {
 		return nil, errors.New("write channel closed")
 	}
@@ -160,7 +148,7 @@ func (s *SessionizedServer) read(ctx context.Context, request []byte, header *he
 	}
 
 	serviceResponse := &service.ServiceResponse{}
-	err = proto.Unmarshal(result.Value, serviceResponse)
+	err = proto.Unmarshal(result.Value.([]byte), serviceResponse)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +156,7 @@ func (s *SessionizedServer) read(ctx context.Context, request []byte, header *he
 }
 
 // readStream sends a streaming read to the service
-func (s *SessionizedServer) readStream(ctx context.Context, request []byte, header *headers.RequestHeader, ch chan<- streams.Result) error {
+func (s *SessionizedServer) readStream(ctx context.Context, request []byte, header *headers.RequestHeader, stream streams.WriteStream) error {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,
@@ -185,30 +173,17 @@ func (s *SessionizedServer) readStream(ctx context.Context, request []byte, head
 		return err
 	}
 
-	// Create a goroutine to convert the results into raw form
-	streamCh := make(chan streams.Result)
-	go func() {
-		defer close(ch)
-		for result := range streamCh {
-			if result.Failed() {
-				ch <- result
-			} else {
-				serviceResponse := &service.ServiceResponse{}
-				err := proto.Unmarshal(result.Value, serviceResponse)
-				if err != nil {
-					ch <- streams.Result{
-						Error: err,
-					}
-				} else {
-					ch <- streams.Result{
-						Value: serviceResponse.GetQuery(),
-					}
-				}
-			}
+	// Convert the stream results into raw form
+	stream = streams.NewDecodingStream(stream, func(value interface{}) (interface{}, error) {
+		serviceResponse := &service.ServiceResponse{}
+		err := proto.Unmarshal(value.([]byte), serviceResponse)
+		if err != nil {
+			return nil, err
 		}
-	}()
+		return serviceResponse.GetQuery(), nil
+	})
 
-	go s.Client.Read(ctx, bytes, streams.NewChannelStream(streamCh))
+	go s.Client.Read(ctx, bytes, stream)
 	return nil
 }
 
@@ -262,16 +237,16 @@ func (s *SessionizedServer) Command(ctx context.Context, name string, input []by
 }
 
 // CommandStream submits a streaming command to the service
-func (s *SessionizedServer) CommandStream(ctx context.Context, name string, input []byte, header *headers.RequestHeader, ch chan<- SessionOutput) error {
+func (s *SessionizedServer) CommandStream(ctx context.Context, name string, input []byte, header *headers.RequestHeader, stream streams.WriteStream) error {
 	// If the client requires a leader and is not the leader, return an error
 	if s.Client.MustLeader() && !s.Client.IsLeader() {
-		ch <- SessionOutput{
+		stream.Value(SessionOutput{
 			Header: &headers.ResponseHeader{
 				Status: headers.ResponseStatus_NOT_LEADER,
 				Leader: s.Client.Leader(),
 			},
-		}
-		close(ch)
+		})
+		stream.Close()
 		return nil
 	}
 
@@ -293,42 +268,32 @@ func (s *SessionizedServer) CommandStream(ctx context.Context, name string, inpu
 		return err
 	}
 
-	resultCh := make(chan streams.Result)
-	go func() {
-		defer close(ch)
-		for result := range resultCh {
-			if result.Failed() {
-				ch <- SessionOutput{
-					Result: result,
-				}
-			} else {
-				sessionResponse := &service.SessionResponse{}
-				err = proto.Unmarshal(result.Value, sessionResponse)
-				if err != nil {
-					ch <- SessionOutput{
-						Result: streams.Result{
-							Error: err,
-						},
-					}
-				} else {
-					commandResponse := sessionResponse.GetCommand()
-					responseHeader := &headers.ResponseHeader{
-						SessionID:  header.SessionID,
-						StreamID:   commandResponse.Context.StreamID,
-						ResponseID: commandResponse.Context.Sequence,
-						Index:      commandResponse.Context.Index,
-					}
-					ch <- SessionOutput{
-						Header: responseHeader,
-						Result: streams.Result{
-							Value: commandResponse.Output,
-						},
-					}
-				}
+	stream = streams.NewEncodingStream(stream, func(value interface{}) (interface{}, error) {
+		sessionResponse := &service.SessionResponse{}
+		err = proto.Unmarshal(value.([]byte), sessionResponse)
+		if err != nil {
+			return SessionOutput{
+				Result: streams.Result{
+					Error: err,
+				},
+			}, nil
+		} else {
+			commandResponse := sessionResponse.GetCommand()
+			responseHeader := &headers.ResponseHeader{
+				SessionID:  header.SessionID,
+				StreamID:   commandResponse.Context.StreamID,
+				ResponseID: commandResponse.Context.Sequence,
+				Index:      commandResponse.Context.Index,
 			}
+			return SessionOutput{
+				Header: responseHeader,
+				Result: streams.Result{
+					Value: commandResponse.Output,
+				},
+			}, nil
 		}
-	}()
-	return s.writeStream(ctx, bytes, header, resultCh)
+	})
+	return s.writeStream(ctx, bytes, header, stream)
 }
 
 // Query submits a query to the service
@@ -380,16 +345,16 @@ func (s *SessionizedServer) Query(ctx context.Context, name string, input []byte
 }
 
 // QueryStream submits a streaming query to the service
-func (s *SessionizedServer) QueryStream(ctx context.Context, name string, input []byte, header *headers.RequestHeader, ch chan<- SessionOutput) error {
+func (s *SessionizedServer) QueryStream(ctx context.Context, name string, input []byte, header *headers.RequestHeader, stream streams.WriteStream) error {
 	// If the client requires a leader and is not the leader, return an error
 	if s.Client.MustLeader() && !s.Client.IsLeader() {
-		ch <- SessionOutput{
+		stream.Value(SessionOutput{
 			Header: &headers.ResponseHeader{
 				Status: headers.ResponseStatus_NOT_LEADER,
 				Leader: s.Client.Leader(),
 			},
-		}
-		close(ch)
+		})
+		stream.Close()
 		return nil
 	}
 
@@ -412,40 +377,24 @@ func (s *SessionizedServer) QueryStream(ctx context.Context, name string, input 
 		return err
 	}
 
-	resultCh := make(chan streams.Result)
-	go func() {
-		defer close(ch)
-		for result := range resultCh {
-			if result.Failed() {
-				ch <- SessionOutput{
-					Result: result,
-				}
-			} else {
-				sessionResponse := &service.SessionResponse{}
-				err = proto.Unmarshal(result.Value, sessionResponse)
-				if err != nil {
-					ch <- SessionOutput{
-						Result: streams.Result{
-							Error: err,
-						},
-					}
-				} else {
-					queryResponse := sessionResponse.GetQuery()
-					responseHeader := &headers.ResponseHeader{
-						SessionID: header.SessionID,
-						Index:     queryResponse.Context.Index,
-					}
-					ch <- SessionOutput{
-						Header: responseHeader,
-						Result: streams.Result{
-							Value: queryResponse.Output,
-						},
-					}
-				}
-			}
+	stream = streams.NewDecodingStream(stream, func(value interface{}) (interface{}, error) {
+		sessionResponse := &service.SessionResponse{}
+		if err := proto.Unmarshal(value.([]byte), sessionResponse); err != nil {
+			return nil, err
 		}
-	}()
-	return s.readStream(ctx, bytes, header, resultCh)
+		queryResponse := sessionResponse.GetQuery()
+		responseHeader := &headers.ResponseHeader{
+			SessionID: header.SessionID,
+			Index:     queryResponse.Context.Index,
+		}
+		return SessionOutput{
+			Header: responseHeader,
+			Result: streams.Result{
+				Value: queryResponse.Output,
+			},
+		}, nil
+	})
+	return s.readStream(ctx, bytes, header, stream)
 }
 
 // OpenSession opens a new session
@@ -598,16 +547,16 @@ func (s *SessionizedServer) Delete(ctx context.Context, header *headers.RequestH
 		return nil, err
 	}
 
-	// Create a write channel
-	ch := make(chan streams.Result)
+	// Create a unary stream
+	stream := streams.NewUnaryStream()
 
 	// Write the request
-	if err := s.Client.Write(ctx, bytes, streams.NewChannelStream(ch)); err != nil {
+	if err := s.Client.Write(ctx, bytes, stream); err != nil {
 		return nil, err
 	}
 
 	// Wait for the result
-	result, ok := <-ch
+	result, ok := stream.Receive()
 	if !ok {
 		return nil, errors.New("write channel closed")
 	}
@@ -619,7 +568,7 @@ func (s *SessionizedServer) Delete(ctx context.Context, header *headers.RequestH
 
 	// Decode and return the response
 	serviceResponse := &service.ServiceResponse{}
-	err = proto.Unmarshal(result.Value, serviceResponse)
+	err = proto.Unmarshal(result.Value.([]byte), serviceResponse)
 	if err != nil {
 		return nil, err
 	}

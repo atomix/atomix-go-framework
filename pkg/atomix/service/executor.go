@@ -24,7 +24,7 @@ type Executor interface {
 	RegisterUnaryOperation(name string, callback func([]byte) ([]byte, error))
 
 	// RegisterStreamOperation registers a new primitive operation
-	RegisterStreamOperation(name string, callback func([]byte, stream.Stream))
+	RegisterStreamOperation(name string, callback func([]byte, stream.WriteStream))
 
 	// GetOperation returns an operation by name
 	GetOperation(name string) Operation
@@ -42,7 +42,7 @@ type UnaryOperation interface {
 // StreamingOperation is a primitive operation that returns a stream
 type StreamingOperation interface {
 	// Execute executes the operation
-	Execute(bytes []byte, stream stream.Stream)
+	Execute(bytes []byte, stream stream.WriteStream)
 }
 
 // newExecutor returns a new executor
@@ -64,7 +64,7 @@ func (e *executor) RegisterUnaryOperation(name string, callback func([]byte) ([]
 	}
 }
 
-func (e *executor) RegisterStreamOperation(name string, callback func([]byte, stream.Stream)) {
+func (e *executor) RegisterStreamOperation(name string, callback func([]byte, stream.WriteStream)) {
 	e.operations[name] = &streamingOperation{
 		f: callback,
 	}
@@ -85,9 +85,9 @@ func (o *unaryOperation) Execute(bytes []byte) ([]byte, error) {
 
 // streamingOperation is an implementation of the StreamingOperation interface
 type streamingOperation struct {
-	f func([]byte, stream.Stream)
+	f func([]byte, stream.WriteStream)
 }
 
-func (o *streamingOperation) Execute(bytes []byte, stream stream.Stream) {
+func (o *streamingOperation) Execute(bytes []byte, stream stream.WriteStream) {
 	o.f(bytes, stream)
 }
