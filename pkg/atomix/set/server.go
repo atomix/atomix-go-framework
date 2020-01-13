@@ -19,6 +19,7 @@ import (
 	api "github.com/atomix/atomix-api/proto/atomix/set"
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/server"
+	streams "github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -192,22 +193,28 @@ func (s *Server) Events(request *api.EventRequest, srv api.SetService_EventsServ
 		return err
 	}
 
-	ch := make(chan server.SessionOutput)
-	if err := s.CommandStream(opEvents, in, request.Header, ch); err != nil {
+	stream := streams.NewBufferedStream()
+	if err := s.CommandStream(srv.Context(), opEvents, in, request.Header, stream); err != nil {
 		return err
 	}
 
-	for result := range ch {
+	for {
+		result, ok := stream.Receive()
+		if !ok {
+			break
+		}
+
 		if result.Failed() {
 			return result.Error
 		}
 
 		response := &ListenResponse{}
-		if err = proto.Unmarshal(result.Value, response); err != nil {
+		output := result.Value.(server.SessionOutput)
+		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}
 		eventResponse := &api.EventResponse{
-			Header: result.Header,
+			Header: output.Header,
 			Type:   getEventType(response.Type),
 			Value:  response.Value,
 		}
@@ -228,22 +235,28 @@ func (s *Server) Iterate(request *api.IterateRequest, srv api.SetService_Iterate
 		return err
 	}
 
-	ch := make(chan server.SessionOutput)
-	if err := s.QueryStream(opIterate, in, request.Header, ch); err != nil {
+	stream := streams.NewBufferedStream()
+	if err := s.QueryStream(srv.Context(), opIterate, in, request.Header, stream); err != nil {
 		return err
 	}
 
-	for result := range ch {
+	for {
+		result, ok := stream.Receive()
+		if !ok {
+			break
+		}
+
 		if result.Failed() {
 			return result.Error
 		}
 
 		response := &IterateResponse{}
-		if err = proto.Unmarshal(result.Value, response); err != nil {
+		output := result.Value.(server.SessionOutput)
+		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}
 		iterateResponse := &api.IterateResponse{
-			Header: result.Header,
+			Header: output.Header,
 			Value:  response.Value,
 		}
 		log.Tracef("Sending IterateResponse %+v", response)

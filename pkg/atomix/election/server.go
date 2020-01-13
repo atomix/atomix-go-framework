@@ -19,6 +19,7 @@ import (
 	api "github.com/atomix/atomix-api/proto/atomix/election"
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/server"
+	streams "github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -244,37 +245,43 @@ func (s *Server) GetTerm(ctx context.Context, request *api.GetTermRequest) (*api
 }
 
 // Events lists for election change events
-func (s *Server) Events(request *api.EventRequest, stream api.LeaderElectionService_EventsServer) error {
+func (s *Server) Events(request *api.EventRequest, srv api.LeaderElectionService_EventsServer) error {
 	log.Tracef("Received EventRequest %+v", request)
 	in, err := proto.Marshal(&ListenRequest{})
 	if err != nil {
 		return err
 	}
 
-	ch := make(chan server.SessionOutput)
-	if err := s.CommandStream(opEvents, in, request.Header, ch); err != nil {
+	stream := streams.NewBufferedStream()
+	if err := s.CommandStream(srv.Context(), opEvents, in, request.Header, stream); err != nil {
 		return err
 	}
 
-	for result := range ch {
+	for {
+		result, ok := stream.Receive()
+		if !ok {
+			break
+		}
+
 		if result.Failed() {
 			return result.Error
 		}
 
 		response := &ListenResponse{}
-		if err = proto.Unmarshal(result.Value, response); err != nil {
+		output := result.Value.(server.SessionOutput)
+		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}
 
 		var eventResponse *api.EventResponse
 		if response.Type == ListenResponse_OPEN {
 			eventResponse = &api.EventResponse{
-				Header: result.Header,
+				Header: output.Header,
 				Type:   api.EventResponse_OPEN,
 			}
 		} else {
 			eventResponse = &api.EventResponse{
-				Header: result.Header,
+				Header: output.Header,
 				Type:   api.EventResponse_CHANGED,
 				Term: &api.Term{
 					ID:         response.Term.ID,
@@ -285,7 +292,7 @@ func (s *Server) Events(request *api.EventRequest, stream api.LeaderElectionServ
 			}
 		}
 		log.Tracef("Sending EventResponse %+v", response)
-		if err = stream.Send(eventResponse); err != nil {
+		if err = srv.Send(eventResponse); err != nil {
 			return err
 		}
 	}

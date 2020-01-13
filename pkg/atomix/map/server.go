@@ -19,6 +19,7 @@ import (
 	api "github.com/atomix/atomix-api/proto/atomix/map"
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/server"
+	streams "github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -327,22 +328,28 @@ func (s *Server) Events(request *api.EventRequest, srv api.MapService_EventsServ
 		return err
 	}
 
-	ch := make(chan server.SessionOutput)
-	if err := s.CommandStream(opEvents, in, request.Header, ch); err != nil {
+	stream := streams.NewBufferedStream()
+	if err := s.CommandStream(srv.Context(), opEvents, in, request.Header, stream); err != nil {
 		return err
 	}
 
-	for result := range ch {
+	for {
+		result, ok := stream.Receive()
+		if !ok {
+			break
+		}
+
 		if result.Failed() {
 			return result.Error
 		}
 
 		response := &ListenResponse{}
-		if err = proto.Unmarshal(result.Value, response); err != nil {
+		output := result.Value.(server.SessionOutput)
+		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}
 		eventResponse := &api.EventResponse{
-			Header:  result.Header,
+			Header:  output.Header,
 			Type:    getEventType(response.Type),
 			Key:     response.Key,
 			Value:   response.Value,
@@ -367,22 +374,28 @@ func (s *Server) Entries(request *api.EntriesRequest, srv api.MapService_Entries
 		return err
 	}
 
-	ch := make(chan server.SessionOutput)
-	if err := s.QueryStream(opEntries, in, request.Header, ch); err != nil {
+	stream := streams.NewBufferedStream()
+	if err := s.QueryStream(srv.Context(), opEntries, in, request.Header, stream); err != nil {
 		return err
 	}
 
-	for result := range ch {
+	for {
+		result, ok := stream.Receive()
+		if !ok {
+			break
+		}
+
 		if result.Failed() {
 			return result.Error
 		}
 
 		response := &EntriesResponse{}
-		if err = proto.Unmarshal(result.Value, response); err != nil {
+		output := result.Value.(server.SessionOutput)
+		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}
 		entriesResponse := &api.EntriesResponse{
-			Header:  result.Header,
+			Header:  output.Header,
 			Key:     response.Key,
 			Value:   response.Value,
 			Version: int64(response.Version),
