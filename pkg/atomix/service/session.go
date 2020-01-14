@@ -386,11 +386,15 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 	s.context.setQuery()
 
 	responseStream := streams.NewEncodingStream(stream, func(value interface{}) (interface{}, error) {
-		return proto.Marshal(&QueryResponse{
-			Context: &ResponseContext{
-				Index: s.Context.Index(),
+		return proto.Marshal(&SessionResponse{
+			Response: &SessionResponse_Query{
+				Query: &SessionQueryResponse{
+					Context: &SessionResponseContext{
+						Index: index,
+					},
+					Output: value.([]byte),
+				},
 			},
-			Output: value.([]byte),
 		})
 	})
 
@@ -405,18 +409,26 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 		stream.Result(unaryOp.Execute(query.Input))
 		stream.Close()
 	} else if streamOp, ok := operation.(StreamingOperation); ok {
-		stream.Result(proto.Marshal(&QueryResponse{
-			Context: &ResponseContext{
-				Index: s.Context.Index(),
-				Type:  ResponseType_OPEN_STREAM,
+		stream.Result(proto.Marshal(&SessionResponse{
+			Response: &SessionResponse_Query{
+				Query: &SessionQueryResponse{
+					Context: &SessionResponseContext{
+						Index: index,
+						Type:  ResponseType_OPEN_STREAM,
+					},
+				},
 			},
 		}))
 
 		responseStream = streams.NewCloserStream(responseStream, func(_ streams.WriteStream) {
-			stream.Result(proto.Marshal(&QueryResponse{
-				Context: &ResponseContext{
-					Index: s.Context.Index(),
-					Type:  ResponseType_CLOSE_STREAM,
+			stream.Result(proto.Marshal(&SessionResponse{
+				Response: &SessionResponse_Query{
+					Query: &SessionQueryResponse{
+						Context: &SessionResponseContext{
+							Index: index,
+							Type:  ResponseType_CLOSE_STREAM,
+						},
+					},
 				},
 			}))
 		})

@@ -284,6 +284,7 @@ func (s *SessionizedServer) CommandStream(ctx context.Context, name string, inpu
 				StreamID:   commandResponse.Context.StreamID,
 				ResponseID: commandResponse.Context.Sequence,
 				Index:      commandResponse.Context.Index,
+				Type:       headers.ResponseType(commandResponse.Context.Type),
 			}
 			return SessionOutput{
 				Header: responseHeader,
@@ -386,6 +387,7 @@ func (s *SessionizedServer) QueryStream(ctx context.Context, name string, input 
 		responseHeader := &headers.ResponseHeader{
 			SessionID: header.SessionID,
 			Index:     queryResponse.Context.Index,
+			Type:      headers.ResponseType(queryResponse.Context.Type),
 		}
 		return SessionOutput{
 			Header: responseHeader,

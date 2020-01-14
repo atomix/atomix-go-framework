@@ -16,6 +16,7 @@ package indexedmap
 
 import (
 	"context"
+	"github.com/atomix/atomix-api/proto/atomix/headers"
 	api "github.com/atomix/atomix-api/proto/atomix/indexedmap"
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/server"
@@ -489,16 +490,30 @@ func (m *Server) Events(request *api.EventRequest, srv api.IndexedMapService_Eve
 		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}
-		eventResponse := &api.EventResponse{
-			Header:  output.Header,
-			Type:    getEventType(response.Type),
-			Index:   int64(response.Index),
-			Key:     response.Key,
-			Value:   response.Value,
-			Version: int64(response.Version),
-			Created: response.Created,
-			Updated: response.Updated,
+
+		var eventResponse *api.EventResponse
+		switch output.Header.Type {
+		case headers.ResponseType_OPEN_STREAM:
+			eventResponse = &api.EventResponse{
+				Header: output.Header,
+			}
+		case headers.ResponseType_CLOSE_STREAM:
+			eventResponse = &api.EventResponse{
+				Header: output.Header,
+			}
+		default:
+			eventResponse = &api.EventResponse{
+				Header:  output.Header,
+				Type:    getEventType(response.Type),
+				Index:   int64(response.Index),
+				Key:     response.Key,
+				Value:   response.Value,
+				Version: int64(response.Version),
+				Created: response.Created,
+				Updated: response.Updated,
+			}
 		}
+
 		log.Tracef("Sending EventResponse %+v", response)
 		if err = srv.Send(eventResponse); err != nil {
 			return err
@@ -538,15 +553,29 @@ func (m *Server) Entries(request *api.EntriesRequest, srv api.IndexedMapService_
 		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}
-		entriesResponse := &api.EntriesResponse{
-			Header:  output.Header,
-			Index:   int64(response.Index),
-			Key:     response.Key,
-			Value:   response.Value,
-			Version: int64(response.Version),
-			Created: response.Created,
-			Updated: response.Updated,
+
+		var entriesResponse *api.EntriesResponse
+		switch output.Header.Type {
+		case headers.ResponseType_OPEN_STREAM:
+			entriesResponse = &api.EntriesResponse{
+				Header: output.Header,
+			}
+		case headers.ResponseType_CLOSE_STREAM:
+			entriesResponse = &api.EntriesResponse{
+				Header: output.Header,
+			}
+		default:
+			entriesResponse = &api.EntriesResponse{
+				Header:  output.Header,
+				Index:   int64(response.Index),
+				Key:     response.Key,
+				Value:   response.Value,
+				Version: int64(response.Version),
+				Created: response.Created,
+				Updated: response.Updated,
+			}
 		}
+
 		log.Tracef("Sending EntriesResponse %+v", response)
 		if err = srv.Send(entriesResponse); err != nil {
 			return err
@@ -580,7 +609,6 @@ func getEventType(eventType ListenResponse_Type) api.EventResponse_Type {
 		return api.EventResponse_UPDATED
 	case ListenResponse_REMOVED:
 		return api.EventResponse_REMOVED
-	default:
-		return api.EventResponse_OPEN
 	}
+	return api.EventResponse_NONE
 }
