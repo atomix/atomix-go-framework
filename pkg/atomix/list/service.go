@@ -269,11 +269,6 @@ func (l *Service) Events(bytes []byte, stream stream.WriteStream) {
 		return
 	}
 
-	// Send an OPEN response to notify the client the stream is open
-	stream.Result(proto.Marshal(&ListenResponse{
-		Type: ListenResponse_OPEN,
-	}))
-
 	if request.Replay {
 		for index, value := range l.values {
 			stream.Result(proto.Marshal(&ListenResponse{

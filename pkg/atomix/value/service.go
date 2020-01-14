@@ -137,10 +137,7 @@ func (v *Service) Get(bytes []byte) ([]byte, error) {
 
 // Events registers a channel on which to send events
 func (v *Service) Events(bytes []byte, stream stream.WriteStream) {
-	// Immediately send an OPEN event but keep the channel open
-	stream.Result(proto.Marshal(&ListenResponse{
-		Type: ListenResponse_OPEN,
-	}))
+	// Keep the stream open for events
 }
 
 func (v *Service) sendEvent(event *ListenResponse) {

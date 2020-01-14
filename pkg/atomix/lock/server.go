@@ -16,12 +16,16 @@ package lock
 
 import (
 	"context"
+	"github.com/atomix/atomix-api/proto/atomix/headers"
 	api "github.com/atomix/atomix-api/proto/atomix/lock"
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/server"
+	streams "github.com/atomix/atomix-go-node/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func init() {
@@ -112,22 +116,36 @@ func (s *Server) Lock(ctx context.Context, request *api.LockRequest) (*api.LockR
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, opLock, in, request.Header)
-	if err != nil {
+	stream := streams.NewBufferedStream()
+	if err := s.CommandStream(ctx, opLock, in, request.Header, stream); err != nil {
 		return nil, err
 	}
 
-	lockResponse := &LockResponse{}
-	if err = proto.Unmarshal(out, lockResponse); err != nil {
-		return nil, err
-	}
+	for {
+		result, ok := stream.Receive()
+		if !ok {
+			return nil, status.Error(codes.Canceled, "stream closed")
+		}
 
-	response := &api.LockResponse{
-		Header:  header,
-		Version: uint64(lockResponse.Index),
+		if result.Failed() {
+			return nil, result.Error
+		}
+
+		output := result.Value.(server.SessionOutput)
+
+		if output.Header.Type == headers.ResponseType_RESPONSE {
+			lockResponse := &LockResponse{}
+			if err = proto.Unmarshal(output.Value.([]byte), lockResponse); err != nil {
+				return nil, err
+			}
+			response := &api.LockResponse{
+				Header:  output.Header,
+				Version: uint64(lockResponse.Index),
+			}
+			log.Tracef("Sending LockResponse %+v", response)
+			return response, nil
+		}
 	}
-	log.Tracef("Sending LockResponse %+v", response)
-	return response, nil
 }
 
 // Unlock releases the lock

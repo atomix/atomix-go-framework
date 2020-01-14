@@ -401,11 +401,6 @@ func (m *Service) Events(bytes []byte, stream stream.WriteStream) {
 		return
 	}
 
-	// Send an OPEN response to notify the client the stream is open
-	stream.Result(proto.Marshal(&ListenResponse{
-		Type: ListenResponse_OPEN,
-	}))
-
 	// Create and populate the listener
 	l := listener{
 		key:    request.Key,

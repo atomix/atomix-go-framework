@@ -224,7 +224,6 @@ func getEventType(eventType ListenResponse_Type) api.EventResponse_Type {
 	switch eventType {
 	case ListenResponse_UPDATED:
 		return api.EventResponse_UPDATED
-	default:
-		return api.EventResponse_OPEN
 	}
+	return api.EventResponse_UPDATED
 }
