@@ -16,6 +16,7 @@ package list
 
 import (
 	"context"
+	"github.com/atomix/atomix-api/proto/atomix/headers"
 	api "github.com/atomix/atomix-api/proto/atomix/list"
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/server"
@@ -356,12 +357,25 @@ func (s *Server) Events(request *api.EventRequest, srv api.ListService_EventsSer
 			return err
 		}
 
-		eventResponse := &api.EventResponse{
-			Header: output.Header,
-			Type:   getEventType(response.Type),
-			Index:  response.Index,
-			Value:  response.Value,
+		var eventResponse *api.EventResponse
+		switch output.Header.Type {
+		case headers.ResponseType_OPEN_STREAM:
+			eventResponse = &api.EventResponse{
+				Header: output.Header,
+			}
+		case headers.ResponseType_CLOSE_STREAM:
+			eventResponse = &api.EventResponse{
+				Header: output.Header,
+			}
+		default:
+			eventResponse = &api.EventResponse{
+				Header: output.Header,
+				Type:   getEventType(response.Type),
+				Index:  response.Index,
+				Value:  response.Value,
+			}
 		}
+
 		log.Tracef("Sending EventResponse %+v", response)
 		if err = srv.Send(eventResponse); err != nil {
 			return err
@@ -400,10 +414,24 @@ func (s *Server) Iterate(request *api.IterateRequest, srv api.ListService_Iterat
 		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}
-		iterateResponse := &api.IterateResponse{
-			Header: output.Header,
-			Value:  response.Value,
+
+		var iterateResponse *api.IterateResponse
+		switch output.Header.Type {
+		case headers.ResponseType_OPEN_STREAM:
+			iterateResponse = &api.IterateResponse{
+				Header: output.Header,
+			}
+		case headers.ResponseType_CLOSE_STREAM:
+			iterateResponse = &api.IterateResponse{
+				Header: output.Header,
+			}
+		default:
+			iterateResponse = &api.IterateResponse{
+				Header: output.Header,
+				Value:  response.Value,
+			}
 		}
+
 		log.Tracef("Sending IterateResponse %+v", response)
 		if err = srv.Send(iterateResponse); err != nil {
 			return err
@@ -436,7 +464,6 @@ func getEventType(eventType ListenResponse_Type) api.EventResponse_Type {
 		return api.EventResponse_ADDED
 	case ListenResponse_REMOVED:
 		return api.EventResponse_REMOVED
-	default:
-		return api.EventResponse_OPEN
 	}
+	return api.EventResponse_NONE
 }

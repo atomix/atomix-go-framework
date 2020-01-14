@@ -16,6 +16,7 @@ package leader
 
 import (
 	"context"
+	"github.com/atomix/atomix-api/proto/atomix/headers"
 	api "github.com/atomix/atomix-api/proto/atomix/leader"
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/server"
@@ -140,12 +141,16 @@ func (s *Server) Events(request *api.EventRequest, srv api.LeaderLatchService_Ev
 		}
 
 		var eventResponse *api.EventResponse
-		if response.Type == ListenResponse_OPEN {
+		switch output.Header.Type {
+		case headers.ResponseType_OPEN_STREAM:
 			eventResponse = &api.EventResponse{
 				Header: output.Header,
-				Type:   api.EventResponse_OPEN,
 			}
-		} else {
+		case headers.ResponseType_CLOSE_STREAM:
+			eventResponse = &api.EventResponse{
+				Header: output.Header,
+			}
+		default:
 			eventResponse = &api.EventResponse{
 				Header: output.Header,
 				Type:   api.EventResponse_CHANGED,
@@ -156,6 +161,7 @@ func (s *Server) Events(request *api.EventRequest, srv api.LeaderLatchService_Ev
 				},
 			}
 		}
+
 		log.Tracef("Sending EventResponse %+v", response)
 		if err = srv.Send(eventResponse); err != nil {
 			return err

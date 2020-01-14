@@ -16,6 +16,7 @@ package value
 
 import (
 	"context"
+	"github.com/atomix/atomix-api/proto/atomix/headers"
 	api "github.com/atomix/atomix-api/proto/atomix/value"
 	"github.com/atomix/atomix-go-node/pkg/atomix/node"
 	"github.com/atomix/atomix-go-node/pkg/atomix/server"
@@ -134,14 +135,28 @@ func (s *Server) Events(request *api.EventRequest, srv api.ValueService_EventsSe
 		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}
-		eventResponse := &api.EventResponse{
-			Header:          output.Header,
-			Type:            getEventType(response.Type),
-			PreviousValue:   response.PreviousValue,
-			PreviousVersion: response.PreviousVersion,
-			NewValue:        response.NewValue,
-			NewVersion:      response.NewVersion,
+
+		var eventResponse *api.EventResponse
+		switch output.Header.Type {
+		case headers.ResponseType_OPEN_STREAM:
+			eventResponse = &api.EventResponse{
+				Header: output.Header,
+			}
+		case headers.ResponseType_CLOSE_STREAM:
+			eventResponse = &api.EventResponse{
+				Header: output.Header,
+			}
+		default:
+			eventResponse = &api.EventResponse{
+				Header:          output.Header,
+				Type:            getEventType(response.Type),
+				PreviousValue:   response.PreviousValue,
+				PreviousVersion: response.PreviousVersion,
+				NewValue:        response.NewValue,
+				NewVersion:      response.NewVersion,
+			}
 		}
+
 		log.Tracef("Sending EventResponse %+v", response)
 		if err = srv.Send(eventResponse); err != nil {
 			return err
