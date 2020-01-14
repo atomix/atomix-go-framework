@@ -369,20 +369,6 @@ func (s *SessionizedService) sequenceQuery(query *SessionQueryRequest, stream st
 func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Session, stream streams.WriteStream) {
 	index := s.Context.Index()
 	commandSequence := session.commandSequence
-	stream = streams.NewEncodingStream(stream, func(value interface{}) (interface{}, error) {
-		return proto.Marshal(&SessionResponse{
-			Response: &SessionResponse_Query{
-				Query: &SessionQueryResponse{
-					Context: &SessionResponseContext{
-						Index:    index,
-						Sequence: commandSequence,
-					},
-					Output: value.([]byte),
-				},
-			},
-		})
-	})
-
 	s.context.setQuery()
 
 	responseStream := streams.NewEncodingStream(stream, func(value interface{}) (interface{}, error) {
@@ -391,6 +377,7 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 				Query: &SessionQueryResponse{
 					Context: &SessionResponseContext{
 						Index: index,
+						Sequence: commandSequence,
 					},
 					Output: value.([]byte),
 				},
@@ -406,8 +393,8 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 	}
 
 	if unaryOp, ok := operation.(UnaryOperation); ok {
-		stream.Result(unaryOp.Execute(query.Input))
-		stream.Close()
+		responseStream.Result(unaryOp.Execute(query.Input))
+		responseStream.Close()
 	} else if streamOp, ok := operation.(StreamingOperation); ok {
 		stream.Result(proto.Marshal(&SessionResponse{
 			Response: &SessionResponse_Query{
@@ -597,6 +584,7 @@ func (s *Session) ack(id uint64, streams map[uint64]uint64) {
 		if open {
 			stream.ack(streamAck)
 		} else {
+			stream.Close()
 			delete(s.streams, streamID)
 		}
 	}

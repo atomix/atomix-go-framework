@@ -102,8 +102,8 @@ func (s *SimpleService) Command(bytes []byte, stream streams.WriteStream) {
 
 			streamOp.Execute(command.Command, responseStream)
 		} else if unaryOp, ok := operation.(UnaryOperation); ok {
-			stream.Result(unaryOp.Execute(command.Command))
-			stream.Close()
+			responseStream.Result(unaryOp.Execute(command.Command))
+			responseStream.Close()
 		}
 
 		s.scheduler.runImmediateTasks()
@@ -148,7 +148,7 @@ func (s *SimpleService) execute(query *QueryRequest, stream streams.WriteStream)
 	}
 
 	if streamOp, ok := operation.(StreamingOperation); ok {
-		stream.Result(proto.Marshal(&CommandResponse{
+		stream.Result(proto.Marshal(&QueryResponse{
 			Context: &ResponseContext{
 				Index: s.Context.Index(),
 				Type:  ResponseType_OPEN_STREAM,
@@ -156,7 +156,7 @@ func (s *SimpleService) execute(query *QueryRequest, stream streams.WriteStream)
 		}))
 
 		responseStream = streams.NewCloserStream(responseStream, func(_ streams.WriteStream) {
-			stream.Result(proto.Marshal(&CommandResponse{
+			stream.Result(proto.Marshal(&QueryResponse{
 				Context: &ResponseContext{
 					Index: s.Context.Index(),
 					Type:  ResponseType_CLOSE_STREAM,
@@ -166,7 +166,7 @@ func (s *SimpleService) execute(query *QueryRequest, stream streams.WriteStream)
 
 		streamOp.Execute(query.Query, responseStream)
 	} else if unaryOp, ok := operation.(UnaryOperation); ok {
-		stream.Result(unaryOp.Execute(query.Query))
-		stream.Close()
+		responseStream.Result(unaryOp.Execute(query.Query))
+		responseStream.Close()
 	}
 }
