@@ -338,7 +338,7 @@ func (m *Service) Remove(bytes []byte) ([]byte, error) {
 		Updated: value.Updated,
 	})
 
-	return proto.Marshal(&ReplaceResponse{
+	return proto.Marshal(&RemoveResponse{
 		Status:          UpdateStatus_OK,
 		PreviousValue:   value.Value,
 		PreviousVersion: value.Version,
