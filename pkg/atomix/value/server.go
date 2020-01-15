@@ -157,7 +157,7 @@ func (s *Server) Events(request *api.EventRequest, srv api.ValueService_EventsSe
 			}
 		}
 
-		log.Tracef("Sending EventResponse %+v", response)
+		log.Tracef("Sending EventResponse %+v", eventResponse)
 		if err = srv.Send(eventResponse); err != nil {
 			return err
 		}

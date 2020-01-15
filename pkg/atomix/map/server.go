@@ -372,7 +372,7 @@ func (s *Server) Events(request *api.EventRequest, srv api.MapService_EventsServ
 			}
 		}
 
-		log.Tracef("Sending EventResponse %+v", response)
+		log.Tracef("Sending EventResponse %+v", eventResponse)
 		if err = srv.Send(eventResponse); err != nil {
 			return err
 		}
@@ -431,7 +431,7 @@ func (s *Server) Entries(request *api.EntriesRequest, srv api.MapService_Entries
 			}
 		}
 
-		log.Tracef("Sending EntriesResponse %+v", response)
+		log.Tracef("Sending EntriesResponse %+v", entriesResponse)
 		if err = srv.Send(entriesResponse); err != nil {
 			return err
 		}

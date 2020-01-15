@@ -514,7 +514,7 @@ func (m *Server) Events(request *api.EventRequest, srv api.IndexedMapService_Eve
 			}
 		}
 
-		log.Tracef("Sending EventResponse %+v", response)
+		log.Tracef("Sending EventResponse %+v", eventResponse)
 		if err = srv.Send(eventResponse); err != nil {
 			return err
 		}
@@ -576,7 +576,7 @@ func (m *Server) Entries(request *api.EntriesRequest, srv api.IndexedMapService_
 			}
 		}
 
-		log.Tracef("Sending EntriesResponse %+v", response)
+		log.Tracef("Sending EntriesResponse %+v", entriesResponse)
 		if err = srv.Send(entriesResponse); err != nil {
 			return err
 		}

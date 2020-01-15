@@ -376,7 +376,7 @@ func (s *Server) Events(request *api.EventRequest, srv api.ListService_EventsSer
 			}
 		}
 
-		log.Tracef("Sending EventResponse %+v", response)
+		log.Tracef("Sending EventResponse %+v", eventResponse)
 		if err = srv.Send(eventResponse); err != nil {
 			return err
 		}
@@ -432,7 +432,7 @@ func (s *Server) Iterate(request *api.IterateRequest, srv api.ListService_Iterat
 			}
 		}
 
-		log.Tracef("Sending IterateResponse %+v", response)
+		log.Tracef("Sending IterateResponse %+v", iterateResponse)
 		if err = srv.Send(iterateResponse); err != nil {
 			return err
 		}
