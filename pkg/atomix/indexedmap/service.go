@@ -111,6 +111,7 @@ func (m *Service) Snapshot(writer io.Writer) error {
 		if err := util.WriteValue(writer, entry.MapEntryValue, proto.Marshal); err != nil {
 			return err
 		}
+		entry = entry.Next
 	}
 	return nil
 }
