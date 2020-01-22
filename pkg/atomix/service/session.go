@@ -116,6 +116,7 @@ func (s *SessionizedService) installSessions(reader io.Reader) error {
 			commandSequence:  snapshot.CommandSequence,
 			commandCallbacks: make(map[uint64]func()),
 			queryCallbacks:   make(map[uint64]*list.List),
+			results:          make(map[uint64]streams.Result),
 			streams:          make(map[uint64]*sessionStream),
 		}
 
