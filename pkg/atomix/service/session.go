@@ -191,8 +191,8 @@ func (s *SessionizedService) applyCommand(request *SessionCommandRequest, stream
 				stream.Close()
 			} else {
 				streamCtx := session.getStream(sequenceNumber)
-				if stream != nil {
-					streamCtx.replay(streamCtx)
+				if streamCtx != nil {
+					streamCtx.replay(stream)
 				} else {
 					stream.Error(fmt.Errorf("sequence number %d has already been acknowledged", sequenceNumber))
 					stream.Close()
