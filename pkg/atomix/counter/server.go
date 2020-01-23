@@ -16,10 +16,10 @@ package counter
 
 import (
 	"context"
-	api "github.com/atomix/atomix-api/proto/atomix/counter"
-	"github.com/atomix/atomix-api/proto/atomix/headers"
-	"github.com/atomix/atomix-go-node/pkg/atomix/node"
-	"github.com/atomix/atomix-go-node/pkg/atomix/server"
+	api "github.com/atomix/api/proto/atomix/counter"
+	"github.com/atomix/api/proto/atomix/headers"
+	"github.com/atomix/go-framework/pkg/atomix/node"
+	"github.com/atomix/go-framework/pkg/atomix/server"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"

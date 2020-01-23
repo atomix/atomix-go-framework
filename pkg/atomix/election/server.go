@@ -16,11 +16,11 @@ package election
 
 import (
 	"context"
-	api "github.com/atomix/atomix-api/proto/atomix/election"
-	"github.com/atomix/atomix-api/proto/atomix/headers"
-	"github.com/atomix/atomix-go-node/pkg/atomix/node"
-	"github.com/atomix/atomix-go-node/pkg/atomix/server"
-	streams "github.com/atomix/atomix-go-node/pkg/atomix/stream"
+	api "github.com/atomix/api/proto/atomix/election"
+	"github.com/atomix/api/proto/atomix/headers"
+	"github.com/atomix/go-framework/pkg/atomix/node"
+	"github.com/atomix/go-framework/pkg/atomix/server"
+	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"

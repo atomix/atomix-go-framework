@@ -16,7 +16,7 @@ package node
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
+	"github.com/atomix/go-framework/pkg/atomix/stream"
 )
 
 // Client is the interface for protocol clients

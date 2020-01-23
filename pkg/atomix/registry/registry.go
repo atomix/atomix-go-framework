@@ -17,35 +17,35 @@ package registry
 // Import all services to ensure they're registered
 import (
 	// Register the counter primitive
-	_ "github.com/atomix/atomix-go-node/pkg/atomix/counter"
-	"github.com/atomix/atomix-go-node/pkg/atomix/node"
+	_ "github.com/atomix/go-framework/pkg/atomix/counter"
+	"github.com/atomix/go-framework/pkg/atomix/node"
 
 	// Register the election primitive
-	_ "github.com/atomix/atomix-go-node/pkg/atomix/election"
+	_ "github.com/atomix/go-framework/pkg/atomix/election"
 
 	// Register the indexedmap primitive
-	_ "github.com/atomix/atomix-go-node/pkg/atomix/indexedmap"
+	_ "github.com/atomix/go-framework/pkg/atomix/indexedmap"
 
 	// Register the leader latch primitive
-	_ "github.com/atomix/atomix-go-node/pkg/atomix/leader"
+	_ "github.com/atomix/go-framework/pkg/atomix/leader"
 
 	// Register the list primitive
-	_ "github.com/atomix/atomix-go-node/pkg/atomix/list"
+	_ "github.com/atomix/go-framework/pkg/atomix/list"
 
 	// Register the lock primitive
-	_ "github.com/atomix/atomix-go-node/pkg/atomix/lock"
+	_ "github.com/atomix/go-framework/pkg/atomix/lock"
 
 	// Register the map primitive
-	_ "github.com/atomix/atomix-go-node/pkg/atomix/map"
+	_ "github.com/atomix/go-framework/pkg/atomix/map"
 
 	// Register the primitive metadata service
-	_ "github.com/atomix/atomix-go-node/pkg/atomix/primitive"
+	_ "github.com/atomix/go-framework/pkg/atomix/primitive"
 
 	// Register the set primitive
-	_ "github.com/atomix/atomix-go-node/pkg/atomix/set"
+	_ "github.com/atomix/go-framework/pkg/atomix/set"
 
 	// Register the value primitive
-	_ "github.com/atomix/atomix-go-node/pkg/atomix/value"
+	_ "github.com/atomix/go-framework/pkg/atomix/value"
 )
 
 // Registry is a service registry populated with all default primitive services

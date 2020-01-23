@@ -17,8 +17,8 @@ package node
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/atomix/atomix-go-node/pkg/atomix/service"
-	streams "github.com/atomix/atomix-go-node/pkg/atomix/stream"
+	"github.com/atomix/go-framework/pkg/atomix/service"
+	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	"io"
 	"strings"

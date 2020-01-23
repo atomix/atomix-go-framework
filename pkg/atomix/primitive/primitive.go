@@ -16,10 +16,10 @@ package primitive
 
 import (
 	"context"
-	api "github.com/atomix/atomix-api/proto/atomix/primitive"
-	"github.com/atomix/atomix-go-node/pkg/atomix/node"
-	"github.com/atomix/atomix-go-node/pkg/atomix/service"
-	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
+	api "github.com/atomix/api/proto/atomix/primitive"
+	"github.com/atomix/go-framework/pkg/atomix/node"
+	"github.com/atomix/go-framework/pkg/atomix/service"
+	"github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"

@@ -15,7 +15,7 @@
 package service
 
 import (
-	"github.com/atomix/atomix-go-node/pkg/atomix/stream"
+	"github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 	"testing"

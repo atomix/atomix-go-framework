@@ -16,10 +16,10 @@ package indexedmap
 
 import (
 	"context"
-	client "github.com/atomix/atomix-go-client/pkg/client/indexedmap"
-	"github.com/atomix/atomix-go-client/pkg/client/primitive"
-	"github.com/atomix/atomix-go-client/pkg/client/session"
-	"github.com/atomix/atomix-go-node/pkg/atomix/test"
+	client "github.com/atomix/go-client/pkg/client/indexedmap"
+	"github.com/atomix/go-client/pkg/client/primitive"
+	"github.com/atomix/go-client/pkg/client/session"
+	"github.com/atomix/go-framework/pkg/atomix/test"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"testing"

@@ -16,10 +16,10 @@ package atomix
 
 import (
 	"fmt"
-	"github.com/atomix/atomix-api/proto/atomix/controller"
-	"github.com/atomix/atomix-go-node/pkg/atomix/cluster"
-	"github.com/atomix/atomix-go-node/pkg/atomix/node"
-	"github.com/atomix/atomix-go-node/pkg/atomix/util"
+	"github.com/atomix/api/proto/atomix/controller"
+	"github.com/atomix/go-framework/pkg/atomix/cluster"
+	"github.com/atomix/go-framework/pkg/atomix/node"
+	"github.com/atomix/go-framework/pkg/atomix/util"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"net"

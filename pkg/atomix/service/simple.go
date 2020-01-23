@@ -16,7 +16,7 @@ package service
 
 import (
 	"fmt"
-	streams "github.com/atomix/atomix-go-node/pkg/atomix/stream"
+	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	"io"
 )

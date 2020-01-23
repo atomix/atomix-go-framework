@@ -16,11 +16,11 @@ package value
 
 import (
 	"context"
-	"github.com/atomix/atomix-api/proto/atomix/headers"
-	api "github.com/atomix/atomix-api/proto/atomix/value"
-	"github.com/atomix/atomix-go-node/pkg/atomix/node"
-	"github.com/atomix/atomix-go-node/pkg/atomix/server"
-	streams "github.com/atomix/atomix-go-node/pkg/atomix/stream"
+	"github.com/atomix/api/proto/atomix/headers"
+	api "github.com/atomix/api/proto/atomix/value"
+	"github.com/atomix/go-framework/pkg/atomix/node"
+	"github.com/atomix/go-framework/pkg/atomix/server"
+	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"

@@ -17,10 +17,10 @@ package server
 import (
 	"context"
 	"errors"
-	"github.com/atomix/atomix-api/proto/atomix/headers"
-	"github.com/atomix/atomix-go-node/pkg/atomix/node"
-	"github.com/atomix/atomix-go-node/pkg/atomix/service"
-	streams "github.com/atomix/atomix-go-node/pkg/atomix/stream"
+	"github.com/atomix/api/proto/atomix/headers"
+	"github.com/atomix/go-framework/pkg/atomix/node"
+	"github.com/atomix/go-framework/pkg/atomix/service"
+	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/gogo/protobuf/proto"
 )
 

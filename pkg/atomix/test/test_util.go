@@ -16,9 +16,9 @@ package test
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-local/pkg/atomix/local"
-	"github.com/atomix/atomix-go-node/pkg/atomix"
-	"github.com/atomix/atomix-go-node/pkg/atomix/node"
+	"github.com/atomix/go-local/pkg/atomix/local"
+	"github.com/atomix/go-framework/pkg/atomix"
+	"github.com/atomix/go-framework/pkg/atomix/node"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
 	"net"

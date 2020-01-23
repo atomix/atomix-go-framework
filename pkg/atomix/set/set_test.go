@@ -16,10 +16,10 @@ package set
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-client/pkg/client/primitive"
-	"github.com/atomix/atomix-go-client/pkg/client/session"
-	client "github.com/atomix/atomix-go-client/pkg/client/set"
-	"github.com/atomix/atomix-go-node/pkg/atomix/test"
+	"github.com/atomix/go-client/pkg/client/primitive"
+	"github.com/atomix/go-client/pkg/client/session"
+	client "github.com/atomix/go-client/pkg/client/set"
+	"github.com/atomix/go-framework/pkg/atomix/test"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"testing"
