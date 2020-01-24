@@ -19,27 +19,27 @@ import (
 	client "github.com/atomix/go-client/pkg/client/election"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/session"
+	"github.com/atomix/go-client/pkg/client/util/net"
 	"github.com/atomix/go-framework/pkg/atomix/test"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/grpc"
 	"testing"
 	"time"
 )
 
 func TestElection(t *testing.T) {
-	node, conn := test.StartTestNode()
+	address, node := test.StartTestNode()
 	defer node.Stop()
 
 	name := primitive.NewName("default", "test", "default", "test")
-	election1, err := client.New(context.TODO(), name, []*grpc.ClientConn{conn}, session.WithTimeout(5*time.Second))
+	election1, err := client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 	assert.NotNil(t, election1)
 
-	election2, err := client.New(context.TODO(), name, []*grpc.ClientConn{conn}, session.WithTimeout(5*time.Second))
+	election2, err := client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 	assert.NotNil(t, election2)
 
-	election3, err := client.New(context.TODO(), name, []*grpc.ClientConn{conn}, session.WithTimeout(5*time.Second))
+	election3, err := client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 	assert.NotNil(t, election3)
 
@@ -228,10 +228,10 @@ func TestElection(t *testing.T) {
 	err = election3.Close()
 	assert.NoError(t, err)
 
-	election1, err = client.New(context.TODO(), name, []*grpc.ClientConn{conn}, session.WithTimeout(5*time.Second))
+	election1, err = client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 
-	election2, err = client.New(context.TODO(), name, []*grpc.ClientConn{conn}, session.WithTimeout(5*time.Second))
+	election2, err = client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 
 	term, err = election1.GetTerm(context.TODO())
@@ -249,7 +249,7 @@ func TestElection(t *testing.T) {
 	err = election2.Delete()
 	assert.NoError(t, err)
 
-	election, err := client.New(context.TODO(), name, []*grpc.ClientConn{conn}, session.WithTimeout(5*time.Second))
+	election, err := client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 
 	term, err = election.GetTerm(context.TODO())

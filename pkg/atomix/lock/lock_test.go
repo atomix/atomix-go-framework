@@ -19,21 +19,21 @@ import (
 	client "github.com/atomix/go-client/pkg/client/lock"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/session"
+	"github.com/atomix/go-client/pkg/client/util/net"
 	"github.com/atomix/go-framework/pkg/atomix/test"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/grpc"
 	"testing"
 	"time"
 )
 
 func TestLock(t *testing.T) {
-	node, conn := test.StartTestNode()
+	address, node := test.StartTestNode()
 	defer node.Stop()
 
 	name := primitive.NewName("default", "test", "default", "test")
-	l1, err := client.New(context.TODO(), name, []*grpc.ClientConn{conn}, session.WithTimeout(5*time.Second))
+	l1, err := client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
-	l2, err := client.New(context.TODO(), name, []*grpc.ClientConn{conn}, session.WithTimeout(5*time.Second))
+	l2, err := client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 
 	v1, err := l1.Lock(context.Background())
@@ -89,7 +89,7 @@ func TestLock(t *testing.T) {
 	err = l2.Delete()
 	assert.NoError(t, err)
 
-	l, err := client.New(context.TODO(), name, []*grpc.ClientConn{conn}, session.WithTimeout(5*time.Second))
+	l, err := client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 
 	locked, err = l.IsLocked(context.TODO())

@@ -15,28 +15,33 @@
 package test
 
 import (
-	"context"
-	"github.com/atomix/go-local/pkg/atomix/local"
+	netutil "github.com/atomix/go-client/pkg/client/util/net"
 	"github.com/atomix/go-framework/pkg/atomix"
-	"github.com/atomix/go-framework/pkg/atomix/node"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/test/bufconn"
+	"github.com/atomix/go-framework/pkg/atomix/registry"
+	"github.com/atomix/go-local/pkg/atomix/local"
+	"golang.org/x/tools/go/ssa/interp/testdata/src/fmt"
 	"net"
 )
 
+const basePort = 5000
+
 // StartTestNode starts a single test node
-func StartTestNode() (*atomix.Node, *grpc.ClientConn) {
-	lis := bufconn.Listen(1024 * 1024)
-	node := local.NewNode(lis, node.GetRegistry())
-	node.Start()
+func StartTestNode() (netutil.Address, *atomix.Node) {
+	for port := basePort; port < basePort+100; port++ {
+		address := netutil.Address(fmt.Sprintf("localhost:%d", port))
+		lis, err := net.Listen("tcp", string(address))
+		if err != nil {
+			continue
+		}
+		node := local.NewNode(lis, registry.Registry)
+		node.Start()
 
-	dialer := func(ctx context.Context, address string) (net.Conn, error) {
-		return lis.Dial()
+		ch := make(chan struct{})
+		go func() {
+			<-ch
+			node.Stop()
+		}()
+		return address, node
 	}
-
-	conn, err := grpc.DialContext(context.Background(), "devices", grpc.WithContextDialer(dialer), grpc.WithInsecure())
-	if err != nil {
-		panic("Failed to dial devices")
-	}
-	return node, conn
+	panic("cannot find open port")
 }

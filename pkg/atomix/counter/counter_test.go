@@ -19,19 +19,19 @@ import (
 	client "github.com/atomix/go-client/pkg/client/counter"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/session"
+	"github.com/atomix/go-client/pkg/client/util/net"
 	"github.com/atomix/go-framework/pkg/atomix/test"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/grpc"
 	"testing"
 	"time"
 )
 
 func TestCounter(t *testing.T) {
-	node, conn := test.StartTestNode()
+	address, node := test.StartTestNode()
 	defer node.Stop()
 
 	name := primitive.NewName("default", "test", "default", "test")
-	counter, err := client.New(context.TODO(), name, []*grpc.ClientConn{conn}, session.WithTimeout(5*time.Second))
+	counter, err := client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 	assert.NotNil(t, counter)
 
@@ -72,10 +72,10 @@ func TestCounter(t *testing.T) {
 	err = counter.Close()
 	assert.NoError(t, err)
 
-	counter1, err := client.New(context.TODO(), name, []*grpc.ClientConn{conn}, session.WithTimeout(5*time.Second))
+	counter1, err := client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 
-	counter2, err := client.New(context.TODO(), name, []*grpc.ClientConn{conn}, session.WithTimeout(5*time.Second))
+	counter2, err := client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 
 	value, err = counter1.Get(context.TODO())
@@ -91,7 +91,7 @@ func TestCounter(t *testing.T) {
 	err = counter2.Delete()
 	assert.NoError(t, err)
 
-	counter, err = client.New(context.TODO(), name, []*grpc.ClientConn{conn}, session.WithTimeout(5*time.Second))
+	counter, err = client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 
 	value, err = counter.Get(context.TODO())
