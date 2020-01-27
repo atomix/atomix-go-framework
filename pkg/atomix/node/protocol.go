@@ -26,6 +26,9 @@ type Protocol interface {
 	// Partition returns a partition
 	Partition(partitionID int) Partition
 
+	// Partitions returns the protocol partitions
+	Partitions() []Partition
+
 	// Stop stops the protocol
 	Stop() error
 }
