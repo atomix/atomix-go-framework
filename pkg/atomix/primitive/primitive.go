@@ -61,36 +61,34 @@ func (s *primitiveServer) GetPrimitives(ctx context.Context, request *api.GetPri
 		return nil, err
 	}
 
-	primitives := make([]*api.PrimitiveInfo, 0)
-	partitions := s.protocol.Partitions()
-	for _, partition := range partitions {
-		stream := stream.NewUnaryStream()
-		if err := partition.Read(ctx, in, stream); err != nil {
-			return nil, err
-		}
+	stream := stream.NewUnaryStream()
+	if err := s.protocol.Partition(int(request.Partition)).Read(ctx, in, stream); err != nil {
+		return nil, err
+	}
 
-		result, ok := stream.Receive()
-		if !ok {
-			return nil, status.Error(codes.Internal, "stream closed")
-		}
-		if result.Failed() {
-			return nil, result.Error
-		}
+	result, ok := stream.Receive()
+	if !ok {
+		return nil, status.Error(codes.Internal, "stream closed")
+	}
+	if result.Failed() {
+		return nil, result.Error
+	}
 
-		response := &service.ServiceResponse{}
-		if err := proto.Unmarshal(result.Value.([]byte), response); err != nil {
-			return nil, err
-		}
+	response := &service.ServiceResponse{}
+	if err := proto.Unmarshal(result.Value.([]byte), response); err != nil {
+		return nil, err
+	}
 
-		metadata := response.GetMetadata()
-		for i, id := range metadata.Services {
-			primitives[i] = &api.PrimitiveInfo{
-				Type: id.Type,
-				Name: &api.Name{
-					Name:      id.Name,
-					Namespace: id.Namespace,
-				},
-			}
+	metadata := response.GetMetadata()
+
+	primitives := make([]*api.PrimitiveInfo, len(metadata.Services))
+	for i, id := range metadata.Services {
+		primitives[i] = &api.PrimitiveInfo{
+			Type: id.Type,
+			Name: &api.Name{
+				Name:      id.Name,
+				Namespace: id.Namespace,
+			},
 		}
 	}
 	return &api.GetPrimitivesResponse{
