@@ -38,8 +38,8 @@ func registerServer(server *grpc.Server, protocol node.Protocol) {
 func newServer(client node.Client) api.IndexedMapServiceServer {
 	return &Server{
 		SessionizedServer: &server.SessionizedServer{
-			Type:   indexMapType,
-			Client: client,
+			Type:     indexMapType,
+			Protocol: client,
 		},
 	}
 }

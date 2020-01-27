@@ -40,8 +40,8 @@ func registerServer(server *grpc.Server, protocol node.Protocol) {
 func newServer(client node.Client) api.LockServiceServer {
 	return &Server{
 		SessionizedServer: &server.SessionizedServer{
-			Type:   lockType,
-			Client: client,
+			Type:     lockType,
+			Protocol: client,
 		},
 	}
 }

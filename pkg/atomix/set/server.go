@@ -38,8 +38,8 @@ func registerServer(server *grpc.Server, protocol node.Protocol) {
 func newServer(client node.Client) api.SetServiceServer {
 	return &Server{
 		SessionizedServer: &server.SessionizedServer{
-			Type:   setType,
-			Client: client,
+			Type:     setType,
+			Protocol: client,
 		},
 	}
 }

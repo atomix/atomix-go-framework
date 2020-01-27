@@ -38,8 +38,8 @@ func registerServer(server *grpc.Server, protocol node.Protocol) {
 func newServer(client node.Client) api.ValueServiceServer {
 	return &Server{
 		SessionizedServer: &server.SessionizedServer{
-			Type:   valueType,
-			Client: client,
+			Type:     valueType,
+			Protocol: client,
 		},
 	}
 }

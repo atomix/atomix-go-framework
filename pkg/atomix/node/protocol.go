@@ -23,8 +23,8 @@ type Protocol interface {
 	// Start starts the protocol
 	Start(cluster cluster.Cluster, registry *Registry) error
 
-	// Client returns the protocol client
-	Client() Client
+	// Partition returns a partition
+	Partition(partitionID int) Partition
 
 	// Stop stops the protocol
 	Stop() error

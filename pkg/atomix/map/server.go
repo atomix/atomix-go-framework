@@ -32,14 +32,14 @@ func init() {
 
 // registerServer registers a map server with the given gRPC server
 func registerServer(server *grpc.Server, protocol node.Protocol) {
-	api.RegisterMapServiceServer(server, newServer(protocol.Client()))
+	api.RegisterMapServiceServer(server, newServer(protocol))
 }
 
-func newServer(client node.Client) api.MapServiceServer {
+func newServer(protocol node.Protocol) api.MapServiceServer {
 	return &Server{
 		SessionizedServer: &server.SessionizedServer{
-			Type:   mapType,
-			Client: client,
+			Type:     mapType,
+			Protocol: protocol,
 		},
 	}
 }

@@ -38,8 +38,8 @@ func registerServer(server *grpc.Server, protocol node.Protocol) {
 func newServer(client node.Client) api.LeaderLatchServiceServer {
 	return &Server{
 		SessionizedServer: &server.SessionizedServer{
-			Type:   leaderLatchType,
-			Client: client,
+			Type:     leaderLatchType,
+			Protocol: client,
 		},
 	}
 }

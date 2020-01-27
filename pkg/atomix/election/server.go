@@ -38,8 +38,8 @@ func registerServer(server *grpc.Server, protocol node.Protocol) {
 func newServer(client node.Client) api.LeaderElectionServiceServer {
 	return &Server{
 		SessionizedServer: &server.SessionizedServer{
-			Type:   electionType,
-			Client: client,
+			Type:     electionType,
+			Protocol: client,
 		},
 	}
 }

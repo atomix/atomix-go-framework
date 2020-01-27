@@ -27,12 +27,12 @@ import (
 
 // SessionizedServer is a base server for servers that support sessions
 type SessionizedServer struct {
-	Client node.Client
-	Type   string
+	Protocol node.Protocol
+	Type     string
 }
 
 // write sends a write to the service
-func (s *SessionizedServer) write(ctx context.Context, request []byte, header *headers.RequestHeader) ([]byte, error) {
+func (s *SessionizedServer) write(ctx context.Context, partition node.Partition, request []byte, header *headers.RequestHeader) ([]byte, error) {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,
@@ -53,7 +53,7 @@ func (s *SessionizedServer) write(ctx context.Context, request []byte, header *h
 	stream := streams.NewUnaryStream()
 
 	// Write the request
-	if err := s.Client.Write(ctx, bytes, stream); err != nil {
+	if err := partition.Write(ctx, bytes, stream); err != nil {
 		return nil, err
 	}
 
@@ -78,7 +78,7 @@ func (s *SessionizedServer) write(ctx context.Context, request []byte, header *h
 }
 
 // writeStream sends a streaming write to the service
-func (s *SessionizedServer) writeStream(ctx context.Context, request []byte, header *headers.RequestHeader, stream streams.WriteStream) error {
+func (s *SessionizedServer) writeStream(ctx context.Context, partition node.Partition, request []byte, header *headers.RequestHeader, stream streams.WriteStream) error {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,
@@ -105,12 +105,12 @@ func (s *SessionizedServer) writeStream(ctx context.Context, request []byte, hea
 		return serviceResponse.GetCommand(), nil
 	})
 
-	go s.Client.Write(ctx, bytes, stream)
+	go partition.Write(ctx, bytes, stream)
 	return nil
 }
 
 // read sends a read to the service
-func (s *SessionizedServer) read(ctx context.Context, request []byte, header *headers.RequestHeader) ([]byte, error) {
+func (s *SessionizedServer) read(ctx context.Context, partition node.Partition, request []byte, header *headers.RequestHeader) ([]byte, error) {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,
@@ -131,7 +131,7 @@ func (s *SessionizedServer) read(ctx context.Context, request []byte, header *he
 	stream := streams.NewUnaryStream()
 
 	// Read the request
-	if err := s.Client.Read(ctx, bytes, stream); err != nil {
+	if err := partition.Read(ctx, bytes, stream); err != nil {
 		return nil, err
 	}
 
@@ -155,7 +155,7 @@ func (s *SessionizedServer) read(ctx context.Context, request []byte, header *he
 }
 
 // readStream sends a streaming read to the service
-func (s *SessionizedServer) readStream(ctx context.Context, request []byte, header *headers.RequestHeader, stream streams.WriteStream) error {
+func (s *SessionizedServer) readStream(ctx context.Context, partition node.Partition, request []byte, header *headers.RequestHeader, stream streams.WriteStream) error {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,
@@ -183,7 +183,7 @@ func (s *SessionizedServer) readStream(ctx context.Context, request []byte, head
 	})
 
 	go func() {
-		_ = s.Client.Read(ctx, bytes, stream)
+		_ = partition.Read(ctx, bytes, stream)
 	}()
 	return nil
 }
@@ -191,10 +191,11 @@ func (s *SessionizedServer) readStream(ctx context.Context, request []byte, head
 // Command submits a command to the service
 func (s *SessionizedServer) Command(ctx context.Context, name string, input []byte, header *headers.RequestHeader) ([]byte, *headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	if s.Client.MustLeader() && !s.Client.IsLeader() {
+	partition := s.Protocol.Partition(int(header.Partition))
+	if partition.MustLeader() && !partition.IsLeader() {
 		return nil, &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
-			Leader: s.Client.Leader(),
+			Leader: partition.Leader(),
 		}, nil
 	}
 
@@ -216,7 +217,7 @@ func (s *SessionizedServer) Command(ctx context.Context, name string, input []by
 		return nil, nil, err
 	}
 
-	bytes, err = s.write(ctx, bytes, header)
+	bytes, err = s.write(ctx, partition, bytes, header)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -240,11 +241,12 @@ func (s *SessionizedServer) Command(ctx context.Context, name string, input []by
 // CommandStream submits a streaming command to the service
 func (s *SessionizedServer) CommandStream(ctx context.Context, name string, input []byte, header *headers.RequestHeader, stream streams.WriteStream) error {
 	// If the client requires a leader and is not the leader, return an error
-	if s.Client.MustLeader() && !s.Client.IsLeader() {
+	partition := s.Protocol.Partition(int(header.Partition))
+	if partition.MustLeader() && !partition.IsLeader() {
 		stream.Value(SessionOutput{
 			Header: &headers.ResponseHeader{
 				Status: headers.ResponseStatus_NOT_LEADER,
-				Leader: s.Client.Leader(),
+				Leader: partition.Leader(),
 			},
 		})
 		stream.Close()
@@ -294,16 +296,17 @@ func (s *SessionizedServer) CommandStream(ctx context.Context, name string, inpu
 			},
 		}, nil
 	})
-	return s.writeStream(ctx, bytes, header, stream)
+	return s.writeStream(ctx, partition, bytes, header, stream)
 }
 
 // Query submits a query to the service
 func (s *SessionizedServer) Query(ctx context.Context, name string, input []byte, header *headers.RequestHeader) ([]byte, *headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	if s.Client.MustLeader() && !s.Client.IsLeader() {
+	partition := s.Protocol.Partition(int(header.Partition))
+	if partition.MustLeader() && !partition.IsLeader() {
 		return nil, &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
-			Leader: s.Client.Leader(),
+			Leader: partition.Leader(),
 		}, nil
 	}
 
@@ -326,7 +329,7 @@ func (s *SessionizedServer) Query(ctx context.Context, name string, input []byte
 		return nil, nil, err
 	}
 
-	bytes, err = s.read(ctx, bytes, header)
+	bytes, err = s.read(ctx, partition, bytes, header)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -348,11 +351,12 @@ func (s *SessionizedServer) Query(ctx context.Context, name string, input []byte
 // QueryStream submits a streaming query to the service
 func (s *SessionizedServer) QueryStream(ctx context.Context, name string, input []byte, header *headers.RequestHeader, stream streams.WriteStream) error {
 	// If the client requires a leader and is not the leader, return an error
-	if s.Client.MustLeader() && !s.Client.IsLeader() {
+	partition := s.Protocol.Partition(int(header.Partition))
+	if partition.MustLeader() && !partition.IsLeader() {
 		stream.Value(SessionOutput{
 			Header: &headers.ResponseHeader{
 				Status: headers.ResponseStatus_NOT_LEADER,
-				Leader: s.Client.Leader(),
+				Leader: partition.Leader(),
 			},
 		})
 		stream.Close()
@@ -396,16 +400,17 @@ func (s *SessionizedServer) QueryStream(ctx context.Context, name string, input 
 			},
 		}, nil
 	})
-	return s.readStream(ctx, bytes, header, stream)
+	return s.readStream(ctx, partition, bytes, header, stream)
 }
 
 // OpenSession opens a new session
 func (s *SessionizedServer) OpenSession(ctx context.Context, header *headers.RequestHeader, timeout *time.Duration) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	if s.Client.MustLeader() && !s.Client.IsLeader() {
+	partition := s.Protocol.Partition(int(header.Partition))
+	if partition.MustLeader() && !partition.IsLeader() {
 		return &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
-			Leader: s.Client.Leader(),
+			Leader: partition.Leader(),
 		}, nil
 	}
 
@@ -422,7 +427,7 @@ func (s *SessionizedServer) OpenSession(ctx context.Context, header *headers.Req
 		return nil, err
 	}
 
-	bytes, err = s.write(ctx, bytes, header)
+	bytes, err = s.write(ctx, partition, bytes, header)
 	if err != nil {
 		return nil, err
 	}
@@ -443,10 +448,11 @@ func (s *SessionizedServer) OpenSession(ctx context.Context, header *headers.Req
 // KeepAliveSession keeps a session alive
 func (s *SessionizedServer) KeepAliveSession(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	if s.Client.MustLeader() && !s.Client.IsLeader() {
+	partition := s.Protocol.Partition(int(header.Partition))
+	if partition.MustLeader() && !partition.IsLeader() {
 		return &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
-			Leader: s.Client.Leader(),
+			Leader: partition.Leader(),
 		}, nil
 	}
 
@@ -470,7 +476,7 @@ func (s *SessionizedServer) KeepAliveSession(ctx context.Context, header *header
 		return nil, err
 	}
 
-	bytes, err = s.write(ctx, bytes, header)
+	bytes, err = s.write(ctx, partition, bytes, header)
 	if err != nil {
 		return nil, err
 	}
@@ -488,10 +494,11 @@ func (s *SessionizedServer) KeepAliveSession(ctx context.Context, header *header
 // CloseSession closes a session
 func (s *SessionizedServer) CloseSession(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	if s.Client.MustLeader() && !s.Client.IsLeader() {
+	partition := s.Protocol.Partition(int(header.Partition))
+	if partition.MustLeader() && !partition.IsLeader() {
 		return &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
-			Leader: s.Client.Leader(),
+			Leader: partition.Leader(),
 		}, nil
 	}
 
@@ -508,7 +515,7 @@ func (s *SessionizedServer) CloseSession(ctx context.Context, header *headers.Re
 		return nil, err
 	}
 
-	bytes, err = s.write(ctx, bytes, header)
+	bytes, err = s.write(ctx, partition, bytes, header)
 	if err != nil {
 		return nil, err
 	}
@@ -526,10 +533,11 @@ func (s *SessionizedServer) CloseSession(ctx context.Context, header *headers.Re
 // Delete deletes the service
 func (s *SessionizedServer) Delete(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	if s.Client.MustLeader() && !s.Client.IsLeader() {
+	partition := s.Protocol.Partition(int(header.Partition))
+	if partition.MustLeader() && !partition.IsLeader() {
 		return &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
-			Leader: s.Client.Leader(),
+			Leader: partition.Leader(),
 		}, nil
 	}
 
@@ -553,7 +561,7 @@ func (s *SessionizedServer) Delete(ctx context.Context, header *headers.RequestH
 	stream := streams.NewUnaryStream()
 
 	// Write the request
-	if err := s.Client.Write(ctx, bytes, stream); err != nil {
+	if err := partition.Write(ctx, bytes, stream); err != nil {
 		return nil, err
 	}
 
