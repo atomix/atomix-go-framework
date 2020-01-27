@@ -31,14 +31,14 @@ func init() {
 
 // registerServer registers a counter server with the given gRPC server
 func registerServer(server *grpc.Server, protocol node.Protocol) {
-	api.RegisterCounterServiceServer(server, newServer(protocol.Client()))
+	api.RegisterCounterServiceServer(server, newServer(protocol))
 }
 
-func newServer(client node.Client) api.CounterServiceServer {
+func newServer(protocol node.Protocol) api.CounterServiceServer {
 	return &Server{
 		SimpleServer: &server.SimpleServer{
-			Type:   counterType,
-			Client: client,
+			Type:     counterType,
+			Protocol: protocol,
 		},
 	}
 }

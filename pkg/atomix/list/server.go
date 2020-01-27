@@ -32,14 +32,14 @@ func init() {
 
 // registerServer registers a list server with the given gRPC server
 func registerServer(server *grpc.Server, protocol node.Protocol) {
-	api.RegisterListServiceServer(server, newServer(protocol.Client()))
+	api.RegisterListServiceServer(server, newServer(protocol))
 }
 
-func newServer(client node.Client) api.ListServiceServer {
+func newServer(protocol node.Protocol) api.ListServiceServer {
 	return &Server{
 		SessionizedServer: &server.SessionizedServer{
 			Type:     listType,
-			Protocol: client,
+			Protocol: protocol,
 		},
 	}
 }

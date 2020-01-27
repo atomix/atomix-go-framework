@@ -32,14 +32,14 @@ func init() {
 
 // registerServer registers an election server with the given gRPC server
 func registerServer(server *grpc.Server, protocol node.Protocol) {
-	api.RegisterLeaderElectionServiceServer(server, newServer(protocol.Client()))
+	api.RegisterLeaderElectionServiceServer(server, newServer(protocol))
 }
 
-func newServer(client node.Client) api.LeaderElectionServiceServer {
+func newServer(protocol node.Protocol) api.LeaderElectionServiceServer {
 	return &Server{
 		SessionizedServer: &server.SessionizedServer{
 			Type:     electionType,
-			Protocol: client,
+			Protocol: protocol,
 		},
 	}
 }

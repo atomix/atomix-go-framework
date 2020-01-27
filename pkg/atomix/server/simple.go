@@ -26,17 +26,18 @@ import (
 
 // SimpleServer is a base server for servers that do not support sessions
 type SimpleServer struct {
-	Client node.Client
-	Type   string
+	Protocol node.Protocol
+	Type     string
 }
 
 // Command submits a command to the service
 func (s *SimpleServer) Command(ctx context.Context, name string, input []byte, header *headers.RequestHeader) ([]byte, *headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	if s.Client.MustLeader() && !s.Client.IsLeader() {
+	partition := s.Protocol.Partition(int(header.Partition))
+	if partition.MustLeader() && !partition.IsLeader() {
 		return nil, &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
-			Leader: s.Client.Leader(),
+			Leader: partition.Leader(),
 		}, nil
 	}
 
@@ -53,7 +54,7 @@ func (s *SimpleServer) Command(ctx context.Context, name string, input []byte, h
 		return nil, nil, err
 	}
 
-	bytes, err = s.write(ctx, bytes, header)
+	bytes, err = s.write(ctx, partition, bytes, header)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -72,7 +73,7 @@ func (s *SimpleServer) Command(ctx context.Context, name string, input []byte, h
 }
 
 // write sends a write to the service
-func (s *SimpleServer) write(ctx context.Context, request []byte, header *headers.RequestHeader) ([]byte, error) {
+func (s *SimpleServer) write(ctx context.Context, partition node.Partition, request []byte, header *headers.RequestHeader) ([]byte, error) {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,
@@ -93,7 +94,7 @@ func (s *SimpleServer) write(ctx context.Context, request []byte, header *header
 	stream := streams.NewUnaryStream()
 
 	// Write the request
-	if err := s.Client.Write(ctx, bytes, stream); err != nil {
+	if err := partition.Write(ctx, bytes, stream); err != nil {
 		return nil, err
 	}
 
@@ -120,10 +121,11 @@ func (s *SimpleServer) write(ctx context.Context, request []byte, header *header
 // Query submits a query to the service
 func (s *SimpleServer) Query(ctx context.Context, name string, input []byte, header *headers.RequestHeader) ([]byte, *headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	if s.Client.MustLeader() && !s.Client.IsLeader() {
+	partition := s.Protocol.Partition(int(header.Partition))
+	if partition.MustLeader() && !partition.IsLeader() {
 		return nil, &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
-			Leader: s.Client.Leader(),
+			Leader: partition.Leader(),
 		}, nil
 	}
 
@@ -140,7 +142,7 @@ func (s *SimpleServer) Query(ctx context.Context, name string, input []byte, hea
 		return nil, nil, err
 	}
 
-	bytes, err = s.read(ctx, bytes, header)
+	bytes, err = s.read(ctx, partition, bytes, header)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -159,7 +161,7 @@ func (s *SimpleServer) Query(ctx context.Context, name string, input []byte, hea
 }
 
 // read sends a read to the service
-func (s *SimpleServer) read(ctx context.Context, request []byte, header *headers.RequestHeader) ([]byte, error) {
+func (s *SimpleServer) read(ctx context.Context, partition node.Partition, request []byte, header *headers.RequestHeader) ([]byte, error) {
 	serviceRequest := &service.ServiceRequest{
 		Id: &service.ServiceId{
 			Type:      s.Type,
@@ -180,7 +182,7 @@ func (s *SimpleServer) read(ctx context.Context, request []byte, header *headers
 	stream := streams.NewUnaryStream()
 
 	// Read the request
-	if err := s.Client.Read(ctx, bytes, stream); err != nil {
+	if err := partition.Read(ctx, bytes, stream); err != nil {
 		return nil, err
 	}
 
@@ -206,10 +208,11 @@ func (s *SimpleServer) read(ctx context.Context, request []byte, header *headers
 // Open opens a simple session
 func (s *SimpleServer) Open(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	if s.Client.MustLeader() && !s.Client.IsLeader() {
+	partition := s.Protocol.Partition(int(header.Partition))
+	if partition.MustLeader() && !partition.IsLeader() {
 		return &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
-			Leader: s.Client.Leader(),
+			Leader: partition.Leader(),
 		}, nil
 	}
 
@@ -233,7 +236,7 @@ func (s *SimpleServer) Open(ctx context.Context, header *headers.RequestHeader) 
 	stream := streams.NewUnaryStream()
 
 	// Write the request
-	if err := s.Client.Write(ctx, bytes, stream); err != nil {
+	if err := partition.Write(ctx, bytes, stream); err != nil {
 		return nil, err
 	}
 
@@ -260,10 +263,11 @@ func (s *SimpleServer) Open(ctx context.Context, header *headers.RequestHeader) 
 // Delete deletes the service
 func (s *SimpleServer) Delete(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	if s.Client.MustLeader() && !s.Client.IsLeader() {
+	partition := s.Protocol.Partition(int(header.Partition))
+	if partition.MustLeader() && !partition.IsLeader() {
 		return &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
-			Leader: s.Client.Leader(),
+			Leader: partition.Leader(),
 		}, nil
 	}
 
@@ -287,7 +291,7 @@ func (s *SimpleServer) Delete(ctx context.Context, header *headers.RequestHeader
 	stream := streams.NewUnaryStream()
 
 	// Write the request
-	if err := s.Client.Write(ctx, bytes, stream); err != nil {
+	if err := partition.Write(ctx, bytes, stream); err != nil {
 		return nil, err
 	}
 

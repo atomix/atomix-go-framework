@@ -32,14 +32,14 @@ func init() {
 
 // registerServer registers an election server with the given gRPC server
 func registerServer(server *grpc.Server, protocol node.Protocol) {
-	api.RegisterLeaderLatchServiceServer(server, newServer(protocol.Client()))
+	api.RegisterLeaderLatchServiceServer(server, newServer(protocol))
 }
 
-func newServer(client node.Client) api.LeaderLatchServiceServer {
+func newServer(protocol node.Protocol) api.LeaderLatchServiceServer {
 	return &Server{
 		SessionizedServer: &server.SessionizedServer{
 			Type:     leaderLatchType,
-			Protocol: client,
+			Protocol: protocol,
 		},
 	}
 }

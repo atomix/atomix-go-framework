@@ -32,14 +32,14 @@ func init() {
 
 // registerServer registers a value server with the given gRPC server
 func registerServer(server *grpc.Server, protocol node.Protocol) {
-	api.RegisterValueServiceServer(server, newServer(protocol.Client()))
+	api.RegisterValueServiceServer(server, newServer(protocol))
 }
 
-func newServer(client node.Client) api.ValueServiceServer {
+func newServer(protocol node.Protocol) api.ValueServiceServer {
 	return &Server{
 		SessionizedServer: &server.SessionizedServer{
 			Type:     valueType,
-			Protocol: client,
+			Protocol: protocol,
 		},
 	}
 }
