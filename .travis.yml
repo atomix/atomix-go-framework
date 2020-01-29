@@ -16,16 +16,15 @@ cache:
   directories:
     - $HOME/gopath/pkg/mod         # Cache the Go modules
 
-install:
-  - go get golang.org/x/tools/cmd/cover
-  - go get github.com/mattn/goveralls
-
 before_script:
   - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin latest
 
 jobs:
   include:
+    - stage: docs build
+      if: type != pull_request
+      script:
+          - sh build/bin/trigger-docs-travis $TRAVIS_API_TOKEN
     - stage: tests
       script:
         - make coverage
-        - goveralls -coverprofile=coverage.out -service=travis-ci

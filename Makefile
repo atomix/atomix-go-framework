@@ -15,7 +15,7 @@ test: build license_check linters
 
 coverage: # @HELP generate unit test coverage data
 coverage: build linters license_check
-	go test github.com/atomix/go-framework/... -coverprofile=coverage.out -covermode=count -coverpkg=`go list github.com/atomix/go-framework/...`
+	./build/bin/coveralls-coverage
 
 linters: # @HELP examines Go source code and reports coding problems
 	golangci-lint run
