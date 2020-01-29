@@ -18,7 +18,7 @@ import (
 	"fmt"
 	netutil "github.com/atomix/go-client/pkg/client/util/net"
 	"github.com/atomix/go-framework/pkg/atomix"
-	"github.com/atomix/go-framework/pkg/atomix/registry"
+	"github.com/atomix/go-framework/pkg/atomix/node"
 	"github.com/atomix/go-local/pkg/atomix/local"
 	"net"
 )
@@ -33,7 +33,7 @@ func StartTestNode() (netutil.Address, *atomix.Node) {
 		if err != nil {
 			continue
 		}
-		node := local.NewNode(lis, registry.Registry)
+		node := local.NewNode(lis, node.GetRegistry())
 		node.Start()
 
 		ch := make(chan struct{})

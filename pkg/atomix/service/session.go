@@ -377,7 +377,7 @@ func (s *SessionizedService) applyQuery(query *SessionQueryRequest, session *Ses
 			Response: &SessionResponse_Query{
 				Query: &SessionQueryResponse{
 					Context: &SessionResponseContext{
-						Index: index,
+						Index:    index,
 						Sequence: commandSequence,
 					},
 					Output: value.([]byte),
@@ -567,11 +567,11 @@ func (s *Session) getStream(id uint64) *sessionStream {
 
 // ack acknowledges response streams up to the given request sequence number
 func (s *Session) ack(id uint64, streams map[uint64]uint64) {
-	for responseId := range s.results {
-		if responseId > id {
+	for responseID := range s.results {
+		if responseID > id {
 			continue
 		}
-		delete(s.results, responseId)
+		delete(s.results, responseID)
 	}
 	for streamID, stream := range s.streams {
 		// If the stream ID is greater than the acknowledged sequence number, skip it

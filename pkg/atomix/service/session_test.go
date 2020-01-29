@@ -30,7 +30,7 @@ func TestSessionService(t *testing.T) {
 	go context.command(service, newOpenSession(), ch)
 	out := <-ch
 	assert.True(t, out.Succeeded())
-	sessionID := getOpenSession(out.Value).SessionID
+	sessionID := getOpenSession(out.Value.([]byte)).SessionID
 
 	setRequest1 := newCommand(sessionID, 1, "set", newSet("Hello world!"))
 	ch1 := make(chan stream.Result)

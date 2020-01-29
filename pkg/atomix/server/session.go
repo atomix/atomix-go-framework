@@ -101,9 +101,8 @@ func (s *SessionizedServer) writeStream(ctx context.Context, request []byte, hea
 		err := proto.Unmarshal(value.([]byte), serviceResponse)
 		if err != nil {
 			return nil, err
-		} else {
-			return serviceResponse.GetCommand(), nil
 		}
+		return serviceResponse.GetCommand(), nil
 	})
 
 	go s.Client.Write(ctx, bytes, stream)
@@ -183,7 +182,9 @@ func (s *SessionizedServer) readStream(ctx context.Context, request []byte, head
 		return serviceResponse.GetQuery(), nil
 	})
 
-	go s.Client.Read(ctx, bytes, stream)
+	go func() {
+		_ = s.Client.Read(ctx, bytes, stream)
+	}()
 	return nil
 }
 
@@ -277,22 +278,21 @@ func (s *SessionizedServer) CommandStream(ctx context.Context, name string, inpu
 					Error: err,
 				},
 			}, nil
-		} else {
-			commandResponse := sessionResponse.GetCommand()
-			responseHeader := &headers.ResponseHeader{
-				SessionID:  header.SessionID,
-				StreamID:   commandResponse.Context.StreamID,
-				ResponseID: commandResponse.Context.Sequence,
-				Index:      commandResponse.Context.Index,
-				Type:       headers.ResponseType(commandResponse.Context.Type),
-			}
-			return SessionOutput{
-				Header: responseHeader,
-				Result: streams.Result{
-					Value: commandResponse.Output,
-				},
-			}, nil
 		}
+		commandResponse := sessionResponse.GetCommand()
+		responseHeader := &headers.ResponseHeader{
+			SessionID:  header.SessionID,
+			StreamID:   commandResponse.Context.StreamID,
+			ResponseID: commandResponse.Context.Sequence,
+			Index:      commandResponse.Context.Index,
+			Type:       headers.ResponseType(commandResponse.Context.Type),
+		}
+		return SessionOutput{
+			Header: responseHeader,
+			Result: streams.Result{
+				Value: commandResponse.Output,
+			},
+		}, nil
 	})
 	return s.writeStream(ctx, bytes, header, stream)
 }

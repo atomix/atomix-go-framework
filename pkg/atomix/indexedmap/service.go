@@ -550,16 +550,15 @@ func (m *Service) Get(bytes []byte) ([]byte, error) {
 
 	if !ok {
 		return proto.Marshal(&GetResponse{})
-	} else {
-		return proto.Marshal(&GetResponse{
-			Index:   entry.Index,
-			Key:     entry.Key,
-			Value:   entry.Value,
-			Version: entry.Version,
-			Created: entry.Created,
-			Updated: entry.Updated,
-		})
 	}
+	return proto.Marshal(&GetResponse{
+		Index:   entry.Index,
+		Key:     entry.Key,
+		Value:   entry.Value,
+		Version: entry.Version,
+		Created: entry.Created,
+		Updated: entry.Updated,
+	})
 }
 
 // FirstEntry gets the first entry from the map
@@ -571,16 +570,15 @@ func (m *Service) FirstEntry(bytes []byte) ([]byte, error) {
 
 	if m.firstEntry == nil {
 		return proto.Marshal(&FirstEntryResponse{})
-	} else {
-		return proto.Marshal(&FirstEntryResponse{
-			Index:   m.firstEntry.Index,
-			Key:     m.firstEntry.Key,
-			Value:   m.firstEntry.Value,
-			Version: m.firstEntry.Version,
-			Created: m.firstEntry.Created,
-			Updated: m.firstEntry.Updated,
-		})
 	}
+	return proto.Marshal(&FirstEntryResponse{
+		Index:   m.firstEntry.Index,
+		Key:     m.firstEntry.Key,
+		Value:   m.firstEntry.Value,
+		Version: m.firstEntry.Version,
+		Created: m.firstEntry.Created,
+		Updated: m.firstEntry.Updated,
+	})
 }
 
 // LastEntry gets the last entry from the map
@@ -592,16 +590,15 @@ func (m *Service) LastEntry(bytes []byte) ([]byte, error) {
 
 	if m.lastEntry == nil {
 		return proto.Marshal(&LastEntryResponse{})
-	} else {
-		return proto.Marshal(&LastEntryResponse{
-			Index:   m.lastEntry.Index,
-			Key:     m.lastEntry.Key,
-			Value:   m.lastEntry.Value,
-			Version: m.lastEntry.Version,
-			Created: m.lastEntry.Created,
-			Updated: m.lastEntry.Updated,
-		})
 	}
+	return proto.Marshal(&LastEntryResponse{
+		Index:   m.lastEntry.Index,
+		Key:     m.lastEntry.Key,
+		Value:   m.lastEntry.Value,
+		Version: m.lastEntry.Version,
+		Created: m.lastEntry.Created,
+		Updated: m.lastEntry.Updated,
+	})
 }
 
 // PrevEntry gets the previous entry from the map
@@ -624,16 +621,15 @@ func (m *Service) PrevEntry(bytes []byte) ([]byte, error) {
 
 	if entry == nil {
 		return proto.Marshal(&PrevEntryResponse{})
-	} else {
-		return proto.Marshal(&PrevEntryResponse{
-			Index:   entry.Index,
-			Key:     entry.Key,
-			Value:   entry.Value,
-			Version: entry.Version,
-			Created: entry.Created,
-			Updated: entry.Updated,
-		})
 	}
+	return proto.Marshal(&PrevEntryResponse{
+		Index:   entry.Index,
+		Key:     entry.Key,
+		Value:   entry.Value,
+		Version: entry.Version,
+		Created: entry.Created,
+		Updated: entry.Updated,
+	})
 }
 
 // NextEntry gets the next entry from the map
@@ -656,16 +652,15 @@ func (m *Service) NextEntry(bytes []byte) ([]byte, error) {
 
 	if entry == nil {
 		return proto.Marshal(&NextEntryResponse{})
-	} else {
-		return proto.Marshal(&NextEntryResponse{
-			Index:   entry.Index,
-			Key:     entry.Key,
-			Value:   entry.Value,
-			Version: entry.Version,
-			Created: entry.Created,
-			Updated: entry.Updated,
-		})
 	}
+	return proto.Marshal(&NextEntryResponse{
+		Index:   entry.Index,
+		Key:     entry.Key,
+		Value:   entry.Value,
+		Version: entry.Version,
+		Created: entry.Created,
+		Updated: entry.Updated,
+	})
 }
 
 // Exists checks if the map contains a key

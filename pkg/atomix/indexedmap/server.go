@@ -105,14 +105,14 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 }
 
 // Size gets the number of entries in the map
-func (m *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeResponse, error) {
+func (s *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeResponse, error) {
 	log.Tracef("Received SizeRequest %+v", request)
 	in, err := proto.Marshal(&SizeRequest{})
 	if err != nil {
 		return nil, err
 	}
 
-	out, header, err := m.Query(ctx, opSize, in, request.Header)
+	out, header, err := s.Query(ctx, opSize, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +131,7 @@ func (m *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeR
 }
 
 // Exists checks whether the map contains a key
-func (m *Server) Exists(ctx context.Context, request *api.ExistsRequest) (*api.ExistsResponse, error) {
+func (s *Server) Exists(ctx context.Context, request *api.ExistsRequest) (*api.ExistsResponse, error) {
 	log.Tracef("Received ExistsRequest %+v", request)
 	in, err := proto.Marshal(&ContainsKeyRequest{
 		Key: request.Key,
@@ -140,7 +140,7 @@ func (m *Server) Exists(ctx context.Context, request *api.ExistsRequest) (*api.E
 		return nil, err
 	}
 
-	out, header, err := m.Query(ctx, opExists, in, request.Header)
+	out, header, err := s.Query(ctx, opExists, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +159,7 @@ func (m *Server) Exists(ctx context.Context, request *api.ExistsRequest) (*api.E
 }
 
 // Put puts a key/value pair into the map
-func (m *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResponse, error) {
+func (s *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResponse, error) {
 	log.Tracef("Received PutRequest %+v", request)
 	in, err := proto.Marshal(&PutRequest{
 		Index:   uint64(request.Index),
@@ -173,7 +173,7 @@ func (m *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResp
 		return nil, err
 	}
 
-	out, header, err := m.Command(ctx, opPut, in, request.Header)
+	out, header, err := s.Command(ctx, opPut, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +198,7 @@ func (m *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResp
 }
 
 // Replace replaces a key/value pair in the map
-func (m *Server) Replace(ctx context.Context, request *api.ReplaceRequest) (*api.ReplaceResponse, error) {
+func (s *Server) Replace(ctx context.Context, request *api.ReplaceRequest) (*api.ReplaceResponse, error) {
 	log.Tracef("Received ReplaceRequest %+v", request)
 	in, err := proto.Marshal(&ReplaceRequest{
 		Index:           uint64(request.Index),
@@ -212,7 +212,7 @@ func (m *Server) Replace(ctx context.Context, request *api.ReplaceRequest) (*api
 		return nil, err
 	}
 
-	out, header, err := m.Command(ctx, opReplace, in, request.Header)
+	out, header, err := s.Command(ctx, opReplace, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +237,7 @@ func (m *Server) Replace(ctx context.Context, request *api.ReplaceRequest) (*api
 }
 
 // Get gets the value of a key
-func (m *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
+func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
 	log.Tracef("Received GetRequest %+v", request)
 	in, err := proto.Marshal(&GetRequest{
 		Index: uint64(request.Index),
@@ -247,7 +247,7 @@ func (m *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 		return nil, err
 	}
 
-	out, header, err := m.Query(ctx, opGet, in, request.Header)
+	out, header, err := s.Query(ctx, opGet, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -271,14 +271,14 @@ func (m *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 }
 
 // FirstEntry gets the first entry in the map
-func (m *Server) FirstEntry(ctx context.Context, request *api.FirstEntryRequest) (*api.FirstEntryResponse, error) {
+func (s *Server) FirstEntry(ctx context.Context, request *api.FirstEntryRequest) (*api.FirstEntryResponse, error) {
 	log.Tracef("Received FirstEntryRequest %+v", request)
 	in, err := proto.Marshal(&FirstEntryRequest{})
 	if err != nil {
 		return nil, err
 	}
 
-	out, header, err := m.Query(ctx, opFirstEntry, in, request.Header)
+	out, header, err := s.Query(ctx, opFirstEntry, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -302,14 +302,14 @@ func (m *Server) FirstEntry(ctx context.Context, request *api.FirstEntryRequest)
 }
 
 // LastEntry gets the last entry in the map
-func (m *Server) LastEntry(ctx context.Context, request *api.LastEntryRequest) (*api.LastEntryResponse, error) {
+func (s *Server) LastEntry(ctx context.Context, request *api.LastEntryRequest) (*api.LastEntryResponse, error) {
 	log.Tracef("Received LastEntryRequest %+v", request)
 	in, err := proto.Marshal(&LastEntryRequest{})
 	if err != nil {
 		return nil, err
 	}
 
-	out, header, err := m.Query(ctx, opLastEntry, in, request.Header)
+	out, header, err := s.Query(ctx, opLastEntry, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -333,7 +333,7 @@ func (m *Server) LastEntry(ctx context.Context, request *api.LastEntryRequest) (
 }
 
 // PrevEntry gets the previous entry in the map
-func (m *Server) PrevEntry(ctx context.Context, request *api.PrevEntryRequest) (*api.PrevEntryResponse, error) {
+func (s *Server) PrevEntry(ctx context.Context, request *api.PrevEntryRequest) (*api.PrevEntryResponse, error) {
 	log.Tracef("Received PrevEntryRequest %+v", request)
 	in, err := proto.Marshal(&PrevEntryRequest{
 		Index: uint64(request.Index),
@@ -342,7 +342,7 @@ func (m *Server) PrevEntry(ctx context.Context, request *api.PrevEntryRequest) (
 		return nil, err
 	}
 
-	out, header, err := m.Query(ctx, opPrevEntry, in, request.Header)
+	out, header, err := s.Query(ctx, opPrevEntry, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -366,7 +366,7 @@ func (m *Server) PrevEntry(ctx context.Context, request *api.PrevEntryRequest) (
 }
 
 // NextEntry gets the next entry in the map
-func (m *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (*api.NextEntryResponse, error) {
+func (s *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (*api.NextEntryResponse, error) {
 	log.Tracef("Received NextEntryRequest %+v", request)
 	in, err := proto.Marshal(&NextEntryRequest{
 		Index: uint64(request.Index),
@@ -375,7 +375,7 @@ func (m *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (
 		return nil, err
 	}
 
-	out, header, err := m.Query(ctx, opNextEntry, in, request.Header)
+	out, header, err := s.Query(ctx, opNextEntry, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -399,7 +399,7 @@ func (m *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (
 }
 
 // Remove removes a key from the map
-func (m *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.RemoveResponse, error) {
+func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.RemoveResponse, error) {
 	log.Tracef("Received RemoveRequest %+v", request)
 	in, err := proto.Marshal(&RemoveRequest{
 		Index:   uint64(request.Index),
@@ -411,7 +411,7 @@ func (m *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 		return nil, err
 	}
 
-	out, header, err := m.Command(ctx, opRemove, in, request.Header)
+	out, header, err := s.Command(ctx, opRemove, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -434,14 +434,14 @@ func (m *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 }
 
 // Clear removes all keys from the map
-func (m *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.ClearResponse, error) {
+func (s *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.ClearResponse, error) {
 	log.Tracef("Received ClearRequest %+v", request)
 	in, err := proto.Marshal(&ClearRequest{})
 	if err != nil {
 		return nil, err
 	}
 
-	out, header, err := m.Command(ctx, opClear, in, request.Header)
+	out, header, err := s.Command(ctx, opClear, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -459,7 +459,7 @@ func (m *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.Cle
 }
 
 // Events listens for map change events
-func (m *Server) Events(request *api.EventRequest, srv api.IndexedMapService_EventsServer) error {
+func (s *Server) Events(request *api.EventRequest, srv api.IndexedMapService_EventsServer) error {
 	log.Tracef("Received EventRequest %+v", request)
 	in, err := proto.Marshal(&ListenRequest{
 		Replay: request.Replay,
@@ -471,7 +471,7 @@ func (m *Server) Events(request *api.EventRequest, srv api.IndexedMapService_Eve
 	}
 
 	stream := streams.NewBufferedStream()
-	if err := m.CommandStream(srv.Context(), opEvents, in, request.Header, stream); err != nil {
+	if err := s.CommandStream(srv.Context(), opEvents, in, request.Header, stream); err != nil {
 		return err
 	}
 
@@ -524,7 +524,7 @@ func (m *Server) Events(request *api.EventRequest, srv api.IndexedMapService_Eve
 }
 
 // Entries lists all entries currently in the map
-func (m *Server) Entries(request *api.EntriesRequest, srv api.IndexedMapService_EntriesServer) error {
+func (s *Server) Entries(request *api.EntriesRequest, srv api.IndexedMapService_EntriesServer) error {
 	log.Tracef("Received EntriesRequest %+v", request)
 	in, err := proto.Marshal(&EntriesRequest{})
 	if err != nil {
@@ -532,8 +532,8 @@ func (m *Server) Entries(request *api.EntriesRequest, srv api.IndexedMapService_
 	}
 
 	stream := streams.NewBufferedStream()
-	if err := m.QueryStream(srv.Context(), opEntries, in, request.Header, stream); err != nil {
-		log.Errorf("EntriesRequest failed", err)
+	if err := s.QueryStream(srv.Context(), opEntries, in, request.Header, stream); err != nil {
+		log.Errorf("EntriesRequest failed: %v", err)
 		return err
 	}
 
@@ -544,7 +544,7 @@ func (m *Server) Entries(request *api.EntriesRequest, srv api.IndexedMapService_
 		}
 
 		if result.Failed() {
-			log.Errorf("EntriesRequest failed", result.Error)
+			log.Errorf("EntriesRequest failed: %v", result.Error)
 			return result.Error
 		}
 

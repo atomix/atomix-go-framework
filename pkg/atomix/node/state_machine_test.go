@@ -31,7 +31,7 @@ func TestPrimitiveStateMachine(t *testing.T) {
 	go ctx.command(sm, newOpenSessionRequest(t), ch)
 	out := <-ch
 	assert.True(t, out.Succeeded())
-	openSessionResponse := getOpenSessionResponse(t, out.Value)
+	openSessionResponse := getOpenSessionResponse(t, out.Value.([]byte))
 	assert.NotEqual(t, 0, openSessionResponse.SessionID)
 	sessionID := openSessionResponse.SessionID
 
@@ -43,7 +43,7 @@ func TestPrimitiveStateMachine(t *testing.T) {
 	go ctx.command(sm, newCommandRequest(t, sessionID, 1, "set", bytes), ch)
 	out = <-ch
 	assert.True(t, out.Succeeded())
-	commandResponse := getCommandResponse(t, out.Value)
+	commandResponse := getCommandResponse(t, out.Value.([]byte))
 	setResponse := &SetResponse{}
 	assert.NoError(t, proto.Unmarshal(commandResponse.Output, setResponse))
 
@@ -53,7 +53,7 @@ func TestPrimitiveStateMachine(t *testing.T) {
 	go ctx.query(sm, newQueryRequest(t, sessionID, commandResponse.Context.Index, 1, "get", bytes), ch)
 	out = <-ch
 	assert.True(t, out.Succeeded())
-	queryResponse := getQueryResponse(t, out.Value)
+	queryResponse := getQueryResponse(t, out.Value.([]byte))
 	getResponse := &GetResponse{}
 	assert.NoError(t, proto.Unmarshal(queryResponse.Output, getResponse))
 	assert.Equal(t, "Hello world!", getResponse.Value)
