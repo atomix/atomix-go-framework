@@ -26,7 +26,7 @@ import (
 )
 
 // NewNode creates a new node running the given protocol
-func NewNode(nodeID string, config *controller.PartitionConfig, protocol node.Protocol, registry *node.Registry, opts ...NodeOption) *Node {
+func NewNode(nodeID string, config *controller.ClusterConfig, protocol node.Protocol, registry *node.Registry, opts ...NodeOption) *Node {
 	node := &Node{
 		ID:       nodeID,
 		config:   config,
@@ -83,7 +83,7 @@ func (o *portOption) apply(node *Node) {
 // Node is an Atomix node
 type Node struct {
 	ID       string
-	config   *controller.PartitionConfig
+	config   *controller.ClusterConfig
 	protocol node.Protocol
 	registry *node.Registry
 	port     int
