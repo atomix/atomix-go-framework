@@ -13,3 +13,4 @@ protoc -I=$proto_imports --gogofaster_out=import_path=atomix/set,plugins=grpc:pk
 protoc -I=$proto_imports --gogofaster_out=Mgoogle/protobuf/duration.proto=github.com/gogo/protobuf/types,Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,import_path=atomix/node,plugins=grpc:pkg pkg/atomix/node/*.proto
 protoc -I=$proto_imports --gogofaster_out=Mgoogle/protobuf/duration.proto=github.com/gogo/protobuf/types,Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,import_path=atomix/service,plugins=grpc:pkg pkg/atomix/service/*.proto
 protoc -I=$proto_imports --gogofaster_out=import_path=atomix/value,plugins=grpc:pkg pkg/atomix/value/*.proto
+protoc -I=$proto_imports --gogofaster_out=Mgoogle/protobuf/duration.proto=github.com/gogo/protobuf/types,Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types,import_path=atomix/log,plugins=grpc:pkg pkg/atomix/log/*.proto
