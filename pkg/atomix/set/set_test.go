@@ -19,7 +19,6 @@ import (
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/session"
 	client "github.com/atomix/go-client/pkg/client/set"
-	"github.com/atomix/go-client/pkg/client/util/net"
 	"github.com/atomix/go-framework/pkg/atomix/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -31,7 +30,7 @@ func TestSet(t *testing.T) {
 	defer node.Stop()
 
 	name := primitive.NewName("default", "test", "default", "test")
-	set, err := client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
+	set, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 	assert.NotNil(t, set)
 
@@ -150,10 +149,10 @@ func TestSet(t *testing.T) {
 	err = set.Close()
 	assert.NoError(t, err)
 
-	set1, err := client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
+	set1, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 
-	set2, err := client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
+	set2, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 
 	size, err = set1.Len(context.TODO())
@@ -169,7 +168,7 @@ func TestSet(t *testing.T) {
 	err = set2.Delete()
 	assert.NoError(t, err)
 
-	set, err = client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
+	set, err = client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 
 	size, err = set.Len(context.TODO())

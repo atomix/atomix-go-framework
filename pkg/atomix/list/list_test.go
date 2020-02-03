@@ -19,7 +19,6 @@ import (
 	client "github.com/atomix/go-client/pkg/client/list"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/session"
-	"github.com/atomix/go-client/pkg/client/util/net"
 	"github.com/atomix/go-framework/pkg/atomix/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -31,7 +30,7 @@ func TestList(t *testing.T) {
 	defer node.Stop()
 
 	name := primitive.NewName("default", "test", "default", "test")
-	list, err := client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
+	list, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 	assert.NotNil(t, list)
 
@@ -136,10 +135,10 @@ func TestList(t *testing.T) {
 	err = list.Close()
 	assert.NoError(t, err)
 
-	list1, err := client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
+	list1, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 
-	list2, err := client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
+	list2, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 
 	size, err = list1.Len(context.TODO())
@@ -155,7 +154,7 @@ func TestList(t *testing.T) {
 	err = list2.Delete()
 	assert.NoError(t, err)
 
-	list, err = client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
+	list, err = client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 
 	size, err = list.Len(context.TODO())

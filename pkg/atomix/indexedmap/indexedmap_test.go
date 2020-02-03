@@ -19,7 +19,6 @@ import (
 	client "github.com/atomix/go-client/pkg/client/indexedmap"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/session"
-	"github.com/atomix/go-client/pkg/client/util/net"
 	"github.com/atomix/go-framework/pkg/atomix/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -31,7 +30,7 @@ func TestIndexedMap(t *testing.T) {
 	defer node.Stop()
 
 	name := primitive.NewName("default", "test", "default", "test")
-	_map, err := client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
+	_map, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 
 	kv, err := _map.Get(context.Background(), "foo")
@@ -121,7 +120,7 @@ func TestMapStreams(t *testing.T) {
 	defer node.Stop()
 
 	name := primitive.NewName("default", "test", "default", "test")
-	_map, err := client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
+	_map, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 
 	kv, err := _map.Put(context.Background(), "foo", []byte{1})
@@ -178,10 +177,10 @@ func TestMapStreams(t *testing.T) {
 	err = _map.Close()
 	assert.NoError(t, err)
 
-	map1, err := client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
+	map1, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 
-	map2, err := client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
+	map2, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 
 	size, err := map1.Len(context.TODO())
@@ -197,7 +196,7 @@ func TestMapStreams(t *testing.T) {
 	err = map2.Delete()
 	assert.NoError(t, err)
 
-	_map, err = client.New(context.TODO(), name, []net.Address{address}, session.WithTimeout(5*time.Second))
+	_map, err = client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 
 	size, err = _map.Len(context.TODO())

@@ -16,6 +16,7 @@ package test
 
 import (
 	"fmt"
+	"github.com/atomix/api/proto/atomix/controller"
 	netutil "github.com/atomix/go-client/pkg/client/util/net"
 	"github.com/atomix/go-framework/pkg/atomix"
 	"github.com/atomix/go-framework/pkg/atomix/node"
@@ -33,7 +34,7 @@ func StartTestNode() (netutil.Address, *atomix.Node) {
 		if err != nil {
 			continue
 		}
-		node := local.NewNode(lis, node.GetRegistry())
+		node := local.NewNode(lis, node.GetRegistry(), []*controller.PartitionId{{Partition: 1}})
 		node.Start()
 
 		ch := make(chan struct{})
