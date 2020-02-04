@@ -21,6 +21,7 @@ import (
 	api "github.com/atomix/api/proto/atomix/log"
 	"github.com/atomix/go-framework/pkg/atomix/node"
 	"github.com/atomix/go-framework/pkg/atomix/server"
+	"github.com/atomix/go-framework/pkg/atomix/service"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
@@ -38,8 +39,8 @@ func registerServer(server *grpc.Server, protocol node.Protocol) {
 
 func newServer(protocol node.Protocol) api.LogServiceServer {
 	return &Server{
-		SessionizedServer: &server.SessionizedServer{
-			Type:     logType,
+		Server: &server.Server{
+			Type:     service.ServiceType_LOG,
 			Protocol: protocol,
 		},
 	}
@@ -48,13 +49,13 @@ func newServer(protocol node.Protocol) api.LogServiceServer {
 // Server is an implementation of LogServiceServer for the log primitive
 type Server struct {
 	api.LogServiceServer
-	*server.SessionizedServer
+	*server.Server
 }
 
 // Create opens a new session
 func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
-	header, err := s.OpenSession(ctx, request.Header, request.Timeout)
+	header, err := s.DoCreateService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -65,25 +66,11 @@ func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.C
 	return response, nil
 }
 
-// KeepAlive keeps an existing session alive
-func (s *Server) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
-	log.Tracef("Received KeepAliveRequest %+v", request)
-	header, err := s.KeepAliveSession(ctx, request.Header)
-	if err != nil {
-		return nil, err
-	}
-	response := &api.KeepAliveResponse{
-		Header: header,
-	}
-	log.Tracef("Sending KeepAliveResponse %+v", response)
-	return response, nil
-}
-
 // Close closes a session
 func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if request.Delete {
-		header, err := s.Delete(ctx, request.Header)
+		header, err := s.DoDeleteService(ctx, request.Header)
 		if err != nil {
 			return nil, err
 		}
@@ -94,7 +81,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return response, nil
 	}
 
-	header, err := s.CloseSession(ctx, request.Header)
+	header, err := s.DoCloseService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +100,7 @@ func (s *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeR
 		return nil, err
 	}
 
-	out, header, err := s.Query(ctx, opSize, in, request.Header)
+	out, header, err := s.DoQuery(ctx, opSize, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +128,7 @@ func (s *Server) Exists(ctx context.Context, request *api.ExistsRequest) (*api.E
 		return nil, err
 	}
 
-	out, header, err := s.Query(ctx, opExists, in, request.Header)
+	out, header, err := s.DoQuery(ctx, opExists, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +157,7 @@ func (s *Server) Append(ctx context.Context, request *api.AppendRequest) (*api.A
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, opAppend, in, request.Header)
+	out, header, err := s.DoCommand(ctx, opAppend, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +188,7 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 		return nil, err
 	}
 
-	out, header, err := s.Query(ctx, opGet, in, request.Header)
+	out, header, err := s.DoQuery(ctx, opGet, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -229,7 +216,7 @@ func (s *Server) FirstEntry(ctx context.Context, request *api.FirstEntryRequest)
 		return nil, err
 	}
 
-	out, header, err := s.Query(ctx, opFirstEntry, in, request.Header)
+	out, header, err := s.DoQuery(ctx, opFirstEntry, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +244,7 @@ func (s *Server) LastEntry(ctx context.Context, request *api.LastEntryRequest) (
 		return nil, err
 	}
 
-	out, header, err := s.Query(ctx, opLastEntry, in, request.Header)
+	out, header, err := s.DoQuery(ctx, opLastEntry, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +274,7 @@ func (s *Server) PrevEntry(ctx context.Context, request *api.PrevEntryRequest) (
 		return nil, err
 	}
 
-	out, header, err := s.Query(ctx, opPrevEntry, in, request.Header)
+	out, header, err := s.DoQuery(ctx, opPrevEntry, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +304,7 @@ func (s *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (
 		return nil, err
 	}
 
-	out, header, err := s.Query(ctx, opNextEntry, in, request.Header)
+	out, header, err := s.DoQuery(ctx, opNextEntry, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -348,7 +335,7 @@ func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, opRemove, in, request.Header)
+	out, header, err := s.DoCommand(ctx, opRemove, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -380,7 +367,7 @@ func (s *Server) Events(request *api.EventRequest, srv api.LogService_EventsServ
 	}
 
 	stream := streams.NewBufferedStream()
-	if err := s.CommandStream(srv.Context(), opEvents, in, request.Header, stream); err != nil {
+	if err := s.DoCommandStream(srv.Context(), opEvents, in, request.Header, stream); err != nil {
 		return err
 	}
 
@@ -437,7 +424,7 @@ func (s *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.Cle
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, opClear, in, request.Header)
+	out, header, err := s.DoCommand(ctx, opClear, in, request.Header)
 	if err != nil {
 		return nil, err
 	}

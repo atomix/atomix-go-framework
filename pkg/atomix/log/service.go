@@ -26,15 +26,15 @@ import (
 )
 
 func init() {
-	node.RegisterService(logType, newService)
+	node.RegisterService(service.ServiceType_LOG, newService)
 }
 
 // newService returns a new Service
-func newService(context service.Context) service.Service {
+func newService(scheduler service.Scheduler, context service.Context) service.Service {
 	service := &Service{
-		SessionizedService: service.NewSessionizedService(context),
-		indexes:            make(map[uint64]*LinkedLogEntryValue),
-		listeners:          make(map[uint64]map[uint64]listener),
+		ManagedService: service.NewManagedService(service.ServiceType_LOG, scheduler, context),
+		indexes:        make(map[uint64]*LinkedLogEntryValue),
+		listeners:      make(map[uint64]map[uint64]listener),
 	}
 	service.init()
 	return service
@@ -42,7 +42,7 @@ func newService(context service.Context) service.Service {
 
 // Service is a state machine for a log primitive
 type Service struct {
-	*service.SessionizedService
+	*service.ManagedService
 	lastIndex  uint64
 	indexes    map[uint64]*LinkedLogEntryValue
 	firstEntry *LinkedLogEntryValue
@@ -72,12 +72,8 @@ type LinkedLogEntryValue struct {
 	Next *LinkedLogEntryValue
 }
 
-// Snapshot takes a snapshot of the service
-func (m *Service) Snapshot(writer io.Writer) error {
-	if err := m.SessionizedService.Snapshot(writer); err != nil {
-		return err
-	}
-
+// Backup takes a snapshot of the service
+func (m *Service) Backup(writer io.Writer) error {
 	listeners := make([]*Listener, 0)
 	for sessionID, sessionListeners := range m.listeners {
 		for streamID, sessionListener := range sessionListeners {
@@ -108,10 +104,36 @@ func (m *Service) Snapshot(writer io.Writer) error {
 	return nil
 }
 
-// Install restores the service from a snapshot
-func (m *Service) Install(reader io.Reader) error {
-	if err := m.SessionizedService.Install(reader); err != nil {
+// Restore restores the service from a snapshot
+func (m *Service) Restore(reader io.Reader) error {
+	length, err := util.ReadVarInt(reader)
+	if err != nil {
 		return err
+	}
+
+	listeners := make([]*Listener, length)
+	err = util.ReadSlice(reader, listeners, func(data []byte) (*Listener, error) {
+		listener := &Listener{}
+		if err := proto.Unmarshal(data, listener); err != nil {
+			return nil, err
+		}
+		return listener, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	m.listeners = make(map[uint64]map[uint64]listener)
+	for _, snapshotListener := range listeners {
+		sessionListeners, ok := m.listeners[snapshotListener.SessionId]
+		if !ok {
+			sessionListeners = make(map[uint64]listener)
+			m.listeners[snapshotListener.SessionId] = sessionListeners
+		}
+		sessionListeners[snapshotListener.StreamId] = listener{
+			index:  snapshotListener.Index,
+			stream: m.Sessions()[snapshotListener.SessionId].Stream(snapshotListener.StreamId),
+		}
 	}
 
 	lastIndex, err := util.ReadVarUint64(reader)
@@ -147,7 +169,6 @@ func (m *Service) Install(reader io.Reader) error {
 		if m.firstEntry == nil {
 			m.firstEntry = linkedEntry
 		}
-
 		m.indexes[linkedEntry.Index] = linkedEntry
 		if prevEntry != nil {
 			prevEntry.Next = linkedEntry
@@ -170,12 +191,6 @@ func (m *Service) Append(value []byte) ([]byte, error) {
 	oldEntry = m.indexes[request.Index]
 
 	if oldEntry == nil {
-		// If the version is positive then reject the request.
-		if !request.IfEmpty && request.Version > 0 {
-			return proto.Marshal(&AppendResponse{
-				Status: UpdateStatus_PRECONDITION_FAILED,
-			})
-		}
 
 		// Increment the index for a new entry
 		var index uint64
@@ -537,7 +552,7 @@ func (m *Service) sendEvent(event *ListenResponse) {
 	bytes, _ := proto.Marshal(event)
 	for sessionID, listeners := range m.listeners {
 
-		session := m.Sessions()[sessionID]
+		session := m.SessionOf(sessionID)
 		if session != nil {
 			for _, listener := range listeners {
 				if listener.index > 0 {

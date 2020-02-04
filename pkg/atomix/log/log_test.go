@@ -17,23 +17,25 @@ package log
 import (
 	"context"
 	"testing"
-	"time"
 
 	client "github.com/atomix/go-client/pkg/client/log"
 
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-framework/pkg/atomix/test"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestLog(t *testing.T) {
-	address, node := test.StartTestNode()
+	partition, node := test.StartTestNode()
 	defer node.Stop()
+
+	session, err := primitive.NewSession(context.TODO(), partition)
+	assert.NoError(t, err)
+	defer session.Close()
 
 	// Creates a new log primitive
 	name := primitive.NewName("default", "test", "default", "test")
-	_log, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
+	_log, err := client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)
 
 	// Gets the log entry at index 0
@@ -119,11 +121,16 @@ func TestLog(t *testing.T) {
 }
 
 func TestLogStreams(t *testing.T) {
-	address, node := test.StartTestNode()
+	partition, node := test.StartTestNode()
 	defer node.Stop()
 
+	session, err := primitive.NewSession(context.TODO(), partition)
+	assert.NoError(t, err)
+	defer session.Close()
+
+	// Creates a new log primitive
 	name := primitive.NewName("default", "test", "default", "test")
-	_log, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
+	_log, err := client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)
 
 	kv, err := _log.Append(context.Background(), []byte("item1"))
@@ -168,29 +175,29 @@ func TestLogStreams(t *testing.T) {
 	assert.Equal(t, "item5", string(kv.Value))
 
 	<-latch
-	err = _log.Close()
+	err = _log.Close(context.Background())
 	assert.NoError(t, err)
 
-	log1, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
+	log1, err := client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)
 
-	log2, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
+	log2, err := client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)
 
 	size, err := log1.Size(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, 5, size)
 
-	err = log1.Close()
+	err = log1.Close(context.Background())
 	assert.NoError(t, err)
 
-	err = log1.Delete()
+	err = log1.Delete(context.Background())
 	assert.NoError(t, err)
 
-	err = log2.Delete()
+	err = log2.Delete(context.Background())
 	assert.NoError(t, err)
 
-	_log, err = client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
+	_log, err = client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)
 
 	size, err = _log.Size(context.TODO())
