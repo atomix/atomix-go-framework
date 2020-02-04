@@ -27,6 +27,9 @@ import (
 	// Register the indexedmap primitive
 	_ "github.com/atomix/go-framework/pkg/atomix/indexedmap"
 
+	// Register the log primitive
+	_ "github.com/atomix/go-framework/pkg/atomix/log"
+
 	// Register the leader latch primitive
 	_ "github.com/atomix/go-framework/pkg/atomix/leader"
 
