@@ -12,5 +12,9 @@ require (
 	github.com/golang/protobuf v1.3.2
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.4.0
-	google.golang.org/grpc v1.23.1
+	google.golang.org/grpc v1.27.0
 )
+
+replace github.com/atomix/api => ../api
+
+replace github.com/atomix/go-client => ../go-client
