@@ -16,7 +16,6 @@ package log
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 
 	"github.com/atomix/go-framework/pkg/atomix/node"
@@ -160,7 +159,7 @@ func (m *Service) Install(reader io.Reader) error {
 	return nil
 }
 
-// Append appends a key/value pair in the log
+// Append appends a value to the end of the log
 func (m *Service) Append(value []byte) ([]byte, error) {
 	request := &AppendRequest{}
 	if err := proto.Unmarshal(value, request); err != nil {
@@ -168,16 +167,7 @@ func (m *Service) Append(value []byte) ([]byte, error) {
 	}
 
 	var oldEntry *LinkedLogEntryValue
-	if request.Index > 0 {
-		oldEntry = m.indexes[request.Index]
-		if oldEntry != nil && oldEntry.Index != request.Index {
-			return proto.Marshal(&AppendResponse{
-				Status: UpdateStatus_PRECONDITION_FAILED,
-			})
-		}
-	} else {
-		oldEntry = m.indexes[request.Index]
-	}
+	oldEntry = m.indexes[request.Index]
 
 	if oldEntry == nil {
 		// If the version is positive then reject the request.
@@ -234,20 +224,16 @@ func (m *Service) Append(value []byte) ([]byte, error) {
 		// Update the last entry
 		m.lastEntry = newEntry
 
+		m.sendEvent(&ListenResponse{
+			Type:      ListenResponse_APPENDED,
+			Index:     newEntry.Index,
+			Value:     newEntry.Value,
+			Version:   newEntry.Version,
+			Timestamp: newEntry.Timestamp,
+		})
 		return proto.Marshal(&AppendResponse{
 			Status: UpdateStatus_OK,
 			Index:  newEntry.Index,
-		})
-	}
-
-	// If the version is -1 then reject the request.
-	// If the version is positive then compare the version to the current version.
-	if request.IfEmpty || (!request.IfEmpty && request.Version > 0 && request.Version != oldEntry.Version) {
-		return proto.Marshal(&AppendResponse{
-			Status:          UpdateStatus_PRECONDITION_FAILED,
-			Index:           oldEntry.Index,
-			PreviousValue:   oldEntry.Value,
-			PreviousVersion: oldEntry.Version,
 		})
 	}
 
@@ -286,6 +272,15 @@ func (m *Service) Append(value []byte) ([]byte, error) {
 		m.lastEntry = newEntry
 	}
 
+	// Publish an event to listener streams.
+	m.sendEvent(&ListenResponse{
+		Type:      ListenResponse_APPENDED,
+		Index:     newEntry.Index,
+		Value:     newEntry.Value,
+		Version:   newEntry.Version,
+		Timestamp: newEntry.Timestamp,
+	})
+
 	return proto.Marshal(&AppendResponse{
 		Status:          UpdateStatus_OK,
 		Index:           newEntry.Index,
@@ -313,13 +308,6 @@ func (m *Service) Remove(bytes []byte) ([]byte, error) {
 		})
 	}
 
-	// If the request version is set, verify that the request version matches the entry version.
-	if request.Version > 0 && request.Version != entry.Version {
-		return proto.Marshal(&RemoveResponse{
-			Status: UpdateStatus_PRECONDITION_FAILED,
-		})
-	}
-
 	// Delete the entry from the log.
 	delete(m.indexes, entry.Index)
 
@@ -335,6 +323,14 @@ func (m *Service) Remove(bytes []byte) ([]byte, error) {
 		m.lastEntry = entry.Prev
 	}
 
+	m.sendEvent(&ListenResponse{
+		Type:      ListenResponse_REMOVED,
+		Index:     entry.Index,
+		Value:     entry.Value,
+		Version:   entry.Version,
+		Timestamp: entry.Timestamp,
+	})
+
 	return proto.Marshal(&RemoveResponse{
 		Status:          UpdateStatus_OK,
 		Index:           entry.Index,
@@ -346,7 +342,6 @@ func (m *Service) Remove(bytes []byte) ([]byte, error) {
 
 // Get gets a value from the log
 func (m *Service) Get(bytes []byte) ([]byte, error) {
-	fmt.Println("Get Operation")
 	request := &GetRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -534,6 +529,25 @@ func (m *Service) Events(bytes []byte, stream stream.WriteStream) {
 				lis.stream.Value(bytes)
 			}
 			entry = entry.Next
+		}
+	}
+}
+
+func (m *Service) sendEvent(event *ListenResponse) {
+	bytes, _ := proto.Marshal(event)
+	for sessionID, listeners := range m.listeners {
+
+		session := m.Sessions()[sessionID]
+		if session != nil {
+			for _, listener := range listeners {
+				if listener.index > 0 {
+					if event.Index == listener.index {
+						listener.stream.Value(bytes)
+					}
+				} else {
+					listener.stream.Value(bytes)
+				}
+			}
 		}
 	}
 }

@@ -283,7 +283,7 @@ func (s *Server) LastEntry(ctx context.Context, request *api.LastEntryRequest) (
 	return response, nil
 }
 
-// PrevEntry gets the previous entry in the map
+// PrevEntry gets the previous entry in the log
 func (s *Server) PrevEntry(ctx context.Context, request *api.PrevEntryRequest) (*api.PrevEntryResponse, error) {
 	log.Tracef("Received PrevEntryRequest %+v", request)
 	in, err := proto.Marshal(&PrevEntryRequest{
@@ -314,7 +314,7 @@ func (s *Server) PrevEntry(ctx context.Context, request *api.PrevEntryRequest) (
 	return response, nil
 }
 
-// NextEntry gets the next entry in the map
+// NextEntry gets the next entry in the log
 func (s *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (*api.NextEntryResponse, error) {
 	log.Tracef("Received NextEntryRequest %+v", request)
 	in, err := proto.Marshal(&NextEntryRequest{
@@ -345,7 +345,7 @@ func (s *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (
 	return response, nil
 }
 
-// Remove removes a key from the map
+// Remove removes a key from the log
 func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.RemoveResponse, error) {
 	log.Tracef("Received RemoveRequest %+v", request)
 	in, err := proto.Marshal(&RemoveRequest{
@@ -378,7 +378,7 @@ func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 	return response, nil
 }
 
-// Events listens for map change events
+// Events listens for log change events
 func (s *Server) Events(request *api.EventRequest, srv api.LogService_EventsServer) error {
 	log.Tracef("Received EventRequest %+v", request)
 	in, err := proto.Marshal(&ListenRequest{

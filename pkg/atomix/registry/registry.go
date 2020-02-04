@@ -35,6 +35,9 @@ import (
 	// Register the lock primitive
 	_ "github.com/atomix/go-framework/pkg/atomix/lock"
 
+	// Register the log primitive
+	_ "github.com/atomix/go-framework/pkg/atomix/log"
+
 	// Register the map primitive
 	_ "github.com/atomix/go-framework/pkg/atomix/map"
 
