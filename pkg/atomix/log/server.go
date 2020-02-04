@@ -163,10 +163,8 @@ func (s *Server) Exists(ctx context.Context, request *api.ExistsRequest) (*api.E
 func (s *Server) Append(ctx context.Context, request *api.AppendRequest) (*api.AppendResponse, error) {
 	log.Tracef("Received PutRequest %+v", request)
 	in, err := proto.Marshal(&AppendRequest{
-		Index:   uint64(request.Index),
-		Value:   request.Value,
-		Version: uint64(request.Version),
-		IfEmpty: request.Version == -1,
+		Index: uint64(request.Index),
+		Value: request.Value,
 	})
 	if err != nil {
 		return nil, err
@@ -183,12 +181,11 @@ func (s *Server) Append(ctx context.Context, request *api.AppendRequest) (*api.A
 	}
 
 	response := &api.AppendResponse{
-		Header:          header,
-		Status:          getResponseStatus(appendResponse.Status),
-		Index:           int64(appendResponse.Index),
-		Timestamp:       appendResponse.Timestamp,
-		PreviousValue:   appendResponse.PreviousValue,
-		PreviousVersion: int64(appendResponse.PreviousVersion),
+		Header:        header,
+		Status:        getResponseStatus(appendResponse.Status),
+		Index:         int64(appendResponse.Index),
+		Timestamp:     appendResponse.Timestamp,
+		PreviousValue: appendResponse.PreviousValue,
 	}
 	log.Tracef("Sending PutResponse %+v", response)
 	return response, nil
@@ -218,7 +215,6 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 		Header:    header,
 		Index:     int64(getResponse.Index),
 		Value:     getResponse.Value,
-		Version:   int64(getResponse.Version),
 		Timestamp: getResponse.Timestamp,
 	}
 	log.Tracef("Sending GetResponse %+v", response)
@@ -247,7 +243,6 @@ func (s *Server) FirstEntry(ctx context.Context, request *api.FirstEntryRequest)
 		Header:    header,
 		Index:     int64(firstEntryResponse.Index),
 		Value:     firstEntryResponse.Value,
-		Version:   int64(firstEntryResponse.Version),
 		Timestamp: firstEntryResponse.Timestamp,
 	}
 	log.Tracef("Sending FirstEntryResponse %+v", response)
@@ -276,7 +271,6 @@ func (s *Server) LastEntry(ctx context.Context, request *api.LastEntryRequest) (
 		Header:    header,
 		Index:     int64(lastEntryResponse.Index),
 		Value:     lastEntryResponse.Value,
-		Version:   int64(lastEntryResponse.Version),
 		Timestamp: lastEntryResponse.Timestamp,
 	}
 	log.Tracef("Sending LastEntryResponse %+v", response)
@@ -307,7 +301,6 @@ func (s *Server) PrevEntry(ctx context.Context, request *api.PrevEntryRequest) (
 		Header:    header,
 		Index:     int64(prevEntryResponse.Index),
 		Value:     prevEntryResponse.Value,
-		Version:   int64(prevEntryResponse.Version),
 		Timestamp: prevEntryResponse.Timestamp,
 	}
 	log.Tracef("Sending PrevEntryResponse %+v", response)
@@ -338,7 +331,6 @@ func (s *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (
 		Header:    header,
 		Index:     int64(nextEntryResponse.Index),
 		Value:     nextEntryResponse.Value,
-		Version:   int64(nextEntryResponse.Version),
 		Timestamp: nextEntryResponse.Timestamp,
 	}
 	log.Tracef("Sending NextEntryResponse %+v", response)
@@ -349,9 +341,8 @@ func (s *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (
 func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.RemoveResponse, error) {
 	log.Tracef("Received RemoveRequest %+v", request)
 	in, err := proto.Marshal(&RemoveRequest{
-		Index:   uint64(request.Index),
-		Value:   request.Value,
-		Version: uint64(request.Version),
+		Index: uint64(request.Index),
+		Value: request.Value,
 	})
 	if err != nil {
 		return nil, err
@@ -368,11 +359,10 @@ func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 	}
 
 	response := &api.RemoveResponse{
-		Header:          header,
-		Status:          getResponseStatus(removeResponse.Status),
-		Index:           int64(removeResponse.Index),
-		PreviousValue:   removeResponse.PreviousValue,
-		PreviousVersion: int64(removeResponse.PreviousVersion),
+		Header:        header,
+		Status:        getResponseStatus(removeResponse.Status),
+		Index:         int64(removeResponse.Index),
+		PreviousValue: removeResponse.PreviousValue,
 	}
 	log.Tracef("Sending RemoveRequest %+v", response)
 	return response, nil
@@ -426,7 +416,6 @@ func (s *Server) Events(request *api.EventRequest, srv api.LogService_EventsServ
 				Type:      getEventType(response.Type),
 				Index:     int64(response.Index),
 				Value:     response.Value,
-				Version:   int64(response.Version),
 				Timestamp: response.Timestamp,
 			}
 		}
