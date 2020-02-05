@@ -17,7 +17,6 @@ package counter
 import (
 	"context"
 	api "github.com/atomix/api/proto/atomix/counter"
-	"github.com/atomix/api/proto/atomix/headers"
 	"github.com/atomix/go-framework/pkg/atomix/node"
 	"github.com/atomix/go-framework/pkg/atomix/server"
 	"github.com/gogo/protobuf/proto"
@@ -223,8 +222,12 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return response, nil
 	}
 
+	header, err := s.DoCloseService(ctx, request.Header)
+	if err != nil {
+		return nil, err
+	}
 	response := &api.CloseResponse{
-		Header: &headers.ResponseHeader{},
+		Header: header,
 	}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil

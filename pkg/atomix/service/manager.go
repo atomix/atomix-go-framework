@@ -283,27 +283,19 @@ func (m *Manager) applyCommand(request *SessionCommandRequest, stream streams.Wr
 			session.scheduleCommand(sequenceNumber, func() {
 				util.SessionEntry(m.context.Node(), request.Context.SessionID).
 					Tracef("Executing command %d", sequenceNumber)
-				m.applySessionCommand(request, stream)
+				m.applySessionCommand(request, session, stream)
 			})
 		} else {
 			util.SessionEntry(m.context.Node(), request.Context.SessionID).
 				Tracef("Executing command %d", sequenceNumber)
-			m.applySessionCommand(request, stream)
+			m.applySessionCommand(request, session, stream)
 		}
 	}
 }
 
-func (m *Manager) applySessionCommand(request *SessionCommandRequest, stream streams.WriteStream) {
-	session, ok := m.sessions[request.Context.SessionID]
-	if !ok {
-		util.SessionEntry(m.context.Node(), request.Context.SessionID).
-			Warn("Unknown session")
-		stream.Error(fmt.Errorf("unknown session %d", request.Context.SessionID))
-		stream.Close()
-	} else {
-		m.applyServiceCommand(request.Command, request.Context, session, stream)
-		session.completeCommand(request.Context.SequenceNumber)
-	}
+func (m *Manager) applySessionCommand(request *SessionCommandRequest, session *Session, stream streams.WriteStream) {
+	m.applyServiceCommand(request.Command, request.Context, session, stream)
+	session.completeCommand(request.Context.SequenceNumber)
 }
 
 func (m *Manager) applyServiceCommand(request *ServiceCommandRequest, context *SessionCommandContext, session *Session, stream streams.WriteStream) {
@@ -351,7 +343,6 @@ func (m *Manager) applyServiceCommandOperation(request *ServiceCommandRequest, c
 	} else {
 		stream.Close()
 	}
-	session.completeCommand(context.SequenceNumber)
 }
 
 func (m *Manager) applyServiceCommandCreate(request *ServiceCommandRequest, context *SessionCommandContext, session *Session, stream streams.WriteStream) {
@@ -360,7 +351,7 @@ func (m *Manager) applyServiceCommandCreate(request *ServiceCommandRequest, cont
 	if !ok {
 		serviceType := m.registry.GetType(request.Service.Type)
 		if serviceType == nil {
-			stream.Error(fmt.Errorf("unknown service %s", name))
+			stream.Error(fmt.Errorf("unknown service type %s", request.Service.Type))
 			stream.Close()
 			return
 		}
@@ -395,13 +386,7 @@ func (m *Manager) applyServiceCommandCreate(request *ServiceCommandRequest, cont
 
 func (m *Manager) applyServiceCommandClose(request *ServiceCommandRequest, context *SessionCommandContext, session *Session, stream streams.WriteStream) {
 	name := newQualifiedServiceName(request.Service.Namespace, request.Service.Name)
-	service, ok := m.services[name]
-	if !ok {
-		stream.Error(fmt.Errorf("unknown service %s", name))
-		stream.Close()
-		return
-	}
-	if session.services[name] {
+	if service, ok := m.services[name]; ok && session.services[name] {
 		delete(session.services, name)
 		service.removeSession(session)
 		if closed, ok := service.(SessionClosed); ok {
@@ -430,14 +415,11 @@ func (m *Manager) applyServiceCommandClose(request *ServiceCommandRequest, conte
 func (m *Manager) applyServiceCommandDelete(request *ServiceCommandRequest, context *SessionCommandContext, session *Session, stream streams.WriteStream) {
 	name := newQualifiedServiceName(request.Service.Namespace, request.Service.Name)
 	_, ok := m.services[name]
-	if !ok {
-		stream.Error(fmt.Errorf("unknown service %s", name))
-		stream.Close()
-		return
-	}
-	delete(m.services, name)
-	for _, session := range m.sessions {
-		delete(session.services, name)
+	if ok {
+		delete(m.services, name)
+		for _, session := range m.sessions {
+			delete(session.services, name)
+		}
 	}
 
 	stream.Result(proto.Marshal(&SessionResponse{
