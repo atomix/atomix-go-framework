@@ -182,15 +182,6 @@ func (s *sessionStream) Close() {
 	s.stream.Close()
 }
 
-// completeIndex returns the highest acknowledged index in the stream
-func (s *sessionStream) completeIndex() uint64 {
-	event := s.results.Front()
-	if event != nil {
-		return event.Value.(sessionStreamResult).index - 1
-	}
-	return s.ctx.Index()
-}
-
 // LastIndex returns the last index in the stream
 func (s *sessionStream) LastIndex() uint64 {
 	if s.results.Len() > 0 {

@@ -30,23 +30,21 @@ import (
 // NewManager returns an initialized Manager
 func NewManager(registry Registry, context Context) *Manager {
 	return &Manager{
-		registry:     registry,
-		context:      context,
-		scheduler:    newScheduler(),
-		sessions:     make(map[uint64]*Session),
-		services:     make(map[qualifiedServiceName]Service),
-		indexQueries: make(map[uint64]*list.List),
+		registry:  registry,
+		context:   context,
+		scheduler: newScheduler(),
+		sessions:  make(map[uint64]*Session),
+		services:  make(map[qualifiedServiceName]Service),
 	}
 }
 
 // Manager is a Manager implementation for primitives that support sessions
 type Manager struct {
-	registry     Registry
-	context      Context
-	sessions     map[uint64]*Session
-	services     map[qualifiedServiceName]Service
-	scheduler    *scheduler
-	indexQueries map[uint64]*list.List
+	registry  Registry
+	context   Context
+	sessions  map[uint64]*Session
+	services  map[qualifiedServiceName]Service
+	scheduler *scheduler
 }
 
 // Snapshot takes a snapshot of the service
@@ -252,7 +250,7 @@ func (m *Manager) Command(bytes []byte, stream streams.WriteStream) {
 		}
 
 		m.scheduler.runImmediateTasks()
-		m.runIndexQueries(m.context.Index())
+		m.scheduler.runIndex(m.context.Index())
 	}
 }
 
@@ -543,35 +541,14 @@ func (m *Manager) Query(bytes []byte, stream streams.WriteStream) {
 		if query.Context.LastIndex > m.context.Index() {
 			util.SessionEntry(m.context.Node(), query.Context.SessionID).
 				Tracef("Query index %d greater than last index %d", query.Context.LastIndex, m.context.Index())
-			m.indexQuery(query, stream)
+			m.scheduler.ScheduleIndex(query.Context.LastIndex, func() {
+				m.sequenceQuery(query, stream)
+			})
 		} else {
 			util.SessionEntry(m.context.Node(), query.Context.SessionID).
 				Tracef("Sequencing query %d <= %d", query.Context.LastIndex, m.context.Index())
 			m.sequenceQuery(query, stream)
 		}
-	}
-}
-
-func (m *Manager) indexQuery(query *SessionQueryRequest, stream streams.WriteStream) {
-	queries, ok := m.indexQueries[query.Context.LastIndex]
-	if !ok {
-		queries = list.New()
-		m.indexQueries[query.Context.LastIndex] = queries
-	}
-	queries.PushBack(func() {
-		m.sequenceQuery(query, stream)
-	})
-}
-
-func (m *Manager) runIndexQueries(index uint64) {
-	tasks, ok := m.indexQueries[index]
-	if ok {
-		task := tasks.Front()
-		for task != nil {
-			task.Value.(func())()
-			task = task.Next()
-		}
-		delete(m.indexQueries, index)
 	}
 }
 

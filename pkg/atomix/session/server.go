@@ -45,6 +45,7 @@ type Server struct {
 	*server.Server
 }
 
+// OpenSession opens a new session
 func (s *Server) OpenSession(ctx context.Context, request *api.OpenSessionRequest) (*api.OpenSessionResponse, error) {
 	log.Tracef("Received OpenSessionRequest %+v", request)
 	header, err := s.DoOpenSession(ctx, request.Header, request.Timeout)
@@ -58,6 +59,7 @@ func (s *Server) OpenSession(ctx context.Context, request *api.OpenSessionReques
 	return response, nil
 }
 
+// KeepAlive keeps a session alive
 func (s *Server) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
 	log.Tracef("Received KeepAliveRequest %+v", request)
 	header, err := s.DoKeepAliveSession(ctx, request.Header)
@@ -71,6 +73,7 @@ func (s *Server) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (
 	return response, nil
 }
 
+// CloseSession closes a session
 func (s *Server) CloseSession(ctx context.Context, request *api.CloseSessionRequest) (*api.CloseSessionResponse, error) {
 	log.Tracef("Received CloseSessionRequest %+v", request)
 	header, err := s.DoCloseSession(ctx, request.Header)

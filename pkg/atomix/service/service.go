@@ -37,21 +37,32 @@ type Registry interface {
 	GetType(name string) func(scheduler Scheduler, context Context) Service
 }
 
+// SessionOpen is an interface for listening to session open events
 type SessionOpen interface {
+	// SessionOpen is called when a session is opened for a service
 	SessionOpen(*Session)
 }
 
+// SessionClosed is an interface for listening to session closed events
 type SessionClosed interface {
+	// SessionClosed is called when a session is closed for a service
 	SessionClosed(*Session)
 }
 
+// SessionExpired is an interface for listening to session expired events
 type SessionExpired interface {
+	// SessionExpired is called when a session is expired for a service
 	SessionExpired(*Session)
 }
 
+// Service is a primitive service
 type Service interface {
 	internalService
+
+	// Backup is called to take a snapshot of the service state
 	Backup(writer io.Writer) error
+
+	// Resotre is called to restore the service state from a snapshot
 	Restore(reader io.Reader) error
 }
 
@@ -84,30 +95,32 @@ type ManagedService struct {
 	currentSession *Session
 }
 
+// Type returns the service type
 func (s *ManagedService) Type() string {
 	return s.serviceType
 }
 
+// Session returns the current session
 func (s *ManagedService) Session() *Session {
 	return s.currentSession
 }
 
+// Sessions returns a list of open sessions
 func (s *ManagedService) Sessions() []*Session {
 	return s.sessions
 }
 
-func (s *ManagedService) setScheduler(scheduler Scheduler) {
-	s.Scheduler = scheduler
-}
-
+// setCurrentSession sets the current session
 func (s *ManagedService) setCurrentSession(session *Session) {
 	s.currentSession = session
 }
 
+// addSession adds a session to the service
 func (s *ManagedService) addSession(session *Session) {
 	s.sessions = append(s.sessions, session)
 }
 
+// removeSession removes a session from the service
 func (s *ManagedService) removeSession(session *Session) {
 	sessions := make([]*Session, 0, len(s.sessions)-1)
 	for _, sess := range s.sessions {
@@ -118,6 +131,7 @@ func (s *ManagedService) removeSession(session *Session) {
 	s.sessions = sessions
 }
 
+// getOperation gets a service operation
 func (s *ManagedService) getOperation(name string) Operation {
 	return s.Executor.GetOperation(name)
 }

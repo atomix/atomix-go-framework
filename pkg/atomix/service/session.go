@@ -22,14 +22,7 @@ import (
 	"time"
 )
 
-type OpenListener interface {
-	OpenSession(session *Session)
-}
-
-type CloseListener interface {
-	CloseSession(session *Session)
-}
-
+// newSession creates a new session
 func newSession(ctx Context, timeout *time.Duration) *Session {
 	if timeout == nil {
 		defaultTimeout := 30 * time.Second

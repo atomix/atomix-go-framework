@@ -176,7 +176,9 @@ func (s *Server) DoCommandStream(ctx context.Context, name string, input []byte,
 		}, nil
 	})
 
-	go partition.Write(ctx, bytes, stream)
+	go func() {
+		_ = partition.Write(ctx, bytes, stream)
+	}()
 	return nil
 }
 
@@ -317,7 +319,9 @@ func (s *Server) DoQueryStream(ctx context.Context, name string, input []byte, h
 			},
 		}, nil
 	})
-	go partition.Read(ctx, bytes, stream)
+	go func() {
+		_ = partition.Read(ctx, bytes, stream)
+	}()
 	return nil
 }
 
