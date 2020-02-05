@@ -51,7 +51,7 @@ type Server struct {
 // Create opens a new session
 func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
-	header, err := s.CreateService(ctx, request.Header)
+	header, err := s.DoCreateService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func (s *Server) Set(ctx context.Context, request *api.SetRequest) (*api.SetResp
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, opSet, in, request.Header)
+	out, header, err := s.DoCommand(ctx, opSet, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 		return nil, err
 	}
 
-	out, header, err := s.Query(ctx, opGet, in, request.Header)
+	out, header, err := s.DoQuery(ctx, opGet, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func (s *Server) Increment(ctx context.Context, request *api.IncrementRequest) (
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, opIncrement, in, request.Header)
+	out, header, err := s.DoCommand(ctx, opIncrement, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +159,7 @@ func (s *Server) Decrement(ctx context.Context, request *api.DecrementRequest) (
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, opDecrement, in, request.Header)
+	out, header, err := s.DoCommand(ctx, opDecrement, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +190,7 @@ func (s *Server) CheckAndSet(ctx context.Context, request *api.CheckAndSetReques
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, opCAS, in, request.Header)
+	out, header, err := s.DoCommand(ctx, opCAS, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +212,7 @@ func (s *Server) CheckAndSet(ctx context.Context, request *api.CheckAndSetReques
 func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if request.Delete {
-		header, err := s.DeleteService(ctx, request.Header)
+		header, err := s.DoDeleteService(ctx, request.Header)
 		if err != nil {
 			return nil, err
 		}

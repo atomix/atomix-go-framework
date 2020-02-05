@@ -16,7 +16,6 @@ package service
 
 import (
 	"container/list"
-	"github.com/atomix/go-framework/pkg/atomix/node"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/gogo/protobuf/proto"
@@ -30,7 +29,7 @@ type sessionStream struct {
 	responseID uint64
 	completeID uint64
 	lastIndex  uint64
-	ctx        node.Context
+	ctx        Context
 	stream     streams.WriteStream
 	results    *list.List
 }

@@ -16,7 +16,6 @@ package service
 
 import (
 	"container/list"
-	"github.com/atomix/go-framework/pkg/atomix/node"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/gogo/protobuf/proto"
@@ -31,7 +30,7 @@ type CloseListener interface {
 	CloseSession(session *Session)
 }
 
-func newSession(ctx node.Context, timeout *time.Duration) *Session {
+func newSession(ctx Context, timeout *time.Duration) *Session {
 	if timeout == nil {
 		defaultTimeout := 30 * time.Second
 		timeout = &defaultTimeout
@@ -57,7 +56,7 @@ type Session struct {
 	ID               uint64
 	Timeout          time.Duration
 	LastUpdated      time.Time
-	ctx              node.Context
+	ctx              Context
 	commandSequence  uint64
 	ackSequence      uint64
 	commandCallbacks map[uint64]func()

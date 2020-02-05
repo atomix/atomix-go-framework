@@ -53,7 +53,7 @@ type Server struct {
 // Create opens a new session
 func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
-	header, err := s.CreateService(ctx, request.Header)
+	header, err := s.DoCreateService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -64,25 +64,11 @@ func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.C
 	return response, nil
 }
 
-// KeepAlive keeps an existing session alive
-func (s *Server) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
-	log.Tracef("Received KeepAliveRequest %+v", request)
-	header, err := s.KeepAliveSession(ctx, request.Header)
-	if err != nil {
-		return nil, err
-	}
-	response := &api.KeepAliveResponse{
-		Header: header,
-	}
-	log.Tracef("Sending KeepAliveResponse %+v", response)
-	return response, nil
-}
-
 // Close closes a session
 func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if request.Delete {
-		header, err := s.DeleteService(ctx, request.Header)
+		header, err := s.DoDeleteService(ctx, request.Header)
 		if err != nil {
 			return nil, err
 		}
@@ -93,7 +79,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return response, nil
 	}
 
-	header, err := s.CloseService(ctx, request.Header)
+	header, err := s.DoCloseService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +98,7 @@ func (s *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeR
 		return nil, err
 	}
 
-	out, header, err := s.Query(ctx, opSize, in, request.Header)
+	out, header, err := s.DoQuery(ctx, opSize, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +126,7 @@ func (s *Server) Exists(ctx context.Context, request *api.ExistsRequest) (*api.E
 		return nil, err
 	}
 
-	out, header, err := s.Query(ctx, opExists, in, request.Header)
+	out, header, err := s.DoQuery(ctx, opExists, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +158,7 @@ func (s *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResp
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, opPut, in, request.Header)
+	out, header, err := s.DoCommand(ctx, opPut, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +194,7 @@ func (s *Server) Replace(ctx context.Context, request *api.ReplaceRequest) (*api
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, opReplace, in, request.Header)
+	out, header, err := s.DoCommand(ctx, opReplace, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +226,7 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 		return nil, err
 	}
 
-	out, header, err := s.Query(ctx, opGet, in, request.Header)
+	out, header, err := s.DoQuery(ctx, opGet, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +259,7 @@ func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, opRemove, in, request.Header)
+	out, header, err := s.DoCommand(ctx, opRemove, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -301,7 +287,7 @@ func (s *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.Cle
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, opClear, in, request.Header)
+	out, header, err := s.DoCommand(ctx, opClear, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -330,7 +316,7 @@ func (s *Server) Events(request *api.EventRequest, srv api.MapService_EventsServ
 	}
 
 	stream := streams.NewBufferedStream()
-	if err := s.CommandStream(srv.Context(), opEvents, in, request.Header, stream); err != nil {
+	if err := s.DoCommandStream(srv.Context(), opEvents, in, request.Header, stream); err != nil {
 		return err
 	}
 
@@ -390,7 +376,7 @@ func (s *Server) Entries(request *api.EntriesRequest, srv api.MapService_Entries
 	}
 
 	stream := streams.NewBufferedStream()
-	if err := s.QueryStream(srv.Context(), opEntries, in, request.Header, stream); err != nil {
+	if err := s.DoQueryStream(srv.Context(), opEntries, in, request.Header, stream); err != nil {
 		return err
 	}
 

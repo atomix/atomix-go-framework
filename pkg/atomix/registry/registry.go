@@ -16,9 +16,10 @@ package registry
 
 // Import all services to ensure they're registered
 import (
+	"github.com/atomix/go-framework/pkg/atomix/node"
+
 	// Register the counter primitive
 	_ "github.com/atomix/go-framework/pkg/atomix/counter"
-	"github.com/atomix/go-framework/pkg/atomix/service"
 
 	// Register the election primitive
 	_ "github.com/atomix/go-framework/pkg/atomix/election"
@@ -38,8 +39,8 @@ import (
 	// Register the map primitive
 	_ "github.com/atomix/go-framework/pkg/atomix/map"
 
-	// Register the primitive metadata service
-	_ "github.com/atomix/go-framework/pkg/atomix/primitive"
+	// Register the session management service
+	_ "github.com/atomix/go-framework/pkg/atomix/session"
 
 	// Register the set primitive
 	_ "github.com/atomix/go-framework/pkg/atomix/set"
@@ -49,4 +50,4 @@ import (
 )
 
 // Registry is a service registry populated with all default primitive services
-var Registry = service.GetRegistry()
+var Registry = node.GetRegistry()

@@ -54,7 +54,7 @@ type Server struct {
 // Create opens a new session
 func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
-	header, err := s.CreateService(ctx, request.Header)
+	header, err := s.DoCreateService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -65,25 +65,11 @@ func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.C
 	return response, nil
 }
 
-// KeepAlive keeps an existing session alive
-func (s *Server) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
-	log.Tracef("Received KeepAliveRequest %+v", request)
-	header, err := s.KeepAliveSession(ctx, request.Header)
-	if err != nil {
-		return nil, err
-	}
-	response := &api.KeepAliveResponse{
-		Header: header,
-	}
-	log.Tracef("Sending KeepAliveResponse %+v", response)
-	return response, nil
-}
-
 // Close closes a session
 func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if request.Delete {
-		header, err := s.DeleteService(ctx, request.Header)
+		header, err := s.DoDeleteService(ctx, request.Header)
 		if err != nil {
 			return nil, err
 		}
@@ -94,7 +80,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return response, nil
 	}
 
-	header, err := s.CloseService(ctx, request.Header)
+	header, err := s.DoCloseService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +103,7 @@ func (s *Server) Lock(ctx context.Context, request *api.LockRequest) (*api.LockR
 	}
 
 	stream := streams.NewBufferedStream()
-	if err := s.CommandStream(ctx, opLock, in, request.Header, stream); err != nil {
+	if err := s.DoCommandStream(ctx, opLock, in, request.Header, stream); err != nil {
 		return nil, err
 	}
 
@@ -158,7 +144,7 @@ func (s *Server) Unlock(ctx context.Context, request *api.UnlockRequest) (*api.U
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, opUnlock, in, request.Header)
+	out, header, err := s.DoCommand(ctx, opUnlock, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +172,7 @@ func (s *Server) IsLocked(ctx context.Context, request *api.IsLockedRequest) (*a
 		return nil, err
 	}
 
-	out, header, err := s.Query(ctx, opIsLocked, in, request.Header)
+	out, header, err := s.DoQuery(ctx, opIsLocked, in, request.Header)
 	if err != nil {
 		return nil, err
 	}

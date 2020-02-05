@@ -28,7 +28,7 @@ import (
 )
 
 // NewManager returns an initialized Manager
-func NewManager(registry *Registry, context Context) *Manager {
+func NewManager(registry Registry, context Context) *Manager {
 	return &Manager{
 		registry:     registry,
 		context:      context,
@@ -41,7 +41,7 @@ func NewManager(registry *Registry, context Context) *Manager {
 
 // Manager is a Manager implementation for primitives that support sessions
 type Manager struct {
-	registry     *Registry
+	registry     Registry
 	context      Context
 	sessions     map[uint64]*Session
 	services     map[qualifiedServiceName]Service

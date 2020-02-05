@@ -15,7 +15,6 @@
 package node
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/node"
 	"github.com/atomix/go-framework/pkg/atomix/service"
 	"google.golang.org/grpc"
 )
@@ -28,7 +27,7 @@ func GetRegistry() *Registry {
 }
 
 // RegisterServer registers a service server
-func RegisterServer(server func(*grpc.Server, node.Protocol)) {
+func RegisterServer(server func(*grpc.Server, Protocol)) {
 	registry.RegisterServer(server)
 }
 
@@ -38,7 +37,7 @@ func RegisterService(name string, service func(scheduler service.Scheduler, cont
 }
 
 // RegisterServers registers service servers on the given gRPC server
-func RegisterServers(server *grpc.Server, protocol node.Protocol) {
+func RegisterServers(server *grpc.Server, protocol Protocol) {
 	for _, s := range registry.servers {
 		s(server, protocol)
 	}
@@ -46,12 +45,12 @@ func RegisterServers(server *grpc.Server, protocol node.Protocol) {
 
 // Registry is a registry of service types
 type Registry struct {
-	servers  []func(*grpc.Server, node.Protocol)
+	servers  []func(*grpc.Server, Protocol)
 	services map[string]func(scheduler service.Scheduler, context service.Context) service.Service
 }
 
 // RegisterServer registers a new primitive server
-func (r *Registry) RegisterServer(server func(*grpc.Server, node.Protocol)) {
+func (r *Registry) RegisterServer(server func(*grpc.Server, Protocol)) {
 	r.servers = append(r.servers, server)
 }
 
@@ -68,7 +67,7 @@ func (r *Registry) GetType(name string) func(scheduler service.Scheduler, contex
 // newRegistry returns a new primitive type registry
 func newRegistry() *Registry {
 	return &Registry{
-		servers:  make([]func(*grpc.Server, node.Protocol), 0),
+		servers:  make([]func(*grpc.Server, Protocol), 0),
 		services: make(map[string]func(scheduler service.Scheduler, context service.Context) service.Service),
 	}
 }

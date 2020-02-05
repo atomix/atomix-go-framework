@@ -59,7 +59,7 @@ func (s *Server) Enter(ctx context.Context, request *api.EnterRequest) (*api.Ent
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, opEnter, in, request.Header)
+	out, header, err := s.DoCommand(ctx, opEnter, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (s *Server) Withdraw(ctx context.Context, request *api.WithdrawRequest) (*a
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, opWithdraw, in, request.Header)
+	out, header, err := s.DoCommand(ctx, opWithdraw, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +125,7 @@ func (s *Server) Anoint(ctx context.Context, request *api.AnointRequest) (*api.A
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, opAnoint, in, request.Header)
+	out, header, err := s.DoCommand(ctx, opAnoint, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +158,7 @@ func (s *Server) Promote(ctx context.Context, request *api.PromoteRequest) (*api
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, opPromote, in, request.Header)
+	out, header, err := s.DoCommand(ctx, opPromote, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +191,7 @@ func (s *Server) Evict(ctx context.Context, request *api.EvictRequest) (*api.Evi
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, opEvict, in, request.Header)
+	out, header, err := s.DoCommand(ctx, opEvict, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +222,7 @@ func (s *Server) GetTerm(ctx context.Context, request *api.GetTermRequest) (*api
 		return nil, err
 	}
 
-	out, header, err := s.Query(ctx, opGetTerm, in, request.Header)
+	out, header, err := s.DoQuery(ctx, opGetTerm, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +254,7 @@ func (s *Server) Events(request *api.EventRequest, srv api.LeaderElectionService
 	}
 
 	stream := streams.NewBufferedStream()
-	if err := s.CommandStream(srv.Context(), opEvents, in, request.Header, stream); err != nil {
+	if err := s.DoCommandStream(srv.Context(), opEvents, in, request.Header, stream); err != nil {
 		return err
 	}
 
@@ -309,7 +309,7 @@ func (s *Server) Events(request *api.EventRequest, srv api.LeaderElectionService
 // Create opens a new session
 func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
-	header, err := s.CreateService(ctx, request.Header)
+	header, err := s.DoCreateService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -320,25 +320,11 @@ func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.C
 	return response, nil
 }
 
-// KeepAlive keeps an existing session alive
-func (s *Server) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
-	log.Tracef("Received KeepAliveRequest %+v", request)
-	header, err := s.KeepAliveSession(ctx, request.Header)
-	if err != nil {
-		return nil, err
-	}
-	response := &api.KeepAliveResponse{
-		Header: header,
-	}
-	log.Tracef("Sending KeepAliveResponse %+v", response)
-	return response, nil
-}
-
 // Close closes a session
 func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if request.Delete {
-		header, err := s.DeleteService(ctx, request.Header)
+		header, err := s.DoDeleteService(ctx, request.Header)
 		if err != nil {
 			return nil, err
 		}
@@ -349,7 +335,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return response, nil
 	}
 
-	header, err := s.CloseService(ctx, request.Header)
+	header, err := s.DoCloseService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}

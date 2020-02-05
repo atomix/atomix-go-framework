@@ -59,7 +59,7 @@ func (s *Server) Latch(ctx context.Context, request *api.LatchRequest) (*api.Lat
 		return nil, err
 	}
 
-	out, header, err := s.Command(ctx, opLatch, in, request.Header)
+	out, header, err := s.DoCommand(ctx, opLatch, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 		return nil, err
 	}
 
-	out, header, err := s.Query(ctx, opGetLatch, in, request.Header)
+	out, header, err := s.DoQuery(ctx, opGetLatch, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,7 @@ func (s *Server) Events(request *api.EventRequest, srv api.LeaderLatchService_Ev
 	}
 
 	stream := streams.NewBufferedStream()
-	if err := s.CommandStream(srv.Context(), opEvents, in, request.Header, stream); err != nil {
+	if err := s.DoCommandStream(srv.Context(), opEvents, in, request.Header, stream); err != nil {
 		return err
 	}
 
@@ -174,7 +174,7 @@ func (s *Server) Events(request *api.EventRequest, srv api.LeaderLatchService_Ev
 // Create opens a new session
 func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
-	header, err := s.CreateService(ctx, request.Header, request.Timeout)
+	header, err := s.DoCreateService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -185,25 +185,11 @@ func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.C
 	return response, nil
 }
 
-// KeepAlive keeps an existing session alive
-func (s *Server) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
-	log.Tracef("Received KeepAliveRequest %+v", request)
-	header, err := s.KeepAliveSession(ctx, request.Header)
-	if err != nil {
-		return nil, err
-	}
-	response := &api.KeepAliveResponse{
-		Header: header,
-	}
-	log.Tracef("Sending KeepAliveResponse %+v", response)
-	return response, nil
-}
-
 // Close closes a session
 func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if request.Delete {
-		header, err := s.DeleteService(ctx, request.Header)
+		header, err := s.DoDeleteService(ctx, request.Header)
 		if err != nil {
 			return nil, err
 		}
@@ -214,7 +200,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return response, nil
 	}
 
-	header, err := s.CloseService(ctx, request.Header)
+	header, err := s.DoCloseService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}

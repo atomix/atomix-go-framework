@@ -31,6 +31,12 @@ type Context interface {
 	Timestamp() time.Time
 }
 
+// Registry is a service registry
+type Registry interface {
+	// GetType returns a service type by name
+	GetType(name string) func(scheduler Scheduler, context Context) Service
+}
+
 type SessionOpen interface {
 	SessionOpen(*Session)
 }

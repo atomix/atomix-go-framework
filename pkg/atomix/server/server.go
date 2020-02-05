@@ -31,8 +31,8 @@ type Server struct {
 	Type     string
 }
 
-// Command submits a command to the service
-func (s *Server) Command(ctx context.Context, name string, input []byte, header *headers.RequestHeader) ([]byte, *headers.ResponseHeader, error) {
+// DoCommand submits a command to the service
+func (s *Server) DoCommand(ctx context.Context, name string, input []byte, header *headers.RequestHeader) ([]byte, *headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
 	partition := s.Protocol.Partition(int(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
@@ -106,8 +106,8 @@ func (s *Server) Command(ctx context.Context, name string, input []byte, header 
 	return commandResponse.Response.GetOperation().Result, responseHeader, nil
 }
 
-// CommandStream submits a streaming command to the service
-func (s *Server) CommandStream(ctx context.Context, name string, input []byte, header *headers.RequestHeader, stream streams.WriteStream) error {
+// DoCommandStream submits a streaming command to the service
+func (s *Server) DoCommandStream(ctx context.Context, name string, input []byte, header *headers.RequestHeader, stream streams.WriteStream) error {
 	// If the client requires a leader and is not the leader, return an error
 	partition := s.Protocol.Partition(int(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
@@ -180,8 +180,8 @@ func (s *Server) CommandStream(ctx context.Context, name string, input []byte, h
 	return nil
 }
 
-// Query submits a query to the service
-func (s *Server) Query(ctx context.Context, name string, input []byte, header *headers.RequestHeader) ([]byte, *headers.ResponseHeader, error) {
+// DoQuery submits a query to the service
+func (s *Server) DoQuery(ctx context.Context, name string, input []byte, header *headers.RequestHeader) ([]byte, *headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
 	partition := s.Protocol.Partition(int(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
@@ -254,8 +254,8 @@ func (s *Server) Query(ctx context.Context, name string, input []byte, header *h
 	return queryResponse.Response.GetOperation().Result, responseHeader, nil
 }
 
-// QueryStream submits a streaming query to the service
-func (s *Server) QueryStream(ctx context.Context, name string, input []byte, header *headers.RequestHeader, stream streams.WriteStream) error {
+// DoQueryStream submits a streaming query to the service
+func (s *Server) DoQueryStream(ctx context.Context, name string, input []byte, header *headers.RequestHeader, stream streams.WriteStream) error {
 	// If the client requires a leader and is not the leader, return an error
 	partition := s.Protocol.Partition(int(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
@@ -321,8 +321,8 @@ func (s *Server) QueryStream(ctx context.Context, name string, input []byte, hea
 	return nil
 }
 
-// OpenSession opens a new session
-func (s *Server) OpenSession(ctx context.Context, header *headers.RequestHeader, timeout *time.Duration) (*headers.ResponseHeader, error) {
+// DoOpenSession opens a new session
+func (s *Server) DoOpenSession(ctx context.Context, header *headers.RequestHeader, timeout *time.Duration) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
 	partition := s.Protocol.Partition(int(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
@@ -377,8 +377,8 @@ func (s *Server) OpenSession(ctx context.Context, header *headers.RequestHeader,
 	}, nil
 }
 
-// KeepAliveSession keeps a session alive
-func (s *Server) KeepAliveSession(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
+// DoKeepAliveSession keeps a session alive
+func (s *Server) DoKeepAliveSession(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
 	partition := s.Protocol.Partition(int(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
@@ -437,8 +437,8 @@ func (s *Server) KeepAliveSession(ctx context.Context, header *headers.RequestHe
 	}, nil
 }
 
-// CloseSession closes a session
-func (s *Server) CloseSession(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
+// DoCloseSession closes a session
+func (s *Server) DoCloseSession(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
 	partition := s.Protocol.Partition(int(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
@@ -490,8 +490,8 @@ func (s *Server) CloseSession(ctx context.Context, header *headers.RequestHeader
 	}, nil
 }
 
-// CreateService creates the service
-func (s *Server) CreateService(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
+// DoCreateService creates the service
+func (s *Server) DoCreateService(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
 	partition := s.Protocol.Partition(int(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
@@ -560,8 +560,8 @@ func (s *Server) CreateService(ctx context.Context, header *headers.RequestHeade
 	return responseHeader, nil
 }
 
-// CloseService closes the service
-func (s *Server) CloseService(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
+// DoCloseService closes the service
+func (s *Server) DoCloseService(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
 	partition := s.Protocol.Partition(int(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
@@ -630,8 +630,8 @@ func (s *Server) CloseService(ctx context.Context, header *headers.RequestHeader
 	return responseHeader, nil
 }
 
-// DeleteService deletes the service
-func (s *Server) DeleteService(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
+// DoDeleteService deletes the service
+func (s *Server) DoDeleteService(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
 	partition := s.Protocol.Partition(int(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
