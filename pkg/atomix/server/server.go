@@ -514,7 +514,9 @@ func (s *Server) DoCreateService(ctx context.Context, header *headers.RequestHea
 						Name:      header.Name.Name,
 						Namespace: header.Name.Namespace,
 					},
-					Request: &service.ServiceCommandRequest_Create{},
+					Request: &service.ServiceCommandRequest_Create{
+						Create: &service.ServiceCreateRequest{},
+					},
 				},
 			},
 		},
@@ -584,7 +586,9 @@ func (s *Server) DoCloseService(ctx context.Context, header *headers.RequestHead
 						Name:      header.Name.Name,
 						Namespace: header.Name.Namespace,
 					},
-					Request: &service.ServiceCommandRequest_Close{},
+					Request: &service.ServiceCommandRequest_Close{
+						Close: &service.ServiceCloseRequest{},
+					},
 				},
 			},
 		},
@@ -654,7 +658,9 @@ func (s *Server) DoDeleteService(ctx context.Context, header *headers.RequestHea
 						Name:      header.Name.Name,
 						Namespace: header.Name.Namespace,
 					},
-					Request: &service.ServiceCommandRequest_Delete{},
+					Request: &service.ServiceCommandRequest_Delete{
+						Delete: &service.ServiceDeleteRequest{},
+					},
 				},
 			},
 		},

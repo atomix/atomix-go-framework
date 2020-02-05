@@ -15,19 +15,22 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"github.com/atomix/api/proto/atomix/controller"
+	"github.com/atomix/go-client/pkg/client/primitive"
 	netutil "github.com/atomix/go-client/pkg/client/util/net"
 	"github.com/atomix/go-framework/pkg/atomix"
 	"github.com/atomix/go-framework/pkg/atomix/node"
 	"github.com/atomix/go-local/pkg/atomix/local"
 	"net"
+	"time"
 )
 
 const basePort = 5000
 
 // StartTestNode starts a single test node
-func StartTestNode() (netutil.Address, *atomix.Node) {
+func StartTestNode() (*primitive.Session, *atomix.Node) {
 	for port := basePort; port < basePort+100; port++ {
 		address := netutil.Address(fmt.Sprintf("localhost:%d", port))
 		lis, err := net.Listen("tcp", string(address))
@@ -42,7 +45,14 @@ func StartTestNode() (netutil.Address, *atomix.Node) {
 			<-ch
 			node.Stop()
 		}()
-		return address, node
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		session, err := primitive.NewSession(ctx, primitive.Partition{ID: 1, Address: address}, primitive.WithSessionTimeout(5*time.Second))
+		if err != nil {
+			panic(err)
+		}
+		cancel()
+		return session, node
 	}
 	panic("cannot find open port")
 }

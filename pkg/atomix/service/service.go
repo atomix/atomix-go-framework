@@ -105,7 +105,7 @@ func (s *ManagedService) setCurrentSession(session *Session) {
 }
 
 func (s *ManagedService) addSession(session *Session) {
-	s.sessions[session.ID] = session
+	s.sessions = append(s.sessions, session)
 }
 
 func (s *ManagedService) removeSession(session *Session) {

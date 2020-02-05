@@ -17,20 +17,19 @@ package value
 import (
 	"context"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
 	client "github.com/atomix/go-client/pkg/client/value"
+	_ "github.com/atomix/go-framework/pkg/atomix/session"
 	"github.com/atomix/go-framework/pkg/atomix/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"time"
 )
 
 func TestValue(t *testing.T) {
-	address, node := test.StartTestNode()
+	session, node := test.StartTestNode()
 	defer node.Stop()
 
 	name := primitive.NewName("default", "test", "default", "test")
-	value, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
+	value, err := client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)
 	assert.NotNil(t, value)
 
@@ -95,29 +94,29 @@ func TestValue(t *testing.T) {
 	assert.Equal(t, uint64(3), event.Version)
 	assert.Equal(t, "baz", string(event.Value))
 
-	err = value.Close()
+	err = value.Close(context.Background())
 	assert.NoError(t, err)
 
-	value1, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
+	value1, err := client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)
 
-	value2, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
+	value2, err := client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)
 
 	val, _, err = value1.Get(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, "baz", string(val))
 
-	err = value1.Close()
+	err = value1.Close(context.Background())
 	assert.NoError(t, err)
 
-	err = value1.Delete()
+	err = value1.Delete(context.Background())
 	assert.NoError(t, err)
 
-	err = value2.Delete()
+	err = value2.Delete(context.Background())
 	assert.NoError(t, err)
 
-	value, err = client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
+	value, err = client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)
 
 	val, _, err = value.Get(context.TODO())

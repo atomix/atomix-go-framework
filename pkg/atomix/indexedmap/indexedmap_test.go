@@ -18,19 +18,18 @@ import (
 	"context"
 	client "github.com/atomix/go-client/pkg/client/indexedmap"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
+	_ "github.com/atomix/go-framework/pkg/atomix/session"
 	"github.com/atomix/go-framework/pkg/atomix/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"time"
 )
 
 func TestIndexedMap(t *testing.T) {
-	address, node := test.StartTestNode()
+	session, node := test.StartTestNode()
 	defer node.Stop()
 
 	name := primitive.NewName("default", "test", "default", "test")
-	_map, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
+	_map, err := client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)
 
 	kv, err := _map.Get(context.Background(), "foo")
@@ -116,11 +115,11 @@ func TestIndexedMap(t *testing.T) {
 }
 
 func TestMapStreams(t *testing.T) {
-	address, node := test.StartTestNode()
+	session, node := test.StartTestNode()
 	defer node.Stop()
 
 	name := primitive.NewName("default", "test", "default", "test")
-	_map, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
+	_map, err := client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)
 
 	kv, err := _map.Put(context.Background(), "foo", []byte{1})
@@ -174,29 +173,29 @@ func TestMapStreams(t *testing.T) {
 
 	<-latch
 
-	err = _map.Close()
+	err = _map.Close(context.Background())
 	assert.NoError(t, err)
 
-	map1, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
+	map1, err := client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)
 
-	map2, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
+	map2, err := client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)
 
 	size, err := map1.Len(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, 3, size)
 
-	err = map1.Close()
+	err = map1.Close(context.Background())
 	assert.NoError(t, err)
 
-	err = map1.Delete()
+	err = map1.Delete(context.Background())
 	assert.NoError(t, err)
 
-	err = map2.Delete()
+	err = map2.Delete(context.Background())
 	assert.NoError(t, err)
 
-	_map, err = client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
+	_map, err = client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)
 
 	size, err = _map.Len(context.TODO())

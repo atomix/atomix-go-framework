@@ -18,19 +18,18 @@ import (
 	"context"
 	client "github.com/atomix/go-client/pkg/client/list"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
+	_ "github.com/atomix/go-framework/pkg/atomix/session"
 	"github.com/atomix/go-framework/pkg/atomix/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"time"
 )
 
 func TestList(t *testing.T) {
-	address, node := test.StartTestNode()
+	session, node := test.StartTestNode()
 	defer node.Stop()
 
 	name := primitive.NewName("default", "test", "default", "test")
-	list, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
+	list, err := client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)
 	assert.NotNil(t, list)
 
@@ -132,29 +131,29 @@ func TestList(t *testing.T) {
 
 	<-done
 
-	err = list.Close()
+	err = list.Close(context.Background())
 	assert.NoError(t, err)
 
-	list1, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
+	list1, err := client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)
 
-	list2, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
+	list2, err := client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)
 
 	size, err = list1.Len(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, 4, size)
 
-	err = list1.Close()
+	err = list1.Close(context.Background())
 	assert.NoError(t, err)
 
-	err = list1.Delete()
+	err = list1.Delete(context.Background())
 	assert.NoError(t, err)
 
-	err = list2.Delete()
+	err = list2.Delete(context.Background())
 	assert.NoError(t, err)
 
-	list, err = client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
+	list, err = client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)
 
 	size, err = list.Len(context.TODO())

@@ -374,15 +374,19 @@ func (m *Manager) applyServiceCommandCreate(request *ServiceCommandRequest, cont
 			open.SessionOpen(session)
 		}
 	}
-	stream.Result(proto.Marshal(&SessionCommandResponse{
-		Context: &SessionResponseContext{
-			Index:    m.context.Index(),
-			Sequence: context.SequenceNumber,
-			Type:     SessionResponseType_RESPONSE,
-		},
-		Response: &ServiceCommandResponse{
-			Response: &ServiceCommandResponse_Create{
-				Create: &ServiceCreateResponse{},
+	stream.Result(proto.Marshal(&SessionResponse{
+		Response: &SessionResponse_Command{
+			Command: &SessionCommandResponse{
+				Context: &SessionResponseContext{
+					Index:    m.context.Index(),
+					Sequence: context.SequenceNumber,
+					Type:     SessionResponseType_RESPONSE,
+				},
+				Response: &ServiceCommandResponse{
+					Response: &ServiceCommandResponse_Create{
+						Create: &ServiceCreateResponse{},
+					},
+				},
 			},
 		},
 	}))
@@ -404,15 +408,19 @@ func (m *Manager) applyServiceCommandClose(request *ServiceCommandRequest, conte
 			closed.SessionClosed(session)
 		}
 	}
-	stream.Result(proto.Marshal(&SessionCommandResponse{
-		Context: &SessionResponseContext{
-			Index:    m.context.Index(),
-			Sequence: context.SequenceNumber,
-			Type:     SessionResponseType_RESPONSE,
-		},
-		Response: &ServiceCommandResponse{
-			Response: &ServiceCommandResponse_Close{
-				Close: &ServiceCloseResponse{},
+	stream.Result(proto.Marshal(&SessionResponse{
+		Response: &SessionResponse_Command{
+			Command: &SessionCommandResponse{
+				Context: &SessionResponseContext{
+					Index:    m.context.Index(),
+					Sequence: context.SequenceNumber,
+					Type:     SessionResponseType_RESPONSE,
+				},
+				Response: &ServiceCommandResponse{
+					Response: &ServiceCommandResponse_Close{
+						Close: &ServiceCloseResponse{},
+					},
+				},
 			},
 		},
 	}))
@@ -432,15 +440,19 @@ func (m *Manager) applyServiceCommandDelete(request *ServiceCommandRequest, cont
 		delete(session.services, name)
 	}
 
-	stream.Result(proto.Marshal(&SessionCommandResponse{
-		Context: &SessionResponseContext{
-			Index:    m.context.Index(),
-			Sequence: context.SequenceNumber,
-			Type:     SessionResponseType_RESPONSE,
-		},
-		Response: &ServiceCommandResponse{
-			Response: &ServiceCommandResponse_Delete{
-				Delete: &ServiceDeleteResponse{},
+	stream.Result(proto.Marshal(&SessionResponse{
+		Response: &SessionResponse_Command{
+			Command: &SessionCommandResponse{
+				Context: &SessionResponseContext{
+					Index:    m.context.Index(),
+					Sequence: context.SequenceNumber,
+					Type:     SessionResponseType_RESPONSE,
+				},
+				Response: &ServiceCommandResponse{
+					Response: &ServiceCommandResponse_Delete{
+						Delete: &ServiceDeleteResponse{},
+					},
+				},
 			},
 		},
 	}))
@@ -667,8 +679,8 @@ func (m *Manager) applyServiceQueryOperation(request *ServiceQueryRequest, conte
 	})
 
 	if unaryOp, ok := operation.(UnaryOperation); ok {
-		stream.Result(unaryOp.Execute(request.GetOperation().Value))
-		stream.Close()
+		responseStream.Result(unaryOp.Execute(request.GetOperation().Value))
+		responseStream.Close()
 	} else if streamOp, ok := operation.(StreamingOperation); ok {
 		stream.Result(proto.Marshal(&SessionResponse{
 			Response: &SessionResponse_Query{

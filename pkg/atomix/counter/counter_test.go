@@ -18,19 +18,18 @@ import (
 	"context"
 	client "github.com/atomix/go-client/pkg/client/counter"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
+	_ "github.com/atomix/go-framework/pkg/atomix/session"
 	"github.com/atomix/go-framework/pkg/atomix/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"time"
 )
 
 func TestCounter(t *testing.T) {
-	address, node := test.StartTestNode()
+	session, node := test.StartTestNode()
 	defer node.Stop()
 
 	name := primitive.NewName("default", "test", "default", "test")
-	counter, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
+	counter, err := client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)
 	assert.NotNil(t, counter)
 
@@ -68,29 +67,29 @@ func TestCounter(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, int64(10), value)
 
-	err = counter.Close()
+	err = counter.Close(context.Background())
 	assert.NoError(t, err)
 
-	counter1, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
+	counter1, err := client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)
 
-	counter2, err := client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
+	counter2, err := client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)
 
 	value, err = counter1.Get(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, int64(10), value)
 
-	err = counter1.Close()
+	err = counter1.Close(context.Background())
 	assert.NoError(t, err)
 
-	err = counter1.Delete()
+	err = counter1.Delete(context.Background())
 	assert.NoError(t, err)
 
-	err = counter2.Delete()
+	err = counter2.Delete(context.Background())
 	assert.NoError(t, err)
 
-	counter, err = client.New(context.TODO(), name, []primitive.Partition{{ID: 1, Address: address}}, session.WithTimeout(5*time.Second))
+	counter, err = client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)
 
 	value, err = counter.Get(context.TODO())
