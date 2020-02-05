@@ -37,7 +37,7 @@ func registerServer(server *grpc.Server, protocol node.Protocol) {
 
 func newServer(protocol node.Protocol) api.ListServiceServer {
 	return &Server{
-		SessionizedServer: &server.SessionizedServer{
+		Server: &server.Server{
 			Type:     listType,
 			Protocol: protocol,
 		},
@@ -46,13 +46,13 @@ func newServer(protocol node.Protocol) api.ListServiceServer {
 
 // Server is an implementation of MapServiceServer for the map primitive
 type Server struct {
-	*server.SessionizedServer
+	*server.Server
 }
 
 // Create opens a new session
 func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
-	header, err := s.OpenSession(ctx, request.Header, request.Timeout)
+	header, err := s.CreateService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (s *Server) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (
 func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if request.Delete {
-		header, err := s.Delete(ctx, request.Header)
+		header, err := s.DeleteService(ctx, request.Header)
 		if err != nil {
 			return nil, err
 		}
@@ -92,7 +92,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return response, nil
 	}
 
-	header, err := s.CloseSession(ctx, request.Header)
+	header, err := s.CloseService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}

@@ -36,7 +36,7 @@ func registerServer(server *grpc.Server, protocol node.Protocol) {
 
 func newServer(protocol node.Protocol) api.CounterServiceServer {
 	return &Server{
-		SimpleServer: &server.SimpleServer{
+		Server: &server.Server{
 			Type:     counterType,
 			Protocol: protocol,
 		},
@@ -45,13 +45,13 @@ func newServer(protocol node.Protocol) api.CounterServiceServer {
 
 // Server is an implementation of CounterServiceServer for the counter primitive
 type Server struct {
-	*server.SimpleServer
+	*server.Server
 }
 
 // Create opens a new session
 func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
-	header, err := s.Open(ctx, request.Header)
+	header, err := s.CreateService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +212,7 @@ func (s *Server) CheckAndSet(ctx context.Context, request *api.CheckAndSetReques
 func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if request.Delete {
-		header, err := s.Delete(ctx, request.Header)
+		header, err := s.DeleteService(ctx, request.Header)
 		if err != nil {
 			return nil, err
 		}
