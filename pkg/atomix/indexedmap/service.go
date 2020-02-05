@@ -29,13 +29,13 @@ func init() {
 }
 
 // newService returns a new Service
-func newService(context service.Context) service.Service {
+func newService(scheduler service.Scheduler, context service.Context) service.Service {
 	service := &Service{
-		SessionizedService: service.NewSessionizedService(context),
-		entries:            make(map[string]*LinkedMapEntryValue),
-		indexes:            make(map[uint64]*LinkedMapEntryValue),
-		timers:             make(map[string]service.Timer),
-		listeners:          make(map[uint64]map[uint64]listener),
+		ManagedService: service.NewManagedService(indexMapType, scheduler, context),
+		entries:        make(map[string]*LinkedMapEntryValue),
+		indexes:        make(map[uint64]*LinkedMapEntryValue),
+		timers:         make(map[string]service.Timer),
+		listeners:      make(map[uint64]map[uint64]listener),
 	}
 	service.init()
 	return service
@@ -43,7 +43,7 @@ func newService(context service.Context) service.Service {
 
 // Service is a state machine for a map primitive
 type Service struct {
-	*service.SessionizedService
+	*service.ManagedService
 	lastIndex  uint64
 	entries    map[string]*LinkedMapEntryValue
 	indexes    map[uint64]*LinkedMapEntryValue
@@ -77,12 +77,8 @@ type LinkedMapEntryValue struct {
 	Next *LinkedMapEntryValue
 }
 
-// Snapshot takes a snapshot of the service
-func (m *Service) Snapshot(writer io.Writer) error {
-	if err := m.SessionizedService.Snapshot(writer); err != nil {
-		return err
-	}
-
+// Backup takes a snapshot of the service
+func (m *Service) Backup(writer io.Writer) error {
 	listeners := make([]*Listener, 0)
 	for sessionID, sessionListeners := range m.listeners {
 		for streamID, sessionListener := range sessionListeners {
@@ -116,12 +112,8 @@ func (m *Service) Snapshot(writer io.Writer) error {
 	return nil
 }
 
-// Install restores the service from a snapshot
-func (m *Service) Install(reader io.Reader) error {
-	if err := m.SessionizedService.Install(reader); err != nil {
-		return err
-	}
-
+// Restore restores the service from a snapshot
+func (m *Service) Restore(reader io.Reader) error {
 	length, err := util.ReadVarInt(reader)
 	if err != nil {
 		return err

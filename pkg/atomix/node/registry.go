@@ -15,6 +15,7 @@
 package node
 
 import (
+	"github.com/atomix/go-framework/pkg/atomix/node"
 	"github.com/atomix/go-framework/pkg/atomix/service"
 	"google.golang.org/grpc"
 )
@@ -27,17 +28,17 @@ func GetRegistry() *Registry {
 }
 
 // RegisterServer registers a service server
-func RegisterServer(server func(*grpc.Server, Protocol)) {
+func RegisterServer(server func(*grpc.Server, node.Protocol)) {
 	registry.RegisterServer(server)
 }
 
 // RegisterService registers a new service
-func RegisterService(name string, service func(ctx service.Context) service.Service) {
+func RegisterService(name string, service func(scheduler service.Scheduler, context service.Context) service.Service) {
 	registry.RegisterService(name, service)
 }
 
 // RegisterServers registers service servers on the given gRPC server
-func RegisterServers(server *grpc.Server, protocol Protocol) {
+func RegisterServers(server *grpc.Server, protocol node.Protocol) {
 	for _, s := range registry.servers {
 		s(server, protocol)
 	}
@@ -45,29 +46,29 @@ func RegisterServers(server *grpc.Server, protocol Protocol) {
 
 // Registry is a registry of service types
 type Registry struct {
-	servers  []func(*grpc.Server, Protocol)
-	services map[string]func(ctx service.Context) service.Service
+	servers  []func(*grpc.Server, node.Protocol)
+	services map[string]func(scheduler service.Scheduler, context service.Context) service.Service
 }
 
 // RegisterServer registers a new primitive server
-func (r *Registry) RegisterServer(server func(*grpc.Server, Protocol)) {
+func (r *Registry) RegisterServer(server func(*grpc.Server, node.Protocol)) {
 	r.servers = append(r.servers, server)
 }
 
 // RegisterService registers a new primitive service
-func (r *Registry) RegisterService(name string, service func(ctx service.Context) service.Service) {
+func (r *Registry) RegisterService(name string, service func(scheduler service.Scheduler, context service.Context) service.Service) {
 	r.services[name] = service
 }
 
-// getType returns a service type by name
-func (r *Registry) getType(name string) func(sctx service.Context) service.Service {
+// GetType returns a service type by name
+func (r *Registry) GetType(name string) func(scheduler service.Scheduler, context service.Context) service.Service {
 	return r.services[name]
 }
 
 // newRegistry returns a new primitive type registry
 func newRegistry() *Registry {
 	return &Registry{
-		servers:  make([]func(*grpc.Server, Protocol), 0),
-		services: make(map[string]func(ctx service.Context) service.Service),
+		servers:  make([]func(*grpc.Server, node.Protocol), 0),
+		services: make(map[string]func(scheduler service.Scheduler, context service.Context) service.Service),
 	}
 }

@@ -16,10 +16,37 @@ limitations under the License.
 
 syntax = "proto3";
 
-package atomix.service;
+package atomix.session;
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "gogoproto/gogo.proto";
+
+// Sessionized service snapshot
+message SessionizedServiceSnapshot {
+    uint64 index = 1;
+    uint64 timestamp = 2;
+    repeated SessionSnapshot sessions = 3;
+}
+
+// Service session
+message SessionSnapshot {
+    uint64 session_id = 1 [(gogoproto.customname) = "SessionID"];
+    google.protobuf.Duration timeout = 2 [(gogoproto.stdduration) = true, (gogoproto.nullable) = false];
+    google.protobuf.Timestamp timestamp = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    uint64 command_sequence = 4;
+    uint64 last_applied = 5;
+    repeated SessionStreamSnapshot streams = 6;
+    repeated string services = 7;
+}
+
+// Service session stream
+message SessionStreamSnapshot {
+    uint64 stream_id = 1;
+    string type = 2;
+    uint64 sequence_number = 3;
+    uint64 last_completed = 4;
+}
 
 message ServiceId {
     string type = 1;
@@ -27,95 +54,155 @@ message ServiceId {
     string namespace = 3;
 }
 
-message ServiceSnapshot {
-    uint64 index = 1;
-    bytes snapshot = 2;
-}
-
-// Simple service snapshot
-message SimpleServiceSnapshot {
-    int64 index = 4;
-    google.protobuf.Timestamp timestamp = 5 [(gogoproto.stdtime) = true];
-}
-
-message ServiceRequest {
-    ServiceId id = 1;
+message SessionRequest {
     oneof request {
-        CreateRequest create = 2;
-        DeleteRequest delete = 3;
-        MetadataRequest metadata = 4;
-        bytes command = 5;
-        bytes query = 6;
+        OpenSessionRequest open_session = 1;
+        KeepAliveRequest keep_alive = 2;
+        CloseSessionRequest close_session = 3;
+        SessionCommandRequest command = 4;
+        SessionQueryRequest query = 5;
     }
 }
 
-message ServiceResponse {
+message SessionResponse {
     oneof response {
-        CreateResponse create = 1;
-        DeleteResponse delete = 2;
-        MetadataResponse metadata = 3;
-        bytes command = 4;
-        bytes query = 5;
+        OpenSessionResponse open_session = 1;
+        KeepAliveResponse keep_alive = 2;
+        CloseSessionResponse close_session = 3;
+        SessionCommandResponse command = 4;
+        SessionQueryResponse query = 5;
     }
 }
 
-message CreateRequest {
+message OpenSessionRequest {
+    google.protobuf.Duration timeout = 1 [(gogoproto.stdduration) = true];
+}
+
+message OpenSessionResponse {
+    uint64 session_id = 1 [(gogoproto.customname) = "SessionID"];
+}
+
+message KeepAliveRequest {
+    uint64 session_id = 1 [(gogoproto.customname) = "SessionID"];
+    uint64 command_sequence = 2;
+    map<uint64, uint64> streams = 3;
+}
+
+message KeepAliveResponse {
+}
+
+message CloseSessionRequest {
+    uint64 session_id = 1 [(gogoproto.customname) = "SessionID"];
+}
+
+message CloseSessionResponse {
 
 }
 
-message CreateResponse {
+message SessionCommandRequest {
+    SessionCommandContext context = 1;
+    ServiceCommandRequest command = 2;
+}
+
+message SessionCommandResponse {
+    SessionResponseContext context = 1;
+    ServiceCommandResponse response = 2;
+}
+
+message SessionQueryRequest {
+    SessionQueryContext context = 1;
+    ServiceQueryRequest query = 2;
+}
+
+message SessionQueryResponse {
+    SessionResponseContext context = 1;
+    ServiceQueryResponse response = 2;
+}
+
+message ServiceCommandRequest {
+    ServiceId service = 1;
+    oneof request {
+        ServiceOperationRequest operation = 2;
+        ServiceCreateRequest create = 3;
+        ServiceCloseRequest close = 4;
+        ServiceDeleteRequest delete = 5;
+    }
+}
+
+message ServiceCommandResponse {
+    oneof response {
+        ServiceOperationResponse operation = 1;
+        ServiceCreateResponse create = 2;
+        ServiceCloseResponse close = 3;
+        ServiceDeleteResponse delete = 4;
+    }
+}
+
+message ServiceQueryRequest {
+    ServiceId service = 1;
+    oneof request {
+        ServiceOperationRequest operation = 2;
+    }
+}
+
+message ServiceQueryResponse {
+    oneof response {
+        ServiceOperationResponse operation = 2;
+    }
+}
+
+message ServiceOperationRequest {
+    string method = 1;
+    bytes value = 2;
+}
+
+message ServiceOperationResponse {
+    bytes result = 1;
+}
+
+message ServiceCreateRequest {
 
 }
 
-message DeleteRequest {
+message ServiceCreateResponse {
 
 }
 
-message DeleteResponse {
+message ServiceCloseRequest {
 
 }
 
-message MetadataRequest {
-    string type = 1;
-    string namespace = 2;
+message ServiceCloseResponse {
+
 }
 
-message MetadataResponse {
-    repeated ServiceId services = 1;
+message ServiceDeleteRequest {
+
 }
 
-message CommandRequest {
-    RequestContext context = 1;
-    string name = 2;
-    bytes command = 3;
+message ServiceDeleteResponse {
+
 }
 
-message CommandResponse {
-    ResponseContext context = 1;
-    bytes output = 2;
+message SessionCommandContext {
+    uint64 session_id = 1 [(gogoproto.customname) = "SessionID"];
+    uint64 sequence_number = 2;
 }
 
-message QueryRequest {
-    RequestContext context = 1;
-    string name = 2;
-    bytes query = 3;
+message SessionQueryContext {
+    uint64 session_id = 1 [(gogoproto.customname) = "SessionID"];
+    uint64 last_sequence_number = 2;
+    uint64 last_index = 3;
 }
 
-message QueryResponse {
-    ResponseContext context = 1;
-    bytes output = 2;
+message SessionResponseContext {
+    uint64 stream_id = 1 [(gogoproto.customname) = "StreamID"];
+    uint64 index = 2;
+    uint64 sequence = 3;
+    SessionResponseType type = 4;
 }
 
-message RequestContext {
-    uint64 index = 1;
-}
-
-message ResponseContext {
-    uint64 index = 1;
-    ResponseType type = 2;
-}
-
-enum ResponseType {
+enum SessionResponseType {
     RESPONSE = 0;
     OPEN_STREAM = 1;
     CLOSE_STREAM = 2;

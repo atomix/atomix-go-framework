@@ -27,9 +27,9 @@ func init() {
 }
 
 // newService returns a new Service
-func newService(context service.Context) service.Service {
+func newService(scheduler service.Scheduler, context service.Context) service.Service {
 	service := &Service{
-		SimpleService: service.NewSimpleService(context),
+		ManagedService: service.NewManagedService(counterType, scheduler, context),
 	}
 	service.init()
 	return service
@@ -37,7 +37,7 @@ func newService(context service.Context) service.Service {
 
 // Service is a state machine for a counter primitive
 type Service struct {
-	*service.SimpleService
+	*service.ManagedService
 	value int64
 }
 
@@ -50,12 +50,8 @@ func (c *Service) init() {
 	c.Executor.RegisterUnaryOperation(opCAS, c.CAS)
 }
 
-// Snapshot takes a snapshot of the service
-func (c *Service) Snapshot(writer io.Writer) error {
-	if err := c.SimpleService.Snapshot(writer); err != nil {
-		return err
-	}
-
+// Backup backs up the service
+func (c *Service) Backup(writer io.Writer) error {
 	snapshot := &CounterSnapshot{
 		Value: c.value,
 	}
@@ -66,12 +62,8 @@ func (c *Service) Snapshot(writer io.Writer) error {
 	return util.WriteBytes(writer, bytes)
 }
 
-// Install restores the service from a snapshot
-func (c *Service) Install(reader io.Reader) error {
-	if err := c.SimpleService.Install(reader); err != nil {
-		return err
-	}
-
+// Restore restores the service from a backup
+func (c *Service) Restore(reader io.Reader) error {
 	bytes, err := util.ReadBytes(reader)
 	if err != nil {
 		return err

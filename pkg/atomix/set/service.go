@@ -28,10 +28,10 @@ func init() {
 }
 
 // newService returns a new Service
-func newService(context service.Context) service.Service {
+func newService(scheduler service.Scheduler, context service.Context) service.Service {
 	service := &Service{
-		SessionizedService: service.NewSessionizedService(context),
-		values:             make(map[string]bool),
+		ManagedService: service.NewManagedService(setType, scheduler, context),
+		values:         make(map[string]bool),
 	}
 	service.init()
 	return service
@@ -39,7 +39,7 @@ func newService(context service.Context) service.Service {
 
 // Service is a state machine for a list primitive
 type Service struct {
-	*service.SessionizedService
+	*service.ManagedService
 	values map[string]bool
 }
 
@@ -54,23 +54,15 @@ func (s *Service) init() {
 	s.Executor.RegisterStreamOperation(opIterate, s.Iterate)
 }
 
-// Snapshot takes a snapshot of the service
-func (s *Service) Snapshot(writer io.Writer) error {
-	if err := s.SessionizedService.Snapshot(writer); err != nil {
-		return err
-	}
-
+// Backup takes a snapshot of the service
+func (s *Service) Backup(writer io.Writer) error {
 	return util.WriteMap(writer, s.values, func(key string, value bool) ([]byte, error) {
 		return []byte(key), nil
 	})
 }
 
-// Install restores the service from a snapshot
-func (s *Service) Install(reader io.Reader) error {
-	if err := s.SessionizedService.Install(reader); err != nil {
-		return err
-	}
-
+// Restore restores the service from a snapshot
+func (s *Service) Restore(reader io.Reader) error {
 	s.values = make(map[string]bool)
 	return util.ReadMap(reader, s.values, func(data []byte) (string, bool, error) {
 		return string(data), true, nil

@@ -48,10 +48,6 @@ type StateMachine interface {
 	// Install reads the state machine snapshot from the given reader
 	Install(reader io.Reader) error
 
-	// CanDelete returns a bool indicating whether the node can delete changes up to the given index without affecting
-	// the correctness of the state machine
-	CanDelete(index uint64) bool
-
 	// Command applies a command to the state machine
 	Command(bytes []byte, stream streams.WriteStream)
 
@@ -174,7 +170,7 @@ func (s *primitiveStateMachine) Command(bytes []byte, stream streams.WriteStream
 			// If the service doesn't exist, create it.
 			svc, ok := s.services[getQualifiedServiceName(request.Id)]
 			if !ok {
-				serviceType := s.registry.getType(request.Id.Type)
+				serviceType := s.registry.GetType(request.Id.Type)
 				if serviceType == nil {
 					stream.Error(fmt.Errorf("unknown service type %s", request.Id.Type))
 					stream.Close()
@@ -195,7 +191,7 @@ func (s *primitiveStateMachine) Command(bytes []byte, stream streams.WriteStream
 		case *service.ServiceRequest_Create:
 			_, ok := s.services[getQualifiedServiceName(request.Id)]
 			if !ok {
-				serviceType := s.registry.getType(request.Id.Type)
+				serviceType := s.registry.GetType(request.Id.Type)
 				if serviceType == nil {
 					stream.Error(fmt.Errorf("unknown service type %s", request.Id.Type))
 				} else {
@@ -240,7 +236,7 @@ func (s *primitiveStateMachine) Query(bytes []byte, stream streams.WriteStream) 
 			// If the service doesn't exist, create it.
 			svc, ok := s.services[getQualifiedServiceName(request.Id)]
 			if !ok {
-				serviceType := s.registry.getType(request.Id.Type)
+				serviceType := s.registry.GetType(request.Id.Type)
 				if serviceType == nil {
 					stream.Error(fmt.Errorf("unknown service type %s", request.Id.Type))
 					stream.Close()
@@ -329,10 +325,6 @@ func (s *serviceStateMachine) Snapshot(writer io.Writer) error {
 
 func (s *serviceStateMachine) Install(reader io.Reader) error {
 	return s.service.Install(reader)
-}
-
-func (s *serviceStateMachine) CanDelete(index uint64) bool {
-	return s.service.CanDelete(index)
 }
 
 func (s *serviceStateMachine) Command(bytes []byte, stream streams.WriteStream) {

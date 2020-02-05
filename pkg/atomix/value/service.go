@@ -28,9 +28,9 @@ func init() {
 }
 
 // newService returns a new Service
-func newService(context service.Context) service.Service {
+func newService(scheduler service.Scheduler, context service.Context) service.Service {
 	service := &Service{
-		SessionizedService: service.NewSessionizedService(context),
+		ManagedService: service.NewManagedService(valueType, scheduler, context),
 	}
 	service.init()
 	return service
@@ -38,7 +38,7 @@ func newService(context service.Context) service.Service {
 
 // Service is a state machine for a list primitive
 type Service struct {
-	*service.SessionizedService
+	*service.ManagedService
 	value   []byte
 	version uint64
 }
@@ -50,12 +50,8 @@ func (v *Service) init() {
 	v.Executor.RegisterStreamOperation(opEvents, v.Events)
 }
 
-// Snapshot takes a snapshot of the service
-func (v *Service) Snapshot(writer io.Writer) error {
-	if err := v.SessionizedService.Snapshot(writer); err != nil {
-		return err
-	}
-
+// Backup takes a snapshot of the service
+func (v *Service) Backup(writer io.Writer) error {
 	if err := util.WriteVarUint64(writer, v.version); err != nil {
 		return err
 	}
@@ -65,12 +61,8 @@ func (v *Service) Snapshot(writer io.Writer) error {
 	return nil
 }
 
-// Install restores the service from a snapshot
-func (v *Service) Install(reader io.Reader) error {
-	if err := v.SessionizedService.Install(reader); err != nil {
-		return err
-	}
-
+// Restore restores the service from a snapshot
+func (v *Service) Restore(reader io.Reader) error {
 	version, err := util.ReadVarUint64(reader)
 	if err != nil {
 		return err

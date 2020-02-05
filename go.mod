@@ -13,3 +13,5 @@ require (
 	google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55 // indirect
 	google.golang.org/grpc v1.23.1
 )
+
+replace github.com/atomix/api => ../atomix-api

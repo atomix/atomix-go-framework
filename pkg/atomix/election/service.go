@@ -29,10 +29,10 @@ func init() {
 }
 
 // newService returns a new Service
-func newService(context service.Context) service.Service {
+func newService(scheduler service.Scheduler, context service.Context) service.Service {
 	service := &Service{
-		SessionizedService: service.NewSessionizedService(context),
-		candidates:         make([]*ElectionRegistration, 0),
+		ManagedService: service.NewManagedService(electionType, scheduler, context),
+		candidates:     make([]*ElectionRegistration, 0),
 	}
 	service.init()
 	return service
@@ -40,7 +40,7 @@ func newService(context service.Context) service.Service {
 
 // Service is a state machine for an election primitive
 type Service struct {
-	*service.SessionizedService
+	*service.ManagedService
 	leader     *ElectionRegistration
 	term       uint64
 	timestamp  *time.Time
@@ -56,16 +56,10 @@ func (e *Service) init() {
 	e.Executor.RegisterUnaryOperation(opEvict, e.Evict)
 	e.Executor.RegisterUnaryOperation(opGetTerm, e.GetTerm)
 	e.Executor.RegisterStreamOperation(opEvents, e.Events)
-	e.SessionizedService.OnExpire(e.OnExpire)
-	e.SessionizedService.OnClose(e.OnClose)
 }
 
-// Snapshot takes a snapshot of the service
-func (e *Service) Snapshot(writer io.Writer) error {
-	if err := e.SessionizedService.Snapshot(writer); err != nil {
-		return err
-	}
-
+// Backup takes a snapshot of the service
+func (e *Service) Backup(writer io.Writer) error {
 	snapshot := &ElectionSnapshot{
 		Term:       e.term,
 		Timestamp:  e.timestamp,
@@ -79,12 +73,8 @@ func (e *Service) Snapshot(writer io.Writer) error {
 	return util.WriteBytes(writer, bytes)
 }
 
-// Install restores the service from a snapshot
-func (e *Service) Install(reader io.Reader) error {
-	if err := e.SessionizedService.Install(reader); err != nil {
-		return err
-	}
-
+// Restore restores the service from a snapshot
+func (e *Service) Restore(reader io.Reader) error {
 	bytes, err := util.ReadBytes(reader)
 	if err != nil {
 		return err
@@ -101,13 +91,13 @@ func (e *Service) Install(reader io.Reader) error {
 	return nil
 }
 
-// OnExpire is called when a session is expired by the server
-func (e *Service) OnExpire(session *service.Session) {
+// SessionExpired is called when a session is expired by the server
+func (e *Service) SessionExpired(session *service.Session) {
 	e.close(session)
 }
 
-// OnClose is called when a session is closed by the client
-func (e *Service) OnClose(session *service.Session) {
+// SessionClosed is called when a session is closed by the client
+func (e *Service) SessionClosed(session *service.Session) {
 	e.close(session)
 }
 

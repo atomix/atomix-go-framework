@@ -28,10 +28,10 @@ func init() {
 }
 
 // newService returns a new Service
-func newService(context service.Context) service.Service {
+func newService(scheduler service.Scheduler, context service.Context) service.Service {
 	service := &Service{
-		SessionizedService: service.NewSessionizedService(context),
-		participants:       make([]*LatchParticipant, 0),
+		ManagedService: service.NewManagedService(leaderLatchType, scheduler, context),
+		participants:   make([]*LatchParticipant, 0),
 	}
 	service.init()
 	return service
@@ -39,7 +39,7 @@ func newService(context service.Context) service.Service {
 
 // Service is a state machine for an election primitive
 type Service struct {
-	*service.SessionizedService
+	*service.ManagedService
 	leader       *LatchParticipant
 	latch        uint64
 	participants []*LatchParticipant
@@ -50,12 +50,10 @@ func (e *Service) init() {
 	e.Executor.RegisterUnaryOperation(opLatch, e.Latch)
 	e.Executor.RegisterUnaryOperation(opGetLatch, e.GetLatch)
 	e.Executor.RegisterStreamOperation(opEvents, e.Events)
-	e.SessionizedService.OnExpire(e.OnExpire)
-	e.SessionizedService.OnClose(e.OnClose)
 }
 
-// Snapshot takes a snapshot of the service
-func (e *Service) Snapshot(writer io.Writer) error {
+// Backup takes a snapshot of the service
+func (e *Service) Backup(writer io.Writer) error {
 	snapshot := &LatchSnapshot{
 		Latch:        e.latch,
 		Leader:       e.leader,
@@ -68,8 +66,8 @@ func (e *Service) Snapshot(writer io.Writer) error {
 	return util.WriteBytes(writer, bytes)
 }
 
-// Install restores the service from a snapshot
-func (e *Service) Install(reader io.Reader) error {
+// Restore restores the service from a snapshot
+func (e *Service) Restore(reader io.Reader) error {
 	bytes, err := util.ReadBytes(reader)
 	if err != nil {
 		return err
@@ -85,13 +83,13 @@ func (e *Service) Install(reader io.Reader) error {
 	return nil
 }
 
-// OnExpire is called when a session is expired by the server
-func (e *Service) OnExpire(session *service.Session) {
+// SessionExpired is called when a session is expired by the server
+func (e *Service) SessionExpired(session *service.Session) {
 	e.close(session)
 }
 
-// OnClose is called when a session is closed by the client
-func (e *Service) OnClose(session *service.Session) {
+// SessionClosed is called when a session is closed by the client
+func (e *Service) SessionClosed(session *service.Session) {
 	e.close(session)
 }
 

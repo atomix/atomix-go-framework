@@ -64,25 +64,22 @@ func ResponseEntry(nodeID string, args ...string) *log.Entry {
 }
 
 // ServiceEntry returns a log Entry with additional fields containing the given service metadata
-func ServiceEntry(nodeID string, serviceNamespace string, serviceName string) *log.Entry {
-	return log.WithField(nodeIDField, nodeID).
-		WithField(serviceNamespaceField, serviceNamespace).
-		WithField(serviceNameField, serviceName)
-}
-
-// SessionEntry returns a log Entry with additional fields containing the given session metadata
-func SessionEntry(nodeID string, serviceNamespace string, serviceName string, sessionID uint64) *log.Entry {
+func ServiceEntry(nodeID string, serviceNamespace string, serviceName string, sessionID uint64) *log.Entry {
 	return log.WithField(nodeIDField, nodeID).
 		WithField(serviceNamespaceField, serviceNamespace).
 		WithField(serviceNameField, serviceName).
 		WithField(sessionIDField, sessionID)
 }
 
-// StreamEntry returns a log Entry with additional fields containing the given stream metadata
-func StreamEntry(nodeID string, serviceNamespace string, serviceName string, sessionID uint64, streamID uint64) *log.Entry {
+// SessionEntry returns a log Entry with additional fields containing the given session metadata
+func SessionEntry(nodeID string, sessionID uint64) *log.Entry {
 	return log.WithField(nodeIDField, nodeID).
-		WithField(serviceNamespaceField, serviceNamespace).
-		WithField(serviceNameField, serviceName).
+		WithField(sessionIDField, sessionID)
+}
+
+// StreamEntry returns a log Entry with additional fields containing the given stream metadata
+func StreamEntry(nodeID string, sessionID uint64, streamID uint64) *log.Entry {
+	return log.WithField(nodeIDField, nodeID).
 		WithField(sessionIDField, sessionID).
 		WithField(streamIDField, streamID)
 }

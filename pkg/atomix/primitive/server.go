@@ -27,7 +27,7 @@ import (
 )
 
 func init() {
-	node.RegisterServer(registerServer)
+	service.RegisterServer(registerServer)
 }
 
 // registerServer registers a primitive server with the given gRPC server

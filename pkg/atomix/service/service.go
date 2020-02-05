@@ -15,102 +15,103 @@
 package service
 
 import (
-	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"io"
 	"time"
 )
 
-// OperationType is the type for a service operation
-type OperationType string
-
-const (
-	// OpTypeCommand is an OperationType indicating a command operation
-	OpTypeCommand OperationType = "command"
-	// OpTypeQuery is an OperationType indicating a query operation
-	OpTypeQuery OperationType = "query"
-)
-
-// Context provides information about the context within which a state machine is running
+// Context provides information about the context within which a service is running
 type Context interface {
 	// Node is the local node identifier
 	Node() string
 
-	// Name is the service name
-	Name() string
-
-	// Namespace is the service namespace name
-	Namespace() string
-
-	// Index returns the current index of the state machine
+	// Index returns the current index of the service
 	Index() uint64
 
 	// Timestamp returns a deterministic, monotonically increasing timestamp
 	Timestamp() time.Time
-
-	// OperationType returns the type of the operation currently being executed against the state machine
-	OperationType() OperationType
 }
 
-// Service is an interface for primitive services
+type SessionOpen interface {
+	SessionOpen(*Session)
+}
+
+type SessionClosed interface {
+	SessionClosed(*Session)
+}
+
+type SessionExpired interface {
+	SessionExpired(*Session)
+}
+
 type Service interface {
-	// Snapshot writes the state machine snapshot to the given writer
-	Snapshot(writer io.Writer) error
-
-	// Install reads the state machine snapshot from the given reader
-	Install(reader io.Reader) error
-
-	// CanDelete returns a bool indicating whether the node can delete changes up to the given index without affecting
-	// the correctness of the state machine
-	CanDelete(index uint64) bool
-
-	// Command applies a command to the state machine
-	Command(bytes []byte, stream streams.WriteStream)
-
-	// Query applies a query to the state machine
-	Query(bytes []byte, stream streams.WriteStream)
+	internalService
+	Backup(writer io.Writer) error
+	Restore(reader io.Reader) error
 }
 
-// service is an internal base for service implementations
-type service struct {
-	Scheduler Scheduler
-	Executor  Executor
-	Context   Context
+type internalService interface {
+	Type() string
+	setCurrentSession(*Session)
+	addSession(*Session)
+	removeSession(*Session)
+	getOperation(name string) Operation
 }
 
-// mutableContext is an internal context implementation which supports per-service indexes
-type mutableContext struct {
-	parent Context
-	op     OperationType
+// NewManagedService creates a new primitive service
+func NewManagedService(serviceType string, scheduler Scheduler, context Context) *ManagedService {
+	return &ManagedService{
+		serviceType: serviceType,
+		Executor:    newExecutor(),
+		Scheduler:   scheduler,
+		Context:     context,
+		sessions:    make([]*Session, 0),
+	}
 }
 
-func (c *mutableContext) Node() string {
-	return c.parent.Node()
+// ManagedService is a service that is managed by the service manager
+type ManagedService struct {
+	Executor       Executor
+	Context        Context
+	Scheduler      Scheduler
+	serviceType    string
+	sessions       []*Session
+	currentSession *Session
 }
 
-func (c *mutableContext) Name() string {
-	return c.parent.Name()
+func (s *ManagedService) Type() string {
+	return s.serviceType
 }
 
-func (c *mutableContext) Namespace() string {
-	return c.parent.Namespace()
+func (s *ManagedService) Session() *Session {
+	return s.currentSession
 }
 
-func (c *mutableContext) Index() uint64 {
-	return c.parent.Index()
+func (s *ManagedService) Sessions() []*Session {
+	return s.sessions
 }
 
-func (c *mutableContext) Timestamp() time.Time {
-	return c.parent.Timestamp()
+func (s *ManagedService) setScheduler(scheduler Scheduler) {
+	s.Scheduler = scheduler
 }
 
-func (c *mutableContext) OperationType() OperationType {
-	return c.op
+func (s *ManagedService) setCurrentSession(session *Session) {
+	s.currentSession = session
 }
 
-func (c *mutableContext) setCommand() {
-	c.op = OpTypeCommand
+func (s *ManagedService) addSession(session *Session) {
+	s.sessions[session.ID] = session
 }
 
-func (c *mutableContext) setQuery() {
-	c.op = OpTypeQuery
+func (s *ManagedService) removeSession(session *Session) {
+	sessions := make([]*Session, 0, len(s.sessions)-1)
+	for _, sess := range s.sessions {
+		if sess.ID != session.ID {
+			sessions = append(sessions, sess)
+		}
+	}
+	s.sessions = sessions
+}
+
+func (s *ManagedService) getOperation(name string) Operation {
+	return s.Executor.GetOperation(name)
 }

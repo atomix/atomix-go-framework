@@ -30,11 +30,11 @@ func init() {
 }
 
 // newService returns a new Service
-func newService(context service.Context) service.Service {
+func newService(scheduler service.Scheduler, context service.Context) service.Service {
 	service := &Service{
-		SessionizedService: service.NewSessionizedService(context),
-		queue:              list.New(),
-		timers:             make(map[uint64]service.Timer),
+		ManagedService: service.NewManagedService(lockType, scheduler, context),
+		queue:          list.New(),
+		timers:         make(map[uint64]service.Timer),
 	}
 	service.init()
 	return service
@@ -42,7 +42,7 @@ func newService(context service.Context) service.Service {
 
 // Service is a state machine for a list primitive
 type Service struct {
-	*service.SessionizedService
+	*service.ManagedService
 	lock   *lockHolder
 	queue  *list.List
 	timers map[uint64]service.Timer
@@ -60,16 +60,10 @@ func (l *Service) init() {
 	l.Executor.RegisterStreamOperation(opLock, l.Lock)
 	l.Executor.RegisterUnaryOperation(opUnlock, l.Unlock)
 	l.Executor.RegisterUnaryOperation(opIsLocked, l.IsLocked)
-	l.SessionizedService.OnExpire(l.OnExpire)
-	l.SessionizedService.OnClose(l.OnClose)
 }
 
-// Snapshot takes a snapshot of the service
-func (l *Service) Snapshot(writer io.Writer) error {
-	if err := l.SessionizedService.Snapshot(writer); err != nil {
-		return err
-	}
-
+// Backup takes a snapshot of the service
+func (l *Service) Backup(writer io.Writer) error {
 	var lock *LockCall
 	if l.lock != nil {
 		lock = &LockCall{
@@ -102,12 +96,8 @@ func (l *Service) Snapshot(writer io.Writer) error {
 	return util.WriteBytes(writer, bytes)
 }
 
-// Install restores the service from a snapshot
-func (l *Service) Install(reader io.Reader) error {
-	if err := l.SessionizedService.Install(reader); err != nil {
-		return err
-	}
-
+// Restore restores the service from a snapshot
+func (l *Service) Restore(reader io.Reader) error {
 	bytes, err := util.ReadBytes(reader)
 	if err != nil {
 		return err
@@ -292,13 +282,13 @@ func (l *Service) IsLocked(bytes []byte) ([]byte, error) {
 	})
 }
 
-// OnExpire releases the lock when the owning session expires
-func (l *Service) OnExpire(session *service.Session) {
+// SessionExpired releases the lock when the owning session expires
+func (l *Service) SessionExpired(session *service.Session) {
 	l.releaseLock(session)
 }
 
-// OnClose releases the lock when the owning session is closed
-func (l *Service) OnClose(session *service.Session) {
+// SessionClosed releases the lock when the owning session is closed
+func (l *Service) SessionClosed(session *service.Session) {
 	l.releaseLock(session)
 }
 
