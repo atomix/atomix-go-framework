@@ -354,11 +354,6 @@ func (s *Server) DoMetadata(ctx context.Context, serviceType primitive.Primitive
 					LastSequenceNumber: header.RequestID,
 				},
 				Query: &service.ServiceQueryRequest{
-					Service: &service.ServiceId{
-						Type:      s.Type,
-						Name:      header.Name.Name,
-						Namespace: header.Name.Namespace,
-					},
 					Request: &service.ServiceQueryRequest_Metadata{
 						Metadata: &service.ServiceMetadataRequest{
 							Type:      service.ServiceType(serviceType),

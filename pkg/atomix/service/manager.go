@@ -586,6 +586,8 @@ func (m *Manager) applyServiceQuery(request *ServiceQueryRequest, context *Sessi
 	switch request.Request.(type) {
 	case *ServiceQueryRequest_Operation:
 		m.applyServiceQueryOperation(request, context, session, stream)
+	case *ServiceQueryRequest_Metadata:
+		m.applyServiceQueryMetadata(request, context, session, stream)
 	default:
 		stream.Error(fmt.Errorf("unknown service query"))
 		stream.Close()
@@ -674,6 +676,39 @@ func (m *Manager) applyServiceQueryOperation(request *ServiceQueryRequest, conte
 	} else {
 		stream.Close()
 	}
+}
+
+func (m *Manager) applyServiceQueryMetadata(request *ServiceQueryRequest, context *SessionQueryContext, session *Session, stream streams.WriteStream) {
+	services := []*ServiceId{}
+	serviceType := request.GetMetadata().Type
+	namespace := request.GetMetadata().Namespace
+	for name, service := range m.services {
+		if (serviceType == 0 || service.Type() == serviceType) && (namespace == "" || name.namespace() == namespace) {
+			services = append(services, &ServiceId{
+				Type:      service.Type(),
+				Namespace: name.namespace(),
+				Name:      name.name(),
+			})
+		}
+	}
+
+	stream.Result(proto.Marshal(&SessionResponse{
+		Response: &SessionResponse_Query{
+			Query: &SessionQueryResponse{
+				Context: &SessionResponseContext{
+					Index:    m.context.Index(),
+					Sequence: context.LastSequenceNumber,
+				},
+				Response: &ServiceQueryResponse{
+					Response: &ServiceQueryResponse_Metadata{
+						Metadata: &ServiceMetadataResponse{
+							Services: services,
+						},
+					},
+				},
+			},
+		},
+	}))
 }
 
 const separator = "."
