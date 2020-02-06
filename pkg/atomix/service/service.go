@@ -81,7 +81,7 @@ func NewManagedService(serviceType string, scheduler Scheduler, context Context)
 		Executor:    newExecutor(),
 		Scheduler:   scheduler,
 		Context:     context,
-		sessions:    make([]*Session, 0),
+		sessions:    make(map[uint64]*Session),
 	}
 }
 
@@ -91,7 +91,7 @@ type ManagedService struct {
 	Context        Context
 	Scheduler      Scheduler
 	serviceType    string
-	sessions       []*Session
+	sessions       map[uint64]*Session
 	currentSession *Session
 }
 
@@ -105,9 +105,18 @@ func (s *ManagedService) Session() *Session {
 	return s.currentSession
 }
 
+// SessionOf returns the session with the given identifier
+func (s *ManagedService) SessionOf(id uint64) *Session {
+	return s.sessions[id]
+}
+
 // Sessions returns a list of open sessions
 func (s *ManagedService) Sessions() []*Session {
-	return s.sessions
+	sessions := make([]*Session, 0, len(s.sessions))
+	for _, session := range s.sessions {
+		sessions = append(sessions, session)
+	}
+	return sessions
 }
 
 // setCurrentSession sets the current session
@@ -117,18 +126,12 @@ func (s *ManagedService) setCurrentSession(session *Session) {
 
 // addSession adds a session to the service
 func (s *ManagedService) addSession(session *Session) {
-	s.sessions = append(s.sessions, session)
+	s.sessions[session.ID] = session
 }
 
 // removeSession removes a session from the service
 func (s *ManagedService) removeSession(session *Session) {
-	sessions := make([]*Session, 0, len(s.sessions)-1)
-	for _, sess := range s.sessions {
-		if sess.ID != session.ID {
-			sessions = append(sessions, sess)
-		}
-	}
-	s.sessions = sessions
+	delete(s.sessions, session.ID)
 }
 
 // getOperation gets a service operation

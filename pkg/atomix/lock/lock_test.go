@@ -26,13 +26,22 @@ import (
 )
 
 func TestLock(t *testing.T) {
-	session, node := test.StartTestNode()
+	partition, node := test.StartTestNode()
 	defer node.Stop()
 
-	name := primitive.NewName("default", "test", "default", "test")
-	l1, err := client.New(context.TODO(), name, []*primitive.Session{session})
+	session1, err := primitive.NewSession(context.TODO(), partition, primitive.WithSessionTimeout(5*time.Second))
 	assert.NoError(t, err)
-	l2, err := client.New(context.TODO(), name, []*primitive.Session{session})
+	defer session1.Close()
+
+	name := primitive.NewName("default", "test", "default", "test")
+	l1, err := client.New(context.TODO(), name, []*primitive.Session{session1})
+	assert.NoError(t, err)
+
+	session2, err := primitive.NewSession(context.TODO(), partition, primitive.WithSessionTimeout(5*time.Second))
+	assert.NoError(t, err)
+	defer session2.Close()
+
+	l2, err := client.New(context.TODO(), name, []*primitive.Session{session2})
 	assert.NoError(t, err)
 
 	v1, err := l1.Lock(context.Background())
@@ -87,6 +96,10 @@ func TestLock(t *testing.T) {
 
 	err = l2.Delete(context.Background())
 	assert.NoError(t, err)
+
+	session, err := primitive.NewSession(context.TODO(), partition)
+	assert.NoError(t, err)
+	defer session.Close()
 
 	l, err := client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)

@@ -25,19 +25,31 @@ import (
 )
 
 func TestElection(t *testing.T) {
-	session, node := test.StartTestNode()
+	partition, node := test.StartTestNode()
 	defer node.Stop()
 
+	session1, err := primitive.NewSession(context.TODO(), partition)
+	assert.NoError(t, err)
+	defer session1.Close()
+
 	name := primitive.NewName("default", "test", "default", "test")
-	election1, err := client.New(context.TODO(), name, []*primitive.Session{session})
+	election1, err := client.New(context.TODO(), name, []*primitive.Session{session1})
 	assert.NoError(t, err)
 	assert.NotNil(t, election1)
 
-	election2, err := client.New(context.TODO(), name, []*primitive.Session{session})
+	session2, err := primitive.NewSession(context.TODO(), partition)
+	assert.NoError(t, err)
+	defer session2.Close()
+
+	election2, err := client.New(context.TODO(), name, []*primitive.Session{session2})
 	assert.NoError(t, err)
 	assert.NotNil(t, election2)
 
-	election3, err := client.New(context.TODO(), name, []*primitive.Session{session})
+	session3, err := primitive.NewSession(context.TODO(), partition)
+	assert.NoError(t, err)
+	defer session3.Close()
+
+	election3, err := client.New(context.TODO(), name, []*primitive.Session{session3})
 	assert.NoError(t, err)
 	assert.NotNil(t, election3)
 
@@ -226,10 +238,10 @@ func TestElection(t *testing.T) {
 	err = election3.Close(context.Background())
 	assert.NoError(t, err)
 
-	election1, err = client.New(context.TODO(), name, []*primitive.Session{session})
+	election1, err = client.New(context.TODO(), name, []*primitive.Session{session1})
 	assert.NoError(t, err)
 
-	election2, err = client.New(context.TODO(), name, []*primitive.Session{session})
+	election2, err = client.New(context.TODO(), name, []*primitive.Session{session2})
 	assert.NoError(t, err)
 
 	term, err = election1.GetTerm(context.TODO())
@@ -246,6 +258,10 @@ func TestElection(t *testing.T) {
 
 	err = election2.Delete(context.Background())
 	assert.NoError(t, err)
+
+	session, err := primitive.NewSession(context.TODO(), partition)
+	assert.NoError(t, err)
+	defer session.Close()
 
 	election, err := client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)

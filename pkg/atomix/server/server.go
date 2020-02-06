@@ -168,10 +168,14 @@ func (s *Server) DoCommandStream(ctx context.Context, name string, input []byte,
 			Index:      commandResponse.Context.Index,
 			Type:       headers.ResponseType(commandResponse.Context.Type),
 		}
+		var result []byte
+		if commandResponse.Response != nil {
+			result = commandResponse.Response.GetOperation().Result
+		}
 		return SessionOutput{
 			Header: responseHeader,
 			Result: streams.Result{
-				Value: commandResponse.Response.GetOperation().Result,
+				Value: result,
 			},
 		}, nil
 	})
@@ -312,10 +316,14 @@ func (s *Server) DoQueryStream(ctx context.Context, name string, input []byte, h
 			Index:     queryResponse.Context.Index,
 			Type:      headers.ResponseType(queryResponse.Context.Type),
 		}
+		var result []byte
+		if queryResponse.Response != nil {
+			result = queryResponse.Response.GetOperation().Result
+		}
 		return SessionOutput{
 			Header: responseHeader,
 			Result: streams.Result{
-				Value: queryResponse.Response.GetOperation().Result,
+				Value: result,
 			},
 		}, nil
 	})

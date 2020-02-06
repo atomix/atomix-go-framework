@@ -25,8 +25,12 @@ import (
 )
 
 func TestMap(t *testing.T) {
-	session, node := test.StartTestNode()
+	partition, node := test.StartTestNode()
 	defer node.Stop()
+
+	session, err := primitive.NewSession(context.TODO(), partition)
+	assert.NoError(t, err)
+	defer session.Close()
 
 	name := primitive.NewName("default", "test", "default", "test")
 	_map, err := client.New(context.TODO(), name, []*primitive.Session{session})
@@ -115,8 +119,12 @@ func TestMap(t *testing.T) {
 }
 
 func TestMapStreams(t *testing.T) {
-	session, node := test.StartTestNode()
+	partition, node := test.StartTestNode()
 	defer node.Stop()
+
+	session, err := primitive.NewSession(context.TODO(), partition)
+	assert.NoError(t, err)
+	defer session.Close()
 
 	name := primitive.NewName("default", "test", "default", "test")
 	_map, err := client.New(context.TODO(), name, []*primitive.Session{session})

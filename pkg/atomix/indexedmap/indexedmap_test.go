@@ -25,8 +25,12 @@ import (
 )
 
 func TestIndexedMap(t *testing.T) {
-	session, node := test.StartTestNode()
+	partition, node := test.StartTestNode()
 	defer node.Stop()
+
+	session, err := primitive.NewSession(context.TODO(), partition)
+	assert.NoError(t, err)
+	defer session.Close()
 
 	name := primitive.NewName("default", "test", "default", "test")
 	_map, err := client.New(context.TODO(), name, []*primitive.Session{session})
@@ -115,8 +119,12 @@ func TestIndexedMap(t *testing.T) {
 }
 
 func TestMapStreams(t *testing.T) {
-	session, node := test.StartTestNode()
+	partition, node := test.StartTestNode()
 	defer node.Stop()
+
+	session, err := primitive.NewSession(context.TODO(), partition)
+	assert.NoError(t, err)
+	defer session.Close()
 
 	name := primitive.NewName("default", "test", "default", "test")
 	_map, err := client.New(context.TODO(), name, []*primitive.Session{session})
@@ -176,10 +184,18 @@ func TestMapStreams(t *testing.T) {
 	err = _map.Close(context.Background())
 	assert.NoError(t, err)
 
-	map1, err := client.New(context.TODO(), name, []*primitive.Session{session})
+	session1, err := primitive.NewSession(context.TODO(), partition)
+	assert.NoError(t, err)
+	defer session1.Close()
+
+	map1, err := client.New(context.TODO(), name, []*primitive.Session{session1})
 	assert.NoError(t, err)
 
-	map2, err := client.New(context.TODO(), name, []*primitive.Session{session})
+	session2, err := primitive.NewSession(context.TODO(), partition)
+	assert.NoError(t, err)
+	defer session2.Close()
+
+	map2, err := client.New(context.TODO(), name, []*primitive.Session{session2})
 	assert.NoError(t, err)
 
 	size, err := map1.Len(context.TODO())
@@ -194,6 +210,10 @@ func TestMapStreams(t *testing.T) {
 
 	err = map2.Delete(context.Background())
 	assert.NoError(t, err)
+
+	session, err = primitive.NewSession(context.TODO(), partition)
+	assert.NoError(t, err)
+	defer session.Close()
 
 	_map, err = client.New(context.TODO(), name, []*primitive.Session{session})
 	assert.NoError(t, err)

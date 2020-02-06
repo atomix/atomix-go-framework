@@ -20,16 +20,17 @@ import (
 	"github.com/atomix/go-client/pkg/client/primitive"
 	_ "github.com/atomix/go-framework/pkg/atomix/session"
 	"github.com/atomix/go-framework/pkg/atomix/test"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestCounter(t *testing.T) {
-	logrus.SetLevel(logrus.TraceLevel)
-
-	session, node := test.StartTestNode()
+	partition, node := test.StartTestNode()
 	defer node.Stop()
+
+	session, err := primitive.NewSession(context.TODO(), partition)
+	assert.NoError(t, err)
+	defer session.Close()
 
 	name := primitive.NewName("default", "test", "default", "test")
 	counter, err := client.New(context.TODO(), name, []*primitive.Session{session})

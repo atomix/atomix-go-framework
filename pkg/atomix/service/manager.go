@@ -326,6 +326,8 @@ func (m *Manager) applyServiceCommandOperation(request *ServiceCommandRequest, c
 		return
 	}
 
+	service.setCurrentSession(session)
+
 	operation := service.getOperation(request.GetOperation().Method)
 	if unaryOp, ok := operation.(UnaryOperation); ok {
 		output, err := unaryOp.Execute(request.GetOperation().Value)
@@ -356,6 +358,9 @@ func (m *Manager) applyServiceCommandCreate(request *ServiceCommandRequest, cont
 		service = serviceType(m.scheduler, m.context)
 		m.services[name] = service
 	}
+
+	service.setCurrentSession(session)
+
 	if !session.services[name] {
 		session.services[name] = true
 		service.addSession(session)
@@ -386,6 +391,7 @@ func (m *Manager) applyServiceCommandClose(request *ServiceCommandRequest, conte
 	name := newQualifiedServiceName(request.Service.Namespace, request.Service.Name)
 	if service, ok := m.services[name]; ok && session.services[name] {
 		delete(session.services, name)
+		service.setCurrentSession(session)
 		service.removeSession(session)
 		if closed, ok := service.(SessionClosed); ok {
 			closed.SessionClosed(session)

@@ -798,7 +798,7 @@ func (m *Service) cancelTTL(key string) {
 func (m *Service) sendEvent(event *ListenResponse) {
 	bytes, _ := proto.Marshal(event)
 	for sessionID, listeners := range m.listeners {
-		session := m.Sessions()[sessionID]
+		session := m.SessionOf(sessionID)
 		if session != nil {
 			for _, listener := range listeners {
 				if listener.key != "" {
