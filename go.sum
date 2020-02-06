@@ -18,6 +18,12 @@ github.com/atomix/api v0.0.0-20200202100958-13b24edbe32d h1:rM+AnOZfgosBZzvkbZUb
 github.com/atomix/api v0.0.0-20200202100958-13b24edbe32d/go.mod h1:Ec7OEwfv1qGASdRZdXxi6TUvwmayT4IkkewDcm7pItI=
 github.com/atomix/api v0.0.0-20200206050905-3494e48c0084 h1:u+Hcm3wJHjIpUjh1vtRKSN+SH1OX4PfBZ7qnb2wg26o=
 github.com/atomix/api v0.0.0-20200206050905-3494e48c0084/go.mod h1:yD3KAX7yCeVhVjM2CD/5AXe9NW4yO6+siRQ5nfY+M1s=
+github.com/atomix/api v0.0.0-20200206205456-e05375c2d909 h1:TR8vyLt0rdVefxHRCuaQhHbAEpn/yqCdftC+hUw7EV4=
+github.com/atomix/api v0.0.0-20200206205456-e05375c2d909/go.mod h1:yD3KAX7yCeVhVjM2CD/5AXe9NW4yO6+siRQ5nfY+M1s=
+github.com/atomix/api v0.0.0-20200206210348-b02806f82e07 h1:fC29XjoZAG75HZNSiY8x5gXAGEXBz2nSNAC/zxNbOn4=
+github.com/atomix/api v0.0.0-20200206210348-b02806f82e07/go.mod h1:yD3KAX7yCeVhVjM2CD/5AXe9NW4yO6+siRQ5nfY+M1s=
+github.com/atomix/api v0.0.0-20200206211058-f075fb5b6d1b h1:DwaZyYMUCs4fJ1i+8eQQ9Jl3gbCk753zP4lT3wH23to=
+github.com/atomix/api v0.0.0-20200206211058-f075fb5b6d1b/go.mod h1:yD3KAX7yCeVhVjM2CD/5AXe9NW4yO6+siRQ5nfY+M1s=
 github.com/atomix/atomix-api v0.0.0-20190826211343-dd8f4db3bf77 h1:+PUuY9wDRp+VAg/JbEguzdOMJj6ruUw6Kw/y+QYHB6s=
 github.com/atomix/atomix-api v0.0.0-20190826211343-dd8f4db3bf77/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
 github.com/atomix/atomix-api v0.0.0-20191002225141-1ee9c98c7dfd h1:D1Gsxu6L0UyPKcXJM/WUrdDYFyXrjlUP+nj6xhVp9N8=

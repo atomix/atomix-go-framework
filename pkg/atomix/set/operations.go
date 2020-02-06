@@ -14,8 +14,6 @@
 
 package set
 
-const setType = "Set"
-
 const (
 	opSize     = "Size"
 	opContains = "Contains"

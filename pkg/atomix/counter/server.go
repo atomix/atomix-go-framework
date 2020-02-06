@@ -19,6 +19,7 @@ import (
 	api "github.com/atomix/api/proto/atomix/counter"
 	"github.com/atomix/go-framework/pkg/atomix/node"
 	"github.com/atomix/go-framework/pkg/atomix/server"
+	"github.com/atomix/go-framework/pkg/atomix/service"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -36,7 +37,7 @@ func registerServer(server *grpc.Server, protocol node.Protocol) {
 func newServer(protocol node.Protocol) api.CounterServiceServer {
 	return &Server{
 		Server: &server.Server{
-			Type:     counterType,
+			Type:     service.ServiceType_COUNTER,
 			Protocol: protocol,
 		},
 	}

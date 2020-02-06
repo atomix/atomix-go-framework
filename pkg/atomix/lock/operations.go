@@ -14,8 +14,6 @@
 
 package lock
 
-const lockType = "Lock"
-
 const (
 	opLock     = "Lock"
 	opUnlock   = "Unlock"

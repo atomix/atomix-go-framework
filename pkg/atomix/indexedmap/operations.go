@@ -14,8 +14,6 @@
 
 package indexedmap
 
-const indexMapType = "IndexedMap"
-
 const (
 	opPut        = "Put"
 	opReplace    = "Replace"

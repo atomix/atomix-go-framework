@@ -49,9 +49,23 @@ message SessionStreamSnapshot {
 }
 
 message ServiceId {
-    string type = 1;
+    ServiceType type = 1;
     string name = 2;
     string namespace = 3;
+}
+
+enum ServiceType {
+    UNKNOWN = 0;
+    COUNTER = 1;
+    ELECTION = 2;
+    INDEXED_MAP = 3;
+    LEADER_LATCH = 4;
+    LIST = 5;
+    LOCK = 6;
+    LOG = 7;
+    MAP = 8;
+    SET = 9;
+    VALUE = 10;
 }
 
 message SessionRequest {
@@ -142,12 +156,14 @@ message ServiceQueryRequest {
     ServiceId service = 1;
     oneof request {
         ServiceOperationRequest operation = 2;
+        ServiceMetadataRequest metadata = 3;
     }
 }
 
 message ServiceQueryResponse {
     oneof response {
         ServiceOperationResponse operation = 2;
+        ServiceMetadataResponse metadata = 3;
     }
 }
 
@@ -182,6 +198,15 @@ message ServiceDeleteRequest {
 
 message ServiceDeleteResponse {
 
+}
+
+message ServiceMetadataRequest {
+    ServiceType type = 1;
+    string namespace = 2;
+}
+
+message ServiceMetadataResponse {
+    repeated ServiceId services = 1;
 }
 
 message SessionCommandContext {

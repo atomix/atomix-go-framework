@@ -14,8 +14,6 @@
 
 package election
 
-const electionType = "Election"
-
 const (
 	opEnter    = "Enter"
 	opWithdraw = "Withdraw"

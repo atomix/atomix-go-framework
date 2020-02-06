@@ -32,8 +32,8 @@ func RegisterServer(server func(*grpc.Server, Protocol)) {
 }
 
 // RegisterService registers a new service
-func RegisterService(name string, service func(scheduler service.Scheduler, context service.Context) service.Service) {
-	registry.RegisterService(name, service)
+func RegisterService(serviceType service.ServiceType, service func(scheduler service.Scheduler, context service.Context) service.Service) {
+	registry.RegisterService(serviceType, service)
 }
 
 // RegisterServers registers service servers on the given gRPC server
@@ -46,7 +46,7 @@ func RegisterServers(server *grpc.Server, protocol Protocol) {
 // Registry is a registry of service types
 type Registry struct {
 	servers  []func(*grpc.Server, Protocol)
-	services map[string]func(scheduler service.Scheduler, context service.Context) service.Service
+	services map[service.ServiceType]func(scheduler service.Scheduler, context service.Context) service.Service
 }
 
 // RegisterServer registers a new primitive server
@@ -55,19 +55,19 @@ func (r *Registry) RegisterServer(server func(*grpc.Server, Protocol)) {
 }
 
 // RegisterService registers a new primitive service
-func (r *Registry) RegisterService(name string, service func(scheduler service.Scheduler, context service.Context) service.Service) {
-	r.services[name] = service
+func (r *Registry) RegisterService(serviceType service.ServiceType, service func(scheduler service.Scheduler, context service.Context) service.Service) {
+	r.services[serviceType] = service
 }
 
 // GetType returns a service type by name
-func (r *Registry) GetType(name string) func(scheduler service.Scheduler, context service.Context) service.Service {
-	return r.services[name]
+func (r *Registry) GetType(serviceType service.ServiceType) func(scheduler service.Scheduler, context service.Context) service.Service {
+	return r.services[serviceType]
 }
 
 // newRegistry returns a new primitive type registry
 func newRegistry() *Registry {
 	return &Registry{
 		servers:  make([]func(*grpc.Server, Protocol), 0),
-		services: make(map[string]func(scheduler service.Scheduler, context service.Context) service.Service),
+		services: make(map[service.ServiceType]func(scheduler service.Scheduler, context service.Context) service.Service),
 	}
 }

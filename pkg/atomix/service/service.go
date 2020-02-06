@@ -34,7 +34,7 @@ type Context interface {
 // Registry is a service registry
 type Registry interface {
 	// GetType returns a service type by name
-	GetType(name string) func(scheduler Scheduler, context Context) Service
+	GetType(serviceType ServiceType) func(scheduler Scheduler, context Context) Service
 }
 
 // SessionOpen is an interface for listening to session open events
@@ -67,7 +67,7 @@ type Service interface {
 }
 
 type internalService interface {
-	Type() string
+	Type() ServiceType
 	setCurrentSession(*Session)
 	addSession(*Session)
 	removeSession(*Session)
@@ -75,7 +75,7 @@ type internalService interface {
 }
 
 // NewManagedService creates a new primitive service
-func NewManagedService(serviceType string, scheduler Scheduler, context Context) *ManagedService {
+func NewManagedService(serviceType ServiceType, scheduler Scheduler, context Context) *ManagedService {
 	return &ManagedService{
 		serviceType: serviceType,
 		Executor:    newExecutor(),
@@ -90,13 +90,13 @@ type ManagedService struct {
 	Executor       Executor
 	Context        Context
 	Scheduler      Scheduler
-	serviceType    string
+	serviceType    ServiceType
 	sessions       map[uint64]*Session
 	currentSession *Session
 }
 
 // Type returns the service type
-func (s *ManagedService) Type() string {
+func (s *ManagedService) Type() ServiceType {
 	return s.serviceType
 }
 

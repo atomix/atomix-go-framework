@@ -14,8 +14,6 @@
 
 package list
 
-const listType = "List"
-
 const (
 	opSize     = "Size"
 	opContains = "Contains"

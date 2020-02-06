@@ -18,7 +18,6 @@ import (
 	"container/list"
 	"encoding/binary"
 	"fmt"
-	"github.com/atomix/atomix-go-node/pkg/atomix/service"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/gogo/protobuf/proto"
@@ -206,7 +205,7 @@ func (m *Manager) installServices(reader io.Reader) error {
 				return err
 			}
 
-			serviceID := &service.ServiceId{}
+			serviceID := &ServiceId{}
 			if err = proto.Unmarshal(bytes, serviceID); err != nil {
 				return err
 			}

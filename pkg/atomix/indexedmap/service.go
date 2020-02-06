@@ -25,13 +25,13 @@ import (
 )
 
 func init() {
-	node.RegisterService(indexMapType, newService)
+	node.RegisterService(service.ServiceType_INDEXED_MAP, newService)
 }
 
 // newService returns a new Service
 func newService(scheduler service.Scheduler, context service.Context) service.Service {
 	service := &Service{
-		ManagedService: service.NewManagedService(indexMapType, scheduler, context),
+		ManagedService: service.NewManagedService(service.ServiceType_INDEXED_MAP, scheduler, context),
 		entries:        make(map[string]*LinkedMapEntryValue),
 		indexes:        make(map[uint64]*LinkedMapEntryValue),
 		timers:         make(map[string]service.Timer),

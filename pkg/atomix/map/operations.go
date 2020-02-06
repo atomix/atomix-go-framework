@@ -14,8 +14,6 @@
 
 package _map //nolint:golint
 
-const mapType = "Map"
-
 const (
 	opPut     = "Put"
 	opReplace = "Replace"

@@ -20,6 +20,7 @@ import (
 	api "github.com/atomix/api/proto/atomix/leader"
 	"github.com/atomix/go-framework/pkg/atomix/node"
 	"github.com/atomix/go-framework/pkg/atomix/server"
+	"github.com/atomix/go-framework/pkg/atomix/service"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
@@ -38,7 +39,7 @@ func registerServer(server *grpc.Server, protocol node.Protocol) {
 func newServer(protocol node.Protocol) api.LeaderLatchServiceServer {
 	return &Server{
 		Server: &server.Server{
-			Type:     leaderLatchType,
+			Type:     service.ServiceType_LEADER_LATCH,
 			Protocol: protocol,
 		},
 	}

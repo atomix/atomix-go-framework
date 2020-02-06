@@ -3,7 +3,7 @@ module github.com/atomix/go-framework
 go 1.12
 
 require (
-	github.com/atomix/api v0.0.0-20200206050905-3494e48c0084
+	github.com/atomix/api v0.0.0-20200206211058-f075fb5b6d1b
 	github.com/atomix/atomix-go-client v0.0.0-20200114212658-58c359bc47b1 // indirect
 	github.com/atomix/atomix-go-node v0.0.0-20200114212450-178a2dc70336
 	github.com/atomix/go-client v0.0.0-20200206051325-cdc03bd1c8bc

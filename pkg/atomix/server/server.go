@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"github.com/atomix/api/proto/atomix/headers"
+	"github.com/atomix/api/proto/atomix/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/node"
 	"github.com/atomix/go-framework/pkg/atomix/service"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
@@ -28,7 +29,7 @@ import (
 // Server is a base server for servers that support sessions
 type Server struct {
 	Protocol node.Protocol
-	Type     string
+	Type     service.ServiceType
 }
 
 // DoCommand submits a command to the service
@@ -331,6 +332,80 @@ func (s *Server) DoQueryStream(ctx context.Context, name string, input []byte, h
 		_ = partition.Read(ctx, bytes, stream)
 	}()
 	return nil
+}
+
+// DoMetadata submits a metadata query to the service
+func (s *Server) DoMetadata(ctx context.Context, serviceType primitive.PrimitiveType, namespace string, header *headers.RequestHeader) ([]*service.ServiceId, *headers.ResponseHeader, error) {
+	// If the client requires a leader and is not the leader, return an error
+	partition := s.Protocol.Partition(int(header.Partition))
+	if partition.MustLeader() && !partition.IsLeader() {
+		return nil, &headers.ResponseHeader{
+			Status: headers.ResponseStatus_NOT_LEADER,
+			Leader: partition.Leader(),
+		}, nil
+	}
+
+	sessionRequest := &service.SessionRequest{
+		Request: &service.SessionRequest_Query{
+			Query: &service.SessionQueryRequest{
+				Context: &service.SessionQueryContext{
+					SessionID:          header.SessionID,
+					LastIndex:          header.Index,
+					LastSequenceNumber: header.RequestID,
+				},
+				Query: &service.ServiceQueryRequest{
+					Service: &service.ServiceId{
+						Type:      s.Type,
+						Name:      header.Name.Name,
+						Namespace: header.Name.Namespace,
+					},
+					Request: &service.ServiceQueryRequest_Metadata{
+						Metadata: &service.ServiceMetadataRequest{
+							Type:      service.ServiceType(serviceType),
+							Namespace: namespace,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	bytes, err := proto.Marshal(sessionRequest)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Create a unary stream
+	stream := streams.NewUnaryStream()
+
+	// Read the request
+	if err := partition.Read(ctx, bytes, stream); err != nil {
+		return nil, nil, err
+	}
+
+	// Wait for the result
+	result, ok := stream.Receive()
+	if !ok {
+		return nil, nil, errors.New("read channel closed")
+	}
+
+	// If the result failed, return the error
+	if result.Failed() {
+		return nil, nil, result.Error
+	}
+
+	sessionResponse := &service.SessionResponse{}
+	err = proto.Unmarshal(result.Value.([]byte), sessionResponse)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	queryResponse := sessionResponse.GetQuery()
+	responseHeader := &headers.ResponseHeader{
+		SessionID: header.SessionID,
+		Index:     queryResponse.Context.Index,
+	}
+	return queryResponse.Response.GetMetadata().Services, responseHeader, nil
 }
 
 // DoOpenSession opens a new session

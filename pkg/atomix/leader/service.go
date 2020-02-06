@@ -24,13 +24,13 @@ import (
 )
 
 func init() {
-	node.RegisterService(leaderLatchType, newService)
+	node.RegisterService(service.ServiceType_LEADER_LATCH, newService)
 }
 
 // newService returns a new Service
 func newService(scheduler service.Scheduler, context service.Context) service.Service {
 	service := &Service{
-		ManagedService: service.NewManagedService(leaderLatchType, scheduler, context),
+		ManagedService: service.NewManagedService(service.ServiceType_LEADER_LATCH, scheduler, context),
 		participants:   make([]*LatchParticipant, 0),
 	}
 	service.init()

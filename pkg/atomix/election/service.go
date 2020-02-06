@@ -25,13 +25,13 @@ import (
 )
 
 func init() {
-	node.RegisterService(electionType, newService)
+	node.RegisterService(service.ServiceType_ELECTION, newService)
 }
 
 // newService returns a new Service
 func newService(scheduler service.Scheduler, context service.Context) service.Service {
 	service := &Service{
-		ManagedService: service.NewManagedService(electionType, scheduler, context),
+		ManagedService: service.NewManagedService(service.ServiceType_ELECTION, scheduler, context),
 		candidates:     make([]*ElectionRegistration, 0),
 	}
 	service.init()

@@ -14,8 +14,6 @@
 
 package counter
 
-const counterType = "Counter"
-
 const (
 	opGet       = "Get"
 	opSet       = "Set"

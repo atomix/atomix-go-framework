@@ -20,6 +20,7 @@ import (
 	api "github.com/atomix/api/proto/atomix/value"
 	"github.com/atomix/go-framework/pkg/atomix/node"
 	"github.com/atomix/go-framework/pkg/atomix/server"
+	"github.com/atomix/go-framework/pkg/atomix/service"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
@@ -38,7 +39,7 @@ func registerServer(server *grpc.Server, protocol node.Protocol) {
 func newServer(protocol node.Protocol) api.ValueServiceServer {
 	return &Server{
 		Server: &server.Server{
-			Type:     valueType,
+			Type:     service.ServiceType_VALUE,
 			Protocol: protocol,
 		},
 	}

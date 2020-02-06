@@ -23,13 +23,13 @@ import (
 )
 
 func init() {
-	node.RegisterService(counterType, newService)
+	node.RegisterService(service.ServiceType_COUNTER, newService)
 }
 
 // newService returns a new Service
 func newService(scheduler service.Scheduler, context service.Context) service.Service {
 	service := &Service{
-		ManagedService: service.NewManagedService(counterType, scheduler, context),
+		ManagedService: service.NewManagedService(service.ServiceType_COUNTER, scheduler, context),
 	}
 	service.init()
 	return service

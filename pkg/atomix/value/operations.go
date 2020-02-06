@@ -14,8 +14,6 @@
 
 package value
 
-const valueType = "Value"
-
 const (
 	opSet    = "Set"
 	opGet    = "Get"
