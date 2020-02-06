@@ -87,10 +87,13 @@ github.com/atomix/go-client v0.0.0-20200124004211-e5e19cd4730d h1:u0auLxc2kozUEU
 github.com/atomix/go-client v0.0.0-20200124004211-e5e19cd4730d/go.mod h1:KBBiViOYhnvSh/U0fIYiuJ8j+k63eyRWZl42kwdseFI=
 github.com/atomix/go-client v0.0.0-20200203180003-61799b5ca7c2 h1:KgGgbgU4dz4nquCq5lb887wbUkDVe1rEWCKV/eAUDp4=
 github.com/atomix/go-client v0.0.0-20200203180003-61799b5ca7c2/go.mod h1:VWAEeWdocSRL1cqMs3zZ32kuIzMAbheoV02wsEVYwhw=
+github.com/atomix/go-client v0.0.0-20200206051325-cdc03bd1c8bc h1:084pbPBIyHqgYNOELy7u8ETctyZoGeoi+RvzzIRgAns=
+github.com/atomix/go-client v0.0.0-20200206051325-cdc03bd1c8bc/go.mod h1:8Gdux/UtiBQK5nmzN9jtWXuH16T6JPNsAxUA2wY4xVk=
 github.com/atomix/go-framework v0.0.0-20200123235029-e29fc7d6e104/go.mod h1:Dn7tjt5LIRA/qr5afQZDh9hdtvK82uQpMrADYIlVtfQ=
 github.com/atomix/go-framework v0.0.0-20200124003840-f24758b13aa2/go.mod h1:vo5K/v+rc5mohoZIw9vbyj+Y/EGGaEdF6XVkEvM9CSM=
 github.com/atomix/go-framework v0.0.0-20200202102454-440bc2678f1c/go.mod h1:EJ/rV5Eea5cPJ7z8LR5Ql/6c6mZEceeH84d7yX5o8No=
 github.com/atomix/go-framework v0.0.0-20200206051037-7d9990b73da9/go.mod h1:Id2oAv7orhN7jsJXwFumLLSDuRokwKOE57euBgms6hI=
+github.com/atomix/go-framework v0.0.0-20200206051223-9d6a0993cce6/go.mod h1:qkjYKkRmSJw5gE8bOfDsSlqas6pLGHyHsRDAvm6MXMQ=
 github.com/atomix/go-local v0.0.0-20200124003802-357f6682b2f4 h1:acDXXOuqzbqfOYDTMvz4dhckHfmH0DMfXSQE+gLFGOA=
 github.com/atomix/go-local v0.0.0-20200124003802-357f6682b2f4/go.mod h1:MabPkX/j2bN399GVAYGigyvDaAslu7omZoujEfzdKDg=
 github.com/atomix/go-local v0.0.0-20200202105028-743d224c66eb h1:MCstZMd7aizXswJ69hf3fzYU3StG4Ge/vHEfp3mS518=
