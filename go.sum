@@ -117,6 +117,7 @@ github.com/atomix/go-local v0.0.0-20200206221051-b1b85e86b0b7 h1:r7hBq6HSSUMXhsI
 github.com/atomix/go-local v0.0.0-20200206221051-b1b85e86b0b7/go.mod h1:FdvYwF2sobJJ8TAWHzNtn/5ppZX248hWh3jd/ZlZsMY=
 github.com/atomix/go-local v0.0.0-20200207202057-4a81cbdd3325 h1:TAnk36LvpuXDYp9qxEt3PJR4NlFUYgUPVTB+IYj2YKM=
 github.com/atomix/go-local v0.0.0-20200207202057-4a81cbdd3325/go.mod h1:n2xWQV3vAxEHcod1K82zOHlx/+iW9gbuu/zYzo5y060=
+github.com/atomix/go-local v0.0.0-20200207214727-4a5d923aa934 h1:/H7YGguN+Qtww7HkMWGtj3/3ayXRioVeURwvDpJQ8lw=
 github.com/atomix/go-local v0.0.0-20200207214727-4a5d923aa934/go.mod h1:qGUGef763ZEO4mcEJi7Bn2S7U/amLUWQp9RsAd+EtcQ=
 github.com/cenkalti/backoff v2.2.1+incompatible h1:tNowT99t7UNflLxfYYSlKYsBpXdEet03Pg2g16Swow4=
 github.com/cenkalti/backoff v2.2.1+incompatible/go.mod h1:90ReRw6GdpyfrHakVjL/QHaoyV4aDUVVkXQJJJ3NXXM=

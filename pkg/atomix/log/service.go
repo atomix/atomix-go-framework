@@ -65,7 +65,7 @@ func (m *Service) init() {
 	m.Executor.RegisterStreamOperation(opEvents, m.Events)
 }
 
-// LinkedEntryValue is a doubly linked LogEntryValue
+// LinkedLogEntryValue is a doubly linked LogEntryValue
 type LinkedLogEntryValue struct {
 	*LogEntryValue
 	Prev *LinkedLogEntryValue
@@ -187,8 +187,7 @@ func (m *Service) Append(value []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	var oldEntry *LinkedLogEntryValue
-	oldEntry = m.indexes[request.Index]
+	oldEntry := m.indexes[request.Index]
 
 	if oldEntry == nil {
 
