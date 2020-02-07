@@ -16,7 +16,7 @@ limitations under the License.
 
 syntax = "proto3";
 
-package atomix.session;
+package atomix.service;
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
