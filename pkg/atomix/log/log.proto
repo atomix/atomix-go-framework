@@ -70,8 +70,7 @@ message AppendRequest {
 message AppendResponse {
     UpdateStatus status = 1;
     uint64 index = 2;
-    bytes previous_value = 3;
-    google.protobuf.Timestamp timestamp = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    google.protobuf.Timestamp timestamp = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 
 }
 

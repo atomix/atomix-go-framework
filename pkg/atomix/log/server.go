@@ -168,11 +168,10 @@ func (s *Server) Append(ctx context.Context, request *api.AppendRequest) (*api.A
 	}
 
 	response := &api.AppendResponse{
-		Header:        header,
-		Status:        getResponseStatus(appendResponse.Status),
-		Index:         int64(appendResponse.Index),
-		Timestamp:     appendResponse.Timestamp,
-		PreviousValue: appendResponse.PreviousValue,
+		Header:    header,
+		Status:    getResponseStatus(appendResponse.Status),
+		Index:     int64(appendResponse.Index),
+		Timestamp: appendResponse.Timestamp,
 	}
 	log.Tracef("Sending PutResponse %+v", response)
 	return response, nil
