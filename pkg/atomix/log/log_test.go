@@ -19,8 +19,8 @@ import (
 	"testing"
 
 	client "github.com/atomix/go-client/pkg/client/log"
-
 	"github.com/atomix/go-client/pkg/client/primitive"
+	_ "github.com/atomix/go-framework/pkg/atomix/session"
 	"github.com/atomix/go-framework/pkg/atomix/test"
 	"github.com/stretchr/testify/assert"
 )
