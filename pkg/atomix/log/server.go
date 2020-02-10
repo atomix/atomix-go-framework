@@ -415,6 +415,65 @@ func (s *Server) Events(request *api.EventRequest, srv api.LogService_EventsServ
 	return nil
 }
 
+// Entries lists all entries currently in the log
+func (s *Server) Entries(request *api.EntriesRequest, srv api.LogService_EntriesServer) error {
+	log.Tracef("Received EntriesRequest %+v", request)
+	in, err := proto.Marshal(&EntriesRequest{})
+	if err != nil {
+		return err
+	}
+
+	stream := streams.NewBufferedStream()
+	if err := s.DoQueryStream(srv.Context(), opEntries, in, request.Header, stream); err != nil {
+		log.Errorf("EntriesRequest failed: %v", err)
+		return err
+	}
+
+	for {
+		result, ok := stream.Receive()
+		if !ok {
+			break
+		}
+
+		if result.Failed() {
+			log.Errorf("EntriesRequest failed: %v", result.Error)
+			return result.Error
+		}
+
+		response := &EntriesResponse{}
+		output := result.Value.(server.SessionOutput)
+		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
+			return err
+		}
+
+		var entriesResponse *api.EntriesResponse
+		switch output.Header.Type {
+		case headers.ResponseType_OPEN_STREAM:
+			entriesResponse = &api.EntriesResponse{
+				Header: output.Header,
+			}
+		case headers.ResponseType_CLOSE_STREAM:
+			entriesResponse = &api.EntriesResponse{
+				Header: output.Header,
+			}
+		default:
+			entriesResponse = &api.EntriesResponse{
+				Header:    output.Header,
+				Index:     int64(response.Index),
+				Value:     response.Value,
+				Timestamp: response.Timestamp,
+			}
+		}
+
+		log.Tracef("Sending EntriesResponse %+v", entriesResponse)
+		if err = srv.Send(entriesResponse); err != nil {
+			return err
+		}
+	}
+	log.Tracef("Finished EntriesRequest %+v", request)
+	return nil
+}
+
 // Clear removes all keys from the log
 func (s *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.ClearResponse, error) {
 	log.Tracef("Received ClearRequest %+v", request)

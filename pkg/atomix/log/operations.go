@@ -26,4 +26,5 @@ const (
 	opSize       = "Size"
 	opClear      = "Clear"
 	opEvents     = "Events"
+	opEntries    = "Entries"
 )

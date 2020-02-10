@@ -208,7 +208,6 @@ func (m *Service) Append(value []byte) ([]byte, error) {
 			LogEntryValue: &LogEntryValue{
 				Index:     index,
 				Value:     request.Value,
-				Version:   m.Context.Index(),
 				Timestamp: m.Context.Timestamp(),
 			},
 		}
@@ -242,7 +241,6 @@ func (m *Service) Append(value []byte) ([]byte, error) {
 			Type:      ListenResponse_APPENDED,
 			Index:     newEntry.Index,
 			Value:     newEntry.Value,
-			Version:   newEntry.Version,
 			Timestamp: newEntry.Timestamp,
 		})
 		return proto.Marshal(&AppendResponse{
@@ -254,10 +252,8 @@ func (m *Service) Append(value []byte) ([]byte, error) {
 	// If the value is equal to the current value, return a no-op.
 	if bytes.Equal(oldEntry.Value, request.Value) {
 		return proto.Marshal(&AppendResponse{
-			Status:          UpdateStatus_NOOP,
-			Index:           oldEntry.Index,
-			PreviousValue:   oldEntry.Value,
-			PreviousVersion: oldEntry.Version,
+			Status: UpdateStatus_NOOP,
+			Index:  oldEntry.Index,
 		})
 	}
 
@@ -266,7 +262,6 @@ func (m *Service) Append(value []byte) ([]byte, error) {
 		LogEntryValue: &LogEntryValue{
 			Index:     oldEntry.Index,
 			Value:     request.Value,
-			Version:   m.Context.Index(),
 			Timestamp: oldEntry.Timestamp,
 		},
 		Prev: oldEntry.Prev,
@@ -291,16 +286,13 @@ func (m *Service) Append(value []byte) ([]byte, error) {
 		Type:      ListenResponse_APPENDED,
 		Index:     newEntry.Index,
 		Value:     newEntry.Value,
-		Version:   newEntry.Version,
 		Timestamp: newEntry.Timestamp,
 	})
 
 	return proto.Marshal(&AppendResponse{
-		Status:          UpdateStatus_OK,
-		Index:           newEntry.Index,
-		PreviousValue:   oldEntry.Value,
-		PreviousVersion: oldEntry.Version,
-		Timestamp:       newEntry.Timestamp,
+		Status:    UpdateStatus_OK,
+		Index:     newEntry.Index,
+		Timestamp: newEntry.Timestamp,
 	})
 }
 
@@ -341,16 +333,14 @@ func (m *Service) Remove(bytes []byte) ([]byte, error) {
 		Type:      ListenResponse_REMOVED,
 		Index:     entry.Index,
 		Value:     entry.Value,
-		Version:   entry.Version,
 		Timestamp: entry.Timestamp,
 	})
 
 	return proto.Marshal(&RemoveResponse{
-		Status:          UpdateStatus_OK,
-		Index:           entry.Index,
-		PreviousValue:   entry.Value,
-		PreviousVersion: entry.Version,
-		Timestamp:       entry.Timestamp,
+		Status:        UpdateStatus_OK,
+		Index:         entry.Index,
+		PreviousValue: entry.Value,
+		Timestamp:     entry.Timestamp,
 	})
 }
 
@@ -373,7 +363,6 @@ func (m *Service) Get(bytes []byte) ([]byte, error) {
 	return proto.Marshal(&GetResponse{
 		Index:     entry.Index,
 		Value:     entry.Value,
-		Version:   entry.Version,
 		Timestamp: entry.Timestamp,
 	})
 }
@@ -391,7 +380,6 @@ func (m *Service) FirstEntry(bytes []byte) ([]byte, error) {
 	return proto.Marshal(&FirstEntryResponse{
 		Index:     m.firstEntry.Index,
 		Value:     m.firstEntry.Value,
-		Version:   m.firstEntry.Version,
 		Timestamp: m.firstEntry.Timestamp,
 	})
 }
@@ -409,7 +397,6 @@ func (m *Service) LastEntry(bytes []byte) ([]byte, error) {
 	return proto.Marshal(&LastEntryResponse{
 		Index:     m.lastEntry.Index,
 		Value:     m.lastEntry.Value,
-		Version:   m.lastEntry.Version,
 		Timestamp: m.lastEntry.Timestamp,
 	})
 }
@@ -438,7 +425,6 @@ func (m *Service) PrevEntry(bytes []byte) ([]byte, error) {
 	return proto.Marshal(&PrevEntryResponse{
 		Index:     entry.Index,
 		Value:     entry.Value,
-		Version:   entry.Version,
 		Timestamp: entry.Timestamp,
 	})
 }
@@ -467,7 +453,6 @@ func (m *Service) NextEntry(bytes []byte) ([]byte, error) {
 	return proto.Marshal(&NextEntryResponse{
 		Index:     entry.Index,
 		Value:     entry.Value,
-		Version:   entry.Version,
 		Timestamp: entry.Timestamp,
 	})
 }
@@ -528,7 +513,6 @@ func (m *Service) Events(bytes []byte, stream stream.WriteStream) {
 				Type:      ListenResponse_NONE,
 				Index:     entry.Index,
 				Value:     entry.Value,
-				Version:   entry.Version,
 				Timestamp: entry.Timestamp,
 			})
 			if err != nil {
@@ -563,6 +547,20 @@ func (m *Service) sendEvent(event *ListenResponse) {
 				}
 			}
 		}
+	}
+}
+
+// Entries returns a stream of entries to the client
+func (m *Service) Entries(value []byte, stream stream.WriteStream) {
+	defer stream.Close()
+	entry := m.firstEntry
+	for entry != nil {
+		stream.Result(proto.Marshal(&EntriesResponse{
+			Index:     entry.Index,
+			Value:     entry.Value,
+			Timestamp: entry.Timestamp,
+		}))
+		entry = entry.Next
 	}
 }
 
