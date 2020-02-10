@@ -63,6 +63,7 @@ func (m *Service) init() {
 	m.Executor.RegisterUnaryOperation(opSize, m.Size)
 	m.Executor.RegisterUnaryOperation(opClear, m.Clear)
 	m.Executor.RegisterStreamOperation(opEvents, m.Events)
+	m.Executor.RegisterStreamOperation(opEntries, m.Entries)
 }
 
 // LinkedLogEntryValue is a doubly linked LogEntryValue
