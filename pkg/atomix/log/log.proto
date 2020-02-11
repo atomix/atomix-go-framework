@@ -160,6 +160,16 @@ message ListenResponse {
     }
 }
 
+message EntriesRequest {
+
+}
+
+message EntriesResponse {
+    uint64 index = 1;
+    bytes value = 2;
+    google.protobuf.Timestamp timestamp = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+}
+
 
 // Listener is a log listener
 message Listener {

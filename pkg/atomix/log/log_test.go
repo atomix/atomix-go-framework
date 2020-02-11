@@ -174,7 +174,24 @@ func TestLogStreams(t *testing.T) {
 	assert.NotNil(t, kv)
 	assert.Equal(t, "item5", string(kv.Value))
 
-	<-latch
+	chanEntry := make(chan *client.Entry)
+	go func() {
+		e := <-chanEntry
+		assert.Equal(t, "item1", string(e.Value))
+		e = <-chanEntry
+		assert.Equal(t, "item2", string(e.Value))
+		e = <-chanEntry
+		assert.Equal(t, "item3", string(e.Value))
+		e = <-chanEntry
+		assert.Equal(t, "item4", string(e.Value))
+		e = <-chanEntry
+		assert.Equal(t, "item5", string(e.Value))
+		latch <- struct{}{}
+	}()
+
+	err = log.Entries(context.Background(), chanEntry)
+	assert.NoError(t, err)
+
 	err = log.Close(context.Background())
 	assert.NoError(t, err)
 
