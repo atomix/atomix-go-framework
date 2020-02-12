@@ -16,8 +16,11 @@ package indexedmap
 
 import (
 	"context"
+
 	"github.com/atomix/api/proto/atomix/headers"
 	api "github.com/atomix/api/proto/atomix/indexedmap"
+	logapi "github.com/atomix/api/proto/atomix/log"
+	mapapi "github.com/atomix/api/proto/atomix/map"
 	"github.com/atomix/go-framework/pkg/atomix/node"
 	"github.com/atomix/go-framework/pkg/atomix/server"
 	"github.com/atomix/go-framework/pkg/atomix/service"
@@ -68,8 +71,15 @@ func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.C
 // Close closes a session
 func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
-	if request.Delete {
-		header, err := s.DoDeleteService(ctx, request.Header)
+
+	mapCloseRequest := mapapi.CloseRequest{
+		Delete: request.GetDelete(),
+	}
+	logCloseRequest := logapi.CloseRequest{
+		Delete: request.GetDelete(),
+	}
+	if mapCloseRequest.Delete {
+		header, err := s.DoDeleteService(ctx, mapCloseRequest.Header)
 		if err != nil {
 			return nil, err
 		}
@@ -80,10 +90,28 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return response, nil
 	}
 
-	header, err := s.DoCloseService(ctx, request.Header)
+	if logCloseRequest.Delete {
+		header, err := s.DoDeleteService(ctx, logCloseRequest.Header)
+		if err != nil {
+			return nil, err
+		}
+		response := &api.CloseResponse{
+			Header: header,
+		}
+		log.Tracef("Sending CloseResponse %+v", response)
+		return response, nil
+	}
+
+	header, err := s.DoCloseService(ctx, logCloseRequest.Header)
 	if err != nil {
 		return nil, err
 	}
+
+	header, err = s.DoCloseService(ctx, mapCloseRequest.Header)
+	if err != nil {
+		return nil, err
+	}
+
 	response := &api.CloseResponse{
 		Header: header,
 	}
@@ -94,17 +122,18 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 // Size gets the number of entries in the map
 func (s *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeResponse, error) {
 	log.Tracef("Received SizeRequest %+v", request)
-	in, err := proto.Marshal(&SizeRequest{})
+	mapSizeRequest := mapapi.SizeRequest{}
+	in, err := proto.Marshal(&mapSizeRequest)
 	if err != nil {
 		return nil, err
 	}
 
-	out, header, err := s.DoQuery(ctx, opSize, in, request.Header)
+	out, header, err := s.DoQuery(ctx, opSize, in, mapSizeRequest.Header)
 	if err != nil {
 		return nil, err
 	}
 
-	sizeResponse := &SizeResponse{}
+	sizeResponse := &mapapi.SizeResponse{}
 	if err = proto.Unmarshal(out, sizeResponse); err != nil {
 		return nil, err
 	}
@@ -148,37 +177,60 @@ func (s *Server) Exists(ctx context.Context, request *api.ExistsRequest) (*api.E
 // Put puts a key/value pair into the map
 func (s *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResponse, error) {
 	log.Tracef("Received PutRequest %+v", request)
-	in, err := proto.Marshal(&PutRequest{
-		Index:   uint64(request.Index),
+
+	// Creates a log entry value (key + value)
+	logValue := LogEntryValue{
+		Key:   request.GetKey(),
+		Value: request.GetValue(),
+	}
+	// Add log entry value to the log primitive
+	logAppendRequest := logapi.AppendRequest{
+		Index: request.Index,
+		Value: logValue.Value,
+	}
+	in, err := proto.Marshal(&logAppendRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	out, header, err := s.DoCommand(ctx, opAppend, in, logAppendRequest.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	appendResponse := &logapi.AppendResponse{}
+	if err = proto.Unmarshal(out, appendResponse); err != nil {
+		return nil, err
+	}
+	// Add values to the map primitive
+	mapPutRequest := mapapi.PutRequest{
 		Key:     request.Key,
 		Value:   request.Value,
-		Version: uint64(request.Version),
 		TTL:     request.TTL,
-		IfEmpty: request.Version == -1,
-	})
+		Version: request.Version,
+	}
+	in, err = proto.Marshal(&mapPutRequest)
 	if err != nil {
 		return nil, err
 	}
 
-	out, header, err := s.DoCommand(ctx, opPut, in, request.Header)
+	out, header, err = s.DoCommand(ctx, opPut, in, mapPutRequest.Header)
 	if err != nil {
 		return nil, err
 	}
-
-	putResponse := &PutResponse{}
-	if err = proto.Unmarshal(out, putResponse); err != nil {
+	mapPutResponse := &mapapi.PutResponse{}
+	if err = proto.Unmarshal(out, mapPutResponse); err != nil {
 		return nil, err
 	}
 
 	response := &api.PutResponse{
 		Header:          header,
-		Status:          getResponseStatus(putResponse.Status),
-		Index:           int64(putResponse.Index),
-		Key:             putResponse.Key,
-		Created:         putResponse.Created,
-		Updated:         putResponse.Updated,
-		PreviousValue:   putResponse.PreviousValue,
-		PreviousVersion: int64(putResponse.PreviousVersion),
+		Status:          api.ResponseStatus(appendResponse.GetStatus()),
+		Index:           int64(appendResponse.Index),
+		Created:         mapPutResponse.Created,
+		Updated:         mapPutResponse.Updated,
+		PreviousValue:   mapPutResponse.PreviousValue,
+		PreviousVersion: mapPutResponse.PreviousVersion,
 	}
 	log.Tracef("Sending PutResponse %+v", response)
 	return response, nil
@@ -423,17 +475,30 @@ func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 // Clear removes all keys from the map
 func (s *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.ClearResponse, error) {
 	log.Tracef("Received ClearRequest %+v", request)
-	in, err := proto.Marshal(&ClearRequest{})
+	mapClearRequest := mapapi.ClearRequest{}
+	logClearRequest := logapi.ClearRequest{}
+
+	in, err := proto.Marshal(&logClearRequest)
 	if err != nil {
 		return nil, err
 	}
 
-	out, header, err := s.DoCommand(ctx, opClear, in, request.Header)
+	out, header, err := s.DoCommand(ctx, opClear, in, logClearRequest.Header)
 	if err != nil {
 		return nil, err
 	}
 
-	serviceResponse := &ClearResponse{}
+	in, err = proto.Marshal(&mapClearRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	out, header, err = s.DoCommand(ctx, opClear, in, mapClearRequest.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	serviceResponse := &mapapi.ClearResponse{}
 	if err = proto.Unmarshal(out, serviceResponse); err != nil {
 		return nil, err
 	}
