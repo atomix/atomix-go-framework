@@ -179,10 +179,15 @@ func (s *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResp
 		Key:   request.GetKey(),
 		Value: request.GetValue(),
 	}
+
+	var logAppendRequestValue []byte
+	_, err := logValue.MarshalTo(logAppendRequestValue)
+	if err != nil {
+		return nil, err
+	}
 	// Add log entry value to the log primitive
 	logAppendRequest := logapi.AppendRequest{
-		Index: request.GetIndex(),
-		Value: logValue.GetValue(),
+		Value: logAppendRequestValue,
 	}
 	in, err := proto.Marshal(&logAppendRequest)
 	if err != nil {
@@ -198,10 +203,21 @@ func (s *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResp
 	if err = proto.Unmarshal(out, logAppendResponse); err != nil {
 		return nil, err
 	}
+
+	mapValue := MapValue{
+		Index: uint64(logAppendResponse.GetIndex()),
+		Value: request.GetValue(),
+	}
+
+	var mapPutRequestValue []byte
+	_, err = mapValue.MarshalTo(mapPutRequestValue)
+	if err != nil {
+		return nil, err
+	}
 	// Add values to the map primitive
 	mapPutRequest := mapapi.PutRequest{
 		Key:     request.Key,
-		Value:   request.Value,
+		Value:   mapPutRequestValue,
 		TTL:     request.TTL,
 		Version: request.Version,
 	}
@@ -275,7 +291,6 @@ func (s *Server) Replace(ctx context.Context, request *api.ReplaceRequest) (*api
 func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
 	log.Tracef("Received GetRequest %+v", request)
 	mapGetRequest := mapapi.GetRequest{
-		//Index: uint64(request.Index),
 		Key: request.Key,
 	}
 	in, err := proto.Marshal(&mapGetRequest)
@@ -293,11 +308,15 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 		return nil, err
 	}
 
+	var mapValue MapValue
+	if err = proto.Unmarshal(getResponse.Value, &mapValue); err != nil {
+		return nil, err
+	}
 	response := &api.GetResponse{
-		Header: header,
-		//Index:   int64(getResponse.Index),
-		//Key:     getResponse.Key,
-		Value:   getResponse.Value,
+		Header:  header,
+		Index:   int64(mapValue.GetIndex()),
+		Key:     request.GetKey(),
+		Value:   mapValue.GetValue(),
 		Version: int64(getResponse.Version),
 		Created: getResponse.Created,
 		Updated: getResponse.Updated,
@@ -349,12 +368,15 @@ func (s *Server) FirstEntry(ctx context.Context, request *api.FirstEntryRequest)
 	if err = proto.Unmarshal(out, &mapGetResponse); err != nil {
 		return nil, err
 	}
-
+	var mapValue MapValue
+	if err = proto.Unmarshal(mapGetResponse.Value, &mapValue); err != nil {
+		return nil, err
+	}
 	response := &api.FirstEntryResponse{
 		Header:  logHeader,
-		Index:   int64(firstEntryResponse.Index),
+		Index:   int64(mapValue.GetIndex()),
 		Key:     logEntryValue.Key,
-		Value:   mapGetResponse.Value,
+		Value:   mapValue.GetValue(),
 		Version: int64(mapGetResponse.Version),
 		Created: mapGetResponse.Created,
 		Updated: mapGetResponse.Updated,
@@ -406,12 +428,16 @@ func (s *Server) LastEntry(ctx context.Context, request *api.LastEntryRequest) (
 	if err = proto.Unmarshal(out, &mapGetResponse); err != nil {
 		return nil, err
 	}
+	var mapValue MapValue
+	if err = proto.Unmarshal(mapGetResponse.Value, &mapValue); err != nil {
+		return nil, err
+	}
 
 	response := &api.LastEntryResponse{
 		Header:  logHeader,
-		Index:   int64(lastEntryResponse.Index),
+		Index:   int64(mapValue.GetIndex()),
 		Key:     logEntryValue.Key,
-		Value:   mapGetResponse.Value,
+		Value:   mapValue.GetValue(),
 		Version: int64(mapGetResponse.Version),
 		Created: mapGetResponse.Created,
 		Updated: mapGetResponse.Updated,
@@ -466,11 +492,16 @@ func (s *Server) PrevEntry(ctx context.Context, request *api.PrevEntryRequest) (
 		return nil, err
 	}
 
+	var mapValue MapValue
+	if err = proto.Unmarshal(mapGetResponse.Value, &mapValue); err != nil {
+		return nil, err
+	}
+
 	response := &api.PrevEntryResponse{
 		Header:  logHeader,
-		Index:   int64(prevEntryResponse.Index),
+		Index:   int64(mapValue.GetIndex()),
 		Key:     logEntryValue.Key,
-		Value:   mapGetResponse.Value,
+		Value:   mapValue.GetValue(),
 		Version: int64(mapGetResponse.Version),
 		Created: mapGetResponse.Created,
 		Updated: mapGetResponse.Updated,
@@ -525,11 +556,16 @@ func (s *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (
 		return nil, err
 	}
 
+	var mapValue MapValue
+	if err = proto.Unmarshal(mapGetResponse.Value, &mapValue); err != nil {
+		return nil, err
+	}
+
 	response := &api.NextEntryResponse{
 		Header:  logHeader,
-		Index:   int64(nextEntryResponse.Index),
+		Index:   int64(mapValue.GetIndex()),
 		Key:     logEntryValue.Key,
-		Value:   mapGetResponse.Value,
+		Value:   mapValue.GetValue(),
 		Version: int64(mapGetResponse.Version),
 		Created: mapGetResponse.Created,
 		Updated: mapGetResponse.Updated,
@@ -559,13 +595,17 @@ func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 	if err = proto.Unmarshal(out, removeResponse); err != nil {
 		return nil, err
 	}
+	var previousValue MapValue
+	if err = proto.Unmarshal(removeResponse.PreviousValue, &previousValue); err != nil {
+		return nil, err
+	}
 
 	response := &api.RemoveResponse{
-		Header: header,
-		Status: api.ResponseStatus(removeResponse.Status),
-		//Index:           int64(removeResponse.Index),
+		Header:          header,
+		Status:          api.ResponseStatus(removeResponse.Status),
+		Index:           int64(previousValue.GetIndex()),
 		Key:             request.Key,
-		PreviousValue:   removeResponse.PreviousValue,
+		PreviousValue:   previousValue.GetValue(),
 		PreviousVersion: int64(removeResponse.PreviousVersion),
 	}
 	log.Tracef("Sending RemoveRequest %+v", response)
