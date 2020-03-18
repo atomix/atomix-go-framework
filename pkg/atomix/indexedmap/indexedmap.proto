@@ -37,6 +37,16 @@ message Listener {
     uint64 index = 4;
 }
 
+message LogEntryValue {
+    string key = 1;
+    bytes value = 2;
+}
+
+message MapValue {
+    uint64 index = 1;
+    bytes value = 2;
+}
+
 // Map entry value
 message MapEntryValue {
     uint64 index = 1;

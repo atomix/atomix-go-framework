@@ -15,6 +15,7 @@
 package indexedmap
 
 const (
+	opAppend     = "Append"
 	opPut        = "Put"
 	opReplace    = "Replace"
 	opRemove     = "Remove"
