@@ -117,7 +117,7 @@ func (m *Service) Restore(reader io.Reader) error {
 		}
 		sessionListeners[snapshotListener.StreamId] = listener{
 			key:    snapshotListener.Key,
-			stream: m.Sessions()[snapshotListener.SessionId].Stream(snapshotListener.StreamId),
+			stream: m.SessionOf(snapshotListener.SessionId).Stream(snapshotListener.StreamId),
 		}
 	}
 

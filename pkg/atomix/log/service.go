@@ -133,7 +133,7 @@ func (m *Service) Restore(reader io.Reader) error {
 		}
 		sessionListeners[snapshotListener.StreamId] = listener{
 			index:  snapshotListener.Index,
-			stream: m.Sessions()[snapshotListener.SessionId].Stream(snapshotListener.StreamId),
+			stream: m.SessionOf(snapshotListener.SessionId).Stream(snapshotListener.StreamId),
 		}
 	}
 
