@@ -16,12 +16,13 @@ package _map //nolint:golint
 
 import (
 	"bytes"
+	"io"
+
 	"github.com/atomix/go-framework/pkg/atomix/node"
 	"github.com/atomix/go-framework/pkg/atomix/service"
 	"github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
-	"io"
 )
 
 func init() {
@@ -436,7 +437,7 @@ func (m *Service) Entries(value []byte, stream stream.WriteStream) {
 
 func (m *Service) scheduleTTL(key string, value *MapEntryValue) {
 	m.cancelTTL(key)
-	if value.TTL != nil {
+	if value.TTL != nil && *value.TTL > 0 {
 		m.timers[key] = m.Scheduler.ScheduleOnce(value.Created.Add(*value.TTL).Sub(m.Context.Timestamp()), func() {
 			delete(m.entries, key)
 			m.sendEvent(&ListenResponse{
