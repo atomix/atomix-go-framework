@@ -53,8 +53,8 @@ func (s *Server) DoCommand(ctx context.Context, name string, input []byte, heade
 				Command: &service.ServiceCommandRequest{
 					Service: &service.ServiceId{
 						Type:      s.Type,
-						Name:      header.Name.Name,
-						Namespace: header.Name.Namespace,
+						Name:      header.Primitive.Name,
+						Namespace: header.Primitive.Namespace,
 					},
 					Request: &service.ServiceCommandRequest_Operation{
 						Operation: &service.ServiceOperationRequest{
@@ -132,8 +132,8 @@ func (s *Server) DoCommandStream(ctx context.Context, name string, input []byte,
 				Command: &service.ServiceCommandRequest{
 					Service: &service.ServiceId{
 						Type:      s.Type,
-						Name:      header.Name.Name,
-						Namespace: header.Name.Namespace,
+						Name:      header.Primitive.Name,
+						Namespace: header.Primitive.Namespace,
 					},
 					Request: &service.ServiceCommandRequest_Operation{
 						Operation: &service.ServiceOperationRequest{
@@ -209,8 +209,8 @@ func (s *Server) DoQuery(ctx context.Context, name string, input []byte, header 
 				Query: &service.ServiceQueryRequest{
 					Service: &service.ServiceId{
 						Type:      s.Type,
-						Name:      header.Name.Name,
-						Namespace: header.Name.Namespace,
+						Name:      header.Primitive.Name,
+						Namespace: header.Primitive.Namespace,
 					},
 					Request: &service.ServiceQueryRequest_Operation{
 						Operation: &service.ServiceOperationRequest{
@@ -287,8 +287,8 @@ func (s *Server) DoQueryStream(ctx context.Context, name string, input []byte, h
 				Query: &service.ServiceQueryRequest{
 					Service: &service.ServiceId{
 						Type:      s.Type,
-						Name:      header.Name.Name,
-						Namespace: header.Name.Namespace,
+						Name:      header.Primitive.Name,
+						Namespace: header.Primitive.Namespace,
 					},
 					Request: &service.ServiceQueryRequest_Operation{
 						Operation: &service.ServiceOperationRequest{
@@ -593,8 +593,8 @@ func (s *Server) DoCreateService(ctx context.Context, header *headers.RequestHea
 				Command: &service.ServiceCommandRequest{
 					Service: &service.ServiceId{
 						Type:      s.Type,
-						Name:      header.Name.Name,
-						Namespace: header.Name.Namespace,
+						Name:      header.Primitive.Name,
+						Namespace: header.Primitive.Namespace,
 					},
 					Request: &service.ServiceCommandRequest_Create{
 						Create: &service.ServiceCreateRequest{},
@@ -665,8 +665,8 @@ func (s *Server) DoCloseService(ctx context.Context, header *headers.RequestHead
 				Command: &service.ServiceCommandRequest{
 					Service: &service.ServiceId{
 						Type:      s.Type,
-						Name:      header.Name.Name,
-						Namespace: header.Name.Namespace,
+						Name:      header.Primitive.Name,
+						Namespace: header.Primitive.Namespace,
 					},
 					Request: &service.ServiceCommandRequest_Close{
 						Close: &service.ServiceCloseRequest{},
@@ -737,8 +737,8 @@ func (s *Server) DoDeleteService(ctx context.Context, header *headers.RequestHea
 				Command: &service.ServiceCommandRequest{
 					Service: &service.ServiceId{
 						Type:      s.Type,
-						Name:      header.Name.Name,
-						Namespace: header.Name.Namespace,
+						Name:      header.Primitive.Name,
+						Namespace: header.Primitive.Namespace,
 					},
 					Request: &service.ServiceCommandRequest_Delete{
 						Delete: &service.ServiceDeleteRequest{},

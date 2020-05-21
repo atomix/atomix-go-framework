@@ -42,9 +42,6 @@ import (
 	// Register the map primitive
 	_ "github.com/atomix/go-framework/pkg/atomix/map"
 
-	// Register the metadata service
-	_ "github.com/atomix/go-framework/pkg/atomix/metadata"
-
 	// Register the session management service
 	_ "github.com/atomix/go-framework/pkg/atomix/session"
 

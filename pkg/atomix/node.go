@@ -16,7 +16,7 @@ package atomix
 
 import (
 	"fmt"
-	"github.com/atomix/api/proto/atomix/controller"
+	"github.com/atomix/api/proto/atomix/database"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/node"
 	"github.com/atomix/go-framework/pkg/atomix/util"
@@ -26,7 +26,7 @@ import (
 )
 
 // NewNode creates a new node running the given protocol
-func NewNode(nodeID string, config *controller.ClusterConfig, protocol node.Protocol, registry *node.Registry, opts ...NodeOption) *Node {
+func NewNode(nodeID string, config *database.DatabaseConfig, protocol node.Protocol, registry *node.Registry, opts ...NodeOption) *Node {
 	node := &Node{
 		ID:       nodeID,
 		config:   config,
@@ -83,7 +83,7 @@ func (o *portOption) apply(node *Node) {
 // Node is an Atomix node
 type Node struct {
 	ID       string
-	config   *controller.ClusterConfig
+	config   *database.DatabaseConfig
 	protocol node.Protocol
 	registry *node.Registry
 	port     int
@@ -95,7 +95,7 @@ type Node struct {
 // Start starts the node
 func (n *Node) Start() error {
 	members := make(map[string]cluster.Member)
-	for _, member := range n.config.Members {
+	for _, member := range n.config.Replicas {
 		members[member.ID] = cluster.Member{
 			ID:           member.ID,
 			Host:         member.Host,
