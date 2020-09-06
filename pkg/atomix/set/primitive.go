@@ -17,22 +17,26 @@ package set
 import (
 	primitiveapi "github.com/atomix/api/proto/atomix/primitive"
 	api "github.com/atomix/api/proto/atomix/set"
+	"github.com/atomix/go-framework/pkg/atomix"
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	"google.golang.org/grpc"
 )
 
-func init() {
-	primitive.Register(primitiveapi.PrimitiveType_SET, &Primitive{})
+const Type = primitiveapi.PrimitiveType_SET
+
+// RegisterPrimitive registers the primitive on the given node
+func RegisterPrimitive(node *atomix.Node) {
+	node.RegisterPrimitive(Type, &Primitive{})
 }
 
 // Primitive is the counter primitive
 type Primitive struct{}
 
-func (p *Primitive) RegisterServer(server *grpc.Server, client primitive.ProtocolClient) {
+func (p *Primitive) RegisterServer(server *grpc.Server, protocol primitive.Protocol) {
 	api.RegisterSetServiceServer(server, &Server{
 		Server: &primitive.Server{
-			Type:   primitive.ServiceType_SET,
-			Client: client,
+			Type:     primitive.ServiceType_SET,
+			Protocol: protocol,
 		},
 	})
 }

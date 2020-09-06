@@ -33,10 +33,14 @@ type ProtocolContext interface {
 
 // Protocol is the interface to be implemented by replication protocols
 type Protocol interface {
-	ProtocolClient
+	// Partition returns a partition
+	Partition(partitionID int) Partition
+
+	// Partitions returns the protocol partitions
+	Partitions() []Partition
 
 	// Start starts the protocol
-	Start(cluster cluster.Cluster) error
+	Start(cluster cluster.Cluster, registry Registry) error
 
 	// Stop stops the protocol
 	Stop() error

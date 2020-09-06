@@ -19,8 +19,8 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/stream"
 )
 
-// PartitionClient is the interface for a partition client
-type PartitionClient interface {
+// Partition is the interface for a partition client
+type Partition interface {
 	// MustLeader returns whether the client can only be used on the leader
 	MustLeader() bool
 

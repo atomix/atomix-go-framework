@@ -22,7 +22,7 @@ import (
 // Primitive is a primitive type
 type Primitive interface {
 	// RegisterServer registers the primitive server with the gRPC server
-	RegisterServer(server *grpc.Server, client ProtocolClient)
+	RegisterServer(server *grpc.Server, protocol Protocol)
 
 	// NewService creates a new primitive service
 	NewService(scheduler Scheduler, context ServiceContext) Service
@@ -38,18 +38,6 @@ type Registry interface {
 
 	// GetPrimitive gets a primitive by type
 	GetPrimitive(primitiveType primitive.PrimitiveType) Primitive
-}
-
-var registry = newRegistry()
-
-// GetRegistry returns the service registry
-func GetRegistry() Registry {
-	return registry
-}
-
-// Register registers a primitive type
-func Register(primitiveType primitive.PrimitiveType, primitive Primitive) {
-	GetRegistry().Register(primitiveType, primitive)
 }
 
 // primitiveRegistry is the default primitive registry
@@ -73,8 +61,8 @@ func (r *primitiveRegistry) GetPrimitive(primitiveType primitive.PrimitiveType) 
 	return r.primitives[primitiveType]
 }
 
-// newRegistry creates a default primitive registry
-func newRegistry() Registry {
+// NewRegistry creates a new primitive registry
+func NewRegistry() Registry {
 	return &primitiveRegistry{
 		primitives: make(map[primitive.PrimitiveType]Primitive),
 	}

@@ -17,6 +17,7 @@ package atomix
 import (
 	"fmt"
 	"github.com/atomix/api/proto/atomix/database"
+	primitiveapi "github.com/atomix/api/proto/atomix/primitive"
 	"github.com/atomix/api/proto/atomix/session"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
@@ -27,12 +28,12 @@ import (
 )
 
 // NewNode creates a new node running the given protocol
-func NewNode(nodeID string, config *database.DatabaseConfig, protocol primitive.Protocol, registry primitive.Registry, opts ...NodeOption) *Node {
+func NewNode(nodeID string, config *database.DatabaseConfig, protocol primitive.Protocol, opts ...NodeOption) *Node {
 	node := &Node{
 		ID:       nodeID,
 		config:   config,
 		protocol: protocol,
-		registry: registry,
+		registry: primitive.NewRegistry(),
 		startCh:  make(chan error),
 	}
 	(&defaultOption{}).apply(node)
@@ -93,6 +94,11 @@ type Node struct {
 	startCh  chan error
 }
 
+// RegisterPrimitive registers a primitive type
+func (n *Node) RegisterPrimitive(t primitiveapi.PrimitiveType, primitive primitive.Primitive) {
+	n.registry.Register(t, primitive)
+}
+
 // Start starts the node
 func (n *Node) Start() error {
 	members := make(map[string]cluster.Member)
@@ -111,7 +117,7 @@ func (n *Node) Start() error {
 	}
 
 	log.Info("Starting protocol")
-	err := n.protocol.Start(cluster)
+	err := n.protocol.Start(cluster, n.registry)
 	if err != nil {
 		return err
 	}
@@ -137,7 +143,7 @@ func (n *Node) run(lis net.Listener) error {
 	n.server = grpc.NewServer()
 	session.RegisterSessionServiceServer(n.server, &primitive.SessionServer{
 		Server: &primitive.Server{
-			Client: n.protocol,
+			Protocol: n.protocol,
 		},
 	})
 	for _, primitive := range n.registry.GetPrimitives() {

@@ -17,22 +17,26 @@ package log
 import (
 	api "github.com/atomix/api/proto/atomix/log"
 	primitiveapi "github.com/atomix/api/proto/atomix/primitive"
+	"github.com/atomix/go-framework/pkg/atomix"
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	"google.golang.org/grpc"
 )
 
-func init() {
-	primitive.Register(primitiveapi.PrimitiveType_LOG, &Primitive{})
+const Type = primitiveapi.PrimitiveType_LOG
+
+// RegisterPrimitive registers the primitive on the given node
+func RegisterPrimitive(node *atomix.Node) {
+	node.RegisterPrimitive(Type, &Primitive{})
 }
 
 // Primitive is the counter primitive
 type Primitive struct{}
 
-func (p *Primitive) RegisterServer(server *grpc.Server, client primitive.ProtocolClient) {
+func (p *Primitive) RegisterServer(server *grpc.Server, protocol primitive.Protocol) {
 	api.RegisterLogServiceServer(server, &Server{
 		Server: &primitive.Server{
-			Type:   primitive.ServiceType_LOG,
-			Client: client,
+			Type:     primitive.ServiceType_LOG,
+			Protocol: protocol,
 		},
 	})
 }

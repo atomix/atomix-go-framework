@@ -17,22 +17,26 @@ package indexedmap
 import (
 	api "github.com/atomix/api/proto/atomix/indexedmap"
 	primitiveapi "github.com/atomix/api/proto/atomix/primitive"
+	"github.com/atomix/go-framework/pkg/atomix"
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	"google.golang.org/grpc"
 )
 
-func init() {
-	primitive.Register(primitiveapi.PrimitiveType_INDEXED_MAP, &Primitive{})
+const Type = primitiveapi.PrimitiveType_INDEXED_MAP
+
+// RegisterPrimitive registers the primitive on the given node
+func RegisterPrimitive(node *atomix.Node) {
+	node.RegisterPrimitive(Type, &Primitive{})
 }
 
 // Primitive is the counter primitive
 type Primitive struct{}
 
-func (p *Primitive) RegisterServer(server *grpc.Server, client primitive.ProtocolClient) {
+func (p *Primitive) RegisterServer(server *grpc.Server, protocol primitive.Protocol) {
 	api.RegisterIndexedMapServiceServer(server, &Server{
 		Server: &primitive.Server{
-			Type:   primitive.ServiceType_INDEXED_MAP,
-			Client: client,
+			Type:     primitive.ServiceType_INDEXED_MAP,
+			Protocol: protocol,
 		},
 	})
 }
