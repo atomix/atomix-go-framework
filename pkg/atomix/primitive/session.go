@@ -12,18 +12,68 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package service
+package primitive
 
 import (
 	"container/list"
+	"context"
+	api "github.com/atomix/api/proto/atomix/session"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/gogo/protobuf/proto"
+	log "github.com/sirupsen/logrus"
 	"time"
 )
 
+// SessionServer is an implementation of SessionServiceServer for session management
+type SessionServer struct {
+	*Server
+}
+
+// OpenSession opens a new session
+func (s *SessionServer) OpenSession(ctx context.Context, request *api.OpenSessionRequest) (*api.OpenSessionResponse, error) {
+	log.Tracef("Received OpenSessionRequest %+v", request)
+	header, err := s.DoOpenSession(ctx, request.Header, request.Timeout)
+	if err != nil {
+		return nil, err
+	}
+	response := &api.OpenSessionResponse{
+		Header: header,
+	}
+	log.Tracef("Sending OpenSessionResponse %+v", response)
+	return response, nil
+}
+
+// KeepAlive keeps a session alive
+func (s *SessionServer) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
+	log.Tracef("Received KeepAliveRequest %+v", request)
+	header, err := s.DoKeepAliveSession(ctx, request.Header)
+	if err != nil {
+		return nil, err
+	}
+	response := &api.KeepAliveResponse{
+		Header: header,
+	}
+	log.Tracef("Sending KeepAliveResponse %+v", response)
+	return response, nil
+}
+
+// CloseSession closes a session
+func (s *SessionServer) CloseSession(ctx context.Context, request *api.CloseSessionRequest) (*api.CloseSessionResponse, error) {
+	log.Tracef("Received CloseSessionRequest %+v", request)
+	header, err := s.DoCloseSession(ctx, request.Header)
+	if err != nil {
+		return nil, err
+	}
+	response := &api.CloseSessionResponse{
+		Header: header,
+	}
+	log.Tracef("Sending CloseSessionResponse %+v", response)
+	return response, nil
+}
+
 // newSession creates a new session
-func newSession(ctx Context, timeout *time.Duration) *Session {
+func newSession(ctx ProtocolContext, timeout *time.Duration) *Session {
 	if timeout == nil {
 		defaultTimeout := 30 * time.Second
 		timeout = &defaultTimeout
@@ -49,7 +99,7 @@ type Session struct {
 	ID               uint64
 	Timeout          time.Duration
 	LastUpdated      time.Time
-	ctx              Context
+	ctx              ProtocolContext
 	commandSequence  uint64
 	ackSequence      uint64
 	commandCallbacks map[uint64]func()

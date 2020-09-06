@@ -12,15 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package server
+package primitive
 
 import (
 	"context"
 	"errors"
 	"github.com/atomix/api/proto/atomix/headers"
 	"github.com/atomix/api/proto/atomix/primitive"
-	"github.com/atomix/go-framework/pkg/atomix/node"
-	"github.com/atomix/go-framework/pkg/atomix/service"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	"time"
@@ -28,14 +26,14 @@ import (
 
 // Server is a base server for servers that support sessions
 type Server struct {
-	Protocol node.Protocol
-	Type     service.ServiceType
+	Client ProtocolClient
+	Type   ServiceType
 }
 
 // DoCommand submits a command to the service
 func (s *Server) DoCommand(ctx context.Context, name string, input []byte, header *headers.RequestHeader) ([]byte, *headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(int(header.Partition))
+	partition := s.Client.Partition(int(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		return nil, &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
@@ -43,21 +41,21 @@ func (s *Server) DoCommand(ctx context.Context, name string, input []byte, heade
 		}, nil
 	}
 
-	sessionRequest := &service.SessionRequest{
-		Request: &service.SessionRequest_Command{
-			Command: &service.SessionCommandRequest{
-				Context: &service.SessionCommandContext{
+	sessionRequest := &SessionRequest{
+		Request: &SessionRequest_Command{
+			Command: &SessionCommandRequest{
+				Context: &SessionCommandContext{
 					SessionID:      header.SessionID,
 					SequenceNumber: header.RequestID,
 				},
-				Command: &service.ServiceCommandRequest{
-					Service: &service.ServiceId{
+				Command: &ServiceCommandRequest{
+					Service: &ServiceId{
 						Type:      s.Type,
 						Name:      header.Primitive.Name,
 						Namespace: header.Primitive.Namespace,
 					},
-					Request: &service.ServiceCommandRequest_Operation{
-						Operation: &service.ServiceOperationRequest{
+					Request: &ServiceCommandRequest_Operation{
+						Operation: &ServiceOperationRequest{
 							Method: name,
 							Value:  input,
 						},
@@ -91,7 +89,7 @@ func (s *Server) DoCommand(ctx context.Context, name string, input []byte, heade
 		return nil, nil, result.Error
 	}
 
-	sessionResponse := &service.SessionResponse{}
+	sessionResponse := &SessionResponse{}
 	err = proto.Unmarshal(result.Value.([]byte), sessionResponse)
 	if err != nil {
 		return nil, nil, err
@@ -110,7 +108,7 @@ func (s *Server) DoCommand(ctx context.Context, name string, input []byte, heade
 // DoCommandStream submits a streaming command to the service
 func (s *Server) DoCommandStream(ctx context.Context, name string, input []byte, header *headers.RequestHeader, stream streams.WriteStream) error {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(int(header.Partition))
+	partition := s.Client.Partition(int(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		stream.Value(SessionOutput{
 			Header: &headers.ResponseHeader{
@@ -122,21 +120,21 @@ func (s *Server) DoCommandStream(ctx context.Context, name string, input []byte,
 		return nil
 	}
 
-	sessionRequest := &service.SessionRequest{
-		Request: &service.SessionRequest_Command{
-			Command: &service.SessionCommandRequest{
-				Context: &service.SessionCommandContext{
+	sessionRequest := &SessionRequest{
+		Request: &SessionRequest_Command{
+			Command: &SessionCommandRequest{
+				Context: &SessionCommandContext{
 					SessionID:      header.SessionID,
 					SequenceNumber: header.RequestID,
 				},
-				Command: &service.ServiceCommandRequest{
-					Service: &service.ServiceId{
+				Command: &ServiceCommandRequest{
+					Service: &ServiceId{
 						Type:      s.Type,
 						Name:      header.Primitive.Name,
 						Namespace: header.Primitive.Namespace,
 					},
-					Request: &service.ServiceCommandRequest_Operation{
-						Operation: &service.ServiceOperationRequest{
+					Request: &ServiceCommandRequest_Operation{
+						Operation: &ServiceOperationRequest{
 							Method: name,
 							Value:  input,
 						},
@@ -152,7 +150,7 @@ func (s *Server) DoCommandStream(ctx context.Context, name string, input []byte,
 	}
 
 	stream = streams.NewEncodingStream(stream, func(value interface{}) (interface{}, error) {
-		sessionResponse := &service.SessionResponse{}
+		sessionResponse := &SessionResponse{}
 		err = proto.Unmarshal(value.([]byte), sessionResponse)
 		if err != nil {
 			return SessionOutput{
@@ -190,7 +188,7 @@ func (s *Server) DoCommandStream(ctx context.Context, name string, input []byte,
 // DoQuery submits a query to the service
 func (s *Server) DoQuery(ctx context.Context, name string, input []byte, header *headers.RequestHeader) ([]byte, *headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(int(header.Partition))
+	partition := s.Client.Partition(int(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		return nil, &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
@@ -198,22 +196,22 @@ func (s *Server) DoQuery(ctx context.Context, name string, input []byte, header 
 		}, nil
 	}
 
-	sessionRequest := &service.SessionRequest{
-		Request: &service.SessionRequest_Query{
-			Query: &service.SessionQueryRequest{
-				Context: &service.SessionQueryContext{
+	sessionRequest := &SessionRequest{
+		Request: &SessionRequest_Query{
+			Query: &SessionQueryRequest{
+				Context: &SessionQueryContext{
 					SessionID:          header.SessionID,
 					LastIndex:          header.Index,
 					LastSequenceNumber: header.RequestID,
 				},
-				Query: &service.ServiceQueryRequest{
-					Service: &service.ServiceId{
+				Query: &ServiceQueryRequest{
+					Service: &ServiceId{
 						Type:      s.Type,
 						Name:      header.Primitive.Name,
 						Namespace: header.Primitive.Namespace,
 					},
-					Request: &service.ServiceQueryRequest_Operation{
-						Operation: &service.ServiceOperationRequest{
+					Request: &ServiceQueryRequest_Operation{
+						Operation: &ServiceOperationRequest{
 							Method: name,
 							Value:  input,
 						},
@@ -247,7 +245,7 @@ func (s *Server) DoQuery(ctx context.Context, name string, input []byte, header 
 		return nil, nil, result.Error
 	}
 
-	sessionResponse := &service.SessionResponse{}
+	sessionResponse := &SessionResponse{}
 	err = proto.Unmarshal(result.Value.([]byte), sessionResponse)
 	if err != nil {
 		return nil, nil, err
@@ -264,7 +262,7 @@ func (s *Server) DoQuery(ctx context.Context, name string, input []byte, header 
 // DoQueryStream submits a streaming query to the service
 func (s *Server) DoQueryStream(ctx context.Context, name string, input []byte, header *headers.RequestHeader, stream streams.WriteStream) error {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(int(header.Partition))
+	partition := s.Client.Partition(int(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		stream.Value(SessionOutput{
 			Header: &headers.ResponseHeader{
@@ -276,22 +274,22 @@ func (s *Server) DoQueryStream(ctx context.Context, name string, input []byte, h
 		return nil
 	}
 
-	sessionRequest := &service.SessionRequest{
-		Request: &service.SessionRequest_Query{
-			Query: &service.SessionQueryRequest{
-				Context: &service.SessionQueryContext{
+	sessionRequest := &SessionRequest{
+		Request: &SessionRequest_Query{
+			Query: &SessionQueryRequest{
+				Context: &SessionQueryContext{
 					SessionID:          header.SessionID,
 					LastIndex:          header.Index,
 					LastSequenceNumber: header.RequestID,
 				},
-				Query: &service.ServiceQueryRequest{
-					Service: &service.ServiceId{
+				Query: &ServiceQueryRequest{
+					Service: &ServiceId{
 						Type:      s.Type,
 						Name:      header.Primitive.Name,
 						Namespace: header.Primitive.Namespace,
 					},
-					Request: &service.ServiceQueryRequest_Operation{
-						Operation: &service.ServiceOperationRequest{
+					Request: &ServiceQueryRequest_Operation{
+						Operation: &ServiceOperationRequest{
 							Method: name,
 							Value:  input,
 						},
@@ -307,7 +305,7 @@ func (s *Server) DoQueryStream(ctx context.Context, name string, input []byte, h
 	}
 
 	stream = streams.NewDecodingStream(stream, func(value interface{}) (interface{}, error) {
-		sessionResponse := &service.SessionResponse{}
+		sessionResponse := &SessionResponse{}
 		if err := proto.Unmarshal(value.([]byte), sessionResponse); err != nil {
 			return nil, err
 		}
@@ -335,9 +333,9 @@ func (s *Server) DoQueryStream(ctx context.Context, name string, input []byte, h
 }
 
 // DoMetadata submits a metadata query to the service
-func (s *Server) DoMetadata(ctx context.Context, serviceType primitive.PrimitiveType, namespace string, header *headers.RequestHeader) ([]*service.ServiceId, *headers.ResponseHeader, error) {
+func (s *Server) DoMetadata(ctx context.Context, serviceType primitive.PrimitiveType, namespace string, header *headers.RequestHeader) ([]*ServiceId, *headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(int(header.Partition))
+	partition := s.Client.Partition(int(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		return nil, &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
@@ -345,18 +343,18 @@ func (s *Server) DoMetadata(ctx context.Context, serviceType primitive.Primitive
 		}, nil
 	}
 
-	sessionRequest := &service.SessionRequest{
-		Request: &service.SessionRequest_Query{
-			Query: &service.SessionQueryRequest{
-				Context: &service.SessionQueryContext{
+	sessionRequest := &SessionRequest{
+		Request: &SessionRequest_Query{
+			Query: &SessionQueryRequest{
+				Context: &SessionQueryContext{
 					SessionID:          header.SessionID,
 					LastIndex:          header.Index,
 					LastSequenceNumber: header.RequestID,
 				},
-				Query: &service.ServiceQueryRequest{
-					Request: &service.ServiceQueryRequest_Metadata{
-						Metadata: &service.ServiceMetadataRequest{
-							Type:      service.ServiceType(serviceType),
+				Query: &ServiceQueryRequest{
+					Request: &ServiceQueryRequest_Metadata{
+						Metadata: &ServiceMetadataRequest{
+							Type:      ServiceType(serviceType),
 							Namespace: namespace,
 						},
 					},
@@ -389,7 +387,7 @@ func (s *Server) DoMetadata(ctx context.Context, serviceType primitive.Primitive
 		return nil, nil, result.Error
 	}
 
-	sessionResponse := &service.SessionResponse{}
+	sessionResponse := &SessionResponse{}
 	err = proto.Unmarshal(result.Value.([]byte), sessionResponse)
 	if err != nil {
 		return nil, nil, err
@@ -406,7 +404,7 @@ func (s *Server) DoMetadata(ctx context.Context, serviceType primitive.Primitive
 // DoOpenSession opens a new session
 func (s *Server) DoOpenSession(ctx context.Context, header *headers.RequestHeader, timeout *time.Duration) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(int(header.Partition))
+	partition := s.Client.Partition(int(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		return &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
@@ -414,9 +412,9 @@ func (s *Server) DoOpenSession(ctx context.Context, header *headers.RequestHeade
 		}, nil
 	}
 
-	sessionRequest := &service.SessionRequest{
-		Request: &service.SessionRequest_OpenSession{
-			OpenSession: &service.OpenSessionRequest{
+	sessionRequest := &SessionRequest{
+		Request: &SessionRequest_OpenSession{
+			OpenSession: &OpenSessionRequest{
 				Timeout: timeout,
 			},
 		},
@@ -446,7 +444,7 @@ func (s *Server) DoOpenSession(ctx context.Context, header *headers.RequestHeade
 		return nil, result.Error
 	}
 
-	sessionResponse := &service.SessionResponse{}
+	sessionResponse := &SessionResponse{}
 	err = proto.Unmarshal(result.Value.([]byte), sessionResponse)
 	if err != nil {
 		return nil, err
@@ -462,7 +460,7 @@ func (s *Server) DoOpenSession(ctx context.Context, header *headers.RequestHeade
 // DoKeepAliveSession keeps a session alive
 func (s *Server) DoKeepAliveSession(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(int(header.Partition))
+	partition := s.Client.Partition(int(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		return &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
@@ -478,9 +476,9 @@ func (s *Server) DoKeepAliveSession(ctx context.Context, header *headers.Request
 		streams[stream.StreamID] = stream.ResponseID
 	}
 
-	sessionRequest := &service.SessionRequest{
-		Request: &service.SessionRequest_KeepAlive{
-			KeepAlive: &service.KeepAliveRequest{
+	sessionRequest := &SessionRequest{
+		Request: &SessionRequest_KeepAlive{
+			KeepAlive: &KeepAliveRequest{
 				SessionID:       header.SessionID,
 				CommandSequence: header.RequestID,
 				Streams:         streams,
@@ -509,7 +507,7 @@ func (s *Server) DoKeepAliveSession(ctx context.Context, header *headers.Request
 		return nil, result.Error
 	}
 
-	sessionResponse := &service.SessionResponse{}
+	sessionResponse := &SessionResponse{}
 	err = proto.Unmarshal(result.Value.([]byte), sessionResponse)
 	if err != nil {
 		return nil, err
@@ -522,7 +520,7 @@ func (s *Server) DoKeepAliveSession(ctx context.Context, header *headers.Request
 // DoCloseSession closes a session
 func (s *Server) DoCloseSession(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(int(header.Partition))
+	partition := s.Client.Partition(int(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		return &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
@@ -530,9 +528,9 @@ func (s *Server) DoCloseSession(ctx context.Context, header *headers.RequestHead
 		}, nil
 	}
 
-	sessionRequest := &service.SessionRequest{
-		Request: &service.SessionRequest_CloseSession{
-			CloseSession: &service.CloseSessionRequest{
+	sessionRequest := &SessionRequest{
+		Request: &SessionRequest_CloseSession{
+			CloseSession: &CloseSessionRequest{
 				SessionID: header.SessionID,
 			},
 		},
@@ -562,7 +560,7 @@ func (s *Server) DoCloseSession(ctx context.Context, header *headers.RequestHead
 		return nil, result.Error
 	}
 
-	sessionResponse := &service.SessionResponse{}
+	sessionResponse := &SessionResponse{}
 	err = proto.Unmarshal(result.Value.([]byte), sessionResponse)
 	if err != nil {
 		return nil, err
@@ -575,7 +573,7 @@ func (s *Server) DoCloseSession(ctx context.Context, header *headers.RequestHead
 // DoCreateService creates the service
 func (s *Server) DoCreateService(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(int(header.Partition))
+	partition := s.Client.Partition(int(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		return &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
@@ -583,21 +581,21 @@ func (s *Server) DoCreateService(ctx context.Context, header *headers.RequestHea
 		}, nil
 	}
 
-	sessionRequest := &service.SessionRequest{
-		Request: &service.SessionRequest_Command{
-			Command: &service.SessionCommandRequest{
-				Context: &service.SessionCommandContext{
+	sessionRequest := &SessionRequest{
+		Request: &SessionRequest_Command{
+			Command: &SessionCommandRequest{
+				Context: &SessionCommandContext{
 					SessionID:      header.SessionID,
 					SequenceNumber: header.RequestID,
 				},
-				Command: &service.ServiceCommandRequest{
-					Service: &service.ServiceId{
+				Command: &ServiceCommandRequest{
+					Service: &ServiceId{
 						Type:      s.Type,
 						Name:      header.Primitive.Name,
 						Namespace: header.Primitive.Namespace,
 					},
-					Request: &service.ServiceCommandRequest_Create{
-						Create: &service.ServiceCreateRequest{},
+					Request: &ServiceCommandRequest_Create{
+						Create: &ServiceCreateRequest{},
 					},
 				},
 			},
@@ -628,7 +626,7 @@ func (s *Server) DoCreateService(ctx context.Context, header *headers.RequestHea
 		return nil, result.Error
 	}
 
-	sessionResponse := &service.SessionResponse{}
+	sessionResponse := &SessionResponse{}
 	err = proto.Unmarshal(result.Value.([]byte), sessionResponse)
 	if err != nil {
 		return nil, err
@@ -647,7 +645,7 @@ func (s *Server) DoCreateService(ctx context.Context, header *headers.RequestHea
 // DoCloseService closes the service
 func (s *Server) DoCloseService(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(int(header.Partition))
+	partition := s.Client.Partition(int(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		return &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
@@ -655,21 +653,21 @@ func (s *Server) DoCloseService(ctx context.Context, header *headers.RequestHead
 		}, nil
 	}
 
-	sessionRequest := &service.SessionRequest{
-		Request: &service.SessionRequest_Command{
-			Command: &service.SessionCommandRequest{
-				Context: &service.SessionCommandContext{
+	sessionRequest := &SessionRequest{
+		Request: &SessionRequest_Command{
+			Command: &SessionCommandRequest{
+				Context: &SessionCommandContext{
 					SessionID:      header.SessionID,
 					SequenceNumber: header.RequestID,
 				},
-				Command: &service.ServiceCommandRequest{
-					Service: &service.ServiceId{
+				Command: &ServiceCommandRequest{
+					Service: &ServiceId{
 						Type:      s.Type,
 						Name:      header.Primitive.Name,
 						Namespace: header.Primitive.Namespace,
 					},
-					Request: &service.ServiceCommandRequest_Close{
-						Close: &service.ServiceCloseRequest{},
+					Request: &ServiceCommandRequest_Close{
+						Close: &ServiceCloseRequest{},
 					},
 				},
 			},
@@ -700,7 +698,7 @@ func (s *Server) DoCloseService(ctx context.Context, header *headers.RequestHead
 		return nil, result.Error
 	}
 
-	sessionResponse := &service.SessionResponse{}
+	sessionResponse := &SessionResponse{}
 	err = proto.Unmarshal(result.Value.([]byte), sessionResponse)
 	if err != nil {
 		return nil, err
@@ -719,7 +717,7 @@ func (s *Server) DoCloseService(ctx context.Context, header *headers.RequestHead
 // DoDeleteService deletes the service
 func (s *Server) DoDeleteService(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(int(header.Partition))
+	partition := s.Client.Partition(int(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		return &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
@@ -727,21 +725,21 @@ func (s *Server) DoDeleteService(ctx context.Context, header *headers.RequestHea
 		}, nil
 	}
 
-	sessionRequest := &service.SessionRequest{
-		Request: &service.SessionRequest_Command{
-			Command: &service.SessionCommandRequest{
-				Context: &service.SessionCommandContext{
+	sessionRequest := &SessionRequest{
+		Request: &SessionRequest_Command{
+			Command: &SessionCommandRequest{
+				Context: &SessionCommandContext{
 					SessionID:      header.SessionID,
 					SequenceNumber: header.RequestID,
 				},
-				Command: &service.ServiceCommandRequest{
-					Service: &service.ServiceId{
+				Command: &ServiceCommandRequest{
+					Service: &ServiceId{
 						Type:      s.Type,
 						Name:      header.Primitive.Name,
 						Namespace: header.Primitive.Namespace,
 					},
-					Request: &service.ServiceCommandRequest_Delete{
-						Delete: &service.ServiceDeleteRequest{},
+					Request: &ServiceCommandRequest_Delete{
+						Delete: &ServiceDeleteRequest{},
 					},
 				},
 			},
@@ -772,7 +770,7 @@ func (s *Server) DoDeleteService(ctx context.Context, header *headers.RequestHea
 		return nil, result.Error
 	}
 
-	sessionResponse := &service.SessionResponse{}
+	sessionResponse := &SessionResponse{}
 	err = proto.Unmarshal(result.Value.([]byte), sessionResponse)
 	if err != nil {
 		return nil, err

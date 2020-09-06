@@ -12,23 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package node
+package primitive
 
-import (
-	"github.com/atomix/go-framework/pkg/atomix/cluster"
-)
-
-// Protocol is the interface to be implemented by replication protocols
-type Protocol interface {
-	// Start starts the protocol
-	Start(cluster cluster.Cluster, registry *Registry) error
-
+// ProtocolClient is a protocol client
+type ProtocolClient interface {
 	// Partition returns a partition
-	Partition(partitionID int) Partition
+	Partition(partitionID int) PartitionClient
 
 	// Partitions returns the protocol partitions
-	Partitions() []Partition
-
-	// Stop stops the protocol
-	Stop() error
+	Partitions() []PartitionClient
 }

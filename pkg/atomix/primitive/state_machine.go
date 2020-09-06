@@ -12,25 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package node
+package primitive
 
 import (
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"io"
-	"time"
 )
-
-// Context provides information about the context within which a state machine is running
-type Context interface {
-	// Node is the local node identifier
-	Node() string
-
-	// Index returns the current index of the state machine
-	Index() uint64
-
-	// Timestamp returns a deterministic, monotonically increasing timestamp
-	Timestamp() time.Time
-}
 
 // StateMachine applies commands from a protocol to a collection of state machines
 type StateMachine interface {

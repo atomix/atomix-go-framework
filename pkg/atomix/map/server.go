@@ -18,37 +18,15 @@ import (
 	"context"
 	"github.com/atomix/api/proto/atomix/headers"
 	api "github.com/atomix/api/proto/atomix/map"
-	"github.com/atomix/go-framework/pkg/atomix/node"
-	"github.com/atomix/go-framework/pkg/atomix/server"
-	"github.com/atomix/go-framework/pkg/atomix/service"
+	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 )
-
-func init() {
-	node.RegisterServer(registerServer)
-}
-
-// registerServer registers a map server with the given gRPC server
-func registerServer(server *grpc.Server, protocol node.Protocol) {
-	api.RegisterMapServiceServer(server, newServer(protocol))
-}
-
-func newServer(protocol node.Protocol) api.MapServiceServer {
-	return &Server{
-		Server: &server.Server{
-			Type:     service.ServiceType_MAP,
-			Protocol: protocol,
-		},
-	}
-}
 
 // Server is an implementation of MapServiceServer for the map primitive
 type Server struct {
-	api.MapServiceServer
-	*server.Server
+	*primitive.Server
 }
 
 // Create opens a new session
@@ -332,7 +310,7 @@ func (s *Server) Events(request *api.EventRequest, srv api.MapService_EventsServ
 		}
 
 		response := &ListenResponse{}
-		output := result.Value.(server.SessionOutput)
+		output := result.Value.(primitive.SessionOutput)
 		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}
@@ -392,7 +370,7 @@ func (s *Server) Entries(request *api.EntriesRequest, srv api.MapService_Entries
 		}
 
 		response := &EntriesResponse{}
-		output := result.Value.(server.SessionOutput)
+		output := result.Value.(primitive.SessionOutput)
 		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}

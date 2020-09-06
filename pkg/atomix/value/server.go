@@ -18,36 +18,15 @@ import (
 	"context"
 	"github.com/atomix/api/proto/atomix/headers"
 	api "github.com/atomix/api/proto/atomix/value"
-	"github.com/atomix/go-framework/pkg/atomix/node"
-	"github.com/atomix/go-framework/pkg/atomix/server"
-	"github.com/atomix/go-framework/pkg/atomix/service"
+	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 )
-
-func init() {
-	node.RegisterServer(registerServer)
-}
-
-// registerServer registers a value server with the given gRPC server
-func registerServer(server *grpc.Server, protocol node.Protocol) {
-	api.RegisterValueServiceServer(server, newServer(protocol))
-}
-
-func newServer(protocol node.Protocol) api.ValueServiceServer {
-	return &Server{
-		Server: &server.Server{
-			Type:     service.ServiceType_VALUE,
-			Protocol: protocol,
-		},
-	}
-}
 
 // Server is an implementation of ValueServiceServer for the value primitive
 type Server struct {
-	*server.Server
+	*primitive.Server
 }
 
 // Set sets the value
@@ -132,7 +111,7 @@ func (s *Server) Events(request *api.EventRequest, srv api.ValueService_EventsSe
 		}
 
 		response := &ListenResponse{}
-		output := result.Value.(server.SessionOutput)
+		output := result.Value.(primitive.SessionOutput)
 		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}

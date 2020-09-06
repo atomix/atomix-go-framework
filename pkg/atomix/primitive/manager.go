@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package service
+package primitive
 
 import (
 	"container/list"
 	"encoding/binary"
 	"fmt"
+	"github.com/atomix/api/proto/atomix/primitive"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/gogo/protobuf/proto"
@@ -27,7 +28,7 @@ import (
 )
 
 // NewManager returns an initialized Manager
-func NewManager(registry Registry, context Context) *Manager {
+func NewManager(registry Registry, context ProtocolContext) *Manager {
 	return &Manager{
 		registry:  registry,
 		context:   context,
@@ -40,7 +41,7 @@ func NewManager(registry Registry, context Context) *Manager {
 // Manager is a Manager implementation for primitives that support sessions
 type Manager struct {
 	registry  Registry
-	context   Context
+	context   ProtocolContext
 	sessions  map[uint64]*Session
 	services  map[qualifiedServiceName]Service
 	scheduler *scheduler
@@ -209,7 +210,8 @@ func (m *Manager) installServices(reader io.Reader) error {
 			if err = proto.Unmarshal(bytes, serviceID); err != nil {
 				return err
 			}
-			service := m.registry.GetType(serviceID.Type)(m.scheduler, m.context)
+			primitive := m.registry.GetPrimitive(primitive.PrimitiveType(serviceID.Type))
+			service := primitive.NewService(m.scheduler, newServiceContext(m.context, *serviceID))
 			services[newQualifiedServiceName(serviceID.Namespace, serviceID.Name)] = service
 			if err := service.Restore(reader); err != nil {
 				return err
@@ -348,13 +350,13 @@ func (m *Manager) applyServiceCommandCreate(request *ServiceCommandRequest, cont
 	name := newQualifiedServiceName(request.Service.Namespace, request.Service.Name)
 	service, ok := m.services[name]
 	if !ok {
-		serviceType := m.registry.GetType(request.Service.Type)
-		if serviceType == nil {
+		primitive := m.registry.GetPrimitive(primitive.PrimitiveType(request.Service.Type))
+		if primitive == nil {
 			stream.Error(fmt.Errorf("unknown service type %s", request.Service.Type))
 			stream.Close()
 			return
 		}
-		service = serviceType(m.scheduler, m.context)
+		service = primitive.NewService(m.scheduler, newServiceContext(m.context, *request.Service))
 		m.services[name] = service
 	}
 

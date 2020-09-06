@@ -16,40 +16,22 @@ package indexedmap
 
 import (
 	"bytes"
-	"github.com/atomix/go-framework/pkg/atomix/node"
-	"github.com/atomix/go-framework/pkg/atomix/service"
+	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
 	"io"
 )
 
-func init() {
-	node.RegisterService(service.ServiceType_INDEXED_MAP, newService)
-}
-
-// newService returns a new Service
-func newService(scheduler service.Scheduler, context service.Context) service.Service {
-	service := &Service{
-		ManagedService: service.NewManagedService(service.ServiceType_INDEXED_MAP, scheduler, context),
-		entries:        make(map[string]*LinkedMapEntryValue),
-		indexes:        make(map[uint64]*LinkedMapEntryValue),
-		timers:         make(map[string]service.Timer),
-		listeners:      make(map[uint64]map[uint64]listener),
-	}
-	service.init()
-	return service
-}
-
 // Service is a state machine for a map primitive
 type Service struct {
-	*service.ManagedService
+	*primitive.ManagedService
 	lastIndex  uint64
 	entries    map[string]*LinkedMapEntryValue
 	indexes    map[uint64]*LinkedMapEntryValue
 	firstEntry *LinkedMapEntryValue
 	lastEntry  *LinkedMapEntryValue
-	timers     map[string]service.Timer
+	timers     map[string]primitive.Timer
 	listeners  map[uint64]map[uint64]listener
 }
 

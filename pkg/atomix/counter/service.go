@@ -15,29 +15,15 @@
 package counter
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/node"
-	"github.com/atomix/go-framework/pkg/atomix/service"
+	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/gogo/protobuf/proto"
 	"io"
 )
 
-func init() {
-	node.RegisterService(service.ServiceType_COUNTER, newService)
-}
-
-// newService returns a new Service
-func newService(scheduler service.Scheduler, context service.Context) service.Service {
-	service := &Service{
-		ManagedService: service.NewManagedService(service.ServiceType_COUNTER, scheduler, context),
-	}
-	service.init()
-	return service
-}
-
 // Service is a state machine for a counter primitive
 type Service struct {
-	*service.ManagedService
+	*primitive.ManagedService
 	value int64
 }
 

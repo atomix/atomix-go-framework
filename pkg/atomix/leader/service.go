@@ -15,31 +15,16 @@
 package leader
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/node"
-	"github.com/atomix/go-framework/pkg/atomix/service"
+	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
 	"io"
 )
 
-func init() {
-	node.RegisterService(service.ServiceType_LEADER_LATCH, newService)
-}
-
-// newService returns a new Service
-func newService(scheduler service.Scheduler, context service.Context) service.Service {
-	service := &Service{
-		ManagedService: service.NewManagedService(service.ServiceType_LEADER_LATCH, scheduler, context),
-		participants:   make([]*LatchParticipant, 0),
-	}
-	service.init()
-	return service
-}
-
 // Service is a state machine for an election primitive
 type Service struct {
-	*service.ManagedService
+	*primitive.ManagedService
 	leader       *LatchParticipant
 	latch        uint64
 	participants []*LatchParticipant
@@ -84,17 +69,17 @@ func (e *Service) Restore(reader io.Reader) error {
 }
 
 // SessionExpired is called when a session is expired by the server
-func (e *Service) SessionExpired(session *service.Session) {
+func (e *Service) SessionExpired(session *primitive.Session) {
 	e.close(session)
 }
 
 // SessionClosed is called when a session is closed by the client
-func (e *Service) SessionClosed(session *service.Session) {
+func (e *Service) SessionClosed(session *primitive.Session) {
 	e.close(session)
 }
 
 // close elects a new leader when a session is closed
-func (e *Service) close(session *service.Session) {
+func (e *Service) close(session *primitive.Session) {
 	candidates := make([]*LatchParticipant, 0, len(e.participants))
 	for _, candidate := range e.participants {
 		if candidate.SessionID != session.ID {

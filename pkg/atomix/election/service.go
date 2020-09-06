@@ -15,32 +15,18 @@
 package election
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/node"
-	"github.com/atomix/go-framework/pkg/atomix/service"
+	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
+	log "github.com/sirupsen/logrus"
 	"io"
 	"time"
 )
 
-func init() {
-	node.RegisterService(service.ServiceType_ELECTION, newService)
-}
-
-// newService returns a new Service
-func newService(scheduler service.Scheduler, context service.Context) service.Service {
-	service := &Service{
-		ManagedService: service.NewManagedService(service.ServiceType_ELECTION, scheduler, context),
-		candidates:     make([]*ElectionRegistration, 0),
-	}
-	service.init()
-	return service
-}
-
 // Service is a state machine for an election primitive
 type Service struct {
-	*service.ManagedService
+	*primitive.ManagedService
 	leader     *ElectionRegistration
 	term       uint64
 	timestamp  *time.Time
@@ -92,17 +78,17 @@ func (e *Service) Restore(reader io.Reader) error {
 }
 
 // SessionExpired is called when a session is expired by the server
-func (e *Service) SessionExpired(session *service.Session) {
+func (e *Service) SessionExpired(session *primitive.Session) {
 	e.close(session)
 }
 
 // SessionClosed is called when a session is closed by the client
-func (e *Service) SessionClosed(session *service.Session) {
+func (e *Service) SessionClosed(session *primitive.Session) {
 	e.close(session)
 }
 
 // close elects a new leader when a session is closed
-func (e *Service) close(session *service.Session) {
+func (e *Service) close(session *primitive.Session) {
 	candidates := make([]*ElectionRegistration, 0, len(e.candidates))
 	for _, candidate := range e.candidates {
 		if candidate.SessionID != session.ID {
@@ -160,23 +146,34 @@ func (e *Service) Enter(bytes []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	reg := &ElectionRegistration{
-		ID:        request.ID,
-		SessionID: e.Session().ID,
+	updated := false
+	for _, candidate := range e.candidates {
+		if candidate.ID == request.ID {
+			candidate.SessionID = e.Session().ID
+			updated = true
+			break
+		}
 	}
 
-	e.candidates = append(e.candidates, reg)
-	if e.leader == nil {
-		e.leader = reg
-		e.term++
-		timestamp := e.Context.Timestamp()
-		e.timestamp = &timestamp
-	}
+	if !updated {
+		reg := &ElectionRegistration{
+			ID:        request.ID,
+			SessionID: e.Session().ID,
+		}
 
-	e.sendEvent(&ListenResponse{
-		Type: ListenResponse_CHANGED,
-		Term: e.getTerm(),
-	})
+		e.candidates = append(e.candidates, reg)
+		if e.leader == nil {
+			e.leader = reg
+			e.term++
+			timestamp := e.Context.Timestamp()
+			e.timestamp = &timestamp
+		}
+
+		e.sendEvent(&ListenResponse{
+			Type: ListenResponse_CHANGED,
+			Term: e.getTerm(),
+		})
+	}
 
 	return proto.Marshal(&EnterResponse{
 		Term: e.getTerm(),
@@ -386,6 +383,7 @@ func (e *Service) Events(bytes []byte, stream stream.WriteStream) {
 func (e *Service) sendEvent(event *ListenResponse) {
 	bytes, err := proto.Marshal(event)
 	for _, session := range e.Sessions() {
+		log.Infof("Election %s publishing event %v to session %d", e.Context.ServiceID().Name, event, session.ID)
 		for _, stream := range session.StreamsOf(opEvents) {
 			stream.Result(bytes, err)
 		}

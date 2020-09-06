@@ -18,31 +18,15 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/atomix/go-framework/pkg/atomix/node"
-	"github.com/atomix/go-framework/pkg/atomix/service"
+	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
 )
 
-func init() {
-	node.RegisterService(service.ServiceType_LOG, newService)
-}
-
-// newService returns a new Service
-func newService(scheduler service.Scheduler, context service.Context) service.Service {
-	service := &Service{
-		ManagedService: service.NewManagedService(service.ServiceType_LOG, scheduler, context),
-		indexes:        make(map[uint64]*LinkedLogEntryValue),
-		listeners:      make(map[uint64]map[uint64]listener),
-	}
-	service.init()
-	return service
-}
-
 // Service is a state machine for a log primitive
 type Service struct {
-	*service.ManagedService
+	*primitive.ManagedService
 	lastIndex  uint64
 	indexes    map[uint64]*LinkedLogEntryValue
 	firstEntry *LinkedLogEntryValue

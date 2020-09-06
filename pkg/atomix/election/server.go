@@ -18,36 +18,15 @@ import (
 	"context"
 	api "github.com/atomix/api/proto/atomix/election"
 	"github.com/atomix/api/proto/atomix/headers"
-	"github.com/atomix/go-framework/pkg/atomix/node"
-	"github.com/atomix/go-framework/pkg/atomix/server"
-	"github.com/atomix/go-framework/pkg/atomix/service"
+	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 )
-
-func init() {
-	node.RegisterServer(registerServer)
-}
-
-// registerServer registers an election server with the given gRPC server
-func registerServer(server *grpc.Server, protocol node.Protocol) {
-	api.RegisterLeaderElectionServiceServer(server, newServer(protocol))
-}
-
-func newServer(protocol node.Protocol) api.LeaderElectionServiceServer {
-	return &Server{
-		Server: &server.Server{
-			Type:     service.ServiceType_ELECTION,
-			Protocol: protocol,
-		},
-	}
-}
 
 // Server is an implementation of LeaderElectionServiceServer for the election primitive
 type Server struct {
-	*server.Server
+	*primitive.Server
 }
 
 // Enter enters a candidate in the election
@@ -270,7 +249,7 @@ func (s *Server) Events(request *api.EventRequest, srv api.LeaderElectionService
 		}
 
 		response := &ListenResponse{}
-		output := result.Value.(server.SessionOutput)
+		output := result.Value.(primitive.SessionOutput)
 		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}

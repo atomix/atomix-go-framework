@@ -18,38 +18,17 @@ import (
 	"context"
 	"github.com/atomix/api/proto/atomix/headers"
 	api "github.com/atomix/api/proto/atomix/lock"
-	"github.com/atomix/go-framework/pkg/atomix/node"
-	"github.com/atomix/go-framework/pkg/atomix/server"
-	"github.com/atomix/go-framework/pkg/atomix/service"
+	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func init() {
-	node.RegisterServer(registerServer)
-}
-
-// registerServer registers a lock server with the given gRPC server
-func registerServer(server *grpc.Server, protocol node.Protocol) {
-	api.RegisterLockServiceServer(server, newServer(protocol))
-}
-
-func newServer(protocol node.Protocol) api.LockServiceServer {
-	return &Server{
-		Server: &server.Server{
-			Type:     service.ServiceType_LOCK,
-			Protocol: protocol,
-		},
-	}
-}
-
 // Server is an implementation of MapServiceServer for the map primitive
 type Server struct {
-	*server.Server
+	*primitive.Server
 }
 
 // Create opens a new session
@@ -118,7 +97,7 @@ func (s *Server) Lock(ctx context.Context, request *api.LockRequest) (*api.LockR
 			return nil, result.Error
 		}
 
-		output := result.Value.(server.SessionOutput)
+		output := result.Value.(primitive.SessionOutput)
 
 		if output.Header.Type == headers.ResponseType_RESPONSE {
 			lockResponse := &LockResponse{}

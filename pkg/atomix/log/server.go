@@ -19,37 +19,15 @@ import (
 
 	"github.com/atomix/api/proto/atomix/headers"
 	api "github.com/atomix/api/proto/atomix/log"
-	"github.com/atomix/go-framework/pkg/atomix/node"
-	"github.com/atomix/go-framework/pkg/atomix/server"
-	"github.com/atomix/go-framework/pkg/atomix/service"
+	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 )
-
-func init() {
-	node.RegisterServer(registerServer)
-}
-
-// registerServer registers a log server with the given gRPC server
-func registerServer(server *grpc.Server, protocol node.Protocol) {
-	api.RegisterLogServiceServer(server, newServer(protocol))
-}
-
-func newServer(protocol node.Protocol) api.LogServiceServer {
-	return &Server{
-		Server: &server.Server{
-			Type:     service.ServiceType_LOG,
-			Protocol: protocol,
-		},
-	}
-}
 
 // Server is an implementation of LogServiceServer for the log primitive
 type Server struct {
-	api.LogServiceServer
-	*server.Server
+	*primitive.Server
 }
 
 // Create opens a new session
@@ -381,7 +359,7 @@ func (s *Server) Events(request *api.EventRequest, srv api.LogService_EventsServ
 		}
 
 		response := &ListenResponse{}
-		output := result.Value.(server.SessionOutput)
+		output := result.Value.(primitive.SessionOutput)
 		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}
@@ -441,7 +419,7 @@ func (s *Server) Entries(request *api.EntriesRequest, srv api.LogService_Entries
 		}
 
 		response := &EntriesResponse{}
-		output := result.Value.(server.SessionOutput)
+		output := result.Value.(primitive.SessionOutput)
 		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}

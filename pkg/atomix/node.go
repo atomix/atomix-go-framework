@@ -17,8 +17,9 @@ package atomix
 import (
 	"fmt"
 	"github.com/atomix/api/proto/atomix/database"
+	"github.com/atomix/api/proto/atomix/session"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
-	"github.com/atomix/go-framework/pkg/atomix/node"
+	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -26,7 +27,7 @@ import (
 )
 
 // NewNode creates a new node running the given protocol
-func NewNode(nodeID string, config *database.DatabaseConfig, protocol node.Protocol, registry *node.Registry, opts ...NodeOption) *Node {
+func NewNode(nodeID string, config *database.DatabaseConfig, protocol primitive.Protocol, registry primitive.Registry, opts ...NodeOption) *Node {
 	node := &Node{
 		ID:       nodeID,
 		config:   config,
@@ -84,8 +85,8 @@ func (o *portOption) apply(node *Node) {
 type Node struct {
 	ID       string
 	config   *database.DatabaseConfig
-	protocol node.Protocol
-	registry *node.Registry
+	protocol primitive.Protocol
+	registry primitive.Registry
 	port     int
 	listener listener
 	server   *grpc.Server
@@ -110,7 +111,7 @@ func (n *Node) Start() error {
 	}
 
 	log.Info("Starting protocol")
-	err := n.protocol.Start(cluster, n.registry)
+	err := n.protocol.Start(cluster)
 	if err != nil {
 		return err
 	}
@@ -134,7 +135,14 @@ func (n *Node) Start() error {
 func (n *Node) run(lis net.Listener) error {
 	log.Info("Starting gRPC server")
 	n.server = grpc.NewServer()
-	node.RegisterServers(n.server, n.protocol)
+	session.RegisterSessionServiceServer(n.server, &primitive.SessionServer{
+		Server: &primitive.Server{
+			Client: n.protocol,
+		},
+	})
+	for _, primitive := range n.registry.GetPrimitives() {
+		primitive.RegisterServer(n.server, n.protocol)
+	}
 	return n.server.Serve(lis)
 }
 

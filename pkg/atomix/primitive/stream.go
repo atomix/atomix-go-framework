@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package service
+package primitive
 
 import (
 	"container/list"
@@ -29,7 +29,7 @@ type sessionStream struct {
 	responseID uint64
 	completeID uint64
 	lastIndex  uint64
-	ctx        Context
+	ctx        ProtocolContext
 	stream     streams.WriteStream
 	results    *list.List
 }

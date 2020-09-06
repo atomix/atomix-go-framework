@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package node
+package primitive
 
 import (
 	"context"
 	"github.com/atomix/go-framework/pkg/atomix/stream"
 )
 
-// Partition is the interface for a partition client
-type Partition interface {
+// PartitionClient is the interface for a partition client
+type PartitionClient interface {
 	// MustLeader returns whether the client can only be used on the leader
 	MustLeader() bool
 

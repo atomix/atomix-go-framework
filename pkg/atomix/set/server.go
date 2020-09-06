@@ -18,36 +18,15 @@ import (
 	"context"
 	"github.com/atomix/api/proto/atomix/headers"
 	api "github.com/atomix/api/proto/atomix/set"
-	"github.com/atomix/go-framework/pkg/atomix/node"
-	"github.com/atomix/go-framework/pkg/atomix/server"
-	"github.com/atomix/go-framework/pkg/atomix/service"
+	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 )
-
-func init() {
-	node.RegisterServer(registerServer)
-}
-
-// registerServer registers a set server with the given gRPC server
-func registerServer(server *grpc.Server, protocol node.Protocol) {
-	api.RegisterSetServiceServer(server, newServer(protocol))
-}
-
-func newServer(protocol node.Protocol) api.SetServiceServer {
-	return &Server{
-		Server: &server.Server{
-			Type:     service.ServiceType_SET,
-			Protocol: protocol,
-		},
-	}
-}
 
 // Server is an implementation of SetServiceServer for the set primitive
 type Server struct {
-	*server.Server
+	*primitive.Server
 }
 
 // Size gets the number of elements in the set
@@ -211,7 +190,7 @@ func (s *Server) Events(request *api.EventRequest, srv api.SetService_EventsServ
 		}
 
 		response := &ListenResponse{}
-		output := result.Value.(server.SessionOutput)
+		output := result.Value.(primitive.SessionOutput)
 		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}
@@ -267,7 +246,7 @@ func (s *Server) Iterate(request *api.IterateRequest, srv api.SetService_Iterate
 		}
 
 		response := &IterateResponse{}
-		output := result.Value.(server.SessionOutput)
+		output := result.Value.(primitive.SessionOutput)
 		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}

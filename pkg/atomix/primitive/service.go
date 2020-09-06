@@ -12,30 +12,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package service
+package primitive
 
 import (
 	"io"
-	"time"
 )
 
-// Context provides information about the context within which a service is running
-type Context interface {
-	// Node is the local node identifier
-	Node() string
+// ID is a service identifier
+type ID ServiceId
 
-	// Index returns the current index of the service
-	Index() uint64
+// ServiceContext provides information about the context within which a service is running
+type ServiceContext interface {
+	ProtocolContext
 
-	// Timestamp returns a deterministic, monotonically increasing timestamp
-	Timestamp() time.Time
+	// ServiceID is the service identifier
+	ServiceID() ID
 }
 
-// Registry is a service registry
-type Registry interface {
-	// GetType returns a service type by name
-	GetType(serviceType ServiceType) func(scheduler Scheduler, context Context) Service
+func newServiceContext(ctx ProtocolContext, id ServiceId) ServiceContext {
+	return &serviceContext{
+		ProtocolContext: ctx,
+		id:      ID(id),
+	}
 }
+
+// serviceContext is a default implementation of the service context
+type serviceContext struct {
+	ProtocolContext
+	id ID
+}
+
+func (c *serviceContext) ServiceID() ID {
+	return c.id
+}
+
+var _ ServiceContext = &serviceContext{}
 
 // SessionOpen is an interface for listening to session open events
 type SessionOpen interface {
@@ -75,7 +86,7 @@ type internalService interface {
 }
 
 // NewManagedService creates a new primitive service
-func NewManagedService(serviceType ServiceType, scheduler Scheduler, context Context) *ManagedService {
+func NewManagedService(serviceType ServiceType, scheduler Scheduler, context ServiceContext) *ManagedService {
 	return &ManagedService{
 		serviceType: serviceType,
 		Executor:    newExecutor(),
@@ -88,7 +99,7 @@ func NewManagedService(serviceType ServiceType, scheduler Scheduler, context Con
 // ManagedService is a service that is managed by the service manager
 type ManagedService struct {
 	Executor       Executor
-	Context        Context
+	Context        ServiceContext
 	Scheduler      Scheduler
 	serviceType    ServiceType
 	sessions       map[uint64]*Session

@@ -15,31 +15,16 @@
 package set
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/node"
-	"github.com/atomix/go-framework/pkg/atomix/service"
+	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
 	"io"
 )
 
-func init() {
-	node.RegisterService(service.ServiceType_SET, newService)
-}
-
-// newService returns a new Service
-func newService(scheduler service.Scheduler, context service.Context) service.Service {
-	service := &Service{
-		ManagedService: service.NewManagedService(service.ServiceType_SET, scheduler, context),
-		values:         make(map[string]bool),
-	}
-	service.init()
-	return service
-}
-
 // Service is a state machine for a list primitive
 type Service struct {
-	*service.ManagedService
+	*primitive.ManagedService
 	values map[string]bool
 }
 

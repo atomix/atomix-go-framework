@@ -16,8 +16,7 @@ package lock
 
 import (
 	"container/list"
-	"github.com/atomix/go-framework/pkg/atomix/node"
-	"github.com/atomix/go-framework/pkg/atomix/service"
+	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
@@ -25,27 +24,12 @@ import (
 	"time"
 )
 
-func init() {
-	node.RegisterService(service.ServiceType_LOCK, newService)
-}
-
-// newService returns a new Service
-func newService(scheduler service.Scheduler, context service.Context) service.Service {
-	service := &Service{
-		ManagedService: service.NewManagedService(service.ServiceType_LOCK, scheduler, context),
-		queue:          list.New(),
-		timers:         make(map[uint64]service.Timer),
-	}
-	service.init()
-	return service
-}
-
 // Service is a state machine for a list primitive
 type Service struct {
-	*service.ManagedService
+	*primitive.ManagedService
 	lock   *lockHolder
 	queue  *list.List
-	timers map[uint64]service.Timer
+	timers map[uint64]primitive.Timer
 }
 
 type lockHolder struct {
@@ -283,16 +267,16 @@ func (l *Service) IsLocked(bytes []byte) ([]byte, error) {
 }
 
 // SessionExpired releases the lock when the owning session expires
-func (l *Service) SessionExpired(session *service.Session) {
+func (l *Service) SessionExpired(session *primitive.Session) {
 	l.releaseLock(session)
 }
 
 // SessionClosed releases the lock when the owning session is closed
-func (l *Service) SessionClosed(session *service.Session) {
+func (l *Service) SessionClosed(session *primitive.Session) {
 	l.releaseLock(session)
 }
 
-func (l *Service) releaseLock(session *service.Session) {
+func (l *Service) releaseLock(session *primitive.Session) {
 	// Remove all instances of the session from the queue.
 	element := l.queue.Front()
 	for element != nil {
