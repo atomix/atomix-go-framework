@@ -17,7 +17,25 @@ package primitive
 import (
 	"context"
 	"github.com/atomix/go-framework/pkg/atomix/stream"
+	"time"
 )
+
+// PartitionContext provides the current state of the partition
+type PartitionContext interface {
+	ProtocolContext
+
+	// PartitionID is the partition identifier
+	PartitionID() PartitionID
+
+	// Index returns the current index of the service
+	Index() uint64
+
+	// Timestamp returns a deterministic, monotonically increasing timestamp
+	Timestamp() time.Time
+}
+
+// PartitionID is a partition identifier
+type PartitionID int
 
 // Partition is the interface for a partition client
 type Partition interface {

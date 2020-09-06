@@ -33,7 +33,7 @@ type Server struct {
 // DoCommand submits a command to the service
 func (s *Server) DoCommand(ctx context.Context, name string, input []byte, header *headers.RequestHeader) ([]byte, *headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(int(header.Partition))
+	partition := s.Protocol.Partition(PartitionID(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		return nil, &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
@@ -108,7 +108,7 @@ func (s *Server) DoCommand(ctx context.Context, name string, input []byte, heade
 // DoCommandStream submits a streaming command to the service
 func (s *Server) DoCommandStream(ctx context.Context, name string, input []byte, header *headers.RequestHeader, stream streams.WriteStream) error {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(int(header.Partition))
+	partition := s.Protocol.Partition(PartitionID(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		stream.Value(SessionOutput{
 			Header: &headers.ResponseHeader{
@@ -188,7 +188,7 @@ func (s *Server) DoCommandStream(ctx context.Context, name string, input []byte,
 // DoQuery submits a query to the service
 func (s *Server) DoQuery(ctx context.Context, name string, input []byte, header *headers.RequestHeader) ([]byte, *headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(int(header.Partition))
+	partition := s.Protocol.Partition(PartitionID(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		return nil, &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
@@ -262,7 +262,7 @@ func (s *Server) DoQuery(ctx context.Context, name string, input []byte, header 
 // DoQueryStream submits a streaming query to the service
 func (s *Server) DoQueryStream(ctx context.Context, name string, input []byte, header *headers.RequestHeader, stream streams.WriteStream) error {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(int(header.Partition))
+	partition := s.Protocol.Partition(PartitionID(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		stream.Value(SessionOutput{
 			Header: &headers.ResponseHeader{
@@ -335,7 +335,7 @@ func (s *Server) DoQueryStream(ctx context.Context, name string, input []byte, h
 // DoMetadata submits a metadata query to the service
 func (s *Server) DoMetadata(ctx context.Context, serviceType primitive.PrimitiveType, namespace string, header *headers.RequestHeader) ([]*ServiceId, *headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(int(header.Partition))
+	partition := s.Protocol.Partition(PartitionID(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		return nil, &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
@@ -404,7 +404,7 @@ func (s *Server) DoMetadata(ctx context.Context, serviceType primitive.Primitive
 // DoOpenSession opens a new session
 func (s *Server) DoOpenSession(ctx context.Context, header *headers.RequestHeader, timeout *time.Duration) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(int(header.Partition))
+	partition := s.Protocol.Partition(PartitionID(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		return &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
@@ -460,7 +460,7 @@ func (s *Server) DoOpenSession(ctx context.Context, header *headers.RequestHeade
 // DoKeepAliveSession keeps a session alive
 func (s *Server) DoKeepAliveSession(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(int(header.Partition))
+	partition := s.Protocol.Partition(PartitionID(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		return &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
@@ -520,7 +520,7 @@ func (s *Server) DoKeepAliveSession(ctx context.Context, header *headers.Request
 // DoCloseSession closes a session
 func (s *Server) DoCloseSession(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(int(header.Partition))
+	partition := s.Protocol.Partition(PartitionID(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		return &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
@@ -573,7 +573,7 @@ func (s *Server) DoCloseSession(ctx context.Context, header *headers.RequestHead
 // DoCreateService creates the service
 func (s *Server) DoCreateService(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(int(header.Partition))
+	partition := s.Protocol.Partition(PartitionID(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		return &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
@@ -645,7 +645,7 @@ func (s *Server) DoCreateService(ctx context.Context, header *headers.RequestHea
 // DoCloseService closes the service
 func (s *Server) DoCloseService(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(int(header.Partition))
+	partition := s.Protocol.Partition(PartitionID(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		return &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,
@@ -717,7 +717,7 @@ func (s *Server) DoCloseService(ctx context.Context, header *headers.RequestHead
 // DoDeleteService deletes the service
 func (s *Server) DoDeleteService(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(int(header.Partition))
+	partition := s.Protocol.Partition(PartitionID(header.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		return &headers.ResponseHeader{
 			Status: headers.ResponseStatus_NOT_LEADER,

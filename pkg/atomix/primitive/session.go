@@ -73,7 +73,7 @@ func (s *SessionServer) CloseSession(ctx context.Context, request *api.CloseSess
 }
 
 // newSession creates a new session
-func newSession(ctx ProtocolContext, timeout *time.Duration) *Session {
+func newSession(ctx PartitionContext, timeout *time.Duration) *Session {
 	if timeout == nil {
 		defaultTimeout := 30 * time.Second
 		timeout = &defaultTimeout
@@ -89,7 +89,7 @@ func newSession(ctx ProtocolContext, timeout *time.Duration) *Session {
 		streams:          make(map[uint64]*sessionStream),
 		services:         make(map[qualifiedServiceName]bool),
 	}
-	util.SessionEntry(ctx.Node(), session.ID).
+	util.SessionEntry(ctx.NodeID(), session.ID).
 		Debug("Session open")
 	return session
 }
@@ -99,7 +99,7 @@ type Session struct {
 	ID               uint64
 	Timeout          time.Duration
 	LastUpdated      time.Time
-	ctx              ProtocolContext
+	ctx              PartitionContext
 	commandSequence  uint64
 	ackSequence      uint64
 	commandCallbacks map[uint64]func()
@@ -194,7 +194,7 @@ func (s *Session) addStream(id uint64, op string, outStream streams.WriteStream)
 	s.streams[id] = stream
 	s.streamID = id
 	stream.open()
-	util.StreamEntry(s.ctx.Node(), s.ID, id).
+	util.StreamEntry(s.ctx.NodeID(), s.ID, id).
 		Trace("Stream open")
 	return stream
 }
@@ -276,7 +276,7 @@ func (s *Session) completeCommand(sequenceNumber uint64) {
 
 // close closes the session and completes all its streams
 func (s *Session) close() {
-	util.SessionEntry(s.ctx.Node(), s.ID).
+	util.SessionEntry(s.ctx.NodeID(), s.ID).
 		Debug("Session closed")
 	for _, stream := range s.streams {
 		stream.Close()

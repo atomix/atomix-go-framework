@@ -28,7 +28,7 @@ import (
 )
 
 // NewManager returns an initialized Manager
-func NewManager(registry Registry, context ProtocolContext) *Manager {
+func NewManager(registry Registry, context PartitionContext) *Manager {
 	return &Manager{
 		registry:  registry,
 		context:   context,
@@ -41,7 +41,7 @@ func NewManager(registry Registry, context ProtocolContext) *Manager {
 // Manager is a Manager implementation for primitives that support sessions
 type Manager struct {
 	registry  Registry
-	context   ProtocolContext
+	context   PartitionContext
 	sessions  map[uint64]*Session
 	services  map[qualifiedServiceName]Service
 	scheduler *scheduler
@@ -258,7 +258,7 @@ func (m *Manager) Command(bytes []byte, stream streams.WriteStream) {
 func (m *Manager) applyCommand(request *SessionCommandRequest, stream streams.WriteStream) {
 	session, ok := m.sessions[request.Context.SessionID]
 	if !ok {
-		util.SessionEntry(m.context.Node(), request.Context.SessionID).
+		util.SessionEntry(m.context.NodeID(), request.Context.SessionID).
 			Warn("Unknown session")
 		stream.Error(fmt.Errorf("unknown session %d", request.Context.SessionID))
 		stream.Close()
@@ -280,12 +280,12 @@ func (m *Manager) applyCommand(request *SessionCommandRequest, stream streams.Wr
 			}
 		} else if sequenceNumber > session.nextCommandSequence() {
 			session.scheduleCommand(sequenceNumber, func() {
-				util.SessionEntry(m.context.Node(), request.Context.SessionID).
+				util.SessionEntry(m.context.NodeID(), request.Context.SessionID).
 					Tracef("Executing command %d", sequenceNumber)
 				m.applySessionCommand(request, session, stream)
 			})
 		} else {
-			util.SessionEntry(m.context.Node(), request.Context.SessionID).
+			util.SessionEntry(m.context.NodeID(), request.Context.SessionID).
 				Tracef("Executing command %d", sequenceNumber)
 			m.applySessionCommand(request, session, stream)
 		}
@@ -463,11 +463,11 @@ func (m *Manager) applyOpenSession(request *OpenSessionRequest, stream streams.W
 func (m *Manager) applyKeepAlive(request *KeepAliveRequest, stream streams.WriteStream) {
 	session, ok := m.sessions[request.SessionID]
 	if !ok {
-		util.SessionEntry(m.context.Node(), request.SessionID).
+		util.SessionEntry(m.context.NodeID(), request.SessionID).
 			Warn("Unknown session")
 		stream.Error(fmt.Errorf("unknown session %d", request.SessionID))
 	} else {
-		util.SessionEntry(m.context.Node(), request.SessionID).
+		util.SessionEntry(m.context.NodeID(), request.SessionID).
 			Tracef("Recording keep-alive %v", request)
 
 		// Update the session's last updated timestamp to prevent it from expiring
@@ -510,7 +510,7 @@ func (m *Manager) expireSessions() {
 func (m *Manager) applyCloseSession(request *CloseSessionRequest, stream streams.WriteStream) {
 	session, ok := m.sessions[request.SessionID]
 	if !ok {
-		util.SessionEntry(m.context.Node(), request.SessionID).
+		util.SessionEntry(m.context.NodeID(), request.SessionID).
 			Warn("Unknown session")
 		stream.Error(fmt.Errorf("unknown session %d", request.SessionID))
 	} else {
@@ -546,13 +546,13 @@ func (m *Manager) Query(bytes []byte, stream streams.WriteStream) {
 	} else {
 		query := request.GetQuery()
 		if query.Context.LastIndex > m.context.Index() {
-			util.SessionEntry(m.context.Node(), query.Context.SessionID).
+			util.SessionEntry(m.context.NodeID(), query.Context.SessionID).
 				Tracef("Query index %d greater than last index %d", query.Context.LastIndex, m.context.Index())
 			m.scheduler.ScheduleIndex(query.Context.LastIndex, func() {
 				m.sequenceQuery(query, stream)
 			})
 		} else {
-			util.SessionEntry(m.context.Node(), query.Context.SessionID).
+			util.SessionEntry(m.context.NodeID(), query.Context.SessionID).
 				Tracef("Sequencing query %d <= %d", query.Context.LastIndex, m.context.Index())
 			m.sequenceQuery(query, stream)
 		}
@@ -562,22 +562,22 @@ func (m *Manager) Query(bytes []byte, stream streams.WriteStream) {
 func (m *Manager) sequenceQuery(request *SessionQueryRequest, stream streams.WriteStream) {
 	session, ok := m.sessions[request.Context.SessionID]
 	if !ok {
-		util.SessionEntry(m.context.Node(), request.Context.SessionID).
+		util.SessionEntry(m.context.NodeID(), request.Context.SessionID).
 			Warn("Unknown session")
 		stream.Error(fmt.Errorf("unknown session %d", request.Context.SessionID))
 		stream.Close()
 	} else {
 		sequenceNumber := request.Context.LastSequenceNumber
 		if sequenceNumber > session.commandSequence {
-			util.SessionEntry(m.context.Node(), request.Context.SessionID).
+			util.SessionEntry(m.context.NodeID(), request.Context.SessionID).
 				Tracef("Query ID %d greater than last ID %d", sequenceNumber, session.commandSequence)
 			session.scheduleQuery(sequenceNumber, func() {
-				util.SessionEntry(m.context.Node(), request.Context.SessionID).
+				util.SessionEntry(m.context.NodeID(), request.Context.SessionID).
 					Tracef("Executing query %d", sequenceNumber)
 				m.applyServiceQuery(request.Query, request.Context, session, stream)
 			})
 		} else {
-			util.SessionEntry(m.context.Node(), request.Context.SessionID).
+			util.SessionEntry(m.context.NodeID(), request.Context.SessionID).
 				Tracef("Executing query %d", sequenceNumber)
 			m.applyServiceQuery(request.Query, request.Context, session, stream)
 		}

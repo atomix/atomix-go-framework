@@ -16,25 +16,18 @@ package primitive
 
 import (
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
-	"time"
 )
 
-// ProtocolContext provides information about the context within which a service is running
+// ProtocolContext provides the current state of the protocol
 type ProtocolContext interface {
-	// Node is the local node identifier
-	Node() string
-
-	// Index returns the current index of the service
-	Index() uint64
-
-	// Timestamp returns a deterministic, monotonically increasing timestamp
-	Timestamp() time.Time
+	// NodeID is the local node identifier
+	NodeID() string
 }
 
 // Protocol is the interface to be implemented by replication protocols
 type Protocol interface {
 	// Partition returns a partition
-	Partition(partitionID int) Partition
+	Partition(partitionID PartitionID) Partition
 
 	// Partitions returns the protocol partitions
 	Partitions() []Partition

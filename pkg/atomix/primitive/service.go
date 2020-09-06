@@ -23,22 +23,22 @@ type ID ServiceId
 
 // ServiceContext provides information about the context within which a service is running
 type ServiceContext interface {
-	ProtocolContext
+	PartitionContext
 
 	// ServiceID is the service identifier
 	ServiceID() ID
 }
 
-func newServiceContext(ctx ProtocolContext, id ServiceId) ServiceContext {
+func newServiceContext(ctx PartitionContext, id ServiceId) ServiceContext {
 	return &serviceContext{
-		ProtocolContext: ctx,
-		id:      ID(id),
+		PartitionContext: ctx,
+		id:               ID(id),
 	}
 }
 
 // serviceContext is a default implementation of the service context
 type serviceContext struct {
-	ProtocolContext
+	PartitionContext
 	id ID
 }
 
