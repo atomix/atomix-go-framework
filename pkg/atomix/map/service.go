@@ -26,23 +26,23 @@ import (
 
 // Service is a state machine for a map primitive
 type Service struct {
-	*primitive.ManagedService
+	primitive.Service
 	entries   map[string]*MapEntryValue
 	timers    map[string]primitive.Timer
-	listeners map[uint64]map[uint64]listener
+	listeners map[primitive.SessionID]map[primitive.StreamID]listener
 }
 
 // init initializes the map service
 func (m *Service) init() {
-	m.Executor.RegisterUnaryOperation(opPut, m.Put)
-	m.Executor.RegisterUnaryOperation(opReplace, m.Replace)
-	m.Executor.RegisterUnaryOperation(opRemove, m.Remove)
-	m.Executor.RegisterUnaryOperation(opGet, m.Get)
-	m.Executor.RegisterUnaryOperation(opExists, m.Exists)
-	m.Executor.RegisterUnaryOperation(opSize, m.Size)
-	m.Executor.RegisterUnaryOperation(opClear, m.Clear)
-	m.Executor.RegisterStreamOperation(opEvents, m.Events)
-	m.Executor.RegisterStreamOperation(opEntries, m.Entries)
+	m.RegisterUnaryOperation(opPut, m.Put)
+	m.RegisterUnaryOperation(opReplace, m.Replace)
+	m.RegisterUnaryOperation(opRemove, m.Remove)
+	m.RegisterUnaryOperation(opGet, m.Get)
+	m.RegisterUnaryOperation(opExists, m.Exists)
+	m.RegisterUnaryOperation(opSize, m.Size)
+	m.RegisterUnaryOperation(opClear, m.Clear)
+	m.RegisterStreamOperation(opEvents, m.Events)
+	m.RegisterStreamOperation(opEntries, m.Entries)
 }
 
 // Backup takes a snapshot of the service
@@ -51,8 +51,8 @@ func (m *Service) Backup(writer io.Writer) error {
 	for sessionID, sessionListeners := range m.listeners {
 		for streamID, sessionListener := range sessionListeners {
 			listeners = append(listeners, &Listener{
-				SessionId: sessionID,
-				StreamId:  streamID,
+				SessionId: uint64(sessionID),
+				StreamId:  uint64(streamID),
 				Key:       sessionListener.key,
 			})
 		}
@@ -92,16 +92,16 @@ func (m *Service) Restore(reader io.Reader) error {
 		return err
 	}
 
-	m.listeners = make(map[uint64]map[uint64]listener)
+	m.listeners = make(map[primitive.SessionID]map[primitive.StreamID]listener)
 	for _, snapshotListener := range listeners {
-		sessionListeners, ok := m.listeners[snapshotListener.SessionId]
+		sessionListeners, ok := m.listeners[primitive.SessionID(snapshotListener.SessionId)]
 		if !ok {
-			sessionListeners = make(map[uint64]listener)
-			m.listeners[snapshotListener.SessionId] = sessionListeners
+			sessionListeners = make(map[primitive.StreamID]listener)
+			m.listeners[primitive.SessionID(snapshotListener.SessionId)] = sessionListeners
 		}
-		sessionListeners[snapshotListener.StreamId] = listener{
+		sessionListeners[primitive.StreamID(snapshotListener.StreamId)] = listener{
 			key:    snapshotListener.Key,
-			stream: m.SessionOf(snapshotListener.SessionId).Stream(snapshotListener.StreamId),
+			stream: m.Session(primitive.SessionID(snapshotListener.SessionId)).Stream(primitive.StreamID(snapshotListener.StreamId)),
 		}
 	}
 
@@ -139,10 +139,10 @@ func (m *Service) Put(value []byte) ([]byte, error) {
 		// Create a new entry value and set it in the map.
 		newValue := &MapEntryValue{
 			Value:   request.Value,
-			Version: m.Context.Index(),
+			Version: uint64(m.Index()),
 			TTL:     request.TTL,
-			Created: m.Context.Timestamp(),
-			Updated: m.Context.Timestamp(),
+			Created: m.Timestamp(),
+			Updated: m.Timestamp(),
 		}
 		m.entries[request.Key] = newValue
 
@@ -186,10 +186,10 @@ func (m *Service) Put(value []byte) ([]byte, error) {
 	// Create a new entry value and set it in the map.
 	newValue := &MapEntryValue{
 		Value:   request.Value,
-		Version: m.Context.Index(),
+		Version: uint64(m.Index()),
 		TTL:     request.TTL,
 		Created: oldValue.Created,
-		Updated: m.Context.Timestamp(),
+		Updated: m.Timestamp(),
 	}
 	m.entries[request.Key] = newValue
 
@@ -247,10 +247,10 @@ func (m *Service) Replace(value []byte) ([]byte, error) {
 	// Create a new entry value and set it in the map.
 	newValue := &MapEntryValue{
 		Value:   request.NewValue,
-		Version: m.Context.Index(),
+		Version: uint64(m.Index()),
 		TTL:     request.TTL,
 		Created: oldValue.Created,
-		Updated: m.Context.Timestamp(),
+		Updated: m.Timestamp(),
 	}
 	m.entries[request.Key] = newValue
 
@@ -369,7 +369,7 @@ func (m *Service) Clear(value []byte) ([]byte, error) {
 }
 
 // Events sends change events to the client
-func (m *Service) Events(bytes []byte, stream stream.WriteStream) {
+func (m *Service) Events(bytes []byte, stream primitive.Stream) {
 	request := &ListenRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		stream.Error(err)
@@ -382,12 +382,12 @@ func (m *Service) Events(bytes []byte, stream stream.WriteStream) {
 		key:    request.Key,
 		stream: stream,
 	}
-	listeners, ok := m.listeners[m.Session().ID]
+	listeners, ok := m.listeners[stream.Session().ID()]
 	if !ok {
-		listeners = make(map[uint64]listener)
-		m.listeners[m.Session().ID] = listeners
+		listeners = make(map[primitive.StreamID]listener)
+		m.listeners[stream.Session().ID()] = listeners
 	}
-	listeners[m.Session().StreamID()] = l
+	listeners[stream.ID()] = l
 
 	// If replay was requested, send existing entries
 	if request.Replay {
@@ -405,7 +405,7 @@ func (m *Service) Events(bytes []byte, stream stream.WriteStream) {
 }
 
 // Entries returns a stream of entries to the client
-func (m *Service) Entries(value []byte, stream stream.WriteStream) {
+func (m *Service) Entries(value []byte, stream primitive.Stream) {
 	defer stream.Close()
 	for key, entry := range m.entries {
 		stream.Result(proto.Marshal(&EntriesResponse{
@@ -421,7 +421,7 @@ func (m *Service) Entries(value []byte, stream stream.WriteStream) {
 func (m *Service) scheduleTTL(key string, value *MapEntryValue) {
 	m.cancelTTL(key)
 	if value.TTL != nil && *value.TTL > 0 {
-		m.timers[key] = m.Scheduler.ScheduleOnce(value.Created.Add(*value.TTL).Sub(m.Context.Timestamp()), func() {
+		m.timers[key] = m.ScheduleOnce(value.Created.Add(*value.TTL).Sub(m.Timestamp()), func() {
 			delete(m.entries, key)
 			m.sendEvent(&ListenResponse{
 				Type:    ListenResponse_REMOVED,
@@ -445,7 +445,7 @@ func (m *Service) cancelTTL(key string) {
 func (m *Service) sendEvent(event *ListenResponse) {
 	bytes, _ := proto.Marshal(event)
 	for sessionID, listeners := range m.listeners {
-		session := m.SessionOf(sessionID)
+		session := m.Session(sessionID)
 		if session != nil {
 			for _, listener := range listeners {
 				if listener.key != "" {

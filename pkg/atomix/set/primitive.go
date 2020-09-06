@@ -43,8 +43,8 @@ func (p *Primitive) RegisterServer(server *grpc.Server, protocol primitive.Proto
 
 func (p *Primitive) NewService(scheduler primitive.Scheduler, context primitive.ServiceContext) primitive.Service {
 	service := &Service{
-		ManagedService: primitive.NewManagedService(primitive.ServiceType_SET, scheduler, context),
-		values:         make(map[string]bool),
+		Service: primitive.NewService(scheduler, context),
+		values:  make(map[string]bool),
 	}
 	service.init()
 	return service

@@ -16,7 +16,6 @@ package set
 
 import (
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
-	"github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
 	"io"
@@ -24,19 +23,19 @@ import (
 
 // Service is a state machine for a list primitive
 type Service struct {
-	*primitive.ManagedService
+	primitive.Service
 	values map[string]bool
 }
 
 // init initializes the list service
 func (s *Service) init() {
-	s.Executor.RegisterUnaryOperation(opSize, s.Size)
-	s.Executor.RegisterUnaryOperation(opContains, s.Contains)
-	s.Executor.RegisterUnaryOperation(opAdd, s.Add)
-	s.Executor.RegisterUnaryOperation(opRemove, s.Remove)
-	s.Executor.RegisterUnaryOperation(opClear, s.Clear)
-	s.Executor.RegisterStreamOperation(opEvents, s.Events)
-	s.Executor.RegisterStreamOperation(opIterate, s.Iterate)
+	s.RegisterUnaryOperation(opSize, s.Size)
+	s.RegisterUnaryOperation(opContains, s.Contains)
+	s.RegisterUnaryOperation(opAdd, s.Add)
+	s.RegisterUnaryOperation(opRemove, s.Remove)
+	s.RegisterUnaryOperation(opClear, s.Clear)
+	s.RegisterStreamOperation(opEvents, s.Events)
+	s.RegisterStreamOperation(opIterate, s.Iterate)
 }
 
 // Backup takes a snapshot of the service
@@ -129,7 +128,7 @@ func (s *Service) Clear(bytes []byte) ([]byte, error) {
 }
 
 // Events registers a channel on which to send set change events
-func (s *Service) Events(bytes []byte, stream stream.WriteStream) {
+func (s *Service) Events(bytes []byte, stream primitive.Stream) {
 	request := &ListenRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		stream.Error(err)
@@ -148,7 +147,7 @@ func (s *Service) Events(bytes []byte, stream stream.WriteStream) {
 }
 
 // Iterate sends all current set elements on the given channel
-func (s *Service) Iterate(bytes []byte, stream stream.WriteStream) {
+func (s *Service) Iterate(bytes []byte, stream primitive.Stream) {
 	defer stream.Close()
 	for value := range s.values {
 		stream.Result(proto.Marshal(&IterateResponse{

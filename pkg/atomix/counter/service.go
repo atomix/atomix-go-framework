@@ -23,17 +23,17 @@ import (
 
 // Service is a state machine for a counter primitive
 type Service struct {
-	*primitive.ManagedService
+	primitive.Service
 	value int64
 }
 
 // init initializes the list service
 func (c *Service) init() {
-	c.Executor.RegisterUnaryOperation(opGet, c.Get)
-	c.Executor.RegisterUnaryOperation(opSet, c.Set)
-	c.Executor.RegisterUnaryOperation(opIncrement, c.Increment)
-	c.Executor.RegisterUnaryOperation(opDecrement, c.Decrement)
-	c.Executor.RegisterUnaryOperation(opCAS, c.CAS)
+	c.RegisterUnaryOperation(opGet, c.Get)
+	c.RegisterUnaryOperation(opSet, c.Set)
+	c.RegisterUnaryOperation(opIncrement, c.Increment)
+	c.RegisterUnaryOperation(opDecrement, c.Decrement)
+	c.RegisterUnaryOperation(opCAS, c.CAS)
 }
 
 // Backup backs up the service

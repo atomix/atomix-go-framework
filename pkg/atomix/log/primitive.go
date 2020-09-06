@@ -43,9 +43,9 @@ func (p *Primitive) RegisterServer(server *grpc.Server, protocol primitive.Proto
 
 func (p *Primitive) NewService(scheduler primitive.Scheduler, context primitive.ServiceContext) primitive.Service {
 	service := &Service{
-		ManagedService: primitive.NewManagedService(primitive.ServiceType_LOG, scheduler, context),
-		indexes:        make(map[uint64]*LinkedLogEntryValue),
-		listeners:      make(map[uint64]map[uint64]listener),
+		Service:   primitive.NewService(scheduler, context),
+		indexes:   make(map[uint64]*LinkedLogEntryValue),
+		listeners: make(map[primitive.SessionID]map[primitive.StreamID]listener),
 	}
 	service.init()
 	return service

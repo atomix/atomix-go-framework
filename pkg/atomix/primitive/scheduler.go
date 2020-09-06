@@ -31,7 +31,7 @@ type Scheduler interface {
 	ScheduleRepeat(delay time.Duration, interval time.Duration, f func()) Timer
 
 	// ScheduleIndex schedules a function to run at a specific index
-	ScheduleIndex(index uint64, f func())
+	ScheduleIndex(index Index, f func())
 }
 
 // Timer is a cancellable timer
@@ -44,7 +44,7 @@ func newScheduler() *scheduler {
 	return &scheduler{
 		tasks:          list.New(),
 		scheduledTasks: list.New(),
-		indexTasks:     make(map[uint64]*list.List),
+		indexTasks:     make(map[Index]*list.List),
 		time:           time.Now(),
 	}
 }
@@ -53,7 +53,7 @@ type scheduler struct {
 	Scheduler
 	tasks          *list.List
 	scheduledTasks *list.List
-	indexTasks     map[uint64]*list.List
+	indexTasks     map[Index]*list.List
 	time           time.Time
 }
 
@@ -83,7 +83,7 @@ func (s *scheduler) ScheduleRepeat(delay time.Duration, interval time.Duration, 
 	return task
 }
 
-func (s *scheduler) ScheduleIndex(index uint64, f func()) {
+func (s *scheduler) ScheduleIndex(index Index, f func()) {
 	tasks, ok := s.indexTasks[index]
 	if !ok {
 		tasks = list.New()
@@ -135,7 +135,7 @@ func (s *scheduler) runScheduledTasks(time time.Time) {
 }
 
 // runIndex runs functions pending at the given index
-func (s *scheduler) runIndex(index uint64) {
+func (s *scheduler) runIndex(index Index) {
 	tasks, ok := s.indexTasks[index]
 	if ok {
 		task := tasks.Front()

@@ -18,134 +18,161 @@ import (
 	"io"
 )
 
-// ID is a service identifier
-type ID ServiceId
+// ServiceID is a service identifier
+type ServiceID ServiceId
 
 // ServiceContext provides information about the context within which a service is running
 type ServiceContext interface {
 	PartitionContext
 
 	// ServiceID is the service identifier
-	ServiceID() ID
+	ServiceID() ServiceID
+
+	// ServiceType returns the service type
+	ServiceType() ServiceType
+
+	// CurrentOperation returns the current operation identifier
+	CurrentOperation() OperationID
+
+	// CurrentSession returns the current session
+	CurrentSession() Session
+
+	// Session returns the session with the given identifier
+	Session(id SessionID) Session
+
+	// Sessions returns a list of open sessions
+	Sessions() []Session
 }
 
-func newServiceContext(ctx PartitionContext, id ServiceId) ServiceContext {
+// internalContext provides setters for the service context
+type internalContext interface {
+	ServiceContext
+	setCurrentOperation(op OperationID)
+	setCurrentSession(session Session)
+	addSession(session Session)
+	removeSession(session Session)
+}
+
+func newServiceContext(ctx PartitionContext, id ServiceID) ServiceContext {
 	return &serviceContext{
 		PartitionContext: ctx,
-		id:               ID(id),
+		serviceID:        id,
+		sessions:         make(map[SessionID]Session),
 	}
 }
 
 // serviceContext is a default implementation of the service context
 type serviceContext struct {
 	PartitionContext
-	id ID
+	serviceID      ServiceID
+	sessions       map[SessionID]Session
+	currentSession Session
+	currentOp      OperationID
 }
 
-func (c *serviceContext) ServiceID() ID {
-	return c.id
+func (c *serviceContext) ServiceID() ServiceID {
+	return c.serviceID
 }
 
-var _ ServiceContext = &serviceContext{}
-
-// SessionOpen is an interface for listening to session open events
-type SessionOpen interface {
-	// SessionOpen is called when a session is opened for a service
-	SessionOpen(*Session)
+func (c *serviceContext) ServiceType() ServiceType {
+	return c.serviceID.Type
 }
 
-// SessionClosed is an interface for listening to session closed events
-type SessionClosed interface {
-	// SessionClosed is called when a session is closed for a service
-	SessionClosed(*Session)
+func (c *serviceContext) CurrentOperation() OperationID {
+	return c.currentOp
 }
 
-// SessionExpired is an interface for listening to session expired events
-type SessionExpired interface {
-	// SessionExpired is called when a session is expired for a service
-	SessionExpired(*Session)
+// setOperation sets the current operation
+func (c *serviceContext) setCurrentOperation(op OperationID) {
+	c.currentOp = op
 }
 
-// Service is a primitive service
-type Service interface {
-	internalService
-
-	// Backup is called to take a snapshot of the service state
-	Backup(writer io.Writer) error
-
-	// Resotre is called to restore the service state from a snapshot
-	Restore(reader io.Reader) error
+func (c *serviceContext) CurrentSession() Session {
+	return c.currentSession
 }
 
-type internalService interface {
-	Type() ServiceType
-	setCurrentSession(*Session)
-	addSession(*Session)
-	removeSession(*Session)
-	getOperation(name string) Operation
+// setCurrentSession sets the current session
+func (c *serviceContext) setCurrentSession(session Session) {
+	c.currentSession = session
 }
 
-// NewManagedService creates a new primitive service
-func NewManagedService(serviceType ServiceType, scheduler Scheduler, context ServiceContext) *ManagedService {
-	return &ManagedService{
-		serviceType: serviceType,
-		Executor:    newExecutor(),
-		Scheduler:   scheduler,
-		Context:     context,
-		sessions:    make(map[uint64]*Session),
-	}
+func (c *serviceContext) Session(id SessionID) Session {
+	return c.sessions[id]
 }
 
-// ManagedService is a service that is managed by the service manager
-type ManagedService struct {
-	Executor       Executor
-	Context        ServiceContext
-	Scheduler      Scheduler
-	serviceType    ServiceType
-	sessions       map[uint64]*Session
-	currentSession *Session
-}
-
-// Type returns the service type
-func (s *ManagedService) Type() ServiceType {
-	return s.serviceType
-}
-
-// Session returns the current session
-func (s *ManagedService) Session() *Session {
-	return s.currentSession
-}
-
-// SessionOf returns the session with the given identifier
-func (s *ManagedService) SessionOf(id uint64) *Session {
-	return s.sessions[id]
-}
-
-// Sessions returns a list of open sessions
-func (s *ManagedService) Sessions() []*Session {
-	sessions := make([]*Session, 0, len(s.sessions))
-	for _, session := range s.sessions {
+func (c *serviceContext) Sessions() []Session {
+	sessions := make([]Session, 0, len(c.sessions))
+	for _, session := range c.sessions {
 		sessions = append(sessions, session)
 	}
 	return sessions
 }
 
-// setCurrentSession sets the current session
-func (s *ManagedService) setCurrentSession(session *Session) {
-	s.currentSession = session
-}
-
 // addSession adds a session to the service
-func (s *ManagedService) addSession(session *Session) {
-	s.sessions[session.ID] = session
+func (c *serviceContext) addSession(session Session) {
+	c.sessions[session.ID()] = session
 }
 
 // removeSession removes a session from the service
-func (s *ManagedService) removeSession(session *Session) {
-	delete(s.sessions, session.ID)
+func (c *serviceContext) removeSession(session Session) {
+	delete(c.sessions, session.ID())
 }
 
-// getOperation gets a service operation
-func (s *ManagedService) getOperation(name string) Operation {
-	return s.Executor.GetOperation(name)
+var _ ServiceContext = &serviceContext{}
+
+// SessionOpenService is an interface for listening to session open events
+type SessionOpenService interface {
+	// SessionOpen is called when a session is opened for a service
+	SessionOpen(Session)
+}
+
+// SessionClosedService is an interface for listening to session closed events
+type SessionClosedService interface {
+	// SessionClosed is called when a session is closed for a service
+	SessionClosed(Session)
+}
+
+// SessionExpiredService is an interface for listening to session expired events
+type SessionExpiredService interface {
+	// SessionExpired is called when a session is expired for a service
+	SessionExpired(Session)
+}
+
+// BackupService is an interface for backing up a service
+type BackupService interface {
+	// Backup is called to take a snapshot of the service state
+	Backup(writer io.Writer) error
+}
+
+// RestoreService is an interface for restoring up a service
+type RestoreService interface {
+	// Restore is called to restore the service state from a snapshot
+	Restore(reader io.Reader) error
+}
+
+// Service is a primitive service
+type Service interface {
+	BackupService
+	RestoreService
+	Executor
+	Scheduler
+	internalContext
+}
+
+// NewService creates a new primitive service
+func NewService(scheduler Scheduler, context ServiceContext) Service {
+	return &managedService{
+		Executor:        newExecutor(),
+		Scheduler:       scheduler,
+		internalContext: context.(internalContext),
+	}
+}
+
+// managedService is a primitive service
+type managedService struct {
+	BackupService
+	RestoreService
+	Executor
+	Scheduler
+	internalContext
 }

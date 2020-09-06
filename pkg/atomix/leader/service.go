@@ -16,7 +16,6 @@ package leader
 
 import (
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
-	"github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
 	"io"
@@ -24,7 +23,7 @@ import (
 
 // Service is a state machine for an election primitive
 type Service struct {
-	*primitive.ManagedService
+	primitive.Service
 	leader       *LatchParticipant
 	latch        uint64
 	participants []*LatchParticipant
@@ -32,9 +31,9 @@ type Service struct {
 
 // init initializes the election service
 func (e *Service) init() {
-	e.Executor.RegisterUnaryOperation(opLatch, e.Latch)
-	e.Executor.RegisterUnaryOperation(opGetLatch, e.GetLatch)
-	e.Executor.RegisterStreamOperation(opEvents, e.Events)
+	e.RegisterUnaryOperation(opLatch, e.Latch)
+	e.RegisterUnaryOperation(opGetLatch, e.GetLatch)
+	e.RegisterStreamOperation(opEvents, e.Events)
 }
 
 // Backup takes a snapshot of the service
@@ -69,20 +68,20 @@ func (e *Service) Restore(reader io.Reader) error {
 }
 
 // SessionExpired is called when a session is expired by the server
-func (e *Service) SessionExpired(session *primitive.Session) {
+func (e *Service) SessionExpired(session primitive.Session) {
 	e.close(session)
 }
 
 // SessionClosed is called when a session is closed by the client
-func (e *Service) SessionClosed(session *primitive.Session) {
+func (e *Service) SessionClosed(session primitive.Session) {
 	e.close(session)
 }
 
 // close elects a new leader when a session is closed
-func (e *Service) close(session *primitive.Session) {
+func (e *Service) close(session primitive.Session) {
 	candidates := make([]*LatchParticipant, 0, len(e.participants))
 	for _, candidate := range e.participants {
-		if candidate.SessionID != session.ID {
+		if primitive.SessionID(candidate.SessionID) != session.ID() {
 			candidates = append(candidates, candidate)
 		}
 	}
@@ -90,7 +89,7 @@ func (e *Service) close(session *primitive.Session) {
 	if len(candidates) != len(e.participants) {
 		e.participants = candidates
 
-		if e.leader.SessionID == session.ID {
+		if primitive.SessionID(e.leader.SessionID) == session.ID() {
 			e.leader = nil
 			if len(e.participants) > 0 {
 				e.leader = e.participants[0]
@@ -136,7 +135,7 @@ func (e *Service) Latch(bytes []byte) ([]byte, error) {
 
 	reg := &LatchParticipant{
 		ID:        request.ID,
-		SessionID: e.Session().ID,
+		SessionID: uint64(e.CurrentSession().ID()),
 	}
 
 	e.participants = append(e.participants, reg)
@@ -163,7 +162,7 @@ func (e *Service) GetLatch(bytes []byte) ([]byte, error) {
 }
 
 // Events registers the given channel to receive election events
-func (e *Service) Events(bytes []byte, stream stream.WriteStream) {
+func (e *Service) Events(bytes []byte, stream primitive.Stream) {
 	// Keep the stream open for events
 }
 

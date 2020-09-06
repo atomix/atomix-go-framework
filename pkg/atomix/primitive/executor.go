@@ -14,20 +14,19 @@
 
 package primitive
 
-import (
-	"github.com/atomix/go-framework/pkg/atomix/stream"
-)
+// OperationID is an operation identifier
+type OperationID string
 
 // Executor executes primitive operations
 type Executor interface {
 	// RegisterUnaryOperation registers a unary primitive operation
-	RegisterUnaryOperation(name string, callback func([]byte) ([]byte, error))
+	RegisterUnaryOperation(id OperationID, callback func([]byte) ([]byte, error))
 
 	// RegisterStreamOperation registers a new primitive operation
-	RegisterStreamOperation(name string, callback func([]byte, stream.WriteStream))
+	RegisterStreamOperation(id OperationID, callback func([]byte, Stream))
 
 	// GetOperation returns an operation by name
-	GetOperation(name string) Operation
+	GetOperation(id OperationID) Operation
 }
 
 // Operation is the base interface for primitive operations
@@ -42,36 +41,36 @@ type UnaryOperation interface {
 // StreamingOperation is a primitive operation that returns a stream
 type StreamingOperation interface {
 	// Execute executes the operation
-	Execute(bytes []byte, stream stream.WriteStream)
+	Execute(bytes []byte, stream Stream)
 }
 
 // newExecutor returns a new executor
 func newExecutor() Executor {
 	return &executor{
-		operations: make(map[string]Operation),
+		operations: make(map[OperationID]Operation),
 	}
 }
 
 // executor is an implementation of the Executor interface
 type executor struct {
 	Executor
-	operations map[string]Operation
+	operations map[OperationID]Operation
 }
 
-func (e *executor) RegisterUnaryOperation(name string, callback func([]byte) ([]byte, error)) {
-	e.operations[name] = &unaryOperation{
+func (e *executor) RegisterUnaryOperation(id OperationID, callback func([]byte) ([]byte, error)) {
+	e.operations[id] = &unaryOperation{
 		f: callback,
 	}
 }
 
-func (e *executor) RegisterStreamOperation(name string, callback func([]byte, stream.WriteStream)) {
-	e.operations[name] = &streamingOperation{
+func (e *executor) RegisterStreamOperation(id OperationID, callback func([]byte, Stream)) {
+	e.operations[id] = &streamingOperation{
 		f: callback,
 	}
 }
 
-func (e *executor) GetOperation(name string) Operation {
-	return e.operations[name]
+func (e *executor) GetOperation(id OperationID) Operation {
+	return e.operations[id]
 }
 
 // unaryOperation is an implementation of the UnaryOperation interface
@@ -85,9 +84,9 @@ func (o *unaryOperation) Execute(bytes []byte) ([]byte, error) {
 
 // streamingOperation is an implementation of the StreamingOperation interface
 type streamingOperation struct {
-	f func([]byte, stream.WriteStream)
+	f func([]byte, Stream)
 }
 
-func (o *streamingOperation) Execute(bytes []byte, stream stream.WriteStream) {
+func (o *streamingOperation) Execute(bytes []byte, stream Stream) {
 	o.f(bytes, stream)
 }

@@ -16,7 +16,6 @@ package list
 
 import (
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
-	"github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
 	"io"
@@ -24,22 +23,22 @@ import (
 
 // Service is a state machine for a list primitive
 type Service struct {
-	*primitive.ManagedService
+	primitive.Service
 	values []string
 }
 
 // init initializes the list service
 func (l *Service) init() {
-	l.Executor.RegisterUnaryOperation(opSize, l.Size)
-	l.Executor.RegisterUnaryOperation(opContains, l.Contains)
-	l.Executor.RegisterUnaryOperation(opAppend, l.Append)
-	l.Executor.RegisterUnaryOperation(opInsert, l.Insert)
-	l.Executor.RegisterUnaryOperation(opGet, l.Get)
-	l.Executor.RegisterUnaryOperation(opSet, l.Set)
-	l.Executor.RegisterUnaryOperation(opRemove, l.Remove)
-	l.Executor.RegisterUnaryOperation(opClear, l.Clear)
-	l.Executor.RegisterStreamOperation(opEvents, l.Events)
-	l.Executor.RegisterStreamOperation(opIterate, l.Iterate)
+	l.RegisterUnaryOperation(opSize, l.Size)
+	l.RegisterUnaryOperation(opContains, l.Contains)
+	l.RegisterUnaryOperation(opAppend, l.Append)
+	l.RegisterUnaryOperation(opInsert, l.Insert)
+	l.RegisterUnaryOperation(opGet, l.Get)
+	l.RegisterUnaryOperation(opSet, l.Set)
+	l.RegisterUnaryOperation(opRemove, l.Remove)
+	l.RegisterUnaryOperation(opClear, l.Clear)
+	l.RegisterStreamOperation(opEvents, l.Events)
+	l.RegisterStreamOperation(opIterate, l.Iterate)
 }
 
 // Backup takes a snapshot of the service
@@ -238,7 +237,7 @@ func (l *Service) Clear(bytes []byte) ([]byte, error) {
 }
 
 // Events registers a channel to send list change events
-func (l *Service) Events(bytes []byte, stream stream.WriteStream) {
+func (l *Service) Events(bytes []byte, stream primitive.Stream) {
 	request := &ListenRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		stream.Error(err)
@@ -258,7 +257,7 @@ func (l *Service) Events(bytes []byte, stream stream.WriteStream) {
 }
 
 // Iterate sends all current values on the given channel
-func (l *Service) Iterate(bytes []byte, stream stream.WriteStream) {
+func (l *Service) Iterate(bytes []byte, stream primitive.Stream) {
 	defer stream.Close()
 	for _, value := range l.values {
 		stream.Result(proto.Marshal(&IterateResponse{

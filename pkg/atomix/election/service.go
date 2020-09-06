@@ -16,17 +16,15 @@ package election
 
 import (
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
-	"github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
-	log "github.com/sirupsen/logrus"
 	"io"
 	"time"
 )
 
 // Service is a state machine for an election primitive
 type Service struct {
-	*primitive.ManagedService
+	primitive.Service
 	leader     *ElectionRegistration
 	term       uint64
 	timestamp  *time.Time
@@ -35,13 +33,13 @@ type Service struct {
 
 // init initializes the election service
 func (e *Service) init() {
-	e.Executor.RegisterUnaryOperation(opEnter, e.Enter)
-	e.Executor.RegisterUnaryOperation(opWithdraw, e.Withdraw)
-	e.Executor.RegisterUnaryOperation(opAnoint, e.Anoint)
-	e.Executor.RegisterUnaryOperation(opPromote, e.Promote)
-	e.Executor.RegisterUnaryOperation(opEvict, e.Evict)
-	e.Executor.RegisterUnaryOperation(opGetTerm, e.GetTerm)
-	e.Executor.RegisterStreamOperation(opEvents, e.Events)
+	e.RegisterUnaryOperation(opEnter, e.Enter)
+	e.RegisterUnaryOperation(opWithdraw, e.Withdraw)
+	e.RegisterUnaryOperation(opAnoint, e.Anoint)
+	e.RegisterUnaryOperation(opPromote, e.Promote)
+	e.RegisterUnaryOperation(opEvict, e.Evict)
+	e.RegisterUnaryOperation(opGetTerm, e.GetTerm)
+	e.RegisterStreamOperation(opEvents, e.Events)
 }
 
 // Backup takes a snapshot of the service
@@ -78,20 +76,20 @@ func (e *Service) Restore(reader io.Reader) error {
 }
 
 // SessionExpired is called when a session is expired by the server
-func (e *Service) SessionExpired(session *primitive.Session) {
+func (e *Service) SessionExpired(session primitive.Session) {
 	e.close(session)
 }
 
 // SessionClosed is called when a session is closed by the client
-func (e *Service) SessionClosed(session *primitive.Session) {
+func (e *Service) SessionClosed(session primitive.Session) {
 	e.close(session)
 }
 
 // close elects a new leader when a session is closed
-func (e *Service) close(session *primitive.Session) {
+func (e *Service) close(session primitive.Session) {
 	candidates := make([]*ElectionRegistration, 0, len(e.candidates))
 	for _, candidate := range e.candidates {
-		if candidate.SessionID != session.ID {
+		if primitive.SessionID(candidate.SessionID) != session.ID() {
 			candidates = append(candidates, candidate)
 		}
 	}
@@ -99,12 +97,12 @@ func (e *Service) close(session *primitive.Session) {
 	if len(candidates) != len(e.candidates) {
 		e.candidates = candidates
 
-		if e.leader.SessionID == session.ID {
+		if primitive.SessionID(e.leader.SessionID) == session.ID() {
 			e.leader = nil
 			if len(e.candidates) > 0 {
 				e.leader = e.candidates[0]
 				e.term++
-				timestamp := e.Context.Timestamp()
+				timestamp := e.Timestamp()
 				e.timestamp = &timestamp
 			}
 		}
@@ -149,7 +147,7 @@ func (e *Service) Enter(bytes []byte) ([]byte, error) {
 	updated := false
 	for _, candidate := range e.candidates {
 		if candidate.ID == request.ID {
-			candidate.SessionID = e.Session().ID
+			candidate.SessionID = uint64(e.CurrentSession().ID())
 			updated = true
 			break
 		}
@@ -158,14 +156,14 @@ func (e *Service) Enter(bytes []byte) ([]byte, error) {
 	if !updated {
 		reg := &ElectionRegistration{
 			ID:        request.ID,
-			SessionID: e.Session().ID,
+			SessionID: uint64(e.CurrentSession().ID()),
 		}
 
 		e.candidates = append(e.candidates, reg)
 		if e.leader == nil {
 			e.leader = reg
 			e.term++
-			timestamp := e.Context.Timestamp()
+			timestamp := e.Timestamp()
 			e.timestamp = &timestamp
 		}
 
@@ -202,7 +200,7 @@ func (e *Service) Withdraw(bytes []byte) ([]byte, error) {
 			if len(e.candidates) > 0 {
 				e.leader = e.candidates[0]
 				e.term++
-				timestamp := e.Context.Timestamp()
+				timestamp := e.Timestamp()
 				e.timestamp = &timestamp
 			}
 		}
@@ -255,7 +253,7 @@ func (e *Service) Anoint(bytes []byte) ([]byte, error) {
 
 	e.leader = leader
 	e.term++
-	timestamp := e.Context.Timestamp()
+	timestamp := e.Timestamp()
 	e.timestamp = &timestamp
 	e.candidates = candidates
 
@@ -315,7 +313,7 @@ func (e *Service) Promote(bytes []byte) ([]byte, error) {
 	if e.leader.ID != leader.ID {
 		e.leader = leader
 		e.term++
-		timestamp := e.Context.Timestamp()
+		timestamp := e.Timestamp()
 		e.timestamp = &timestamp
 	}
 	e.candidates = candidates
@@ -352,7 +350,7 @@ func (e *Service) Evict(bytes []byte) ([]byte, error) {
 			if len(e.candidates) > 0 {
 				e.leader = e.candidates[0]
 				e.term++
-				timestamp := e.Context.Timestamp()
+				timestamp := e.Timestamp()
 				e.timestamp = &timestamp
 			}
 		}
@@ -376,14 +374,13 @@ func (e *Service) GetTerm(bytes []byte) ([]byte, error) {
 }
 
 // Events registers the given channel to receive election events
-func (e *Service) Events(bytes []byte, stream stream.WriteStream) {
+func (e *Service) Events(bytes []byte, stream primitive.Stream) {
 	// Keep the stream open for events
 }
 
 func (e *Service) sendEvent(event *ListenResponse) {
 	bytes, err := proto.Marshal(event)
 	for _, session := range e.Sessions() {
-		log.Infof("Election %s publishing event %v to session %d", e.Context.ServiceID().Name, event, session.ID)
 		for _, stream := range session.StreamsOf(opEvents) {
 			stream.Result(bytes, err)
 		}

@@ -23,7 +23,6 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/gogo/protobuf/proto"
 	"io"
-	"strings"
 	"time"
 )
 
@@ -33,8 +32,8 @@ func NewManager(registry Registry, context PartitionContext) *Manager {
 		registry:  registry,
 		context:   context,
 		scheduler: newScheduler(),
-		sessions:  make(map[uint64]*Session),
-		services:  make(map[qualifiedServiceName]Service),
+		sessions:  make(map[SessionID]*sessionManager),
+		services:  make(map[ServiceID]Service),
 	}
 }
 
@@ -42,8 +41,8 @@ func NewManager(registry Registry, context PartitionContext) *Manager {
 type Manager struct {
 	registry  Registry
 	context   PartitionContext
-	sessions  map[uint64]*Session
-	services  map[qualifiedServiceName]Service
+	sessions  map[SessionID]*sessionManager
+	services  map[ServiceID]Service
 	scheduler *scheduler
 }
 
@@ -59,26 +58,28 @@ func (m *Manager) Snapshot(writer io.Writer) error {
 }
 
 func (m *Manager) snapshotSessions(writer io.Writer) error {
-	return util.WriteMap(writer, m.sessions, func(id uint64, session *Session) ([]byte, error) {
-		streams := make([]*SessionStreamSnapshot, 0, len(session.streams))
-		for _, stream := range session.streams {
-			streams = append(streams, &SessionStreamSnapshot{
-				StreamId:       stream.ID,
-				Type:           stream.Type,
-				SequenceNumber: stream.responseID,
-				LastCompleted:  stream.completeID,
+	return util.WriteMap(writer, m.sessions, func(id SessionID, session *sessionManager) ([]byte, error) {
+		services := make([]*SessionServiceSnapshot, 0, len(session.services))
+		for _, service := range session.services {
+			streams := make([]*SessionStreamSnapshot, 0, len(service.streams))
+			for _, stream := range service.streams {
+				streams = append(streams, &SessionStreamSnapshot{
+					StreamId:       uint64(stream.id),
+					Type:           string(stream.op),
+					SequenceNumber: stream.responseID,
+					LastCompleted:  stream.completeID,
+				})
+			}
+			services = append(services, &SessionServiceSnapshot{
+				ServiceId: ServiceId(service.service),
+				Streams:   streams,
 			})
 		}
-		services := make([]string, 0, len(session.services))
-		for service := range session.services {
-			services = append(services, string(service))
-		}
 		snapshot := &SessionSnapshot{
-			SessionID:       session.ID,
-			Timeout:         session.Timeout,
-			Timestamp:       session.LastUpdated,
+			SessionID:       uint64(session.id),
+			Timeout:         session.timeout,
+			Timestamp:       session.lastUpdated,
 			CommandSequence: session.commandSequence,
-			Streams:         streams,
 			Services:        services,
 		}
 		return proto.Marshal(snapshot)
@@ -94,12 +95,8 @@ func (m *Manager) snapshotServices(writer io.Writer) error {
 	}
 
 	for id, service := range m.services {
-		serviceID := &ServiceId{
-			Type:      service.Type(),
-			Name:      id.name(),
-			Namespace: id.namespace(),
-		}
-		bytes, err := proto.Marshal(serviceID)
+		serviceID := ServiceId(id)
+		bytes, err := proto.Marshal(&serviceID)
 		if err != nil {
 			return err
 		}
@@ -137,51 +134,52 @@ func (m *Manager) Install(reader io.Reader) error {
 }
 
 func (m *Manager) installSessions(reader io.Reader) error {
-	m.sessions = make(map[uint64]*Session)
-	return util.ReadMap(reader, m.sessions, func(data []byte) (uint64, *Session, error) {
+	m.sessions = make(map[SessionID]*sessionManager)
+	return util.ReadMap(reader, m.sessions, func(data []byte) (SessionID, *sessionManager, error) {
 		snapshot := &SessionSnapshot{}
 		if err := proto.Unmarshal(data, snapshot); err != nil {
 			return 0, nil, err
 		}
 
-		session := &Session{
-			ID:               snapshot.SessionID,
-			Timeout:          time.Duration(snapshot.Timeout),
-			LastUpdated:      snapshot.Timestamp,
+		sessionManager := &sessionManager{
+			id:               SessionID(snapshot.SessionID),
+			timeout:          time.Duration(snapshot.Timeout),
+			lastUpdated:      snapshot.Timestamp,
 			ctx:              m.context,
 			commandSequence:  snapshot.CommandSequence,
 			commandCallbacks: make(map[uint64]func()),
 			queryCallbacks:   make(map[uint64]*list.List),
 			results:          make(map[uint64]streams.Result),
-			streams:          make(map[uint64]*sessionStream),
+			services:         make(map[ServiceID]*serviceSession),
 		}
 
-		sessionStreams := make(map[uint64]*sessionStream)
-		for _, stream := range snapshot.Streams {
-			sessionStreams[stream.StreamId] = &sessionStream{
-				ID:         stream.StreamId,
-				Type:       stream.Type,
-				session:    session,
-				responseID: stream.SequenceNumber,
-				completeID: stream.LastCompleted,
-				ctx:        m.context,
-				stream:     streams.NewNilStream(),
-				results:    list.New(),
-			}
-		}
-		session.streams = sessionStreams
-
-		sessionServices := make(map[qualifiedServiceName]bool)
 		for _, service := range snapshot.Services {
-			sessionServices[qualifiedServiceName(service)] = true
+			session := &serviceSession{
+				sessionManager: sessionManager,
+				service:        ServiceID(service.ServiceId),
+				streams:        make(map[StreamID]*sessionStream),
+			}
+
+			for _, stream := range service.Streams {
+				session.streams[StreamID(stream.StreamId)] = &sessionStream{
+					id:         StreamID(stream.StreamId),
+					op:         OperationID(stream.Type),
+					session:    session,
+					responseID: stream.SequenceNumber,
+					completeID: stream.LastCompleted,
+					ctx:        m.context,
+					stream:     streams.NewNilStream(),
+					results:    list.New(),
+				}
+			}
+			sessionManager.services[ServiceID(service.ServiceId)] = session
 		}
-		session.services = sessionServices
-		return session.ID, session, nil
+		return sessionManager.id, sessionManager, nil
 	})
 }
 
 func (m *Manager) installServices(reader io.Reader) error {
-	services := make(map[qualifiedServiceName]Service)
+	services := make(map[ServiceID]Service)
 
 	countBytes := make([]byte, 4)
 	n, err := reader.Read(countBytes)
@@ -206,13 +204,13 @@ func (m *Manager) installServices(reader io.Reader) error {
 				return err
 			}
 
-			serviceID := &ServiceId{}
-			if err = proto.Unmarshal(bytes, serviceID); err != nil {
+			serviceID := ServiceId{}
+			if err = proto.Unmarshal(bytes, &serviceID); err != nil {
 				return err
 			}
 			primitive := m.registry.GetPrimitive(primitive.PrimitiveType(serviceID.Type))
-			service := primitive.NewService(m.scheduler, newServiceContext(m.context, *serviceID))
-			services[newQualifiedServiceName(serviceID.Namespace, serviceID.Name)] = service
+			service := primitive.NewService(m.scheduler, newServiceContext(m.context, ServiceID(serviceID)))
+			services[ServiceID(serviceID)] = service
 			if err := service.Restore(reader); err != nil {
 				return err
 			}
@@ -220,9 +218,10 @@ func (m *Manager) installServices(reader io.Reader) error {
 	}
 	m.services = services
 
-	for _, session := range m.sessions {
-		for serviceName := range session.services {
-			if service, ok := m.services[serviceName]; ok {
+	for _, sessionManager := range m.sessions {
+		for serviceID, session := range sessionManager.services {
+			service, ok := m.services[serviceID]
+			if ok {
 				service.addSession(session)
 			}
 		}
@@ -256,7 +255,7 @@ func (m *Manager) Command(bytes []byte, stream streams.WriteStream) {
 }
 
 func (m *Manager) applyCommand(request *SessionCommandRequest, stream streams.WriteStream) {
-	session, ok := m.sessions[request.Context.SessionID]
+	sessionManager, ok := m.sessions[SessionID(request.Context.SessionID)]
 	if !ok {
 		util.SessionEntry(m.context.NodeID(), request.Context.SessionID).
 			Warn("Unknown session")
@@ -264,13 +263,22 @@ func (m *Manager) applyCommand(request *SessionCommandRequest, stream streams.Wr
 		stream.Close()
 	} else {
 		sequenceNumber := request.Context.SequenceNumber
-		if sequenceNumber != 0 && sequenceNumber <= session.commandSequence {
-			result, ok := session.getResult(sequenceNumber)
+		if sequenceNumber != 0 && sequenceNumber <= sessionManager.commandSequence {
+			serviceID := ServiceID(*request.Command.Service)
+
+			session := sessionManager.getService(serviceID)
+			if session == nil {
+				stream.Error(fmt.Errorf("no open session for service %s", serviceID))
+				stream.Close()
+				return
+			}
+
+			result, ok := session.getUnaryResult(sequenceNumber)
 			if ok {
 				stream.Send(result)
 				stream.Close()
 			} else {
-				streamCtx := session.getStream(sequenceNumber)
+				streamCtx := session.getStream(StreamID(sequenceNumber))
 				if streamCtx != nil {
 					streamCtx.replay(stream)
 				} else {
@@ -278,77 +286,81 @@ func (m *Manager) applyCommand(request *SessionCommandRequest, stream streams.Wr
 					stream.Close()
 				}
 			}
-		} else if sequenceNumber > session.nextCommandSequence() {
-			session.scheduleCommand(sequenceNumber, func() {
+		} else if sequenceNumber > sessionManager.nextCommandSequence() {
+			sessionManager.scheduleCommand(sequenceNumber, func() {
 				util.SessionEntry(m.context.NodeID(), request.Context.SessionID).
 					Tracef("Executing command %d", sequenceNumber)
-				m.applySessionCommand(request, session, stream)
+				m.applySessionCommand(request, sessionManager, stream)
 			})
 		} else {
 			util.SessionEntry(m.context.NodeID(), request.Context.SessionID).
 				Tracef("Executing command %d", sequenceNumber)
-			m.applySessionCommand(request, session, stream)
+			m.applySessionCommand(request, sessionManager, stream)
 		}
 	}
 }
 
-func (m *Manager) applySessionCommand(request *SessionCommandRequest, session *Session, stream streams.WriteStream) {
+func (m *Manager) applySessionCommand(request *SessionCommandRequest, session *sessionManager, stream streams.WriteStream) {
 	m.applyServiceCommand(request.Command, request.Context, session, stream)
 	session.completeCommand(request.Context.SequenceNumber)
 }
 
-func (m *Manager) applyServiceCommand(request *ServiceCommandRequest, context *SessionCommandContext, session *Session, stream streams.WriteStream) {
+func (m *Manager) applyServiceCommand(request *ServiceCommandRequest, context *SessionCommandContext, sessionManager *sessionManager, stream streams.WriteStream) {
 	switch request.Request.(type) {
 	case *ServiceCommandRequest_Operation:
-		m.applyServiceCommandOperation(request, context, session, stream)
+		m.applyServiceCommandOperation(request, context, sessionManager, stream)
 	case *ServiceCommandRequest_Create:
-		m.applyServiceCommandCreate(request, context, session, stream)
+		m.applyServiceCommandCreate(request, context, sessionManager, stream)
 	case *ServiceCommandRequest_Close:
-		m.applyServiceCommandClose(request, context, session, stream)
+		m.applyServiceCommandClose(request, context, sessionManager, stream)
 	case *ServiceCommandRequest_Delete:
-		m.applyServiceCommandDelete(request, context, session, stream)
+		m.applyServiceCommandDelete(request, context, sessionManager, stream)
 	default:
 		stream.Error(fmt.Errorf("unknown service command"))
 		stream.Close()
 	}
 }
 
-func (m *Manager) applyServiceCommandOperation(request *ServiceCommandRequest, context *SessionCommandContext, session *Session, stream streams.WriteStream) {
-	name := newQualifiedServiceName(request.Service.Namespace, request.Service.Name)
-	service, ok := m.services[name]
+func (m *Manager) applyServiceCommandOperation(request *ServiceCommandRequest, context *SessionCommandContext, sessionManager *sessionManager, stream streams.WriteStream) {
+	serviceID := ServiceID(*request.Service)
+
+	service, ok := m.services[serviceID]
 	if !ok {
-		stream.Error(fmt.Errorf("unknown service %s", name))
+		stream.Error(fmt.Errorf("unknown service %s", serviceID))
 		stream.Close()
 		return
 	}
-	if !session.services[name] {
-		stream.Error(fmt.Errorf("no open session for service %s", name))
+
+	session := sessionManager.getService(serviceID)
+	if session == nil {
+		stream.Error(fmt.Errorf("no open session for service %s", serviceID))
 		stream.Close()
 		return
 	}
 
 	service.setCurrentSession(session)
 
-	operation := service.getOperation(request.GetOperation().Method)
+	operation := service.GetOperation(OperationID(request.GetOperation().Method))
 	if unaryOp, ok := operation.(UnaryOperation); ok {
 		output, err := unaryOp.Execute(request.GetOperation().Value)
-		result := session.addResult(context.SequenceNumber, streams.Result{
+		result := session.addUnaryResult(context.SequenceNumber, streams.Result{
 			Value: output,
 			Error: err,
 		})
 		stream.Send(result)
 		stream.Close()
 	} else if streamOp, ok := operation.(StreamingOperation); ok {
-		streamCtx := session.addStream(context.SequenceNumber, request.GetOperation().Method, stream)
+		streamCtx := session.addStream(StreamID(context.SequenceNumber), OperationID(request.GetOperation().Method), stream)
 		streamOp.Execute(request.GetOperation().Value, streamCtx)
 	} else {
 		stream.Close()
 	}
 }
 
-func (m *Manager) applyServiceCommandCreate(request *ServiceCommandRequest, context *SessionCommandContext, session *Session, stream streams.WriteStream) {
-	name := newQualifiedServiceName(request.Service.Namespace, request.Service.Name)
-	service, ok := m.services[name]
+func (m *Manager) applyServiceCommandCreate(request *ServiceCommandRequest, context *SessionCommandContext, sessionManager *sessionManager, stream streams.WriteStream) {
+	serviceID := ServiceID(*request.Service)
+
+	service, ok := m.services[serviceID]
 	if !ok {
 		primitive := m.registry.GetPrimitive(primitive.PrimitiveType(request.Service.Type))
 		if primitive == nil {
@@ -356,24 +368,25 @@ func (m *Manager) applyServiceCommandCreate(request *ServiceCommandRequest, cont
 			stream.Close()
 			return
 		}
-		service = primitive.NewService(m.scheduler, newServiceContext(m.context, *request.Service))
-		m.services[name] = service
+		service = primitive.NewService(m.scheduler, newServiceContext(m.context, serviceID))
+		m.services[serviceID] = service
+	}
+
+	session := sessionManager.getService(serviceID)
+	if session == nil {
+		session = sessionManager.addService(serviceID)
+		if open, ok := service.(SessionOpenService); ok {
+			open.SessionOpen(session)
+		}
 	}
 
 	service.setCurrentSession(session)
 
-	if !session.services[name] {
-		session.services[name] = true
-		service.addSession(session)
-		if open, ok := service.(SessionOpen); ok {
-			open.SessionOpen(session)
-		}
-	}
 	stream.Result(proto.Marshal(&SessionResponse{
 		Response: &SessionResponse_Command{
 			Command: &SessionCommandResponse{
 				Context: &SessionResponseContext{
-					Index:    m.context.Index(),
+					Index:    uint64(m.context.Index()),
 					Sequence: context.SequenceNumber,
 					Type:     SessionResponseType_RESPONSE,
 				},
@@ -388,21 +401,26 @@ func (m *Manager) applyServiceCommandCreate(request *ServiceCommandRequest, cont
 	stream.Close()
 }
 
-func (m *Manager) applyServiceCommandClose(request *ServiceCommandRequest, context *SessionCommandContext, session *Session, stream streams.WriteStream) {
-	name := newQualifiedServiceName(request.Service.Namespace, request.Service.Name)
-	if service, ok := m.services[name]; ok && session.services[name] {
-		delete(session.services, name)
-		service.setCurrentSession(session)
-		service.removeSession(session)
-		if closed, ok := service.(SessionClosed); ok {
-			closed.SessionClosed(session)
+func (m *Manager) applyServiceCommandClose(request *ServiceCommandRequest, context *SessionCommandContext, sessionManager *sessionManager, stream streams.WriteStream) {
+	serviceID := ServiceID(*request.Service)
+
+	service, ok := m.services[serviceID]
+	if ok {
+		session := sessionManager.removeService(serviceID)
+		if session != nil {
+			service.setCurrentSession(session)
+			service.removeSession(session)
+			if closed, ok := service.(SessionClosedService); ok {
+				closed.SessionClosed(session)
+			}
 		}
 	}
+
 	stream.Result(proto.Marshal(&SessionResponse{
 		Response: &SessionResponse_Command{
 			Command: &SessionCommandResponse{
 				Context: &SessionResponseContext{
-					Index:    m.context.Index(),
+					Index:    uint64(m.context.Index()),
 					Sequence: context.SequenceNumber,
 					Type:     SessionResponseType_RESPONSE,
 				},
@@ -417,13 +435,14 @@ func (m *Manager) applyServiceCommandClose(request *ServiceCommandRequest, conte
 	stream.Close()
 }
 
-func (m *Manager) applyServiceCommandDelete(request *ServiceCommandRequest, context *SessionCommandContext, session *Session, stream streams.WriteStream) {
-	name := newQualifiedServiceName(request.Service.Namespace, request.Service.Name)
-	_, ok := m.services[name]
+func (m *Manager) applyServiceCommandDelete(request *ServiceCommandRequest, context *SessionCommandContext, session *sessionManager, stream streams.WriteStream) {
+	serviceID := ServiceID(*request.Service)
+
+	_, ok := m.services[serviceID]
 	if ok {
-		delete(m.services, name)
+		delete(m.services, serviceID)
 		for _, session := range m.sessions {
-			delete(session.services, name)
+			session.removeService(serviceID)
 		}
 	}
 
@@ -431,7 +450,7 @@ func (m *Manager) applyServiceCommandDelete(request *ServiceCommandRequest, cont
 		Response: &SessionResponse_Command{
 			Command: &SessionCommandResponse{
 				Context: &SessionResponseContext{
-					Index:    m.context.Index(),
+					Index:    uint64(m.context.Index()),
 					Sequence: context.SequenceNumber,
 					Type:     SessionResponseType_RESPONSE,
 				},
@@ -447,12 +466,12 @@ func (m *Manager) applyServiceCommandDelete(request *ServiceCommandRequest, cont
 }
 
 func (m *Manager) applyOpenSession(request *OpenSessionRequest, stream streams.WriteStream) {
-	session := newSession(m.context, request.Timeout)
-	m.sessions[session.ID] = session
+	session := newSessionManager(m.context, request.Timeout)
+	m.sessions[session.id] = session
 	stream.Result(proto.Marshal(&SessionResponse{
 		Response: &SessionResponse_OpenSession{
 			OpenSession: &OpenSessionResponse{
-				SessionID: session.ID,
+				SessionID: uint64(session.id),
 			},
 		},
 	}))
@@ -461,7 +480,7 @@ func (m *Manager) applyOpenSession(request *OpenSessionRequest, stream streams.W
 
 // applyKeepAlive applies a KeepAliveRequest to the service
 func (m *Manager) applyKeepAlive(request *KeepAliveRequest, stream streams.WriteStream) {
-	session, ok := m.sessions[request.SessionID]
+	session, ok := m.sessions[SessionID(request.SessionID)]
 	if !ok {
 		util.SessionEntry(m.context.NodeID(), request.SessionID).
 			Warn("Unknown session")
@@ -471,10 +490,12 @@ func (m *Manager) applyKeepAlive(request *KeepAliveRequest, stream streams.Write
 			Tracef("Recording keep-alive %v", request)
 
 		// Update the session's last updated timestamp to prevent it from expiring
-		session.LastUpdated = m.context.Timestamp()
+		session.lastUpdated = m.context.Timestamp()
 
 		// Clear the results up to the given command sequence number
-		session.ack(request.CommandSequence, request.Streams)
+		for _, service := range session.services {
+			service.ack(request.CommandSequence, request.Streams)
+		}
 
 		// Expire sessions that have not been kept alive
 		m.expireSessions()
@@ -491,14 +512,15 @@ func (m *Manager) applyKeepAlive(request *KeepAliveRequest, stream streams.Write
 
 // expireSessions expires sessions that have not been kept alive within their timeout
 func (m *Manager) expireSessions() {
-	for id, session := range m.sessions {
-		if session.timedOut(m.context.Timestamp()) {
-			session.close()
+	for id, sessionManager := range m.sessions {
+		if sessionManager.timedOut(m.context.Timestamp()) {
+			sessionManager.close()
 			delete(m.sessions, id)
-			for name := range session.services {
-				if service, ok := m.services[name]; ok {
+			for _, session := range sessionManager.services {
+				service, ok := m.services[session.service]
+				if ok {
 					service.removeSession(session)
-					if expired, ok := service.(SessionExpired); ok {
+					if expired, ok := service.(SessionExpiredService); ok {
 						expired.SessionExpired(session)
 					}
 				}
@@ -508,20 +530,21 @@ func (m *Manager) expireSessions() {
 }
 
 func (m *Manager) applyCloseSession(request *CloseSessionRequest, stream streams.WriteStream) {
-	session, ok := m.sessions[request.SessionID]
+	sessionManager, ok := m.sessions[SessionID(request.SessionID)]
 	if !ok {
 		util.SessionEntry(m.context.NodeID(), request.SessionID).
 			Warn("Unknown session")
 		stream.Error(fmt.Errorf("unknown session %d", request.SessionID))
 	} else {
 		// Close the session and notify the service.
-		delete(m.sessions, session.ID)
-		session.close()
-		for name := range session.services {
-			if service, ok := m.services[name]; ok {
+		delete(m.sessions, sessionManager.id)
+		sessionManager.close()
+		for _, session := range sessionManager.services {
+			service, ok := m.services[session.service]
+			if ok {
 				service.removeSession(session)
-				if closed, ok := service.(SessionClosed); ok {
-					closed.SessionClosed(session)
+				if expired, ok := service.(SessionExpiredService); ok {
+					expired.SessionExpired(session)
 				}
 			}
 		}
@@ -545,10 +568,10 @@ func (m *Manager) Query(bytes []byte, stream streams.WriteStream) {
 		stream.Close()
 	} else {
 		query := request.GetQuery()
-		if query.Context.LastIndex > m.context.Index() {
+		if Index(query.Context.LastIndex) > m.context.Index() {
 			util.SessionEntry(m.context.NodeID(), query.Context.SessionID).
 				Tracef("Query index %d greater than last index %d", query.Context.LastIndex, m.context.Index())
-			m.scheduler.ScheduleIndex(query.Context.LastIndex, func() {
+			m.scheduler.ScheduleIndex(Index(query.Context.LastIndex), func() {
 				m.sequenceQuery(query, stream)
 			})
 		} else {
@@ -560,7 +583,7 @@ func (m *Manager) Query(bytes []byte, stream streams.WriteStream) {
 }
 
 func (m *Manager) sequenceQuery(request *SessionQueryRequest, stream streams.WriteStream) {
-	session, ok := m.sessions[request.Context.SessionID]
+	sessionManager, ok := m.sessions[SessionID(request.Context.SessionID)]
 	if !ok {
 		util.SessionEntry(m.context.NodeID(), request.Context.SessionID).
 			Warn("Unknown session")
@@ -568,48 +591,49 @@ func (m *Manager) sequenceQuery(request *SessionQueryRequest, stream streams.Wri
 		stream.Close()
 	} else {
 		sequenceNumber := request.Context.LastSequenceNumber
-		if sequenceNumber > session.commandSequence {
+		if sequenceNumber > sessionManager.commandSequence {
 			util.SessionEntry(m.context.NodeID(), request.Context.SessionID).
-				Tracef("Query ID %d greater than last ID %d", sequenceNumber, session.commandSequence)
-			session.scheduleQuery(sequenceNumber, func() {
+				Tracef("Query ID %d greater than last ID %d", sequenceNumber, sessionManager.commandSequence)
+			sessionManager.scheduleQuery(sequenceNumber, func() {
 				util.SessionEntry(m.context.NodeID(), request.Context.SessionID).
 					Tracef("Executing query %d", sequenceNumber)
-				m.applyServiceQuery(request.Query, request.Context, session, stream)
+				m.applyServiceQuery(request.Query, request.Context, sessionManager, stream)
 			})
 		} else {
 			util.SessionEntry(m.context.NodeID(), request.Context.SessionID).
 				Tracef("Executing query %d", sequenceNumber)
-			m.applyServiceQuery(request.Query, request.Context, session, stream)
+			m.applyServiceQuery(request.Query, request.Context, sessionManager, stream)
 		}
 	}
 }
 
-func (m *Manager) applyServiceQuery(request *ServiceQueryRequest, context *SessionQueryContext, session *Session, stream streams.WriteStream) {
+func (m *Manager) applyServiceQuery(request *ServiceQueryRequest, context *SessionQueryContext, sessionManager *sessionManager, stream streams.WriteStream) {
 	switch request.Request.(type) {
 	case *ServiceQueryRequest_Operation:
-		m.applyServiceQueryOperation(request, context, session, stream)
+		m.applyServiceQueryOperation(request, context, sessionManager, stream)
 	case *ServiceQueryRequest_Metadata:
-		m.applyServiceQueryMetadata(request, context, session, stream)
+		m.applyServiceQueryMetadata(request, context, sessionManager, stream)
 	default:
 		stream.Error(fmt.Errorf("unknown service query"))
 		stream.Close()
 	}
 }
 
-func (m *Manager) applyServiceQueryOperation(request *ServiceQueryRequest, context *SessionQueryContext, session *Session, stream streams.WriteStream) {
-	name := newQualifiedServiceName(request.Service.Namespace, request.Service.Name)
-	service, ok := m.services[name]
+func (m *Manager) applyServiceQueryOperation(request *ServiceQueryRequest, context *SessionQueryContext, sessionManager *sessionManager, stream streams.WriteStream) {
+	serviceID := ServiceID(*request.Service)
+
+	service, ok := m.services[serviceID]
 
 	// If the service does not exist, reject the operation
 	if !ok {
-		stream.Error(fmt.Errorf("unknown service %s", request.Service))
+		stream.Error(fmt.Errorf("unknown service %s", serviceID))
 		stream.Close()
 		return
 	}
 
-	// If the session is not open for the service, reject the operation
-	if !session.services[name] {
-		stream.Error(fmt.Errorf("no open session for service %s", name))
+	session := sessionManager.getService(serviceID)
+	if session == nil {
+		stream.Error(fmt.Errorf("no open session for service %s", serviceID))
 		stream.Close()
 		return
 	}
@@ -618,7 +642,7 @@ func (m *Manager) applyServiceQueryOperation(request *ServiceQueryRequest, conte
 	service.setCurrentSession(session)
 
 	// Get the service operation
-	operation := service.getOperation(request.GetOperation().Method)
+	operation := service.GetOperation(OperationID(request.GetOperation().Method))
 	if operation == nil {
 		stream.Error(fmt.Errorf("unknown operation: %s", request.GetOperation().Method))
 		stream.Close()
@@ -631,7 +655,7 @@ func (m *Manager) applyServiceQueryOperation(request *ServiceQueryRequest, conte
 			Response: &SessionResponse_Query{
 				Query: &SessionQueryResponse{
 					Context: &SessionResponseContext{
-						Index:    index,
+						Index:    uint64(index),
 						Sequence: context.LastSequenceNumber,
 					},
 					Response: &ServiceQueryResponse{
@@ -654,7 +678,7 @@ func (m *Manager) applyServiceQueryOperation(request *ServiceQueryRequest, conte
 			Response: &SessionResponse_Query{
 				Query: &SessionQueryResponse{
 					Context: &SessionResponseContext{
-						Index: index,
+						Index: uint64(index),
 						Type:  SessionResponseType_OPEN_STREAM,
 					},
 				},
@@ -666,7 +690,7 @@ func (m *Manager) applyServiceQueryOperation(request *ServiceQueryRequest, conte
 				Response: &SessionResponse_Query{
 					Query: &SessionQueryResponse{
 						Context: &SessionResponseContext{
-							Index: index,
+							Index: uint64(index),
 							Type:  SessionResponseType_CLOSE_STREAM,
 						},
 					},
@@ -674,22 +698,29 @@ func (m *Manager) applyServiceQueryOperation(request *ServiceQueryRequest, conte
 			}))
 		})
 
-		streamOp.Execute(request.GetOperation().Value, responseStream)
+		queryStream := &queryStream{
+			WriteStream: responseStream,
+			id:          StreamID(m.context.Index()),
+			op:          OperationID(request.GetOperation().Method),
+			session:     session,
+		}
+
+		streamOp.Execute(request.GetOperation().Value, queryStream)
 	} else {
 		stream.Close()
 	}
 }
 
-func (m *Manager) applyServiceQueryMetadata(request *ServiceQueryRequest, context *SessionQueryContext, session *Session, stream streams.WriteStream) {
+func (m *Manager) applyServiceQueryMetadata(request *ServiceQueryRequest, context *SessionQueryContext, session *sessionManager, stream streams.WriteStream) {
 	services := []*ServiceId{}
 	serviceType := request.GetMetadata().Type
 	namespace := request.GetMetadata().Namespace
 	for name, service := range m.services {
-		if (serviceType == 0 || service.Type() == serviceType) && (namespace == "" || name.namespace() == namespace) {
+		if (serviceType == 0 || service.ServiceType() == serviceType) && (namespace == "" || name.Namespace == namespace) {
 			services = append(services, &ServiceId{
-				Type:      service.Type(),
-				Namespace: name.namespace(),
-				Name:      name.name(),
+				Type:      service.ServiceType(),
+				Namespace: name.Namespace,
+				Name:      name.Name,
 			})
 		}
 	}
@@ -698,7 +729,7 @@ func (m *Manager) applyServiceQueryMetadata(request *ServiceQueryRequest, contex
 		Response: &SessionResponse_Query{
 			Query: &SessionQueryResponse{
 				Context: &SessionResponseContext{
-					Index:    m.context.Index(),
+					Index:    uint64(m.context.Index()),
 					Sequence: context.LastSequenceNumber,
 				},
 				Response: &ServiceQueryResponse{
@@ -711,20 +742,4 @@ func (m *Manager) applyServiceQueryMetadata(request *ServiceQueryRequest, contex
 			},
 		},
 	}))
-}
-
-const separator = "."
-
-type qualifiedServiceName string
-
-func newQualifiedServiceName(namespace, name string) qualifiedServiceName {
-	return qualifiedServiceName(namespace + separator + name)
-}
-
-func (n qualifiedServiceName) namespace() string {
-	return strings.Split(string(n), separator)[0]
-}
-
-func (n qualifiedServiceName) name() string {
-	return strings.Split(string(n), separator)[1]
 }

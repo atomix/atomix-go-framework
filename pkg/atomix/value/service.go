@@ -16,7 +16,6 @@ package value
 
 import (
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
-	"github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
 	"io"
@@ -24,16 +23,16 @@ import (
 
 // Service is a state machine for a list primitive
 type Service struct {
-	*primitive.ManagedService
+	primitive.Service
 	value   []byte
 	version uint64
 }
 
 // init initializes the list service
 func (v *Service) init() {
-	v.Executor.RegisterUnaryOperation(opSet, v.Set)
-	v.Executor.RegisterUnaryOperation(opGet, v.Get)
-	v.Executor.RegisterStreamOperation(opEvents, v.Events)
+	v.RegisterUnaryOperation(opSet, v.Set)
+	v.RegisterUnaryOperation(opGet, v.Get)
+	v.RegisterStreamOperation(opEvents, v.Events)
 }
 
 // Backup takes a snapshot of the service
@@ -114,7 +113,7 @@ func (v *Service) Get(bytes []byte) ([]byte, error) {
 }
 
 // Events registers a channel on which to send events
-func (v *Service) Events(bytes []byte, stream stream.WriteStream) {
+func (v *Service) Events(bytes []byte, stream primitive.Stream) {
 	// Keep the stream open for events
 }
 

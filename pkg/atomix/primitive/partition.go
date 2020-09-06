@@ -20,6 +20,9 @@ import (
 	"time"
 )
 
+// Index is a partition log index
+type Index uint64
+
 // PartitionContext provides the current state of the partition
 type PartitionContext interface {
 	ProtocolContext
@@ -28,7 +31,7 @@ type PartitionContext interface {
 	PartitionID() PartitionID
 
 	// Index returns the current index of the service
-	Index() uint64
+	Index() Index
 
 	// Timestamp returns a deterministic, monotonically increasing timestamp
 	Timestamp() time.Time

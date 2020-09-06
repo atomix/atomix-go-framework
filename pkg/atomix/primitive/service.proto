@@ -22,22 +22,19 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "gogoproto/gogo.proto";
 
-// Sessionized service snapshot
-message SessionizedServiceSnapshot {
-    uint64 index = 1;
-    uint64 timestamp = 2;
-    repeated SessionSnapshot sessions = 3;
-}
-
 // Service session
 message SessionSnapshot {
     uint64 session_id = 1 [(gogoproto.customname) = "SessionID"];
     google.protobuf.Duration timeout = 2 [(gogoproto.stdduration) = true, (gogoproto.nullable) = false];
     google.protobuf.Timestamp timestamp = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
     uint64 command_sequence = 4;
-    uint64 last_applied = 5;
-    repeated SessionStreamSnapshot streams = 6;
-    repeated string services = 7;
+    repeated SessionServiceSnapshot services = 7;
+}
+
+// Session service snapshot
+message SessionServiceSnapshot {
+    ServiceId service_id = 1 [(gogoproto.nullable) = false];
+    repeated SessionStreamSnapshot streams = 2;
 }
 
 // Service session stream

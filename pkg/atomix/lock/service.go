@@ -26,24 +26,24 @@ import (
 
 // Service is a state machine for a list primitive
 type Service struct {
-	*primitive.ManagedService
+	primitive.Service
 	lock   *lockHolder
 	queue  *list.List
-	timers map[uint64]primitive.Timer
+	timers map[primitive.Index]primitive.Timer
 }
 
 type lockHolder struct {
-	index   uint64
-	session uint64
+	index   primitive.Index
+	session primitive.SessionID
 	expire  *time.Time
 	stream  stream.WriteStream
 }
 
 // init initializes the lock service
 func (l *Service) init() {
-	l.Executor.RegisterStreamOperation(opLock, l.Lock)
-	l.Executor.RegisterUnaryOperation(opUnlock, l.Unlock)
-	l.Executor.RegisterUnaryOperation(opIsLocked, l.IsLocked)
+	l.RegisterStreamOperation(opLock, l.Lock)
+	l.RegisterUnaryOperation(opUnlock, l.Unlock)
+	l.RegisterUnaryOperation(opIsLocked, l.IsLocked)
 }
 
 // Backup takes a snapshot of the service
@@ -94,8 +94,8 @@ func (l *Service) Restore(reader io.Reader) error {
 
 	if snapshot.Lock != nil {
 		l.lock = &lockHolder{
-			index:   uint64(snapshot.Lock.Index),
-			session: uint64(snapshot.Lock.SessionId),
+			index:   primitive.Index(snapshot.Lock.Index),
+			session: primitive.SessionID(snapshot.Lock.SessionId),
 			expire:  snapshot.Lock.Expire,
 		}
 	}
@@ -103,14 +103,14 @@ func (l *Service) Restore(reader io.Reader) error {
 	l.queue = list.New()
 	for _, lock := range snapshot.Queue {
 		element := l.queue.PushBack(&lockHolder{
-			index:   uint64(lock.Index),
-			session: uint64(lock.SessionId),
+			index:   primitive.Index(lock.Index),
+			session: primitive.SessionID(lock.SessionId),
 			expire:  lock.Expire,
 		})
 
 		if lock.Expire != nil {
-			index := uint64(lock.Index)
-			l.timers[index] = l.Scheduler.ScheduleOnce(lock.Expire.Sub(l.Context.Timestamp()), func() {
+			index := primitive.Index(lock.Index)
+			l.timers[index] = l.ScheduleOnce(lock.Expire.Sub(l.Timestamp()), func() {
 				delete(l.timers, index)
 				l.queue.Remove(element)
 			})
@@ -120,7 +120,7 @@ func (l *Service) Restore(reader io.Reader) error {
 }
 
 // Lock attempts to acquire the lock for the current session
-func (l *Service) Lock(bytes []byte, stream stream.WriteStream) {
+func (l *Service) Lock(bytes []byte, stream primitive.Stream) {
 	request := &LockRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		stream.Error(err)
@@ -128,20 +128,20 @@ func (l *Service) Lock(bytes []byte, stream stream.WriteStream) {
 		return
 	}
 
-	session := l.Session()
+	session := l.CurrentSession()
 
 	if l.lock == nil {
 		// If the lock is not already owned, immediately grant the lock to the requester.
 		// Note that we still have to publish an event to the session. The event is guaranteed to be received
 		// by the client-side primitive after the LOCK response.
 		l.lock = &lockHolder{
-			index:   l.Context.Index(),
-			session: session.ID,
+			index:   l.Index(),
+			session: session.ID(),
 			stream:  stream,
 		}
 
 		stream.Result(proto.Marshal(&LockResponse{
-			Index:    int64(l.Context.Index()),
+			Index:    int64(l.Index()),
 			Acquired: true,
 		}))
 		stream.Close()
@@ -154,16 +154,16 @@ func (l *Service) Lock(bytes []byte, stream stream.WriteStream) {
 	} else if request.Timeout != nil {
 		// If a timeout exists, add the request to the queue and set a timer. Note that the lock request expiration
 		// time is based on the *state machine* time - not the system time - to ensure consistency across servers.
-		index := l.Context.Index()
-		expire := l.Context.Timestamp().Add(*request.Timeout)
+		index := l.Index()
+		expire := l.Timestamp().Add(*request.Timeout)
 		holder := &lockHolder{
 			index:   index,
-			session: session.ID,
+			session: session.ID(),
 			expire:  &expire,
 			stream:  stream,
 		}
 		element := l.queue.PushBack(holder)
-		l.timers[index] = l.Scheduler.ScheduleOnce(*request.Timeout, func() {
+		l.timers[index] = l.ScheduleOnce(*request.Timeout, func() {
 			// When the lock request timer expires, remove the request from the queue and publish a FAILED
 			// event to the session. Note that this timer is guaranteed to be executed in the same thread as the
 			// state machine commands, so there's no need to use a lock here.
@@ -177,8 +177,8 @@ func (l *Service) Lock(bytes []byte, stream stream.WriteStream) {
 	} else {
 		// If the lock is -1, just add the request to the queue with no expiration.
 		holder := &lockHolder{
-			index:   l.Context.Index(),
-			session: session.ID,
+			index:   l.Index(),
+			session: session.ID(),
 			stream:  stream,
 		}
 		l.queue.PushBack(holder)
@@ -192,18 +192,18 @@ func (l *Service) Unlock(bytes []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	session := l.Session()
+	session := l.CurrentSession()
 	if l.lock != nil {
 		// If the commit's session does not match the current lock holder, preserve the existing lock.
 		// If the current lock ID does not match the requested lock ID, preserve the existing lock.
 		// However, ensure the associated lock request is removed from the queue.
-		if (request.Index == 0 && l.lock.session != session.ID) || (request.Index > 0 && l.lock.index != uint64(request.Index)) {
+		if (request.Index == 0 && l.lock.session != session.ID()) || (request.Index > 0 && l.lock.index != primitive.Index(request.Index)) {
 			unlocked := false
 			element := l.queue.Front()
 			for element != nil {
 				next := element.Next()
 				holder := element.Value.(*lockHolder)
-				if (request.Index == 0 && holder.session == session.ID) || (request.Index > 0 && holder.index == uint64(request.Index)) {
+				if (request.Index == 0 && holder.session == session.ID()) || (request.Index > 0 && holder.index == primitive.Index(request.Index)) {
 					l.queue.Remove(element)
 					timer, ok := l.timers[holder.index]
 					if ok {
@@ -260,29 +260,29 @@ func (l *Service) IsLocked(bytes []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	locked := l.lock != nil && (request.Index == 0 || l.lock.index == uint64(request.Index))
+	locked := l.lock != nil && (request.Index == 0 || l.lock.index == primitive.Index(request.Index))
 	return proto.Marshal(&IsLockedResponse{
 		Locked: locked,
 	})
 }
 
 // SessionExpired releases the lock when the owning session expires
-func (l *Service) SessionExpired(session *primitive.Session) {
+func (l *Service) SessionExpired(session primitive.Session) {
 	l.releaseLock(session)
 }
 
 // SessionClosed releases the lock when the owning session is closed
-func (l *Service) SessionClosed(session *primitive.Session) {
+func (l *Service) SessionClosed(session primitive.Session) {
 	l.releaseLock(session)
 }
 
-func (l *Service) releaseLock(session *primitive.Session) {
+func (l *Service) releaseLock(session primitive.Session) {
 	// Remove all instances of the session from the queue.
 	element := l.queue.Front()
 	for element != nil {
 		next := element.Next()
 		lock := element.Value.(*lockHolder)
-		if lock.session == session.ID {
+		if lock.session == session.ID() {
 			l.queue.Remove(element)
 			timer, ok := l.timers[lock.index]
 			if ok {
@@ -295,7 +295,7 @@ func (l *Service) releaseLock(session *primitive.Session) {
 
 	// If the removed session is the current holder of the lock, nullify the lock and attempt to grant it
 	// to the next waiter in the queue.
-	if l.lock != nil && l.lock.session == session.ID {
+	if l.lock != nil && l.lock.session == session.ID() {
 		l.lock = nil
 
 		element := l.queue.Front()

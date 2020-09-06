@@ -21,14 +21,51 @@ import (
 	"github.com/gogo/protobuf/proto"
 )
 
+// StreamID is a stream identifier
+type StreamID uint64
+
+// Stream is a service stream
+type Stream interface {
+	streams.WriteStream
+
+	// ID returns the stream identifier
+	ID() StreamID
+
+	// OperationID returns the stream operation identifier
+	OperationID() OperationID
+
+	// Session returns the stream session
+	Session() Session
+}
+
+// queryStream wraps a stream for a query
+type queryStream struct {
+	streams.WriteStream
+	id      StreamID
+	op      OperationID
+	session Session
+}
+
+func (s *queryStream) ID() StreamID {
+	return s.id
+}
+
+func (s *queryStream) OperationID() OperationID {
+	return s.op
+}
+
+func (s *queryStream) Session() Session {
+	return s.session
+}
+
 // sessionStream manages a single stream for a session
 type sessionStream struct {
-	ID         uint64
-	Type       string
-	session    *Session
+	id         StreamID
+	op         OperationID
+	session    Session
 	responseID uint64
 	completeID uint64
-	lastIndex  uint64
+	lastIndex  Index
 	ctx        PartitionContext
 	stream     streams.WriteStream
 	results    *list.List
@@ -37,8 +74,22 @@ type sessionStream struct {
 // sessionStreamResult contains a single stream result
 type sessionStreamResult struct {
 	id     uint64
-	index  uint64
+	index  Index
 	result streams.Result
+}
+
+// ID returns the stream identifier
+func (s *sessionStream) ID() StreamID {
+	return s.id
+}
+
+// OperationID returns the stream operation identifier
+func (s *sessionStream) OperationID() OperationID {
+	return s.op
+}
+
+func (s *sessionStream) Session() Session {
+	return s.session
 }
 
 // open opens the stream
@@ -49,8 +100,8 @@ func (s *sessionStream) open() {
 		Response: &SessionResponse_Command{
 			Command: &SessionCommandResponse{
 				Context: &SessionResponseContext{
-					StreamID: s.ID,
-					Index:    s.lastIndex,
+					StreamID: uint64(s.ID()),
+					Index:    uint64(s.lastIndex),
 					Sequence: s.responseID,
 					Type:     SessionResponseType_OPEN_STREAM,
 				},
@@ -69,7 +120,7 @@ func (s *sessionStream) open() {
 	}
 	s.results.PushBack(out)
 
-	util.StreamEntry(s.ctx.NodeID(), s.session.ID, s.ID).
+	util.StreamEntry(s.ctx.NodeID(), uint64(s.session.ID()), uint64(s.ID())).
 		Tracef("Sending stream open %d %v", s.responseID, out.result)
 	s.stream.Send(out.result)
 }
@@ -79,7 +130,7 @@ func (s *sessionStream) updateClock() {
 	// client must have received it from another server.
 	s.responseID++
 	if s.completeID > s.responseID {
-		util.StreamEntry(s.ctx.NodeID(), s.session.ID, s.ID).
+		util.StreamEntry(s.ctx.NodeID(), uint64(s.session.ID()), uint64(s.ID())).
 			Debugf("Skipped completed result %d", s.responseID)
 		return
 	}
@@ -97,8 +148,8 @@ func (s *sessionStream) Send(result streams.Result) {
 			Response: &SessionResponse_Command{
 				Command: &SessionCommandResponse{
 					Context: &SessionResponseContext{
-						StreamID: s.ID,
-						Index:    s.lastIndex,
+						StreamID: uint64(s.ID()),
+						Index:    uint64(s.lastIndex),
 						Sequence: s.responseID,
 					},
 					Response: &ServiceCommandResponse{
@@ -123,11 +174,11 @@ func (s *sessionStream) Send(result streams.Result) {
 		result: result,
 	}
 	s.results.PushBack(out)
-	util.StreamEntry(s.ctx.NodeID(), s.session.ID, s.ID).
+	util.StreamEntry(s.ctx.NodeID(), uint64(s.session.ID()), uint64(s.ID())).
 		Tracef("Cached response %d", s.responseID)
 
 	// If the out channel is set, send the result
-	util.StreamEntry(s.ctx.NodeID(), s.session.ID, s.ID).
+	util.StreamEntry(s.ctx.NodeID(), uint64(s.session.ID()), uint64(s.ID())).
 		Tracef("Sending response %d %v", s.responseID, out.result)
 	s.stream.Send(out.result)
 }
@@ -148,7 +199,7 @@ func (s *sessionStream) Error(err error) {
 }
 
 func (s *sessionStream) Close() {
-	util.StreamEntry(s.ctx.NodeID(), s.session.ID, s.ID).
+	util.StreamEntry(s.ctx.NodeID(), uint64(s.session.ID()), uint64(s.ID())).
 		Trace("Stream closed")
 	s.updateClock()
 
@@ -156,8 +207,8 @@ func (s *sessionStream) Close() {
 		Response: &SessionResponse_Command{
 			Command: &SessionCommandResponse{
 				Context: &SessionResponseContext{
-					StreamID: s.ID,
-					Index:    s.lastIndex,
+					StreamID: uint64(s.ID()),
+					Index:    uint64(s.lastIndex),
 					Sequence: s.responseID,
 					Type:     SessionResponseType_CLOSE_STREAM,
 				},
@@ -176,18 +227,10 @@ func (s *sessionStream) Close() {
 	}
 	s.results.PushBack(out)
 
-	util.StreamEntry(s.ctx.NodeID(), s.session.ID, s.ID).
+	util.StreamEntry(s.ctx.NodeID(), uint64(s.session.ID()), uint64(s.ID())).
 		Tracef("Sending stream close %d %v", s.responseID, out.result)
 	s.stream.Send(out.result)
 	s.stream.Close()
-}
-
-// LastIndex returns the last index in the stream
-func (s *sessionStream) LastIndex() uint64 {
-	if s.results.Len() > 0 {
-		return s.lastIndex
-	}
-	return s.ctx.Index()
 }
 
 // ack acknowledges results up to the given ID
@@ -200,7 +243,7 @@ func (s *sessionStream) ack(id uint64) {
 			s.completeID = event.Value.(sessionStreamResult).id
 			event = next
 		}
-		util.StreamEntry(s.ctx.NodeID(), s.session.ID, s.ID).
+		util.StreamEntry(s.ctx.NodeID(), uint64(s.session.ID()), uint64(s.ID())).
 			Tracef("Discarded cached responses up to %d", id)
 	}
 }
@@ -210,7 +253,7 @@ func (s *sessionStream) replay(stream streams.WriteStream) {
 	result := s.results.Front()
 	for result != nil {
 		response := result.Value.(sessionStreamResult)
-		util.StreamEntry(s.ctx.NodeID(), s.session.ID, s.ID).
+		util.StreamEntry(s.ctx.NodeID(), uint64(s.session.ID()), uint64(s.ID())).
 			Tracef("Sending response %d %v", response.id, response.result)
 		stream.Send(response.result)
 		result = result.Next()
