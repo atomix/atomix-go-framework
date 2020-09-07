@@ -338,9 +338,11 @@ func (m *Manager) applyServiceCommandOperation(request *ServiceCommandRequest, c
 		return
 	}
 
+	operationID := OperationID(request.GetOperation().Method)
 	service.setCurrentSession(session)
+	service.setCurrentOperation(operationID)
 
-	operation := service.GetOperation(OperationID(request.GetOperation().Method))
+	operation := service.GetOperation(operationID)
 	if unaryOp, ok := operation.(UnaryOperation); ok {
 		output, err := unaryOp.Execute(request.GetOperation().Value)
 		result := session.addUnaryResult(context.SequenceNumber, streams.Result{
@@ -350,7 +352,7 @@ func (m *Manager) applyServiceCommandOperation(request *ServiceCommandRequest, c
 		stream.Send(result)
 		stream.Close()
 	} else if streamOp, ok := operation.(StreamingOperation); ok {
-		streamCtx := session.addStream(StreamID(context.SequenceNumber), OperationID(request.GetOperation().Method), stream)
+		streamCtx := session.addStream(StreamID(context.SequenceNumber), operationID, stream)
 		streamOp.Execute(request.GetOperation().Value, streamCtx)
 	} else {
 		stream.Close()
@@ -639,10 +641,12 @@ func (m *Manager) applyServiceQueryOperation(request *ServiceQueryRequest, conte
 	}
 
 	// Set the current session on the service
+	operationID := OperationID(request.GetOperation().Method)
 	service.setCurrentSession(session)
+	service.setCurrentOperation(operationID)
 
 	// Get the service operation
-	operation := service.GetOperation(OperationID(request.GetOperation().Method))
+	operation := service.GetOperation(operationID)
 	if operation == nil {
 		stream.Error(fmt.Errorf("unknown operation: %s", request.GetOperation().Method))
 		stream.Close()
@@ -701,7 +705,7 @@ func (m *Manager) applyServiceQueryOperation(request *ServiceQueryRequest, conte
 		queryStream := &queryStream{
 			WriteStream: responseStream,
 			id:          StreamID(m.context.Index()),
-			op:          OperationID(request.GetOperation().Method),
+			op:          operationID,
 			session:     session,
 		}
 
