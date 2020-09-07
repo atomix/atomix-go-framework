@@ -375,12 +375,12 @@ func (m *Manager) applyServiceCommandCreate(request *ServiceCommandRequest, cont
 	session := sessionManager.getService(serviceID)
 	if session == nil {
 		session = sessionManager.addService(serviceID)
+		service.addSession(session)
+		service.setCurrentSession(session)
 		if open, ok := service.(SessionOpenService); ok {
 			open.SessionOpen(session)
 		}
 	}
-
-	service.setCurrentSession(session)
 
 	stream.Result(proto.Marshal(&SessionResponse{
 		Response: &SessionResponse_Command{
