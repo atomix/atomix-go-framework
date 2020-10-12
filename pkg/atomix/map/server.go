@@ -129,9 +129,9 @@ func (s *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResp
 	in, err := proto.Marshal(&PutRequest{
 		Key:     request.Key,
 		Value:   request.Value,
-		Version: uint64(request.Version),
+		Version: request.Version,
 		TTL:     request.TTL,
-		IfEmpty: request.Version == -1,
+		IfEmpty: request.IfEmpty,
 	})
 	if err != nil {
 		return nil, err
@@ -153,7 +153,7 @@ func (s *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResp
 		Created:         putResponse.Created,
 		Updated:         putResponse.Updated,
 		PreviousValue:   putResponse.PreviousValue,
-		PreviousVersion: int64(putResponse.PreviousVersion),
+		PreviousVersion: putResponse.PreviousVersion,
 	}
 	log.Tracef("Sending PutResponse %+v", response)
 	return response, nil
@@ -165,7 +165,7 @@ func (s *Server) Replace(ctx context.Context, request *api.ReplaceRequest) (*api
 	in, err := proto.Marshal(&ReplaceRequest{
 		Key:             request.Key,
 		PreviousValue:   request.PreviousValue,
-		PreviousVersion: uint64(request.PreviousVersion),
+		PreviousVersion: request.PreviousVersion,
 		NewValue:        request.NewValue,
 		TTL:             request.TTL,
 	})
@@ -189,7 +189,7 @@ func (s *Server) Replace(ctx context.Context, request *api.ReplaceRequest) (*api
 		Created:         replaceResponse.Created,
 		Updated:         replaceResponse.Updated,
 		PreviousValue:   replaceResponse.PreviousValue,
-		PreviousVersion: int64(replaceResponse.PreviousVersion),
+		PreviousVersion: replaceResponse.PreviousVersion,
 	}
 	log.Tracef("Sending ReplaceResponse %+v", response)
 	return response, nil
@@ -218,7 +218,7 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 	response := &api.GetResponse{
 		Header:  header,
 		Value:   getResponse.Value,
-		Version: int64(getResponse.Version),
+		Version: getResponse.Version,
 		Created: getResponse.Created,
 		Updated: getResponse.Updated,
 	}
@@ -232,7 +232,7 @@ func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 	in, err := proto.Marshal(&RemoveRequest{
 		Key:     request.Key,
 		Value:   request.Value,
-		Version: uint64(request.Version),
+		Version: request.Version,
 	})
 	if err != nil {
 		return nil, err
@@ -252,7 +252,7 @@ func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 		Header:          header,
 		Status:          getResponseStatus(serviceResponse.Status),
 		PreviousValue:   serviceResponse.PreviousValue,
-		PreviousVersion: int64(serviceResponse.PreviousVersion),
+		PreviousVersion: serviceResponse.PreviousVersion,
 	}
 	log.Tracef("Sending RemoveRequest %+v", response)
 	return response, nil
@@ -331,7 +331,7 @@ func (s *Server) Events(request *api.EventRequest, srv api.MapService_EventsServ
 				Type:    getEventType(response.Type),
 				Key:     response.Key,
 				Value:   response.Value,
-				Version: int64(response.Version),
+				Version: response.Version,
 				Created: response.Created,
 				Updated: response.Updated,
 			}
@@ -390,7 +390,7 @@ func (s *Server) Entries(request *api.EntriesRequest, srv api.MapService_Entries
 				Header:  output.Header,
 				Key:     response.Key,
 				Value:   response.Value,
-				Version: int64(response.Version),
+				Version: response.Version,
 				Created: response.Created,
 				Updated: response.Updated,
 			}

@@ -56,7 +56,7 @@ func (s *Service) Restore(reader io.Reader) error {
 // Size gets the number of elements in the set
 func (s *Service) Size(bytes []byte) ([]byte, error) {
 	return proto.Marshal(&SizeResponse{
-		Size_: int32(len(s.values)),
+		Size_: uint32(len(s.values)),
 	})
 }
 

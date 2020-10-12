@@ -27,7 +27,7 @@ message SizeRequest {
 }
 
 message SizeResponse {
-    int32 size = 1;
+    uint32 size = 1;
 }
 
 message ContainsRequest {

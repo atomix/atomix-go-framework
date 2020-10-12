@@ -358,7 +358,7 @@ func (m *Service) Exists(bytes []byte) ([]byte, error) {
 // Size returns the size of the map
 func (m *Service) Size(bytes []byte) ([]byte, error) {
 	return proto.Marshal(&SizeResponse{
-		Size_: int32(len(m.entries)),
+		Size_: uint32(len(m.entries)),
 	})
 }
 

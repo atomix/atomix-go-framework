@@ -128,7 +128,7 @@ func (s *Server) Exists(ctx context.Context, request *api.ExistsRequest) (*api.E
 func (s *Server) Append(ctx context.Context, request *api.AppendRequest) (*api.AppendResponse, error) {
 	log.Tracef("Received PutRequest %+v", request)
 	in, err := proto.Marshal(&AppendRequest{
-		Index: uint64(request.Index),
+		Index: request.Index,
 		Value: request.Value,
 	})
 	if err != nil {
@@ -148,7 +148,7 @@ func (s *Server) Append(ctx context.Context, request *api.AppendRequest) (*api.A
 	response := &api.AppendResponse{
 		Header:    header,
 		Status:    getResponseStatus(appendResponse.Status),
-		Index:     int64(appendResponse.Index),
+		Index:     appendResponse.Index,
 		Timestamp: appendResponse.Timestamp,
 	}
 	log.Tracef("Sending PutResponse %+v", response)
@@ -159,7 +159,7 @@ func (s *Server) Append(ctx context.Context, request *api.AppendRequest) (*api.A
 func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
 	log.Tracef("Received GetRequest %+v", request)
 	in, err := proto.Marshal(&GetRequest{
-		Index: uint64(request.Index),
+		Index: request.Index,
 	})
 	if err != nil {
 		return nil, err
@@ -177,7 +177,7 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 
 	response := &api.GetResponse{
 		Header:    header,
-		Index:     int64(getResponse.Index),
+		Index:     getResponse.Index,
 		Value:     getResponse.Value,
 		Timestamp: getResponse.Timestamp,
 	}
@@ -205,7 +205,7 @@ func (s *Server) FirstEntry(ctx context.Context, request *api.FirstEntryRequest)
 
 	response := &api.FirstEntryResponse{
 		Header:    header,
-		Index:     int64(firstEntryResponse.Index),
+		Index:     firstEntryResponse.Index,
 		Value:     firstEntryResponse.Value,
 		Timestamp: firstEntryResponse.Timestamp,
 	}
@@ -233,7 +233,7 @@ func (s *Server) LastEntry(ctx context.Context, request *api.LastEntryRequest) (
 
 	response := &api.LastEntryResponse{
 		Header:    header,
-		Index:     int64(lastEntryResponse.Index),
+		Index:     lastEntryResponse.Index,
 		Value:     lastEntryResponse.Value,
 		Timestamp: lastEntryResponse.Timestamp,
 	}
@@ -245,7 +245,7 @@ func (s *Server) LastEntry(ctx context.Context, request *api.LastEntryRequest) (
 func (s *Server) PrevEntry(ctx context.Context, request *api.PrevEntryRequest) (*api.PrevEntryResponse, error) {
 	log.Tracef("Received PrevEntryRequest %+v", request)
 	in, err := proto.Marshal(&PrevEntryRequest{
-		Index: uint64(request.Index),
+		Index: request.Index,
 	})
 	if err != nil {
 		return nil, err
@@ -263,7 +263,7 @@ func (s *Server) PrevEntry(ctx context.Context, request *api.PrevEntryRequest) (
 
 	response := &api.PrevEntryResponse{
 		Header:    header,
-		Index:     int64(prevEntryResponse.Index),
+		Index:     prevEntryResponse.Index,
 		Value:     prevEntryResponse.Value,
 		Timestamp: prevEntryResponse.Timestamp,
 	}
@@ -275,7 +275,7 @@ func (s *Server) PrevEntry(ctx context.Context, request *api.PrevEntryRequest) (
 func (s *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (*api.NextEntryResponse, error) {
 	log.Tracef("Received NextEntryRequest %+v", request)
 	in, err := proto.Marshal(&NextEntryRequest{
-		Index: uint64(request.Index),
+		Index: request.Index,
 	})
 	if err != nil {
 		return nil, err
@@ -293,7 +293,7 @@ func (s *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (
 
 	response := &api.NextEntryResponse{
 		Header:    header,
-		Index:     int64(nextEntryResponse.Index),
+		Index:     nextEntryResponse.Index,
 		Value:     nextEntryResponse.Value,
 		Timestamp: nextEntryResponse.Timestamp,
 	}
@@ -305,7 +305,7 @@ func (s *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (
 func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.RemoveResponse, error) {
 	log.Tracef("Received RemoveRequest %+v", request)
 	in, err := proto.Marshal(&RemoveRequest{
-		Index: uint64(request.Index),
+		Index: request.Index,
 		Value: request.Value,
 	})
 	if err != nil {
@@ -325,7 +325,7 @@ func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 	response := &api.RemoveResponse{
 		Header:        header,
 		Status:        getResponseStatus(removeResponse.Status),
-		Index:         int64(removeResponse.Index),
+		Index:         removeResponse.Index,
 		PreviousValue: removeResponse.PreviousValue,
 	}
 	log.Tracef("Sending RemoveRequest %+v", response)
@@ -337,7 +337,7 @@ func (s *Server) Events(request *api.EventRequest, srv api.LogService_EventsServ
 	log.Tracef("Received EventRequest %+v", request)
 	in, err := proto.Marshal(&ListenRequest{
 		Replay: request.Replay,
-		Index:  uint64(request.Index),
+		Index:  request.Index,
 	})
 	if err != nil {
 		return err
@@ -378,7 +378,7 @@ func (s *Server) Events(request *api.EventRequest, srv api.LogService_EventsServ
 			eventResponse = &api.EventResponse{
 				Header:    output.Header,
 				Type:      getEventType(response.Type),
-				Index:     int64(response.Index),
+				Index:     response.Index,
 				Value:     response.Value,
 				Timestamp: response.Timestamp,
 			}
@@ -437,7 +437,7 @@ func (s *Server) Entries(request *api.EntriesRequest, srv api.LogService_Entries
 		default:
 			entriesResponse = &api.EntriesResponse{
 				Header:    output.Header,
-				Index:     int64(response.Index),
+				Index:     response.Index,
 				Value:     response.Value,
 				Timestamp: response.Timestamp,
 			}

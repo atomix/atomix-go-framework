@@ -128,12 +128,12 @@ func (s *Server) Exists(ctx context.Context, request *api.ExistsRequest) (*api.E
 func (s *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResponse, error) {
 	log.Tracef("Received PutRequest %+v", request)
 	in, err := proto.Marshal(&PutRequest{
-		Index:   uint64(request.Index),
+		Index:   request.Index,
 		Key:     request.Key,
 		Value:   request.Value,
-		Version: uint64(request.Version),
+		Version: request.Version,
 		TTL:     request.TTL,
-		IfEmpty: request.Version == -1,
+		IfEmpty: request.IfEmpty,
 	})
 	if err != nil {
 		return nil, err
@@ -152,12 +152,12 @@ func (s *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResp
 	response := &api.PutResponse{
 		Header:          header,
 		Status:          getResponseStatus(putResponse.Status),
-		Index:           int64(putResponse.Index),
+		Index:           putResponse.Index,
 		Key:             putResponse.Key,
 		Created:         putResponse.Created,
 		Updated:         putResponse.Updated,
 		PreviousValue:   putResponse.PreviousValue,
-		PreviousVersion: int64(putResponse.PreviousVersion),
+		PreviousVersion: putResponse.PreviousVersion,
 	}
 	log.Tracef("Sending PutResponse %+v", response)
 	return response, nil
@@ -167,10 +167,10 @@ func (s *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResp
 func (s *Server) Replace(ctx context.Context, request *api.ReplaceRequest) (*api.ReplaceResponse, error) {
 	log.Tracef("Received ReplaceRequest %+v", request)
 	in, err := proto.Marshal(&ReplaceRequest{
-		Index:           uint64(request.Index),
+		Index:           request.Index,
 		Key:             request.Key,
 		PreviousValue:   request.PreviousValue,
-		PreviousVersion: uint64(request.PreviousVersion),
+		PreviousVersion: request.PreviousVersion,
 		NewValue:        request.NewValue,
 		TTL:             request.TTL,
 	})
@@ -191,12 +191,12 @@ func (s *Server) Replace(ctx context.Context, request *api.ReplaceRequest) (*api
 	response := &api.ReplaceResponse{
 		Header:          header,
 		Status:          getResponseStatus(replaceResponse.Status),
-		Index:           int64(replaceResponse.Index),
+		Index:           replaceResponse.Index,
 		Key:             replaceResponse.Key,
 		Created:         replaceResponse.Created,
 		Updated:         replaceResponse.Updated,
 		PreviousValue:   replaceResponse.PreviousValue,
-		PreviousVersion: int64(replaceResponse.PreviousVersion),
+		PreviousVersion: replaceResponse.PreviousVersion,
 	}
 	log.Tracef("Sending ReplaceResponse %+v", response)
 	return response, nil
@@ -206,7 +206,7 @@ func (s *Server) Replace(ctx context.Context, request *api.ReplaceRequest) (*api
 func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
 	log.Tracef("Received GetRequest %+v", request)
 	in, err := proto.Marshal(&GetRequest{
-		Index: uint64(request.Index),
+		Index: request.Index,
 		Key:   request.Key,
 	})
 	if err != nil {
@@ -225,10 +225,10 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 
 	response := &api.GetResponse{
 		Header:  header,
-		Index:   int64(getResponse.Index),
+		Index:   getResponse.Index,
 		Key:     getResponse.Key,
 		Value:   getResponse.Value,
-		Version: int64(getResponse.Version),
+		Version: getResponse.Version,
 		Created: getResponse.Created,
 		Updated: getResponse.Updated,
 	}
@@ -256,10 +256,10 @@ func (s *Server) FirstEntry(ctx context.Context, request *api.FirstEntryRequest)
 
 	response := &api.FirstEntryResponse{
 		Header:  header,
-		Index:   int64(firstEntryResponse.Index),
+		Index:   firstEntryResponse.Index,
 		Key:     firstEntryResponse.Key,
 		Value:   firstEntryResponse.Value,
-		Version: int64(firstEntryResponse.Version),
+		Version: firstEntryResponse.Version,
 		Created: firstEntryResponse.Created,
 		Updated: firstEntryResponse.Updated,
 	}
@@ -287,10 +287,10 @@ func (s *Server) LastEntry(ctx context.Context, request *api.LastEntryRequest) (
 
 	response := &api.LastEntryResponse{
 		Header:  header,
-		Index:   int64(lastEntryResponse.Index),
+		Index:   lastEntryResponse.Index,
 		Key:     lastEntryResponse.Key,
 		Value:   lastEntryResponse.Value,
-		Version: int64(lastEntryResponse.Version),
+		Version: lastEntryResponse.Version,
 		Created: lastEntryResponse.Created,
 		Updated: lastEntryResponse.Updated,
 	}
@@ -302,7 +302,7 @@ func (s *Server) LastEntry(ctx context.Context, request *api.LastEntryRequest) (
 func (s *Server) PrevEntry(ctx context.Context, request *api.PrevEntryRequest) (*api.PrevEntryResponse, error) {
 	log.Tracef("Received PrevEntryRequest %+v", request)
 	in, err := proto.Marshal(&PrevEntryRequest{
-		Index: uint64(request.Index),
+		Index: request.Index,
 	})
 	if err != nil {
 		return nil, err
@@ -320,10 +320,10 @@ func (s *Server) PrevEntry(ctx context.Context, request *api.PrevEntryRequest) (
 
 	response := &api.PrevEntryResponse{
 		Header:  header,
-		Index:   int64(prevEntryResponse.Index),
+		Index:   prevEntryResponse.Index,
 		Key:     prevEntryResponse.Key,
 		Value:   prevEntryResponse.Value,
-		Version: int64(prevEntryResponse.Version),
+		Version: prevEntryResponse.Version,
 		Created: prevEntryResponse.Created,
 		Updated: prevEntryResponse.Updated,
 	}
@@ -335,7 +335,7 @@ func (s *Server) PrevEntry(ctx context.Context, request *api.PrevEntryRequest) (
 func (s *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (*api.NextEntryResponse, error) {
 	log.Tracef("Received NextEntryRequest %+v", request)
 	in, err := proto.Marshal(&NextEntryRequest{
-		Index: uint64(request.Index),
+		Index: request.Index,
 	})
 	if err != nil {
 		return nil, err
@@ -353,10 +353,10 @@ func (s *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (
 
 	response := &api.NextEntryResponse{
 		Header:  header,
-		Index:   int64(nextEntryResponse.Index),
+		Index:   nextEntryResponse.Index,
 		Key:     nextEntryResponse.Key,
 		Value:   nextEntryResponse.Value,
-		Version: int64(nextEntryResponse.Version),
+		Version: nextEntryResponse.Version,
 		Created: nextEntryResponse.Created,
 		Updated: nextEntryResponse.Updated,
 	}
@@ -368,10 +368,10 @@ func (s *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (
 func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.RemoveResponse, error) {
 	log.Tracef("Received RemoveRequest %+v", request)
 	in, err := proto.Marshal(&RemoveRequest{
-		Index:   uint64(request.Index),
+		Index:   request.Index,
 		Key:     request.Key,
 		Value:   request.Value,
-		Version: uint64(request.Version),
+		Version: request.Version,
 	})
 	if err != nil {
 		return nil, err
@@ -390,10 +390,10 @@ func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 	response := &api.RemoveResponse{
 		Header:          header,
 		Status:          getResponseStatus(removeResponse.Status),
-		Index:           int64(removeResponse.Index),
+		Index:           removeResponse.Index,
 		Key:             removeResponse.Key,
 		PreviousValue:   removeResponse.PreviousValue,
-		PreviousVersion: int64(removeResponse.PreviousVersion),
+		PreviousVersion: removeResponse.PreviousVersion,
 	}
 	log.Tracef("Sending RemoveRequest %+v", response)
 	return response, nil
@@ -430,7 +430,7 @@ func (s *Server) Events(request *api.EventRequest, srv api.IndexedMapService_Eve
 	in, err := proto.Marshal(&ListenRequest{
 		Replay: request.Replay,
 		Key:    request.Key,
-		Index:  uint64(request.Index),
+		Index:  request.Index,
 	})
 	if err != nil {
 		return err
@@ -471,10 +471,10 @@ func (s *Server) Events(request *api.EventRequest, srv api.IndexedMapService_Eve
 			eventResponse = &api.EventResponse{
 				Header:  output.Header,
 				Type:    getEventType(response.Type),
-				Index:   int64(response.Index),
+				Index:   response.Index,
 				Key:     response.Key,
 				Value:   response.Value,
-				Version: int64(response.Version),
+				Version: response.Version,
 				Created: response.Created,
 				Updated: response.Updated,
 			}
@@ -533,10 +533,10 @@ func (s *Server) Entries(request *api.EntriesRequest, srv api.IndexedMapService_
 		default:
 			entriesResponse = &api.EntriesResponse{
 				Header:  output.Header,
-				Index:   int64(response.Index),
+				Index:   response.Index,
 				Key:     response.Key,
 				Value:   response.Value,
-				Version: int64(response.Version),
+				Version: response.Version,
 				Created: response.Created,
 				Updated: response.Updated,
 			}

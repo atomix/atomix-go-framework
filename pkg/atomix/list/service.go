@@ -66,7 +66,7 @@ func (l *Service) Restore(reader io.Reader) error {
 // Size gets the size of the list
 func (l *Service) Size(bytes []byte) ([]byte, error) {
 	return proto.Marshal(&SizeResponse{
-		Size_: int32(len(l.values)),
+		Size_: uint32(len(l.values)),
 	})
 }
 
