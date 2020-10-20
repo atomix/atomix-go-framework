@@ -71,7 +71,6 @@ type sessionManager struct {
 	lastUpdated      time.Time
 	ctx              PartitionContext
 	commandSequence  uint64
-	ackSequence      uint64
 	commandCallbacks map[uint64]func()
 	queryCallbacks   map[uint64]*list.List
 	results          map[uint64]streams.Result
@@ -278,7 +277,6 @@ func (s *serviceSession) ack(id uint64, streams map[uint64]uint64) {
 			delete(s.streams, streamID)
 		}
 	}
-	s.ackSequence = id
 }
 
 // close closes the session and completes all its streams

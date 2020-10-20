@@ -22,6 +22,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+// Type is the list primitive type
 const Type = primitiveapi.PrimitiveType_LIST
 
 // RegisterPrimitive registers the primitive on the given node
@@ -32,6 +33,7 @@ func RegisterPrimitive(node *atomix.Node) {
 // Primitive is the counter primitive
 type Primitive struct{}
 
+// RegisterServer registers the list server with the protocol
 func (p *Primitive) RegisterServer(server *grpc.Server, protocol primitive.Protocol) {
 	api.RegisterListServiceServer(server, &Server{
 		Server: &primitive.Server{
@@ -41,6 +43,7 @@ func (p *Primitive) RegisterServer(server *grpc.Server, protocol primitive.Proto
 	})
 }
 
+// NewService creates a new list service
 func (p *Primitive) NewService(scheduler primitive.Scheduler, context primitive.ServiceContext) primitive.Service {
 	service := &Service{
 		Service: primitive.NewService(scheduler, context),
@@ -49,3 +52,5 @@ func (p *Primitive) NewService(scheduler primitive.Scheduler, context primitive.
 	service.init()
 	return service
 }
+
+var _ primitive.Primitive = &Primitive{}
