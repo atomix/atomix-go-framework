@@ -319,7 +319,7 @@ func (m *Service) Get(bytes []byte) ([]byte, error) {
 
 	value, ok := m.entries[request.Key]
 	if !ok {
-		return proto.Marshal(&GetResponse{})
+		return nil, errors.NewNotFound("key %s not found", request.Key)
 	}
 	return proto.Marshal(&GetResponse{
 		Value:   value.Value,
