@@ -15,6 +15,7 @@
 package list
 
 import (
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
@@ -120,9 +121,7 @@ func (l *Service) Insert(bytes []byte) ([]byte, error) {
 
 	index := request.Index
 	if index >= uint32(len(l.values)) {
-		return proto.Marshal(&InsertResponse{
-			Status: ResponseStatus_OUT_OF_BOUNDS,
-		})
+		return nil, errors.NewInvalid("index %d out of bounds", index)
 	}
 
 	intIndex := int(index)
@@ -156,9 +155,7 @@ func (l *Service) Set(bytes []byte) ([]byte, error) {
 
 	index := request.Index
 	if index >= uint32(len(l.values)) {
-		return proto.Marshal(&InsertResponse{
-			Status: ResponseStatus_OUT_OF_BOUNDS,
-		})
+		return nil, errors.NewInvalid("index %d out of bounds", index)
 	}
 
 	oldValue := l.values[index]
@@ -189,9 +186,7 @@ func (l *Service) Get(bytes []byte) ([]byte, error) {
 
 	index := request.Index
 	if index >= uint32(len(l.values)) {
-		return proto.Marshal(&GetResponse{
-			Status: ResponseStatus_OUT_OF_BOUNDS,
-		})
+		return nil, errors.NewInvalid("index %d out of bounds", index)
 	}
 
 	value := l.values[index]
@@ -210,9 +205,7 @@ func (l *Service) Remove(bytes []byte) ([]byte, error) {
 
 	index := request.Index
 	if index >= uint32(len(l.values)) {
-		return proto.Marshal(&RemoveResponse{
-			Status: ResponseStatus_OUT_OF_BOUNDS,
-		})
+		return nil, errors.NewInvalid("index %d out of bounds", index)
 	}
 
 	value := l.values[index]

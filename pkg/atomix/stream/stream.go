@@ -234,7 +234,7 @@ func (s *nilStream) Close() {
 }
 
 // NewEncodingStream returns a new encoding stream
-func NewEncodingStream(stream WriteStream, encoder func(interface{}) (interface{}, error)) WriteStream {
+func NewEncodingStream(stream WriteStream, encoder func(interface{}, error) (interface{}, error)) WriteStream {
 	return &transcodingStream{
 		stream:     stream,
 		transcoder: encoder,
@@ -242,7 +242,7 @@ func NewEncodingStream(stream WriteStream, encoder func(interface{}) (interface{
 }
 
 // NewDecodingStream returns a new decoding stream
-func NewDecodingStream(stream WriteStream, encoder func(interface{}) (interface{}, error)) WriteStream {
+func NewDecodingStream(stream WriteStream, encoder func(interface{}, error) (interface{}, error)) WriteStream {
 	return &transcodingStream{
 		stream:     stream,
 		transcoder: encoder,
@@ -252,7 +252,7 @@ func NewDecodingStream(stream WriteStream, encoder func(interface{}) (interface{
 // transcodingStream is a stream that encodes output
 type transcodingStream struct {
 	stream     WriteStream
-	transcoder func(interface{}) (interface{}, error)
+	transcoder func(interface{}, error) (interface{}, error)
 }
 
 func (s *transcodingStream) Send(result Result) {
@@ -264,15 +264,16 @@ func (s *transcodingStream) Send(result Result) {
 }
 
 func (s *transcodingStream) Result(value interface{}, err error) {
+	bytes, err := s.transcoder(value, err)
 	if err != nil {
 		s.stream.Error(err)
 	} else {
-		s.Value(value)
+		s.stream.Value(bytes)
 	}
 }
 
 func (s *transcodingStream) Value(value interface{}) {
-	bytes, err := s.transcoder(value)
+	bytes, err := s.transcoder(value, nil)
 	if err != nil {
 		s.stream.Error(err)
 	} else {
@@ -281,7 +282,12 @@ func (s *transcodingStream) Value(value interface{}) {
 }
 
 func (s *transcodingStream) Error(err error) {
-	s.stream.Error(err)
+	bytes, err := s.transcoder(nil, err)
+	if err != nil {
+		s.stream.Error(err)
+	} else {
+		s.stream.Value(bytes)
+	}
 }
 
 func (s *transcodingStream) Close() {

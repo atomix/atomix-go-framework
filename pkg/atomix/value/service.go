@@ -15,6 +15,7 @@
 package value
 
 import (
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
@@ -69,15 +70,9 @@ func (v *Service) Set(bytes []byte) ([]byte, error) {
 	}
 
 	if request.ExpectVersion > 0 && request.ExpectVersion != v.version {
-		return proto.Marshal(&SetResponse{
-			Version:   v.version,
-			Succeeded: false,
-		})
+		return nil, errors.NewConflict("expected version %d does not match actual version %d", request.ExpectVersion, v.version)
 	} else if request.ExpectValue != nil && len(request.ExpectValue) > 0 && (v.value == nil || !slicesEqual(v.value, request.ExpectValue)) {
-		return proto.Marshal(&SetResponse{
-			Version:   v.version,
-			Succeeded: false,
-		})
+		return nil, errors.NewConflict("expected value %v does not match actual value %v", request.ExpectValue, v.value)
 	} else {
 		prevValue := v.value
 		prevVersion := v.version

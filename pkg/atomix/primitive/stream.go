@@ -104,6 +104,7 @@ func (s *sessionStream) open() {
 					Index:    uint64(s.lastIndex),
 					Sequence: s.responseID,
 					Type:     SessionResponseType_OPEN_STREAM,
+					Status:   SessionResponseStatus_OK,
 				},
 			},
 		},
@@ -143,35 +144,34 @@ func (s *sessionStream) Send(result streams.Result) {
 	s.updateClock()
 
 	// Create the stream result and add it to the results list.
-	if result.Succeeded() {
-		bytes, err := proto.Marshal(&SessionResponse{
-			Response: &SessionResponse_Command{
-				Command: &SessionCommandResponse{
-					Context: &SessionResponseContext{
-						StreamID: uint64(s.ID()),
-						Index:    uint64(s.lastIndex),
-						Sequence: s.responseID,
-					},
-					Response: &ServiceCommandResponse{
-						Response: &ServiceCommandResponse_Operation{
-							Operation: &ServiceOperationResponse{
-								result.Value.([]byte),
-							},
+	bytes, err := proto.Marshal(&SessionResponse{
+		Response: &SessionResponse_Command{
+			Command: &SessionCommandResponse{
+				Context: &SessionResponseContext{
+					StreamID: uint64(s.ID()),
+					Index:    uint64(s.lastIndex),
+					Sequence: s.responseID,
+					Status:   getStatus(result.Error),
+					Message:  getMessage(result.Error),
+				},
+				Response: &ServiceCommandResponse{
+					Response: &ServiceCommandResponse_Operation{
+						Operation: &ServiceOperationResponse{
+							result.Value.([]byte),
 						},
 					},
 				},
 			},
-		})
-		result = streams.Result{
-			Value: bytes,
-			Error: err,
-		}
-	}
+		},
+	})
 
 	out := sessionStreamResult{
-		id:     s.responseID,
-		index:  s.ctx.Index(),
-		result: result,
+		id:    s.responseID,
+		index: s.ctx.Index(),
+		result: streams.Result{
+			Value: bytes,
+			Error: err,
+		},
 	}
 	s.results.PushBack(out)
 	util.StreamEntry(s.ctx.NodeID(), uint64(s.session.ID()), uint64(s.ID())).
@@ -211,6 +211,7 @@ func (s *sessionStream) Close() {
 					Index:    uint64(s.lastIndex),
 					Sequence: s.responseID,
 					Type:     SessionResponseType_CLOSE_STREAM,
+					Status:   SessionResponseStatus_OK,
 				},
 			},
 		},

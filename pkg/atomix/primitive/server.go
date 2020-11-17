@@ -16,9 +16,9 @@ package primitive
 
 import (
 	"context"
-	"errors"
 	"github.com/atomix/api/proto/atomix/headers"
 	"github.com/atomix/api/proto/atomix/primitive"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	"time"
@@ -67,7 +67,7 @@ func (s *Server) DoCommand(ctx context.Context, name string, input []byte, heade
 
 	bytes, err := proto.Marshal(sessionRequest)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Proto(errors.NewInternal(err.Error()))
 	}
 
 	// Create a unary stream
@@ -75,24 +75,24 @@ func (s *Server) DoCommand(ctx context.Context, name string, input []byte, heade
 
 	// Write the request
 	if err := partition.Write(ctx, bytes, stream); err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Proto(err)
 	}
 
 	// Wait for the result
 	result, ok := stream.Receive()
 	if !ok {
-		return nil, nil, errors.New("write channel closed")
+		return nil, nil, errors.Proto(errors.NewInternal("write channel closed"))
 	}
 
 	// If the result failed, return the error
 	if result.Failed() {
-		return nil, nil, result.Error
+		return nil, nil, errors.Proto(result.Error)
 	}
 
 	sessionResponse := &SessionResponse{}
 	err = proto.Unmarshal(result.Value.([]byte), sessionResponse)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Proto(errors.NewInternal(err.Error()))
 	}
 
 	commandResponse := sessionResponse.GetCommand()
@@ -101,6 +101,8 @@ func (s *Server) DoCommand(ctx context.Context, name string, input []byte, heade
 		StreamID:   commandResponse.Context.StreamID,
 		ResponseID: commandResponse.Context.Sequence,
 		Index:      commandResponse.Context.Index,
+		Status:     headers.ResponseStatus(commandResponse.Context.Status),
+		Message:    commandResponse.Context.Message,
 	}
 	return commandResponse.Response.GetOperation().Result, responseHeader, nil
 }
@@ -146,10 +148,14 @@ func (s *Server) DoCommandStream(ctx context.Context, name string, input []byte,
 
 	bytes, err := proto.Marshal(sessionRequest)
 	if err != nil {
-		return err
+		return errors.Proto(errors.NewInternal(err.Error()))
 	}
 
-	stream = streams.NewEncodingStream(stream, func(value interface{}) (interface{}, error) {
+	stream = streams.NewEncodingStream(stream, func(value interface{}, err error) (interface{}, error) {
+		if err != nil {
+			return nil, err
+		}
+
 		sessionResponse := &SessionResponse{}
 		err = proto.Unmarshal(value.([]byte), sessionResponse)
 		if err != nil {
@@ -159,6 +165,7 @@ func (s *Server) DoCommandStream(ctx context.Context, name string, input []byte,
 				},
 			}, nil
 		}
+
 		commandResponse := sessionResponse.GetCommand()
 		responseHeader := &headers.ResponseHeader{
 			SessionID:  header.SessionID,
@@ -166,7 +173,10 @@ func (s *Server) DoCommandStream(ctx context.Context, name string, input []byte,
 			ResponseID: commandResponse.Context.Sequence,
 			Index:      commandResponse.Context.Index,
 			Type:       headers.ResponseType(commandResponse.Context.Type),
+			Status:     headers.ResponseStatus(commandResponse.Context.Status),
+			Message:    commandResponse.Context.Message,
 		}
+
 		var result []byte
 		if commandResponse.Response != nil {
 			result = commandResponse.Response.GetOperation().Result
@@ -223,7 +233,7 @@ func (s *Server) DoQuery(ctx context.Context, name string, input []byte, header 
 
 	bytes, err := proto.Marshal(sessionRequest)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Proto(errors.NewInternal(err.Error()))
 	}
 
 	// Create a unary stream
@@ -231,30 +241,32 @@ func (s *Server) DoQuery(ctx context.Context, name string, input []byte, header 
 
 	// Read the request
 	if err := partition.Read(ctx, bytes, stream); err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Proto(err)
 	}
 
 	// Wait for the result
 	result, ok := stream.Receive()
 	if !ok {
-		return nil, nil, errors.New("write channel closed")
+		return nil, nil, errors.Proto(errors.NewInternal("write channel closed"))
 	}
 
 	// If the result failed, return the error
 	if result.Failed() {
-		return nil, nil, result.Error
+		return nil, nil, errors.Proto(result.Error)
 	}
 
 	sessionResponse := &SessionResponse{}
 	err = proto.Unmarshal(result.Value.([]byte), sessionResponse)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Proto(errors.NewInternal(err.Error()))
 	}
 
 	queryResponse := sessionResponse.GetQuery()
 	responseHeader := &headers.ResponseHeader{
 		SessionID: header.SessionID,
 		Index:     queryResponse.Context.Index,
+		Status:    headers.ResponseStatus(queryResponse.Context.Status),
+		Message:   queryResponse.Context.Message,
 	}
 	return queryResponse.Response.GetOperation().Result, responseHeader, nil
 }
@@ -301,19 +313,21 @@ func (s *Server) DoQueryStream(ctx context.Context, name string, input []byte, h
 
 	bytes, err := proto.Marshal(sessionRequest)
 	if err != nil {
-		return err
+		return errors.Proto(errors.NewInternal(err.Error()))
 	}
 
-	stream = streams.NewDecodingStream(stream, func(value interface{}) (interface{}, error) {
+	stream = streams.NewDecodingStream(stream, func(value interface{}, err error) (interface{}, error) {
 		sessionResponse := &SessionResponse{}
 		if err := proto.Unmarshal(value.([]byte), sessionResponse); err != nil {
-			return nil, err
+			return nil, errors.Proto(errors.NewInternal(err.Error()))
 		}
 		queryResponse := sessionResponse.GetQuery()
 		responseHeader := &headers.ResponseHeader{
 			SessionID: header.SessionID,
 			Index:     queryResponse.Context.Index,
 			Type:      headers.ResponseType(queryResponse.Context.Type),
+			Status:    headers.ResponseStatus(queryResponse.Context.Status),
+			Message:   queryResponse.Context.Message,
 		}
 		var result []byte
 		if queryResponse.Response != nil {
@@ -365,7 +379,7 @@ func (s *Server) DoMetadata(ctx context.Context, serviceType primitive.Primitive
 
 	bytes, err := proto.Marshal(sessionRequest)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Proto(errors.NewInternal(err.Error()))
 	}
 
 	// Create a unary stream
@@ -373,30 +387,32 @@ func (s *Server) DoMetadata(ctx context.Context, serviceType primitive.Primitive
 
 	// Read the request
 	if err := partition.Read(ctx, bytes, stream); err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Proto(err)
 	}
 
 	// Wait for the result
 	result, ok := stream.Receive()
 	if !ok {
-		return nil, nil, errors.New("read channel closed")
+		return nil, nil, errors.NewInternal("read channel closed")
 	}
 
 	// If the result failed, return the error
 	if result.Failed() {
-		return nil, nil, result.Error
+		return nil, nil, errors.Proto(result.Error)
 	}
 
 	sessionResponse := &SessionResponse{}
 	err = proto.Unmarshal(result.Value.([]byte), sessionResponse)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Proto(errors.NewInternal(err.Error()))
 	}
 
 	queryResponse := sessionResponse.GetQuery()
 	responseHeader := &headers.ResponseHeader{
 		SessionID: header.SessionID,
 		Index:     queryResponse.Context.Index,
+		Status:    headers.ResponseStatus(queryResponse.Context.Status),
+		Message:   queryResponse.Context.Message,
 	}
 	return queryResponse.Response.GetMetadata().Services, responseHeader, nil
 }
@@ -422,7 +438,7 @@ func (s *Server) DoOpenSession(ctx context.Context, header *headers.RequestHeade
 
 	bytes, err := proto.Marshal(sessionRequest)
 	if err != nil {
-		return nil, err
+		return nil, errors.Proto(errors.NewInternal(err.Error()))
 	}
 
 	// Create a unary stream
@@ -430,24 +446,24 @@ func (s *Server) DoOpenSession(ctx context.Context, header *headers.RequestHeade
 
 	// Write the request
 	if err := partition.Write(ctx, bytes, stream); err != nil {
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	// Wait for the result
 	result, ok := stream.Receive()
 	if !ok {
-		return nil, errors.New("write channel closed")
+		return nil, errors.Proto(errors.NewInternal("write channel closed"))
 	}
 
 	// If the result failed, return the error
 	if result.Failed() {
-		return nil, result.Error
+		return nil, errors.Proto(result.Error)
 	}
 
 	sessionResponse := &SessionResponse{}
 	err = proto.Unmarshal(result.Value.([]byte), sessionResponse)
 	if err != nil {
-		return nil, err
+		return nil, errors.Proto(errors.NewInternal(err.Error()))
 	}
 
 	sessionID := sessionResponse.GetOpenSession().SessionID
@@ -488,29 +504,29 @@ func (s *Server) DoKeepAliveSession(ctx context.Context, header *headers.Request
 
 	bytes, err := proto.Marshal(sessionRequest)
 	if err != nil {
-		return nil, err
+		return nil, errors.Proto(errors.NewInternal(err.Error()))
 	}
 
 	// Write the request
 	if err := partition.Write(ctx, bytes, stream); err != nil {
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	// Wait for the result
 	result, ok := stream.Receive()
 	if !ok {
-		return nil, errors.New("write channel closed")
+		return nil, errors.Proto(errors.NewInternal("write channel closed"))
 	}
 
 	// If the result failed, return the error
 	if result.Failed() {
-		return nil, result.Error
+		return nil, errors.Proto(result.Error)
 	}
 
 	sessionResponse := &SessionResponse{}
 	err = proto.Unmarshal(result.Value.([]byte), sessionResponse)
 	if err != nil {
-		return nil, err
+		return nil, errors.Proto(errors.NewInternal(err.Error()))
 	}
 	return &headers.ResponseHeader{
 		SessionID: header.SessionID,
@@ -538,7 +554,7 @@ func (s *Server) DoCloseSession(ctx context.Context, header *headers.RequestHead
 
 	bytes, err := proto.Marshal(sessionRequest)
 	if err != nil {
-		return nil, err
+		return nil, errors.Proto(errors.NewInternal(err.Error()))
 	}
 
 	// Create a unary stream
@@ -546,24 +562,24 @@ func (s *Server) DoCloseSession(ctx context.Context, header *headers.RequestHead
 
 	// Write the request
 	if err := partition.Write(ctx, bytes, stream); err != nil {
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	// Wait for the result
 	result, ok := stream.Receive()
 	if !ok {
-		return nil, errors.New("write channel closed")
+		return nil, errors.Proto(errors.NewInternal("write channel closed"))
 	}
 
 	// If the result failed, return the error
 	if result.Failed() {
-		return nil, result.Error
+		return nil, errors.Proto(result.Error)
 	}
 
 	sessionResponse := &SessionResponse{}
 	err = proto.Unmarshal(result.Value.([]byte), sessionResponse)
 	if err != nil {
-		return nil, err
+		return nil, errors.Proto(errors.NewInternal(err.Error()))
 	}
 	return &headers.ResponseHeader{
 		SessionID: header.SessionID,
@@ -604,7 +620,7 @@ func (s *Server) DoCreateService(ctx context.Context, header *headers.RequestHea
 
 	bytes, err := proto.Marshal(sessionRequest)
 	if err != nil {
-		return nil, err
+		return nil, errors.Proto(errors.NewInternal(err.Error()))
 	}
 
 	// Create a unary stream
@@ -612,24 +628,24 @@ func (s *Server) DoCreateService(ctx context.Context, header *headers.RequestHea
 
 	// Write the request
 	if err := partition.Write(ctx, bytes, stream); err != nil {
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	// Wait for the result
 	result, ok := stream.Receive()
 	if !ok {
-		return nil, errors.New("write channel closed")
+		return nil, errors.Proto(errors.NewInternal("write channel closed"))
 	}
 
 	// If the result failed, return the error
 	if result.Failed() {
-		return nil, result.Error
+		return nil, errors.Proto(result.Error)
 	}
 
 	sessionResponse := &SessionResponse{}
 	err = proto.Unmarshal(result.Value.([]byte), sessionResponse)
 	if err != nil {
-		return nil, err
+		return nil, errors.Proto(errors.NewInternal(err.Error()))
 	}
 
 	commandResponse := sessionResponse.GetCommand()
@@ -638,6 +654,8 @@ func (s *Server) DoCreateService(ctx context.Context, header *headers.RequestHea
 		StreamID:   commandResponse.Context.StreamID,
 		ResponseID: commandResponse.Context.Sequence,
 		Index:      commandResponse.Context.Index,
+		Status:     headers.ResponseStatus(commandResponse.Context.Status),
+		Message:    commandResponse.Context.Message,
 	}
 	return responseHeader, nil
 }
@@ -676,7 +694,7 @@ func (s *Server) DoCloseService(ctx context.Context, header *headers.RequestHead
 
 	bytes, err := proto.Marshal(sessionRequest)
 	if err != nil {
-		return nil, err
+		return nil, errors.Proto(errors.NewInternal(err.Error()))
 	}
 
 	// Create a unary stream
@@ -684,24 +702,24 @@ func (s *Server) DoCloseService(ctx context.Context, header *headers.RequestHead
 
 	// Write the request
 	if err := partition.Write(ctx, bytes, stream); err != nil {
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	// Wait for the result
 	result, ok := stream.Receive()
 	if !ok {
-		return nil, errors.New("write channel closed")
+		return nil, errors.Proto(errors.NewInternal("write channel closed"))
 	}
 
 	// If the result failed, return the error
 	if result.Failed() {
-		return nil, result.Error
+		return nil, errors.Proto(result.Error)
 	}
 
 	sessionResponse := &SessionResponse{}
 	err = proto.Unmarshal(result.Value.([]byte), sessionResponse)
 	if err != nil {
-		return nil, err
+		return nil, errors.Proto(errors.NewInternal(err.Error()))
 	}
 
 	commandResponse := sessionResponse.GetCommand()
@@ -710,6 +728,8 @@ func (s *Server) DoCloseService(ctx context.Context, header *headers.RequestHead
 		StreamID:   commandResponse.Context.StreamID,
 		ResponseID: commandResponse.Context.Sequence,
 		Index:      commandResponse.Context.Index,
+		Status:     headers.ResponseStatus(commandResponse.Context.Status),
+		Message:    commandResponse.Context.Message,
 	}
 	return responseHeader, nil
 }
@@ -748,7 +768,7 @@ func (s *Server) DoDeleteService(ctx context.Context, header *headers.RequestHea
 
 	bytes, err := proto.Marshal(sessionRequest)
 	if err != nil {
-		return nil, err
+		return nil, errors.Proto(errors.NewInternal(err.Error()))
 	}
 
 	// Create a unary stream
@@ -756,24 +776,24 @@ func (s *Server) DoDeleteService(ctx context.Context, header *headers.RequestHea
 
 	// Write the request
 	if err := partition.Write(ctx, bytes, stream); err != nil {
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	// Wait for the result
 	result, ok := stream.Receive()
 	if !ok {
-		return nil, errors.New("write channel closed")
+		return nil, errors.Proto(errors.NewInternal("write channel closed"))
 	}
 
 	// If the result failed, return the error
 	if result.Failed() {
-		return nil, result.Error
+		return nil, errors.Proto(result.Error)
 	}
 
 	sessionResponse := &SessionResponse{}
 	err = proto.Unmarshal(result.Value.([]byte), sessionResponse)
 	if err != nil {
-		return nil, err
+		return nil, errors.Proto(errors.NewInternal(err.Error()))
 	}
 
 	commandResponse := sessionResponse.GetCommand()
@@ -782,6 +802,8 @@ func (s *Server) DoDeleteService(ctx context.Context, header *headers.RequestHea
 		StreamID:   commandResponse.Context.StreamID,
 		ResponseID: commandResponse.Context.Sequence,
 		Index:      commandResponse.Context.Index,
+		Status:     headers.ResponseStatus(commandResponse.Context.Status),
+		Message:    commandResponse.Context.Message,
 	}
 	return responseHeader, nil
 }

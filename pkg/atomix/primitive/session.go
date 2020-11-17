@@ -109,29 +109,29 @@ func (s *sessionManager) getUnaryResult(id uint64) (streams.Result, bool) {
 
 // addUnaryResult adds a unary result
 func (s *sessionManager) addUnaryResult(id uint64, result streams.Result) streams.Result {
-	if result.Succeeded() {
-		bytes, err := proto.Marshal(&SessionResponse{
-			Response: &SessionResponse_Command{
-				Command: &SessionCommandResponse{
-					Context: &SessionResponseContext{
-						StreamID: uint64(id),
-						Index:    uint64(s.ctx.Index()),
-						Sequence: 1,
-					},
-					Response: &ServiceCommandResponse{
-						Response: &ServiceCommandResponse_Operation{
-							Operation: &ServiceOperationResponse{
-								result.Value.([]byte),
-							},
+	bytes, err := proto.Marshal(&SessionResponse{
+		Response: &SessionResponse_Command{
+			Command: &SessionCommandResponse{
+				Context: &SessionResponseContext{
+					StreamID: uint64(id),
+					Index:    uint64(s.ctx.Index()),
+					Sequence: 1,
+					Status:   getStatus(result.Error),
+					Message:  getMessage(result.Error),
+				},
+				Response: &ServiceCommandResponse{
+					Response: &ServiceCommandResponse_Operation{
+						Operation: &ServiceOperationResponse{
+							result.Value.([]byte),
 						},
 					},
 				},
 			},
-		})
-		result = streams.Result{
-			Value: bytes,
-			Error: err,
-		}
+		},
+	})
+	result = streams.Result{
+		Value: bytes,
+		Error: err,
 	}
 	s.results[id] = result
 	return result

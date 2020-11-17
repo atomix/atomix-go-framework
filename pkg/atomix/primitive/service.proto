@@ -52,7 +52,7 @@ message ServiceId {
 }
 
 enum ServiceType {
-    UNKNOWN = 0;
+    UNKNOWN_SERVICE = 0;
     COUNTER = 1;
     ELECTION = 2;
     INDEXED_MAP = 3;
@@ -222,10 +222,30 @@ message SessionResponseContext {
     uint64 index = 2;
     uint64 sequence = 3;
     SessionResponseType type = 4;
+    SessionResponseStatus status = 5;
+    string message = 6;
 }
 
 enum SessionResponseType {
     RESPONSE = 0;
     OPEN_STREAM = 1;
     CLOSE_STREAM = 2;
+}
+
+enum SessionResponseStatus {
+    OK = 0;
+    ERROR = 1;
+    NOT_LEADER = 2;
+    UNKNOWN = 3;
+    CANCELED = 4;
+    NOT_FOUND = 5;
+    ALREADY_EXISTS = 6;
+    UNAUTHORIZED = 7;
+    FORBIDDEN = 8;
+    CONFLICT = 9;
+    INVALID = 10;
+    UNAVAILABLE = 11;
+    NOT_SUPPORTED = 12;
+    TIMEOUT = 13;
+    INTERNAL = 14;
 }

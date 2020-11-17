@@ -360,14 +360,32 @@ func (m *Manager) applyServiceCommandOperation(request *ServiceCommandRequest, c
 }
 
 func (m *Manager) applyServiceCommandCreate(request *ServiceCommandRequest, context *SessionCommandContext, sessionManager *sessionManager, stream streams.WriteStream) {
+	defer stream.Close()
+
 	serviceID := ServiceID(*request.Service)
 
 	service, ok := m.services[serviceID]
 	if !ok {
 		primitive := m.registry.GetPrimitive(primitive.PrimitiveType(request.Service.Type))
 		if primitive == nil {
-			stream.Error(fmt.Errorf("unknown service type %s", request.Service.Type))
-			stream.Close()
+			stream.Result(proto.Marshal(&SessionResponse{
+				Response: &SessionResponse_Command{
+					Command: &SessionCommandResponse{
+						Context: &SessionResponseContext{
+							Index:    uint64(m.context.Index()),
+							Sequence: context.SequenceNumber,
+							Type:     SessionResponseType_RESPONSE,
+							Status:   SessionResponseStatus_INVALID,
+							Message:  fmt.Sprintf("unknown primitive type '%s'", request.Service.Type),
+						},
+						Response: &ServiceCommandResponse{
+							Response: &ServiceCommandResponse_Create{
+								Create: &ServiceCreateResponse{},
+							},
+						},
+					},
+				},
+			}))
 			return
 		}
 		service = primitive.NewService(m.scheduler, newServiceContext(m.context, serviceID))
@@ -391,6 +409,7 @@ func (m *Manager) applyServiceCommandCreate(request *ServiceCommandRequest, cont
 					Index:    uint64(m.context.Index()),
 					Sequence: context.SequenceNumber,
 					Type:     SessionResponseType_RESPONSE,
+					Status:   SessionResponseStatus_OK,
 				},
 				Response: &ServiceCommandResponse{
 					Response: &ServiceCommandResponse_Create{
@@ -400,7 +419,6 @@ func (m *Manager) applyServiceCommandCreate(request *ServiceCommandRequest, cont
 			},
 		},
 	}))
-	stream.Close()
 }
 
 func (m *Manager) applyServiceCommandClose(request *ServiceCommandRequest, context *SessionCommandContext, sessionManager *sessionManager, stream streams.WriteStream) {
@@ -425,6 +443,7 @@ func (m *Manager) applyServiceCommandClose(request *ServiceCommandRequest, conte
 					Index:    uint64(m.context.Index()),
 					Sequence: context.SequenceNumber,
 					Type:     SessionResponseType_RESPONSE,
+					Status:   SessionResponseStatus_OK,
 				},
 				Response: &ServiceCommandResponse{
 					Response: &ServiceCommandResponse_Close{
@@ -438,33 +457,54 @@ func (m *Manager) applyServiceCommandClose(request *ServiceCommandRequest, conte
 }
 
 func (m *Manager) applyServiceCommandDelete(request *ServiceCommandRequest, context *SessionCommandContext, session *sessionManager, stream streams.WriteStream) {
+	defer stream.Close()
+
 	serviceID := ServiceID(*request.Service)
 
 	_, ok := m.services[serviceID]
-	if ok {
+	if !ok {
+		stream.Result(proto.Marshal(&SessionResponse{
+			Response: &SessionResponse_Command{
+				Command: &SessionCommandResponse{
+					Context: &SessionResponseContext{
+						Index:    uint64(m.context.Index()),
+						Sequence: context.SequenceNumber,
+						Type:     SessionResponseType_RESPONSE,
+						Status:   SessionResponseStatus_NOT_FOUND,
+						Message:  fmt.Sprintf("unknown service '%s.%s'", serviceID.Namespace, serviceID.Name),
+					},
+					Response: &ServiceCommandResponse{
+						Response: &ServiceCommandResponse_Delete{
+							Delete: &ServiceDeleteResponse{},
+						},
+					},
+				},
+			},
+		}))
+	} else {
 		delete(m.services, serviceID)
 		for _, session := range m.sessions {
 			session.removeService(serviceID)
 		}
-	}
 
-	stream.Result(proto.Marshal(&SessionResponse{
-		Response: &SessionResponse_Command{
-			Command: &SessionCommandResponse{
-				Context: &SessionResponseContext{
-					Index:    uint64(m.context.Index()),
-					Sequence: context.SequenceNumber,
-					Type:     SessionResponseType_RESPONSE,
-				},
-				Response: &ServiceCommandResponse{
-					Response: &ServiceCommandResponse_Delete{
-						Delete: &ServiceDeleteResponse{},
+		stream.Result(proto.Marshal(&SessionResponse{
+			Response: &SessionResponse_Command{
+				Command: &SessionCommandResponse{
+					Context: &SessionResponseContext{
+						Index:    uint64(m.context.Index()),
+						Sequence: context.SequenceNumber,
+						Type:     SessionResponseType_RESPONSE,
+						Status:   SessionResponseStatus_OK,
+					},
+					Response: &ServiceCommandResponse{
+						Response: &ServiceCommandResponse_Delete{
+							Delete: &ServiceDeleteResponse{},
+						},
 					},
 				},
 			},
-		},
-	}))
-	stream.Close()
+		}))
+	}
 }
 
 func (m *Manager) applyOpenSession(request *OpenSessionRequest, stream streams.WriteStream) {
@@ -654,13 +694,15 @@ func (m *Manager) applyServiceQueryOperation(request *ServiceQueryRequest, conte
 	}
 
 	index := m.context.Index()
-	responseStream := streams.NewEncodingStream(stream, func(value interface{}) (interface{}, error) {
+	responseStream := streams.NewEncodingStream(stream, func(value interface{}, err error) (interface{}, error) {
 		return proto.Marshal(&SessionResponse{
 			Response: &SessionResponse_Query{
 				Query: &SessionQueryResponse{
 					Context: &SessionResponseContext{
 						Index:    uint64(index),
 						Sequence: context.LastSequenceNumber,
+						Status:   getStatus(err),
+						Message:  getMessage(err),
 					},
 					Response: &ServiceQueryResponse{
 						Response: &ServiceQueryResponse_Operation{
@@ -682,8 +724,9 @@ func (m *Manager) applyServiceQueryOperation(request *ServiceQueryRequest, conte
 			Response: &SessionResponse_Query{
 				Query: &SessionQueryResponse{
 					Context: &SessionResponseContext{
-						Index: uint64(index),
-						Type:  SessionResponseType_OPEN_STREAM,
+						Index:  uint64(index),
+						Type:   SessionResponseType_OPEN_STREAM,
+						Status: SessionResponseStatus_OK,
 					},
 				},
 			},
@@ -694,8 +737,9 @@ func (m *Manager) applyServiceQueryOperation(request *ServiceQueryRequest, conte
 				Response: &SessionResponse_Query{
 					Query: &SessionQueryResponse{
 						Context: &SessionResponseContext{
-							Index: uint64(index),
-							Type:  SessionResponseType_CLOSE_STREAM,
+							Index:  uint64(index),
+							Type:   SessionResponseType_CLOSE_STREAM,
+							Status: SessionResponseStatus_OK,
 						},
 					},
 				},
@@ -716,6 +760,8 @@ func (m *Manager) applyServiceQueryOperation(request *ServiceQueryRequest, conte
 }
 
 func (m *Manager) applyServiceQueryMetadata(request *ServiceQueryRequest, context *SessionQueryContext, session *sessionManager, stream streams.WriteStream) {
+	defer stream.Close()
+
 	services := []*ServiceId{}
 	serviceType := request.GetMetadata().Type
 	namespace := request.GetMetadata().Namespace
@@ -735,6 +781,7 @@ func (m *Manager) applyServiceQueryMetadata(request *ServiceQueryRequest, contex
 				Context: &SessionResponseContext{
 					Index:    uint64(m.context.Index()),
 					Sequence: context.LastSequenceNumber,
+					Status:   SessionResponseStatus_OK,
 				},
 				Response: &ServiceQueryResponse{
 					Response: &ServiceQueryResponse_Metadata{

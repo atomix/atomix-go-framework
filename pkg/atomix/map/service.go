@@ -16,6 +16,7 @@ package _map //nolint:golint
 
 import (
 	"bytes"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"io"
 
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
@@ -131,9 +132,7 @@ func (m *Service) Put(value []byte) ([]byte, error) {
 	if oldValue == nil {
 		// If the version is positive then reject the request.
 		if !request.IfEmpty && request.Version > 0 {
-			return proto.Marshal(&PutResponse{
-				Status: UpdateStatus_PRECONDITION_FAILED,
-			})
+			return nil, errors.NewAlreadyExists("key %s already exists", request.Key)
 		}
 
 		// Create a new entry value and set it in the map.
@@ -166,12 +165,10 @@ func (m *Service) Put(value []byte) ([]byte, error) {
 
 	// If the version is -1 then reject the request.
 	// If the version is positive then compare the version to the current version.
-	if request.IfEmpty || (!request.IfEmpty && request.Version > 0 && request.Version != oldValue.Version) {
-		return proto.Marshal(&PutResponse{
-			Status:          UpdateStatus_PRECONDITION_FAILED,
-			PreviousValue:   oldValue.Value,
-			PreviousVersion: oldValue.Version,
-		})
+	if request.IfEmpty {
+		return nil, errors.NewAlreadyExists("key %s already exists", request.Key)
+	} else if request.Version > 0 && request.Version != oldValue.Version {
+		return nil, errors.NewConflict("request version %d does not match stored entry version %d", request.Version, oldValue.Version)
 	}
 
 	// If the value is equal to the current value, return a no-op.
@@ -224,23 +221,17 @@ func (m *Service) Replace(value []byte) ([]byte, error) {
 
 	oldValue, ok := m.entries[request.Key]
 	if !ok {
-		return proto.Marshal(&ReplaceResponse{
-			Status: UpdateStatus_PRECONDITION_FAILED,
-		})
+		return nil, errors.NewNotFound("entry for key %s not found", request.Key)
 	}
 
 	// If the version was specified and does not match the entry version, fail the replace.
 	if request.PreviousVersion != 0 && request.PreviousVersion != oldValue.Version {
-		return proto.Marshal(&ReplaceResponse{
-			Status: UpdateStatus_PRECONDITION_FAILED,
-		})
+		return nil, errors.NewConflict("previous version %d does not match stored entry version %d", request.PreviousVersion, oldValue.Version)
 	}
 
 	// If the value was specified and does not match the entry value, fail the replace.
 	if len(request.PreviousValue) != 0 && bytes.Equal(request.PreviousValue, oldValue.Value) {
-		return proto.Marshal(&ReplaceResponse{
-			Status: UpdateStatus_PRECONDITION_FAILED,
-		})
+		return nil, errors.NewConflict("previous value %v does not match stored entry value %v", request.PreviousValue, oldValue.Value)
 	}
 
 	// If we've made it this far, update the entry.
@@ -286,16 +277,12 @@ func (m *Service) Remove(bytes []byte) ([]byte, error) {
 
 	value, ok := m.entries[request.Key]
 	if !ok {
-		return proto.Marshal(&RemoveResponse{
-			Status: UpdateStatus_NOOP,
-		})
+		return nil, errors.NewNotFound("key %s not found", request.Key)
 	}
 
 	// If the request version is set, verify that the request version matches the entry version.
 	if request.Version > 0 && request.Version != value.Version {
-		return proto.Marshal(&RemoveResponse{
-			Status: UpdateStatus_PRECONDITION_FAILED,
-		})
+		return nil, errors.NewConflict("request version %s does not match stored entry version %d", request.Version, value.Version)
 	}
 
 	// Delete the entry from the map.
