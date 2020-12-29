@@ -21,10 +21,13 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
+	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"github.com/gogo/protobuf/proto"
 	"io"
 	"time"
 )
+
+var log = logging.GetLogger("atomix", "storage")
 
 // NewManager returns an initialized Manager
 func NewManager(cluster *cluster.Cluster, registry Registry, context PartitionContext) *Manager {
@@ -260,7 +263,9 @@ func (m *Manager) Command(bytes []byte, stream streams.WriteStream) {
 func (m *Manager) applyCommand(request *SessionCommandRequest, stream streams.WriteStream) {
 	sessionManager, ok := m.sessions[SessionID(request.Context.SessionID)]
 	if !ok {
-		util.SessionEntry(string(m.cluster.Member().NodeID), request.Context.SessionID).
+		log.WithFields(
+			logging.String("NodeID", string(m.cluster.Member().NodeID)),
+			logging.Uint64("SessionID", request.Context.SessionID)).
 			Warn("Unknown session")
 		stream.Error(fmt.Errorf("unknown session %d", request.Context.SessionID))
 		stream.Close()
@@ -291,13 +296,17 @@ func (m *Manager) applyCommand(request *SessionCommandRequest, stream streams.Wr
 			}
 		} else if sequenceNumber > sessionManager.nextCommandSequence() {
 			sessionManager.scheduleCommand(sequenceNumber, func() {
-				util.SessionEntry(string(m.cluster.Member().NodeID), request.Context.SessionID).
-					Tracef("Executing command %d", sequenceNumber)
+				log.WithFields(
+					logging.String("NodeID", string(m.cluster.Member().NodeID)),
+					logging.Uint64("SessionID", request.Context.SessionID)).
+					Debugf("Executing command %d", sequenceNumber)
 				m.applySessionCommand(request, sessionManager, stream)
 			})
 		} else {
-			util.SessionEntry(string(m.cluster.Member().NodeID), request.Context.SessionID).
-				Tracef("Executing command %d", sequenceNumber)
+			log.WithFields(
+				logging.String("NodeID", string(m.cluster.Member().NodeID)),
+				logging.Uint64("SessionID", request.Context.SessionID)).
+				Debugf("Executing command %d", sequenceNumber)
 			m.applySessionCommand(request, sessionManager, stream)
 		}
 	}
@@ -542,12 +551,16 @@ func (m *Manager) applyOpenSession(request *OpenSessionRequest, stream streams.W
 func (m *Manager) applyKeepAlive(request *KeepAliveRequest, stream streams.WriteStream) {
 	session, ok := m.sessions[SessionID(request.SessionID)]
 	if !ok {
-		util.SessionEntry(string(m.cluster.Member().NodeID), request.SessionID).
+		log.WithFields(
+			logging.String("NodeID", string(m.cluster.Member().NodeID)),
+			logging.Uint64("SessionID", request.SessionID)).
 			Warn("Unknown session")
 		stream.Error(fmt.Errorf("unknown session %d", request.SessionID))
 	} else {
-		util.SessionEntry(string(m.cluster.Member().NodeID), request.SessionID).
-			Tracef("Recording keep-alive %v", request)
+		log.WithFields(
+			logging.String("NodeID", string(m.cluster.Member().NodeID)),
+			logging.Uint64("SessionID", request.SessionID)).
+			Debugf("Recording keep-alive %v", request)
 
 		// Update the session's last updated timestamp to prevent it from expiring
 		session.lastUpdated = m.context.Timestamp()
@@ -592,7 +605,9 @@ func (m *Manager) expireSessions() {
 func (m *Manager) applyCloseSession(request *CloseSessionRequest, stream streams.WriteStream) {
 	sessionManager, ok := m.sessions[SessionID(request.SessionID)]
 	if !ok {
-		util.SessionEntry(string(m.cluster.Member().NodeID), request.SessionID).
+		log.WithFields(
+			logging.String("NodeID", string(m.cluster.Member().NodeID)),
+			logging.Uint64("SessionID", request.SessionID)).
 			Warn("Unknown session")
 		stream.Error(fmt.Errorf("unknown session %d", request.SessionID))
 	} else {
@@ -629,14 +644,16 @@ func (m *Manager) Query(bytes []byte, stream streams.WriteStream) {
 	} else {
 		query := request.GetQuery()
 		if Index(query.Context.LastIndex) > m.context.Index() {
-			util.SessionEntry(string(m.cluster.Member().NodeID), query.Context.SessionID).
-				Tracef("Query index %d greater than last index %d", query.Context.LastIndex, m.context.Index())
+			log.WithFields(
+				logging.String("NodeID", string(m.cluster.Member().NodeID))).
+				Debugf("Query index %d greater than last index %d", query.Context.LastIndex, m.context.Index())
 			m.scheduler.ScheduleIndex(Index(query.Context.LastIndex), func() {
 				m.sequenceQuery(query, stream)
 			})
 		} else {
-			util.SessionEntry(string(m.cluster.Member().NodeID), query.Context.SessionID).
-				Tracef("Sequencing query %d <= %d", query.Context.LastIndex, m.context.Index())
+			log.WithFields(
+				logging.String("NodeID", string(m.cluster.Member().NodeID))).
+				Debugf("Sequencing query %d <= %d", query.Context.LastIndex, m.context.Index())
 			m.sequenceQuery(query, stream)
 		}
 	}
@@ -645,23 +662,31 @@ func (m *Manager) Query(bytes []byte, stream streams.WriteStream) {
 func (m *Manager) sequenceQuery(request *SessionQueryRequest, stream streams.WriteStream) {
 	sessionManager, ok := m.sessions[SessionID(request.Context.SessionID)]
 	if !ok {
-		util.SessionEntry(string(m.cluster.Member().NodeID), request.Context.SessionID).
+		log.WithFields(
+			logging.String("NodeID", string(m.cluster.Member().NodeID)),
+			logging.Uint64("SessionID", request.Context.SessionID)).
 			Warn("Unknown session")
 		stream.Error(fmt.Errorf("unknown session %d", request.Context.SessionID))
 		stream.Close()
 	} else {
 		sequenceNumber := request.Context.LastSequenceNumber
 		if sequenceNumber > sessionManager.commandSequence {
-			util.SessionEntry(string(m.cluster.Member().NodeID), request.Context.SessionID).
-				Tracef("Query ID %d greater than last ID %d", sequenceNumber, sessionManager.commandSequence)
+			log.WithFields(
+				logging.String("NodeID", string(m.cluster.Member().NodeID)),
+				logging.Uint64("SessionID", request.Context.SessionID)).
+				Debugf("Query ID %d greater than last ID %d", sequenceNumber, sessionManager.commandSequence)
 			sessionManager.scheduleQuery(sequenceNumber, func() {
-				util.SessionEntry(string(m.cluster.Member().NodeID), request.Context.SessionID).
-					Tracef("Executing query %d", sequenceNumber)
+				log.WithFields(
+					logging.String("NodeID", string(m.cluster.Member().NodeID)),
+					logging.Uint64("SessionID", request.Context.SessionID)).
+					Debugf("Executing query %d", sequenceNumber)
 				m.applyServiceQuery(request.Query, request.Context, sessionManager, stream)
 			})
 		} else {
-			util.SessionEntry(string(m.cluster.Member().NodeID), request.Context.SessionID).
-				Tracef("Executing query %d", sequenceNumber)
+			log.WithFields(
+				logging.String("NodeID", string(m.cluster.Member().NodeID)),
+				logging.Uint64("SessionID", request.Context.SessionID)).
+				Debugf("Executing query %d", sequenceNumber)
 			m.applyServiceQuery(request.Query, request.Context, sessionManager, stream)
 		}
 	}

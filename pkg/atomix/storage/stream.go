@@ -18,7 +18,7 @@ import (
 	"container/list"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
-	"github.com/atomix/go-framework/pkg/atomix/util"
+	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"github.com/gogo/protobuf/proto"
 )
 
@@ -126,8 +126,11 @@ func (s *sessionStream) open() {
 	}
 	s.results.PushBack(out)
 
-	util.StreamEntry(string(s.cluster.Member().NodeID), uint64(s.session.ID()), uint64(s.ID())).
-		Tracef("Sending stream open %d %v", s.responseID, out.result)
+	log.WithFields(
+		logging.String("NodeID", string(s.cluster.Member().NodeID)),
+		logging.Uint64("SessionID", uint64(s.session.ID())),
+		logging.Uint64("StreamID", uint64(s.ID()))).
+		Debugf("Sending stream open %d %v", s.responseID, out.result)
 	s.stream.Send(out.result)
 }
 
@@ -136,7 +139,10 @@ func (s *sessionStream) updateClock() {
 	// client must have received it from another server.
 	s.responseID++
 	if s.completeID > s.responseID {
-		util.StreamEntry(string(s.cluster.Member().NodeID), uint64(s.session.ID()), uint64(s.ID())).
+		log.WithFields(
+			logging.String("NodeID", string(s.cluster.Member().NodeID)),
+			logging.Uint64("SessionID", uint64(s.session.ID())),
+			logging.Uint64("StreamID", uint64(s.ID()))).
 			Debugf("Skipped completed result %d", s.responseID)
 		return
 	}
@@ -183,12 +189,18 @@ func (s *sessionStream) Send(result streams.Result) {
 		},
 	}
 	s.results.PushBack(out)
-	util.StreamEntry(string(s.cluster.Member().NodeID), uint64(s.session.ID()), uint64(s.ID())).
-		Tracef("Cached response %d", s.responseID)
+	log.WithFields(
+		logging.String("NodeID", string(s.cluster.Member().NodeID)),
+		logging.Uint64("SessionID", uint64(s.session.ID())),
+		logging.Uint64("StreamID", uint64(s.ID()))).
+		Debugf("Cached response %d", s.responseID)
 
 	// If the out channel is set, send the result
-	util.StreamEntry(string(s.cluster.Member().NodeID), uint64(s.session.ID()), uint64(s.ID())).
-		Tracef("Sending response %d %v", s.responseID, out.result)
+	log.WithFields(
+		logging.String("NodeID", string(s.cluster.Member().NodeID)),
+		logging.Uint64("SessionID", uint64(s.session.ID())),
+		logging.Uint64("StreamID", uint64(s.ID()))).
+		Debugf("Sending response %d %v", s.responseID, out.result)
 	s.stream.Send(out.result)
 }
 
@@ -208,8 +220,11 @@ func (s *sessionStream) Error(err error) {
 }
 
 func (s *sessionStream) Close() {
-	util.StreamEntry(string(s.cluster.Member().NodeID), uint64(s.session.ID()), uint64(s.ID())).
-		Trace("Stream closed")
+	log.WithFields(
+		logging.String("NodeID", string(s.cluster.Member().NodeID)),
+		logging.Uint64("SessionID", uint64(s.session.ID())),
+		logging.Uint64("StreamID", uint64(s.ID()))).
+		Debug("Stream closed")
 	s.updateClock()
 
 	bytes, err := proto.Marshal(&SessionResponse{
@@ -240,8 +255,11 @@ func (s *sessionStream) Close() {
 	}
 	s.results.PushBack(out)
 
-	util.StreamEntry(string(s.cluster.Member().NodeID), uint64(s.session.ID()), uint64(s.ID())).
-		Tracef("Sending stream close %d %v", s.responseID, out.result)
+	log.WithFields(
+		logging.String("NodeID", string(s.cluster.Member().NodeID)),
+		logging.Uint64("SessionID", uint64(s.session.ID())),
+		logging.Uint64("StreamID", uint64(s.ID()))).
+		Debugf("Sending stream close %d %v", s.responseID, out.result)
 	s.stream.Send(out.result)
 	s.stream.Close()
 }
@@ -256,8 +274,11 @@ func (s *sessionStream) ack(id uint64) {
 			s.completeID = event.Value.(sessionStreamResult).id
 			event = next
 		}
-		util.StreamEntry(string(s.cluster.Member().NodeID), uint64(s.session.ID()), uint64(s.ID())).
-			Tracef("Discarded cached responses up to %d", id)
+		log.WithFields(
+			logging.String("NodeID", string(s.cluster.Member().NodeID)),
+			logging.Uint64("SessionID", uint64(s.session.ID())),
+			logging.Uint64("StreamID", uint64(s.ID()))).
+			Debugf("Discarded cached responses up to %d", id)
 	}
 }
 
@@ -266,8 +287,11 @@ func (s *sessionStream) replay(stream streams.WriteStream) {
 	result := s.results.Front()
 	for result != nil {
 		response := result.Value.(sessionStreamResult)
-		util.StreamEntry(string(s.cluster.Member().NodeID), uint64(s.session.ID()), uint64(s.ID())).
-			Tracef("Sending response %d %v", response.id, response.result)
+		log.WithFields(
+			logging.String("NodeID", string(s.cluster.Member().NodeID)),
+			logging.Uint64("SessionID", uint64(s.session.ID())),
+			logging.Uint64("StreamID", uint64(s.ID()))).
+			Debugf("Sending response %d %v", response.id, response.result)
 		stream.Send(response.result)
 		result = result.Next()
 	}

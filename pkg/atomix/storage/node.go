@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/util"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"net"
 )

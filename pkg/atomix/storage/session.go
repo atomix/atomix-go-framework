@@ -18,7 +18,7 @@ import (
 	"container/list"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
-	"github.com/atomix/go-framework/pkg/atomix/util"
+	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"github.com/gogo/protobuf/proto"
 	"time"
 )
@@ -47,8 +47,12 @@ func newSessionManager(cluster *cluster.Cluster, ctx PartitionContext, timeout *
 		defaultTimeout := 30 * time.Second
 		timeout = &defaultTimeout
 	}
+	log := log.WithFields(
+		logging.String("NodeID", string(cluster.Member().NodeID)),
+		logging.Uint64("SessionID", uint64(ctx.Index())))
 	session := &sessionManager{
 		cluster:          cluster,
+		log:              log,
 		id:               SessionID(ctx.Index()),
 		timeout:          *timeout,
 		lastUpdated:      ctx.Timestamp(),
@@ -58,14 +62,14 @@ func newSessionManager(cluster *cluster.Cluster, ctx PartitionContext, timeout *
 		results:          make(map[uint64]streams.Result),
 		services:         make(map[ServiceID]*serviceSession),
 	}
-	util.SessionEntry(string(cluster.Member().NodeID), uint64(session.id)).
-		Debug("Session open")
+	log.Debug("Session open")
 	return session
 }
 
 // sessionManager manages the ordering of request and response streams for a single client
 type sessionManager struct {
 	cluster          *cluster.Cluster
+	log              logging.Logger
 	id               SessionID
 	timeout          time.Duration
 	lastUpdated      time.Time
@@ -186,8 +190,7 @@ func (s *sessionManager) completeCommand(sequenceNumber uint64) {
 
 // close closes the session and completes all its streams
 func (s *sessionManager) close() {
-	util.SessionEntry(string(s.cluster.Member().NodeID), uint64(s.id)).
-		Debug("Session closed")
+	s.log.Debug("Session closed")
 	for _, service := range s.services {
 		service.close()
 	}
@@ -248,8 +251,7 @@ func (s *serviceSession) addStream(id StreamID, op OperationID, outStream stream
 	}
 	s.streams[id] = stream
 	stream.open()
-	util.StreamEntry(string(s.cluster.Member().NodeID), uint64(s.ID()), uint64(id)).
-		Trace("Stream open")
+	s.log.Debugf("Stream open")
 	return stream
 }
 
