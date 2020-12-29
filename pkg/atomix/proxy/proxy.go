@@ -12,24 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package primitive
+package proxy
 
-import (
-	streams "github.com/atomix/go-framework/pkg/atomix/stream"
-	"io"
-)
+// NewProxy creates a new proxy server
+func NewProxy(client *Client) *Proxy {
+	return &Proxy{
+		Client: client,
+	}
+}
 
-// StateMachine applies commands from a protocol to a collection of state machines
-type StateMachine interface {
-	// Snapshot writes the state machine snapshot to the given writer
-	Snapshot(writer io.Writer) error
-
-	// Install reads the state machine snapshot from the given reader
-	Install(reader io.Reader) error
-
-	// Command applies a command to the state machine
-	Command(bytes []byte, stream streams.WriteStream)
-
-	// Query applies a query to the state machine
-	Query(bytes []byte, stream streams.WriteStream)
+// Server is a base server for servers that support sessions
+type Proxy struct {
+	*Client
 }

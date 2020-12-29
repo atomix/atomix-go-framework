@@ -12,16 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package primitive
+package storage
 
 import (
 	"container/list"
-	"context"
-	api "github.com/atomix/api/go/atomix/storage/session"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/gogo/protobuf/proto"
-	log "github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -110,16 +107,20 @@ func (s *sessionManager) getUnaryResult(id uint64) (streams.Result, bool) {
 // addUnaryResult adds a unary result
 func (s *sessionManager) addUnaryResult(id uint64, result streams.Result) streams.Result {
 	bytes, err := proto.Marshal(&SessionResponse{
+		Type: SessionResponseType_RESPONSE,
+		Status: SessionResponseStatus{
+			Code:    getCode(result.Error),
+			Message: getMessage(result.Error),
+		},
 		Response: &SessionResponse_Command{
 			Command: &SessionCommandResponse{
-				Context: &SessionResponseContext{
+				Context: SessionResponseContext{
+					SessionID: uint64(s.id),
 					StreamID: uint64(id),
 					Index:    uint64(s.ctx.Index()),
 					Sequence: 1,
-					Status:   getStatus(result.Error),
-					Message:  getMessage(result.Error),
 				},
-				Response: &ServiceCommandResponse{
+				Response: ServiceCommandResponse{
 					Response: &ServiceCommandResponse_Operation{
 						Operation: &ServiceOperationResponse{
 							result.Value.([]byte),
@@ -254,13 +255,19 @@ func (s *serviceSession) getStream(id StreamID) *sessionStream {
 }
 
 // ack acknowledges response streams up to the given request sequence number
-func (s *serviceSession) ack(id uint64, streams map[uint64]uint64) {
+func (s *serviceSession) ack(id uint64, streams []SessionStreamContext) {
 	for responseID := range s.results {
 		if responseID > id {
 			continue
 		}
 		delete(s.results, responseID)
 	}
+
+	streamAcks := make(map[uint64]uint64)
+	for _, stream := range streams {
+		streamAcks[stream.StreamID] = stream.ResponseID
+	}
+
 	for streamID, stream := range s.streams {
 		// If the stream ID is greater than the acknowledged sequence number, skip it
 		if uint64(stream.ID()) > id {
@@ -269,7 +276,7 @@ func (s *serviceSession) ack(id uint64, streams map[uint64]uint64) {
 
 		// If the stream is still held by the client, ack the stream.
 		// Otherwise, close the stream.
-		streamAck, open := streams[uint64(stream.ID())]
+		streamAck, open := streamAcks[uint64(stream.ID())]
 		if open {
 			stream.ack(streamAck)
 		} else {
@@ -287,50 +294,3 @@ func (s *serviceSession) close() {
 }
 
 var _ Session = &serviceSession{}
-
-// SessionServer is an implementation of SessionServiceServer for session management
-type SessionServer struct {
-	*Server
-}
-
-// OpenSession opens a new session
-func (s *SessionServer) OpenSession(ctx context.Context, request *api.OpenSessionRequest) (*api.OpenSessionResponse, error) {
-	log.Tracef("Received OpenSessionRequest %+v", request)
-	header, err := s.DoOpenSession(ctx, request.Header, request.Timeout)
-	if err != nil {
-		return nil, err
-	}
-	response := &api.OpenSessionResponse{
-		Header: *header,
-	}
-	log.Tracef("Sending OpenSessionResponse %+v", response)
-	return response, nil
-}
-
-// KeepAlive keeps a session alive
-func (s *SessionServer) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
-	log.Tracef("Received KeepAliveRequest %+v", request)
-	header, err := s.DoKeepAliveSession(ctx, request.Header)
-	if err != nil {
-		return nil, err
-	}
-	response := &api.KeepAliveResponse{
-		Header: *header,
-	}
-	log.Tracef("Sending KeepAliveResponse %+v", response)
-	return response, nil
-}
-
-// CloseSession closes a session
-func (s *SessionServer) CloseSession(ctx context.Context, request *api.CloseSessionRequest) (*api.CloseSessionResponse, error) {
-	log.Tracef("Received CloseSessionRequest %+v", request)
-	header, err := s.DoCloseSession(ctx, request.Header)
-	if err != nil {
-		return nil, err
-	}
-	response := &api.CloseSessionResponse{
-		Header: *header,
-	}
-	log.Tracef("Sending CloseSessionResponse %+v", response)
-	return response, nil
-}

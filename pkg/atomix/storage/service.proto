@@ -51,6 +51,16 @@ message ServiceId {
     string namespace = 3;
 }
 
+message StorageRequest {
+    uint32 partition_id = 1 [(gogoproto.customname) = "PartitionID"];
+    SessionRequest request = 2;
+}
+
+message StorageResponse {
+    uint32 partition_id = 1 [(gogoproto.customname) = "PartitionID"];
+    SessionResponse response = 2;
+}
+
 message SessionRequest {
     oneof request {
         OpenSessionRequest open_session = 1;
@@ -62,12 +72,14 @@ message SessionRequest {
 }
 
 message SessionResponse {
+    SessionResponseType type = 1;
+    SessionResponseStatus status = 2 [(gogoproto.nullable) = false];
     oneof response {
-        OpenSessionResponse open_session = 1;
-        KeepAliveResponse keep_alive = 2;
-        CloseSessionResponse close_session = 3;
-        SessionCommandResponse command = 4;
-        SessionQueryResponse query = 5;
+        OpenSessionResponse open_session = 3;
+        KeepAliveResponse keep_alive = 4;
+        CloseSessionResponse close_session = 5;
+        SessionCommandResponse command = 6;
+        SessionQueryResponse query = 7;
     }
 }
 
@@ -82,7 +94,7 @@ message OpenSessionResponse {
 message KeepAliveRequest {
     uint64 session_id = 1 [(gogoproto.customname) = "SessionID"];
     uint64 command_sequence = 2;
-    map<uint64, uint64> streams = 3;
+    repeated SessionStreamContext streams = 3 [(gogoproto.nullable) = false];
 }
 
 message KeepAliveResponse {
@@ -97,27 +109,27 @@ message CloseSessionResponse {
 }
 
 message SessionCommandRequest {
-    SessionCommandContext context = 1;
-    ServiceCommandRequest command = 2;
+    SessionCommandContext context = 1 [(gogoproto.nullable) = false];
+    ServiceCommandRequest command = 2 [(gogoproto.nullable) = false];
 }
 
 message SessionCommandResponse {
-    SessionResponseContext context = 1;
-    ServiceCommandResponse response = 2;
+    SessionResponseContext context = 1 [(gogoproto.nullable) = false];
+    ServiceCommandResponse response = 2 [(gogoproto.nullable) = false];
 }
 
 message SessionQueryRequest {
-    SessionQueryContext context = 1;
-    ServiceQueryRequest query = 2;
+    SessionQueryContext context = 1 [(gogoproto.nullable) = false];
+    ServiceQueryRequest query = 2 [(gogoproto.nullable) = false];
 }
 
 message SessionQueryResponse {
-    SessionResponseContext context = 1;
-    ServiceQueryResponse response = 2;
+    SessionResponseContext context = 1 [(gogoproto.nullable) = false];
+    ServiceQueryResponse response = 2 [(gogoproto.nullable) = false];
 }
 
 message ServiceCommandRequest {
-    ServiceId service = 1;
+    ServiceId service = 1 [(gogoproto.nullable) = false];
     oneof request {
         ServiceOperationRequest operation = 2;
         ServiceCreateRequest create = 3;
@@ -204,12 +216,20 @@ message SessionQueryContext {
 }
 
 message SessionResponseContext {
+    uint64 session_id = 1 [(gogoproto.customname) = "SessionID"];
+    uint64 stream_id = 2 [(gogoproto.customname) = "StreamID"];
+    uint64 index = 3;
+    uint64 sequence = 4;
+}
+
+message SessionStreamContext {
     uint64 stream_id = 1 [(gogoproto.customname) = "StreamID"];
-    uint64 index = 2;
-    uint64 sequence = 3;
-    SessionResponseType type = 4;
-    SessionResponseStatus status = 5;
-    string message = 6;
+    uint64 response_id = 2 [(gogoproto.customname) = "ResponseID"];
+}
+
+message SessionResponseStatus {
+    SessionResponseCode code = 1;
+    string message = 2;
 }
 
 enum SessionResponseType {
@@ -218,7 +238,7 @@ enum SessionResponseType {
     CLOSE_STREAM = 2;
 }
 
-enum SessionResponseStatus {
+enum SessionResponseCode {
     OK = 0;
     ERROR = 1;
     NOT_LEADER = 2;
@@ -234,4 +254,8 @@ enum SessionResponseStatus {
     NOT_SUPPORTED = 12;
     TIMEOUT = 13;
     INTERNAL = 14;
+}
+
+service StorageService {
+    rpc Request (StorageRequest) returns (stream StorageResponse);
 }

@@ -16,17 +16,36 @@ package set
 
 import (
 	"context"
-	"github.com/atomix/api/go/atomix/storage"
+	storageapi "github.com/atomix/api/go/atomix/storage"
 	api "github.com/atomix/api/go/atomix/storage/set"
-	"github.com/atomix/go-framework/pkg/atomix/primitive"
+	"github.com/atomix/go-framework/pkg/atomix/proxy"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
+	"github.com/atomix/go-framework/pkg/atomix/util/async"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 )
+
+// RegisterPrimitive registers the election primitive on the given node
+func RegisterServer(node *proxy.Node) {
+	node.RegisterServer(Type, &ServerType{})
+}
+
+// ServerType is the election primitive server
+type ServerType struct{}
+
+// RegisterServer registers the election server with the protocol
+func (p *ServerType) RegisterServer(server *grpc.Server, client *proxy.Client) {
+	api.RegisterSetServiceServer(server, &Server{
+		Proxy: proxy.NewProxy(client),
+	})
+}
+
+var _ proxy.PrimitiveServer = &ServerType{}
 
 // Server is an implementation of SetServiceServer for the set primitive
 type Server struct {
-	*primitive.Server
+	*proxy.Proxy
 }
 
 // Size gets the number of elements in the set
@@ -37,19 +56,26 @@ func (s *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeR
 		return nil, err
 	}
 
-	out, header, err := s.DoQuery(ctx, opSize, in, request.Header)
-	if err != nil {
-		return nil, err
-	}
+	partitions := s.Partitions()
+	results, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
+		out, err := partitions[i].DoQuery(ctx, opSize, in, request.Header)
+		if err != nil {
+			return nil, err
+		}
+		sizeResponse := &SizeResponse{}
+		if err = proto.Unmarshal(out, sizeResponse); err != nil {
+			return nil, err
+		}
+		return sizeResponse.Size_, nil
+	})
 
-	sizeResponse := &SizeResponse{}
-	if err = proto.Unmarshal(out, sizeResponse); err != nil {
-		return nil, err
+	var size uint32
+	for _, result := range results {
+		size += result.(uint32)
 	}
 
 	response := &api.SizeResponse{
-		Header: *header,
-		Size_:  sizeResponse.Size_,
+		Size_: size,
 	}
 	log.Tracef("Sending SizeResponse %+v", response)
 	return response, nil
@@ -65,7 +91,8 @@ func (s *Server) Contains(ctx context.Context, request *api.ContainsRequest) (*a
 		return nil, err
 	}
 
-	out, header, err := s.DoQuery(ctx, opContains, in, request.Header)
+	partition := s.PartitionBy([]byte(request.Value))
+	out, err := partition.DoQuery(ctx, opContains, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +103,6 @@ func (s *Server) Contains(ctx context.Context, request *api.ContainsRequest) (*a
 	}
 
 	response := &api.ContainsResponse{
-		Header:   *header,
 		Contains: containsResponse.Contains,
 	}
 	log.Tracef("Sending ContainsResponse %+v", response)
@@ -93,7 +119,8 @@ func (s *Server) Add(ctx context.Context, request *api.AddRequest) (*api.AddResp
 		return nil, err
 	}
 
-	out, header, err := s.DoCommand(ctx, opAdd, in, request.Header)
+	partition := s.PartitionBy([]byte(request.Value))
+	out, err := partition.DoCommand(ctx, opAdd, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -104,8 +131,7 @@ func (s *Server) Add(ctx context.Context, request *api.AddRequest) (*api.AddResp
 	}
 
 	response := &api.AddResponse{
-		Header: *header,
-		Added:  addResponse.Added,
+		Added: addResponse.Added,
 	}
 	log.Tracef("Sending AddResponse %+v", response)
 	return response, nil
@@ -121,7 +147,8 @@ func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 		return nil, err
 	}
 
-	out, header, err := s.DoCommand(ctx, opRemove, in, request.Header)
+	partition := s.PartitionBy([]byte(request.Value))
+	out, err := partition.DoCommand(ctx, opRemove, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +159,6 @@ func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 	}
 
 	response := &api.RemoveResponse{
-		Header:  *header,
 		Removed: removeResponse.Removed,
 	}
 	log.Tracef("Sending RemoveResponse %+v", response)
@@ -147,19 +173,16 @@ func (s *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.Cle
 		return nil, err
 	}
 
-	out, header, err := s.DoCommand(ctx, opClear, in, request.Header)
+	partitions := s.Partitions()
+	err = async.IterAsync(len(partitions), func(i int) error {
+		_, err := partitions[i].DoCommand(ctx, opClear, in, request.Header)
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	clearResponse := &ClearResponse{}
-	if err = proto.Unmarshal(out, clearResponse); err != nil {
-		return nil, err
-	}
-
-	response := &api.ClearResponse{
-		Header: *header,
-	}
+	response := &api.ClearResponse{}
 	log.Tracef("Sending ClearResponse %+v", response)
 	return response, nil
 }
@@ -175,7 +198,11 @@ func (s *Server) Events(request *api.EventRequest, srv api.SetService_EventsServ
 	}
 
 	stream := streams.NewBufferedStream()
-	if err := s.DoCommandStream(srv.Context(), opEvents, in, request.Header, stream); err != nil {
+	partitions := s.Partitions()
+	err = async.IterAsync(len(partitions), func(i int) error {
+		return partitions[i].DoCommandStream(srv.Context(), opEvents, in, request.Header, stream)
+	})
+	if err != nil {
 		return err
 	}
 
@@ -190,26 +217,32 @@ func (s *Server) Events(request *api.EventRequest, srv api.SetService_EventsServ
 		}
 
 		response := &ListenResponse{}
-		output := result.Value.(primitive.SessionOutput)
+		output := result.Value.(proxy.SessionOutput)
 		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}
 
 		var eventResponse *api.EventResponse
-		switch output.Header.State.Type {
-		case storage.ResponseType_OPEN_STREAM:
+		switch output.Type {
+		case storageapi.ResponseType_OPEN_STREAM:
 			eventResponse = &api.EventResponse{
-				Header: *output.Header,
+				Header: storageapi.ResponseHeader{
+					Type: storageapi.ResponseType_OPEN_STREAM,
+				},
 			}
-		case storage.ResponseType_CLOSE_STREAM:
+		case storageapi.ResponseType_CLOSE_STREAM:
 			eventResponse = &api.EventResponse{
-				Header: *output.Header,
+				Header: storageapi.ResponseHeader{
+					Type: storageapi.ResponseType_CLOSE_STREAM,
+				},
 			}
 		default:
 			eventResponse = &api.EventResponse{
-				Header: *output.Header,
-				Type:   getEventType(response.Type),
-				Value:  response.Value,
+				Header: storageapi.ResponseHeader{
+					Type: storageapi.ResponseType_RESPONSE,
+				},
+				Type:  getEventType(response.Type),
+				Value: response.Value,
 			}
 		}
 
@@ -231,7 +264,11 @@ func (s *Server) Iterate(request *api.IterateRequest, srv api.SetService_Iterate
 	}
 
 	stream := streams.NewBufferedStream()
-	if err := s.DoQueryStream(srv.Context(), opIterate, in, request.Header, stream); err != nil {
+	partitions := s.Partitions()
+	err = async.IterAsync(len(partitions), func(i int) error {
+		return partitions[i].DoQueryStream(srv.Context(), opIterate, in, request.Header, stream)
+	})
+	if err != nil {
 		return err
 	}
 
@@ -246,25 +283,31 @@ func (s *Server) Iterate(request *api.IterateRequest, srv api.SetService_Iterate
 		}
 
 		response := &IterateResponse{}
-		output := result.Value.(primitive.SessionOutput)
+		output := result.Value.(proxy.SessionOutput)
 		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}
 
 		var iterateResponse *api.IterateResponse
-		switch output.Header.State.Type {
-		case storage.ResponseType_OPEN_STREAM:
+		switch output.Type {
+		case storageapi.ResponseType_OPEN_STREAM:
 			iterateResponse = &api.IterateResponse{
-				Header: *output.Header,
+				Header: storageapi.ResponseHeader{
+					Type: storageapi.ResponseType_OPEN_STREAM,
+				},
 			}
-		case storage.ResponseType_CLOSE_STREAM:
+		case storageapi.ResponseType_CLOSE_STREAM:
 			iterateResponse = &api.IterateResponse{
-				Header: *output.Header,
+				Header: storageapi.ResponseHeader{
+					Type: storageapi.ResponseType_CLOSE_STREAM,
+				},
 			}
 		default:
 			iterateResponse = &api.IterateResponse{
-				Header: *output.Header,
-				Value:  response.Value,
+				Header: storageapi.ResponseHeader{
+					Type: storageapi.ResponseType_RESPONSE,
+				},
+				Value: response.Value,
 			}
 		}
 
@@ -280,13 +323,14 @@ func (s *Server) Iterate(request *api.IterateRequest, srv api.SetService_Iterate
 // Create opens a new session
 func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
-	header, err := s.DoCreateService(ctx, request.Header)
+	partitions := s.Partitions()
+	err := async.IterAsync(len(partitions), func(i int) error {
+		return partitions[i].DoCreateService(ctx, request.Header)
+	})
 	if err != nil {
 		return nil, err
 	}
-	response := &api.CreateResponse{
-		Header: *header,
-	}
+	response := &api.CreateResponse{}
 	log.Tracef("Sending CreateResponse %+v", response)
 	return response, nil
 }
@@ -295,24 +339,26 @@ func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.C
 func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if request.Delete {
-		header, err := s.DoDeleteService(ctx, request.Header)
+		partitions := s.Partitions()
+		err := async.IterAsync(len(partitions), func(i int) error {
+			return partitions[i].DoDeleteService(ctx, request.Header)
+		})
 		if err != nil {
 			return nil, err
 		}
-		response := &api.CloseResponse{
-			Header: *header,
-		}
+		response := &api.CloseResponse{}
 		log.Tracef("Sending CloseResponse %+v", response)
 		return response, nil
 	}
 
-	header, err := s.DoCloseService(ctx, request.Header)
+	partitions := s.Partitions()
+	err := async.IterAsync(len(partitions), func(i int) error {
+		return partitions[i].DoCloseService(ctx, request.Header)
+	})
 	if err != nil {
 		return nil, err
 	}
-	response := &api.CloseResponse{
-		Header: *header,
-	}
+	response := &api.CloseResponse{}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil
 }

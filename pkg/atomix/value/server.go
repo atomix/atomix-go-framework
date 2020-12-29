@@ -16,17 +16,35 @@ package value
 
 import (
 	"context"
-	"github.com/atomix/api/go/atomix/storage"
+	storageapi "github.com/atomix/api/go/atomix/storage"
 	api "github.com/atomix/api/go/atomix/storage/value"
-	"github.com/atomix/go-framework/pkg/atomix/primitive"
+	"github.com/atomix/go-framework/pkg/atomix/proxy"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 )
+
+// RegisterPrimitive registers the election primitive on the given node
+func RegisterServer(node *proxy.Node) {
+	node.RegisterServer(Type, &ServerType{})
+}
+
+// ServerType is the election primitive server
+type ServerType struct{}
+
+// RegisterServer registers the election server with the protocol
+func (p *ServerType) RegisterServer(server *grpc.Server, client *proxy.Client) {
+	api.RegisterValueServiceServer(server, &Server{
+		Proxy: proxy.NewProxy(client),
+	})
+}
+
+var _ proxy.PrimitiveServer = &ServerType{}
 
 // Server is an implementation of ValueServiceServer for the value primitive
 type Server struct {
-	*primitive.Server
+	*proxy.Proxy
 }
 
 // Set sets the value
@@ -41,7 +59,8 @@ func (s *Server) Set(ctx context.Context, request *api.SetRequest) (*api.SetResp
 		return nil, err
 	}
 
-	out, header, err := s.DoCommand(ctx, opSet, in, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	out, err := partition.DoCommand(ctx, opSet, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +71,6 @@ func (s *Server) Set(ctx context.Context, request *api.SetRequest) (*api.SetResp
 	}
 
 	response := &api.SetResponse{
-		Header:    *header,
 		Version:   setResponse.Version,
 		Succeeded: setResponse.Succeeded,
 	}
@@ -68,7 +86,8 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 		return nil, err
 	}
 
-	out, header, err := s.DoQuery(ctx, opGet, in, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	out, err := partition.DoQuery(ctx, opGet, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +98,6 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 	}
 
 	response := &api.GetResponse{
-		Header:  *header,
 		Value:   getResponse.Value,
 		Version: getResponse.Version,
 	}
@@ -96,7 +114,8 @@ func (s *Server) Events(request *api.EventRequest, srv api.ValueService_EventsSe
 	}
 
 	stream := streams.NewBufferedStream()
-	if err := s.DoCommandStream(srv.Context(), opEvents, in, request.Header, stream); err != nil {
+	partition := s.PartitionFor(request.Header.Primitive)
+	if err := partition.DoCommandStream(srv.Context(), opEvents, in, request.Header, stream); err != nil {
 		return err
 	}
 
@@ -111,24 +130,30 @@ func (s *Server) Events(request *api.EventRequest, srv api.ValueService_EventsSe
 		}
 
 		response := &ListenResponse{}
-		output := result.Value.(primitive.SessionOutput)
+		output := result.Value.(proxy.SessionOutput)
 		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}
 
 		var eventResponse *api.EventResponse
-		switch output.Header.State.Type {
-		case storage.ResponseType_OPEN_STREAM:
+		switch output.Type {
+		case storageapi.ResponseType_OPEN_STREAM:
 			eventResponse = &api.EventResponse{
-				Header: *output.Header,
+				Header: storageapi.ResponseHeader{
+					Type: storageapi.ResponseType_OPEN_STREAM,
+				},
 			}
-		case storage.ResponseType_CLOSE_STREAM:
+		case storageapi.ResponseType_CLOSE_STREAM:
 			eventResponse = &api.EventResponse{
-				Header: *output.Header,
+				Header: storageapi.ResponseHeader{
+					Type: storageapi.ResponseType_CLOSE_STREAM,
+				},
 			}
 		default:
 			eventResponse = &api.EventResponse{
-				Header:          *output.Header,
+				Header: storageapi.ResponseHeader{
+					Type: storageapi.ResponseType_RESPONSE,
+				},
 				Type:            getEventType(response.Type),
 				PreviousValue:   response.PreviousValue,
 				PreviousVersion: response.PreviousVersion,
@@ -149,13 +174,12 @@ func (s *Server) Events(request *api.EventRequest, srv api.ValueService_EventsSe
 // Create opens a new session
 func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
-	header, err := s.DoCreateService(ctx, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	err := partition.DoCreateService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
-	response := &api.CreateResponse{
-		Header: *header,
-	}
+	response := &api.CreateResponse{}
 	log.Tracef("Sending CreateResponse %+v", response)
 	return response, nil
 }
@@ -164,24 +188,22 @@ func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.C
 func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if request.Delete {
-		header, err := s.DoDeleteService(ctx, request.Header)
+		partition := s.PartitionFor(request.Header.Primitive)
+		err := partition.DoDeleteService(ctx, request.Header)
 		if err != nil {
 			return nil, err
 		}
-		response := &api.CloseResponse{
-			Header: *header,
-		}
+		response := &api.CloseResponse{}
 		log.Tracef("Sending CloseResponse %+v", response)
 		return response, nil
 	}
 
-	header, err := s.DoCloseService(ctx, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	err := partition.DoCloseService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
-	response := &api.CloseResponse{
-		Header: *header,
-	}
+	response := &api.CloseResponse{}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil
 }

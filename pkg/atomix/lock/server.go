@@ -16,31 +16,48 @@ package lock
 
 import (
 	"context"
-	"github.com/atomix/api/go/atomix/storage"
+	storageapi "github.com/atomix/api/go/atomix/storage"
 	api "github.com/atomix/api/go/atomix/storage/lock"
-	"github.com/atomix/go-framework/pkg/atomix/primitive"
+	"github.com/atomix/go-framework/pkg/atomix/proxy"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
+// RegisterPrimitive registers the election primitive on the given node
+func RegisterServer(node *proxy.Node) {
+	node.RegisterServer(Type, &ServerType{})
+}
+
+// ServerType is the election primitive server
+type ServerType struct{}
+
+// RegisterServer registers the election server with the protocol
+func (p *ServerType) RegisterServer(server *grpc.Server, client *proxy.Client) {
+	api.RegisterLockServiceServer(server, &Server{
+		Proxy: proxy.NewProxy(client),
+	})
+}
+
+var _ proxy.PrimitiveServer = &ServerType{}
+
 // Server is an implementation of MapServiceServer for the map primitive
 type Server struct {
-	*primitive.Server
+	*proxy.Proxy
 }
 
 // Create opens a new session
 func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
-	header, err := s.DoCreateService(ctx, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	err := partition.DoCreateService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
-	response := &api.CreateResponse{
-		Header: *header,
-	}
+	response := &api.CreateResponse{}
 	log.Tracef("Sending CreateResponse %+v", response)
 	return response, nil
 }
@@ -49,24 +66,22 @@ func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.C
 func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if request.Delete {
-		header, err := s.DoDeleteService(ctx, request.Header)
+		partition := s.PartitionFor(request.Header.Primitive)
+		err := partition.DoDeleteService(ctx, request.Header)
 		if err != nil {
 			return nil, err
 		}
-		response := &api.CloseResponse{
-			Header: *header,
-		}
+		response := &api.CloseResponse{}
 		log.Tracef("Sending CloseResponse %+v", response)
 		return response, nil
 	}
 
-	header, err := s.DoCloseService(ctx, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	err := partition.DoCloseService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
-	response := &api.CloseResponse{
-		Header: *header,
-	}
+	response := &api.CloseResponse{}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil
 }
@@ -83,7 +98,8 @@ func (s *Server) Lock(ctx context.Context, request *api.LockRequest) (*api.LockR
 	}
 
 	stream := streams.NewBufferedStream()
-	if err := s.DoCommandStream(ctx, opLock, in, request.Header, stream); err != nil {
+	partition := s.PartitionFor(request.Header.Primitive)
+	if err := partition.DoCommandStream(ctx, opLock, in, request.Header, stream); err != nil {
 		return nil, err
 	}
 
@@ -97,15 +113,14 @@ func (s *Server) Lock(ctx context.Context, request *api.LockRequest) (*api.LockR
 			return nil, result.Error
 		}
 
-		output := result.Value.(primitive.SessionOutput)
+		output := result.Value.(proxy.SessionOutput)
 
-		if output.Header.State.Type == storage.ResponseType_RESPONSE {
+		if output.Type == storageapi.ResponseType_RESPONSE {
 			lockResponse := &LockResponse{}
 			if err = proto.Unmarshal(output.Value.([]byte), lockResponse); err != nil {
 				return nil, err
 			}
 			response := &api.LockResponse{
-				Header:  *output.Header,
 				Version: uint64(lockResponse.Index),
 			}
 			log.Tracef("Sending LockResponse %+v", response)
@@ -124,7 +139,8 @@ func (s *Server) Unlock(ctx context.Context, request *api.UnlockRequest) (*api.U
 		return nil, err
 	}
 
-	out, header, err := s.DoCommand(ctx, opUnlock, in, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	out, err := partition.DoCommand(ctx, opUnlock, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +151,6 @@ func (s *Server) Unlock(ctx context.Context, request *api.UnlockRequest) (*api.U
 	}
 
 	response := &api.UnlockResponse{
-		Header:   *header,
 		Unlocked: unlockResponse.Succeeded,
 	}
 	log.Tracef("Sending UnlockResponse %+v", response)
@@ -152,7 +167,8 @@ func (s *Server) IsLocked(ctx context.Context, request *api.IsLockedRequest) (*a
 		return nil, err
 	}
 
-	out, header, err := s.DoQuery(ctx, opIsLocked, in, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	out, err := partition.DoQuery(ctx, opIsLocked, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +179,6 @@ func (s *Server) IsLocked(ctx context.Context, request *api.IsLockedRequest) (*a
 	}
 
 	response := &api.IsLockedResponse{
-		Header:   *header,
 		IsLocked: isLockedResponse.Locked,
 	}
 	log.Tracef("Sending IsLockedResponse %+v", response)

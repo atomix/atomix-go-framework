@@ -16,7 +16,6 @@ package errors
 
 import (
 	"fmt"
-	"github.com/atomix/api/go/atomix/storage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -64,83 +63,6 @@ func (e *TypedError) Error() string {
 }
 
 var _ error = &TypedError{}
-
-// Status gets the proto status for the given error
-func Status(err error) storage.ResponseCode {
-	if err == nil {
-		return storage.ResponseCode_OK
-	}
-
-	typed, ok := err.(*TypedError)
-	if !ok {
-		return storage.ResponseCode_ERROR
-	}
-
-	switch typed.Type {
-	case Unknown:
-		return storage.ResponseCode_UNKNOWN
-	case Canceled:
-		return storage.ResponseCode_CANCELED
-	case NotFound:
-		return storage.ResponseCode_NOT_FOUND
-	case AlreadyExists:
-		return storage.ResponseCode_ALREADY_EXISTS
-	case Unauthorized:
-		return storage.ResponseCode_UNAUTHORIZED
-	case Forbidden:
-		return storage.ResponseCode_FORBIDDEN
-	case Conflict:
-		return storage.ResponseCode_CONFLICT
-	case Invalid:
-		return storage.ResponseCode_INVALID
-	case Unavailable:
-		return storage.ResponseCode_UNAVAILABLE
-	case NotSupported:
-		return storage.ResponseCode_NOT_SUPPORTED
-	case Timeout:
-		return storage.ResponseCode_TIMEOUT
-	case Internal:
-		return storage.ResponseCode_INTERNAL
-	default:
-		return storage.ResponseCode_ERROR
-	}
-}
-
-// FromHeader creates a typed error from a response header
-func FromHeader(header storage.ResponseHeader) error {
-	switch header.Status.Code {
-	case storage.ResponseCode_OK:
-		return nil
-	case storage.ResponseCode_ERROR:
-		return NewUnknown(header.Status.Message)
-	case storage.ResponseCode_UNKNOWN:
-		return NewUnknown(header.Status.Message)
-	case storage.ResponseCode_CANCELED:
-		return NewCanceled(header.Status.Message)
-	case storage.ResponseCode_NOT_FOUND:
-		return NewNotFound(header.Status.Message)
-	case storage.ResponseCode_ALREADY_EXISTS:
-		return NewAlreadyExists(header.Status.Message)
-	case storage.ResponseCode_UNAUTHORIZED:
-		return NewUnauthorized(header.Status.Message)
-	case storage.ResponseCode_FORBIDDEN:
-		return NewForbidden(header.Status.Message)
-	case storage.ResponseCode_CONFLICT:
-		return NewConflict(header.Status.Message)
-	case storage.ResponseCode_INVALID:
-		return NewInvalid(header.Status.Message)
-	case storage.ResponseCode_UNAVAILABLE:
-		return NewUnavailable(header.Status.Message)
-	case storage.ResponseCode_NOT_SUPPORTED:
-		return NewNotSupported(header.Status.Message)
-	case storage.ResponseCode_TIMEOUT:
-		return NewTimeout(header.Status.Message)
-	case storage.ResponseCode_INTERNAL:
-		return NewInternal(header.Status.Message)
-	default:
-		return NewUnknown(header.Status.Message)
-	}
-}
 
 // Proto returns the given error as a gRPC error
 func Proto(err error) error {

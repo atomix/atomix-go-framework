@@ -15,15 +15,34 @@
 package counter
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/primitive"
+	"github.com/atomix/go-framework/pkg/atomix/storage"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/gogo/protobuf/proto"
 	"io"
 )
 
+// RegisterService registers the primitive service on the given node
+func RegisterService(node *storage.Node) {
+	node.RegisterService(Type, &ServiceType{})
+}
+
+// ServiceType is the counter service type
+type ServiceType struct{}
+
+// NewService creates a new counter service
+func (s *ServiceType) NewService(scheduler storage.Scheduler, context storage.ServiceContext) storage.Service {
+	service := &Service{
+		Service: storage.NewService(scheduler, context),
+	}
+	service.init()
+	return service
+}
+
+var _ storage.PrimitiveService = &ServiceType{}
+
 // Service is a state machine for a counter primitive
 type Service struct {
-	primitive.Service
+	storage.Service
 	value int64
 }
 

@@ -14,6 +14,8 @@
 
 package lock
 
+const Type = "lock"
+
 const (
 	opLock     = "Lock"
 	opUnlock   = "Unlock"

@@ -15,16 +15,36 @@
 package election
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/primitive"
+	"github.com/atomix/go-framework/pkg/atomix/storage"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
 	"io"
 	"time"
 )
 
+// RegisterService registers the election primitive service on the given node
+func RegisterService(node *storage.Node) {
+	node.RegisterService(Type, &ServiceType{})
+}
+
+// ServiceType is the election primitive service
+type ServiceType struct{}
+
+// NewService creates a new election service
+func (p *ServiceType) NewService(scheduler storage.Scheduler, context storage.ServiceContext) storage.Service {
+	service := &Service{
+		Service:    storage.NewService(scheduler, context),
+		candidates: make([]*ElectionRegistration, 0),
+	}
+	service.init()
+	return service
+}
+
+var _ storage.PrimitiveService = &ServiceType{}
+
 // Service is a state machine for an election primitive
 type Service struct {
-	primitive.Service
+	storage.Service
 	leader     *ElectionRegistration
 	term       uint64
 	timestamp  *time.Time
@@ -76,20 +96,20 @@ func (e *Service) Restore(reader io.Reader) error {
 }
 
 // SessionExpired is called when a session is expired by the server
-func (e *Service) SessionExpired(session primitive.Session) {
+func (e *Service) SessionExpired(session storage.Session) {
 	e.close(session)
 }
 
 // SessionClosed is called when a session is closed by the client
-func (e *Service) SessionClosed(session primitive.Session) {
+func (e *Service) SessionClosed(session storage.Session) {
 	e.close(session)
 }
 
 // close elects a new leader when a session is closed
-func (e *Service) close(session primitive.Session) {
+func (e *Service) close(session storage.Session) {
 	candidates := make([]*ElectionRegistration, 0, len(e.candidates))
 	for _, candidate := range e.candidates {
-		if primitive.SessionID(candidate.SessionID) != session.ID() {
+		if storage.SessionID(candidate.SessionID) != session.ID() {
 			candidates = append(candidates, candidate)
 		}
 	}
@@ -97,7 +117,7 @@ func (e *Service) close(session primitive.Session) {
 	if len(candidates) != len(e.candidates) {
 		e.candidates = candidates
 
-		if primitive.SessionID(e.leader.SessionID) == session.ID() {
+		if storage.SessionID(e.leader.SessionID) == session.ID() {
 			e.leader = nil
 			if len(e.candidates) > 0 {
 				e.leader = e.candidates[0]
@@ -374,7 +394,7 @@ func (e *Service) GetTerm(bytes []byte) ([]byte, error) {
 }
 
 // Events registers the given channel to receive election events
-func (e *Service) Events(bytes []byte, stream primitive.Stream) {
+func (e *Service) Events(bytes []byte, stream storage.Stream) {
 	// Keep the stream open for events
 }
 

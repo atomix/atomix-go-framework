@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package value
+package util
 
-const Type = "value"
+import "hash/fnv"
 
-const (
-	opSet    = "Set"
-	opGet    = "Get"
-	opEvents = "Events"
-)
+// GetPartitionIndex returns the index of the partition for the given key
+func GetPartitionIndex(key []byte, partitions int) (int, error) {
+	h := fnv.New32a()
+	if _, err := h.Write(key); err != nil {
+		return 0, err
+	}
+	return int(h.Sum32() % uint32(partitions)), nil
+}

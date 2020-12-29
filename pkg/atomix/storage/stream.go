@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package primitive
+package storage
 
 import (
 	"container/list"
@@ -97,14 +97,17 @@ func (s *sessionStream) open() {
 	s.updateClock()
 
 	bytes, err := proto.Marshal(&SessionResponse{
+		Type: SessionResponseType_OPEN_STREAM,
+		Status: SessionResponseStatus{
+			Code: SessionResponseCode_OK,
+		},
 		Response: &SessionResponse_Command{
 			Command: &SessionCommandResponse{
-				Context: &SessionResponseContext{
-					StreamID: uint64(s.ID()),
-					Index:    uint64(s.lastIndex),
-					Sequence: s.responseID,
-					Type:     SessionResponseType_OPEN_STREAM,
-					Status:   SessionResponseStatus_OK,
+				Context: SessionResponseContext{
+					SessionID: uint64(s.session.ID()),
+					StreamID:  uint64(s.ID()),
+					Index:     uint64(s.lastIndex),
+					Sequence:  s.responseID,
 				},
 			},
 		},
@@ -145,16 +148,20 @@ func (s *sessionStream) Send(result streams.Result) {
 
 	// Create the stream result and add it to the results list.
 	bytes, err := proto.Marshal(&SessionResponse{
+		Type: SessionResponseType_RESPONSE,
+		Status: SessionResponseStatus{
+			Code:    getCode(result.Error),
+			Message: getMessage(result.Error),
+		},
 		Response: &SessionResponse_Command{
 			Command: &SessionCommandResponse{
-				Context: &SessionResponseContext{
-					StreamID: uint64(s.ID()),
-					Index:    uint64(s.lastIndex),
-					Sequence: s.responseID,
-					Status:   getStatus(result.Error),
-					Message:  getMessage(result.Error),
+				Context: SessionResponseContext{
+					SessionID: uint64(s.session.ID()),
+					StreamID:  uint64(s.ID()),
+					Index:     uint64(s.lastIndex),
+					Sequence:  s.responseID,
 				},
-				Response: &ServiceCommandResponse{
+				Response: ServiceCommandResponse{
 					Response: &ServiceCommandResponse_Operation{
 						Operation: &ServiceOperationResponse{
 							result.Value.([]byte),
@@ -204,14 +211,17 @@ func (s *sessionStream) Close() {
 	s.updateClock()
 
 	bytes, err := proto.Marshal(&SessionResponse{
+		Type: SessionResponseType_CLOSE_STREAM,
+		Status: SessionResponseStatus{
+			Code: SessionResponseCode_OK,
+		},
 		Response: &SessionResponse_Command{
 			Command: &SessionCommandResponse{
-				Context: &SessionResponseContext{
-					StreamID: uint64(s.ID()),
-					Index:    uint64(s.lastIndex),
-					Sequence: s.responseID,
-					Type:     SessionResponseType_CLOSE_STREAM,
-					Status:   SessionResponseStatus_OK,
+				Context: SessionResponseContext{
+					SessionID: uint64(s.session.ID()),
+					StreamID:  uint64(s.ID()),
+					Index:     uint64(s.lastIndex),
+					Sequence:  s.responseID,
 				},
 			},
 		},

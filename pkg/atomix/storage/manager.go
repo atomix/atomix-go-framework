@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package primitive
+package storage
 
 import (
 	"container/list"
@@ -263,7 +263,7 @@ func (m *Manager) applyCommand(request *SessionCommandRequest, stream streams.Wr
 	} else {
 		sequenceNumber := request.Context.SequenceNumber
 		if sequenceNumber != 0 && sequenceNumber <= sessionManager.commandSequence {
-			serviceID := ServiceID(*request.Command.Service)
+			serviceID := ServiceID(request.Command.Service)
 
 			session := sessionManager.getService(serviceID)
 			if session == nil {
@@ -304,7 +304,7 @@ func (m *Manager) applySessionCommand(request *SessionCommandRequest, session *s
 	session.completeCommand(request.Context.SequenceNumber)
 }
 
-func (m *Manager) applyServiceCommand(request *ServiceCommandRequest, context *SessionCommandContext, sessionManager *sessionManager, stream streams.WriteStream) {
+func (m *Manager) applyServiceCommand(request ServiceCommandRequest, context SessionCommandContext, sessionManager *sessionManager, stream streams.WriteStream) {
 	switch request.Request.(type) {
 	case *ServiceCommandRequest_Operation:
 		m.applyServiceCommandOperation(request, context, sessionManager, stream)
@@ -320,8 +320,8 @@ func (m *Manager) applyServiceCommand(request *ServiceCommandRequest, context *S
 	}
 }
 
-func (m *Manager) applyServiceCommandOperation(request *ServiceCommandRequest, context *SessionCommandContext, sessionManager *sessionManager, stream streams.WriteStream) {
-	serviceID := ServiceID(*request.Service)
+func (m *Manager) applyServiceCommandOperation(request ServiceCommandRequest, context SessionCommandContext, sessionManager *sessionManager, stream streams.WriteStream) {
+	serviceID := ServiceID(request.Service)
 
 	service, ok := m.services[serviceID]
 	if !ok {
@@ -358,26 +358,29 @@ func (m *Manager) applyServiceCommandOperation(request *ServiceCommandRequest, c
 	}
 }
 
-func (m *Manager) applyServiceCommandCreate(request *ServiceCommandRequest, context *SessionCommandContext, sessionManager *sessionManager, stream streams.WriteStream) {
+func (m *Manager) applyServiceCommandCreate(request ServiceCommandRequest, context SessionCommandContext, sessionManager *sessionManager, stream streams.WriteStream) {
 	defer stream.Close()
 
-	serviceID := ServiceID(*request.Service)
+	serviceID := ServiceID(request.Service)
 
 	service, ok := m.services[serviceID]
 	if !ok {
 		primitive := m.registry.GetPrimitive(request.Service.Type)
 		if primitive == nil {
 			stream.Result(proto.Marshal(&SessionResponse{
+				Type: SessionResponseType_RESPONSE,
+				Status: SessionResponseStatus{
+					Code:    SessionResponseCode_INVALID,
+					Message: fmt.Sprintf("unknown primitive type '%s'", request.Service.Type),
+				},
 				Response: &SessionResponse_Command{
 					Command: &SessionCommandResponse{
-						Context: &SessionResponseContext{
+						Context: SessionResponseContext{
+							SessionID: context.SessionID,
 							Index:    uint64(m.context.Index()),
 							Sequence: context.SequenceNumber,
-							Type:     SessionResponseType_RESPONSE,
-							Status:   SessionResponseStatus_INVALID,
-							Message:  fmt.Sprintf("unknown primitive type '%s'", request.Service.Type),
 						},
-						Response: &ServiceCommandResponse{
+						Response: ServiceCommandResponse{
 							Response: &ServiceCommandResponse_Create{
 								Create: &ServiceCreateResponse{},
 							},
@@ -402,15 +405,18 @@ func (m *Manager) applyServiceCommandCreate(request *ServiceCommandRequest, cont
 	}
 
 	stream.Result(proto.Marshal(&SessionResponse{
+		Type: SessionResponseType_RESPONSE,
+		Status: SessionResponseStatus{
+			Code: SessionResponseCode_OK,
+		},
 		Response: &SessionResponse_Command{
 			Command: &SessionCommandResponse{
-				Context: &SessionResponseContext{
+				Context: SessionResponseContext{
+					SessionID: context.SessionID,
 					Index:    uint64(m.context.Index()),
 					Sequence: context.SequenceNumber,
-					Type:     SessionResponseType_RESPONSE,
-					Status:   SessionResponseStatus_OK,
 				},
-				Response: &ServiceCommandResponse{
+				Response: ServiceCommandResponse{
 					Response: &ServiceCommandResponse_Create{
 						Create: &ServiceCreateResponse{},
 					},
@@ -420,8 +426,8 @@ func (m *Manager) applyServiceCommandCreate(request *ServiceCommandRequest, cont
 	}))
 }
 
-func (m *Manager) applyServiceCommandClose(request *ServiceCommandRequest, context *SessionCommandContext, sessionManager *sessionManager, stream streams.WriteStream) {
-	serviceID := ServiceID(*request.Service)
+func (m *Manager) applyServiceCommandClose(request ServiceCommandRequest, context SessionCommandContext, sessionManager *sessionManager, stream streams.WriteStream) {
+	serviceID := ServiceID(request.Service)
 
 	service, ok := m.services[serviceID]
 	if ok {
@@ -436,15 +442,18 @@ func (m *Manager) applyServiceCommandClose(request *ServiceCommandRequest, conte
 	}
 
 	stream.Result(proto.Marshal(&SessionResponse{
+		Type: SessionResponseType_RESPONSE,
+		Status: SessionResponseStatus{
+			Code: SessionResponseCode_OK,
+		},
 		Response: &SessionResponse_Command{
 			Command: &SessionCommandResponse{
-				Context: &SessionResponseContext{
+				Context: SessionResponseContext{
+					SessionID: context.SessionID,
 					Index:    uint64(m.context.Index()),
 					Sequence: context.SequenceNumber,
-					Type:     SessionResponseType_RESPONSE,
-					Status:   SessionResponseStatus_OK,
 				},
-				Response: &ServiceCommandResponse{
+				Response: ServiceCommandResponse{
 					Response: &ServiceCommandResponse_Close{
 						Close: &ServiceCloseResponse{},
 					},
@@ -455,24 +464,27 @@ func (m *Manager) applyServiceCommandClose(request *ServiceCommandRequest, conte
 	stream.Close()
 }
 
-func (m *Manager) applyServiceCommandDelete(request *ServiceCommandRequest, context *SessionCommandContext, session *sessionManager, stream streams.WriteStream) {
+func (m *Manager) applyServiceCommandDelete(request ServiceCommandRequest, context SessionCommandContext, session *sessionManager, stream streams.WriteStream) {
 	defer stream.Close()
 
-	serviceID := ServiceID(*request.Service)
+	serviceID := ServiceID(request.Service)
 
 	_, ok := m.services[serviceID]
 	if !ok {
 		stream.Result(proto.Marshal(&SessionResponse{
+			Type: SessionResponseType_RESPONSE,
+			Status: SessionResponseStatus{
+				Code:    SessionResponseCode_NOT_FOUND,
+				Message: fmt.Sprintf("unknown service '%s.%s'", serviceID.Namespace, serviceID.Name),
+			},
 			Response: &SessionResponse_Command{
 				Command: &SessionCommandResponse{
-					Context: &SessionResponseContext{
+					Context: SessionResponseContext{
+						SessionID: context.SessionID,
 						Index:    uint64(m.context.Index()),
 						Sequence: context.SequenceNumber,
-						Type:     SessionResponseType_RESPONSE,
-						Status:   SessionResponseStatus_NOT_FOUND,
-						Message:  fmt.Sprintf("unknown service '%s.%s'", serviceID.Namespace, serviceID.Name),
 					},
-					Response: &ServiceCommandResponse{
+					Response: ServiceCommandResponse{
 						Response: &ServiceCommandResponse_Delete{
 							Delete: &ServiceDeleteResponse{},
 						},
@@ -487,15 +499,18 @@ func (m *Manager) applyServiceCommandDelete(request *ServiceCommandRequest, cont
 		}
 
 		stream.Result(proto.Marshal(&SessionResponse{
+			Type: SessionResponseType_RESPONSE,
+			Status: SessionResponseStatus{
+				Code: SessionResponseCode_OK,
+			},
 			Response: &SessionResponse_Command{
 				Command: &SessionCommandResponse{
-					Context: &SessionResponseContext{
+					Context: SessionResponseContext{
+						SessionID: context.SessionID,
 						Index:    uint64(m.context.Index()),
 						Sequence: context.SequenceNumber,
-						Type:     SessionResponseType_RESPONSE,
-						Status:   SessionResponseStatus_OK,
 					},
-					Response: &ServiceCommandResponse{
+					Response: ServiceCommandResponse{
 						Response: &ServiceCommandResponse_Delete{
 							Delete: &ServiceDeleteResponse{},
 						},
@@ -648,7 +663,7 @@ func (m *Manager) sequenceQuery(request *SessionQueryRequest, stream streams.Wri
 	}
 }
 
-func (m *Manager) applyServiceQuery(request *ServiceQueryRequest, context *SessionQueryContext, sessionManager *sessionManager, stream streams.WriteStream) {
+func (m *Manager) applyServiceQuery(request ServiceQueryRequest, context SessionQueryContext, sessionManager *sessionManager, stream streams.WriteStream) {
 	switch request.Request.(type) {
 	case *ServiceQueryRequest_Operation:
 		m.applyServiceQueryOperation(request, context, sessionManager, stream)
@@ -660,7 +675,7 @@ func (m *Manager) applyServiceQuery(request *ServiceQueryRequest, context *Sessi
 	}
 }
 
-func (m *Manager) applyServiceQueryOperation(request *ServiceQueryRequest, context *SessionQueryContext, sessionManager *sessionManager, stream streams.WriteStream) {
+func (m *Manager) applyServiceQueryOperation(request ServiceQueryRequest, context SessionQueryContext, sessionManager *sessionManager, stream streams.WriteStream) {
 	serviceID := ServiceID(*request.Service)
 
 	service, ok := m.services[serviceID]
@@ -695,15 +710,19 @@ func (m *Manager) applyServiceQueryOperation(request *ServiceQueryRequest, conte
 	index := m.context.Index()
 	responseStream := streams.NewEncodingStream(stream, func(value interface{}, err error) (interface{}, error) {
 		return proto.Marshal(&SessionResponse{
+			Type: SessionResponseType_RESPONSE,
+			Status: SessionResponseStatus{
+				Code:    getCode(err),
+				Message: getMessage(err),
+			},
 			Response: &SessionResponse_Query{
 				Query: &SessionQueryResponse{
-					Context: &SessionResponseContext{
+					Context: SessionResponseContext{
+						SessionID: context.SessionID,
 						Index:    uint64(index),
 						Sequence: context.LastSequenceNumber,
-						Status:   getStatus(err),
-						Message:  getMessage(err),
 					},
-					Response: &ServiceQueryResponse{
+					Response: ServiceQueryResponse{
 						Response: &ServiceQueryResponse_Operation{
 							Operation: &ServiceOperationResponse{
 								Result: value.([]byte),
@@ -720,12 +739,15 @@ func (m *Manager) applyServiceQueryOperation(request *ServiceQueryRequest, conte
 		responseStream.Close()
 	} else if streamOp, ok := operation.(StreamingOperation); ok {
 		stream.Result(proto.Marshal(&SessionResponse{
+			Type: SessionResponseType_OPEN_STREAM,
+			Status: SessionResponseStatus{
+				Code: SessionResponseCode_OK,
+			},
 			Response: &SessionResponse_Query{
 				Query: &SessionQueryResponse{
-					Context: &SessionResponseContext{
-						Index:  uint64(index),
-						Type:   SessionResponseType_OPEN_STREAM,
-						Status: SessionResponseStatus_OK,
+					Context: SessionResponseContext{
+						SessionID: context.SessionID,
+						Index: uint64(index),
 					},
 				},
 			},
@@ -733,12 +755,15 @@ func (m *Manager) applyServiceQueryOperation(request *ServiceQueryRequest, conte
 
 		responseStream = streams.NewCloserStream(responseStream, func(_ streams.WriteStream) {
 			stream.Result(proto.Marshal(&SessionResponse{
+				Type: SessionResponseType_CLOSE_STREAM,
+				Status: SessionResponseStatus{
+					Code: SessionResponseCode_OK,
+				},
 				Response: &SessionResponse_Query{
 					Query: &SessionQueryResponse{
-						Context: &SessionResponseContext{
-							Index:  uint64(index),
-							Type:   SessionResponseType_CLOSE_STREAM,
-							Status: SessionResponseStatus_OK,
+						Context: SessionResponseContext{
+							SessionID: context.SessionID,
+							Index: uint64(index),
 						},
 					},
 				},
@@ -758,7 +783,7 @@ func (m *Manager) applyServiceQueryOperation(request *ServiceQueryRequest, conte
 	}
 }
 
-func (m *Manager) applyServiceQueryMetadata(request *ServiceQueryRequest, context *SessionQueryContext, session *sessionManager, stream streams.WriteStream) {
+func (m *Manager) applyServiceQueryMetadata(request ServiceQueryRequest, context SessionQueryContext, session *sessionManager, stream streams.WriteStream) {
 	defer stream.Close()
 
 	services := []*ServiceId{}
@@ -775,14 +800,18 @@ func (m *Manager) applyServiceQueryMetadata(request *ServiceQueryRequest, contex
 	}
 
 	stream.Result(proto.Marshal(&SessionResponse{
+		Type: SessionResponseType_RESPONSE,
+		Status: SessionResponseStatus{
+			Code: SessionResponseCode_OK,
+		},
 		Response: &SessionResponse_Query{
 			Query: &SessionQueryResponse{
-				Context: &SessionResponseContext{
+				Context: SessionResponseContext{
+					SessionID: context.SessionID,
 					Index:    uint64(m.context.Index()),
 					Sequence: context.LastSequenceNumber,
-					Status:   SessionResponseStatus_OK,
 				},
-				Response: &ServiceQueryResponse{
+				Response: ServiceQueryResponse{
 					Response: &ServiceQueryResponse_Metadata{
 						Metadata: &ServiceMetadataResponse{
 							Services: services,

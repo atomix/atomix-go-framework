@@ -15,15 +15,35 @@
 package set
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/primitive"
+	"github.com/atomix/go-framework/pkg/atomix/storage"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
 	"io"
 )
 
+// RegisterService registers the election primitive service on the given node
+func RegisterService(node *storage.Node) {
+	node.RegisterService(Type, &ServiceType{})
+}
+
+// ServiceType is the election primitive service
+type ServiceType struct{}
+
+// NewService creates a new election service
+func (p *ServiceType) NewService(scheduler storage.Scheduler, context storage.ServiceContext) storage.Service {
+	service := &Service{
+		Service: storage.NewService(scheduler, context),
+		values:  make(map[string]bool),
+	}
+	service.init()
+	return service
+}
+
+var _ storage.PrimitiveService = &ServiceType{}
+
 // Service is a state machine for a list primitive
 type Service struct {
-	primitive.Service
+	storage.Service
 	values map[string]bool
 }
 
@@ -128,7 +148,7 @@ func (s *Service) Clear(bytes []byte) ([]byte, error) {
 }
 
 // Events registers a channel on which to send set change events
-func (s *Service) Events(bytes []byte, stream primitive.Stream) {
+func (s *Service) Events(bytes []byte, stream storage.Stream) {
 	request := &ListenRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		stream.Error(err)
@@ -147,7 +167,7 @@ func (s *Service) Events(bytes []byte, stream primitive.Stream) {
 }
 
 // Iterate sends all current set elements on the given channel
-func (s *Service) Iterate(bytes []byte, stream primitive.Stream) {
+func (s *Service) Iterate(bytes []byte, stream storage.Stream) {
 	defer stream.Close()
 	for value := range s.values {
 		stream.Result(proto.Marshal(&IterateResponse{

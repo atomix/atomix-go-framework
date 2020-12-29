@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package atomix
+package proxy
 
 import (
 	"fmt"
-	"github.com/atomix/api/go/atomix/storage"
-	"github.com/atomix/api/go/atomix/storage/session"
+	storageapi "github.com/atomix/api/go/atomix/storage"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
-	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -27,12 +25,12 @@ import (
 )
 
 // NewNode creates a new node running the given protocol
-func NewNode(nodeID string, config storage.StorageConfig, protocol primitive.Protocol, opts ...NodeOption) *Node {
+func NewNode(nodeID string, config storageapi.StorageConfig, opts ...NodeOption) *Node {
 	node := &Node{
 		ID:       nodeID,
 		config:   config,
-		protocol: protocol,
-		registry: primitive.NewRegistry(),
+		client:   NewClient(config),
+		registry: NewRegistry(),
 		startCh:  make(chan error),
 	}
 	(&defaultOption{}).apply(node)
@@ -84,17 +82,17 @@ func (o *portOption) apply(node *Node) {
 // Node is an Atomix node
 type Node struct {
 	ID       string
-	config   storage.StorageConfig
-	protocol primitive.Protocol
-	registry primitive.Registry
+	config   storageapi.StorageConfig
+	client   *Client
+	registry Registry
 	port     int
 	listener listener
 	server   *grpc.Server
 	startCh  chan error
 }
 
-// RegisterPrimitive registers a primitive type
-func (n *Node) RegisterPrimitive(t string, primitive primitive.Primitive) {
+// RegisterService registers a primitive service
+func (n *Node) RegisterServer(t string, primitive PrimitiveServer) {
 	n.registry.Register(t, primitive)
 }
 
@@ -116,7 +114,7 @@ func (n *Node) Start() error {
 	}
 
 	log.Info("Starting protocol")
-	err := n.protocol.Start(cluster, n.registry)
+	err := n.client.Connect(cluster)
 	if err != nil {
 		return err
 	}
@@ -140,13 +138,8 @@ func (n *Node) Start() error {
 func (n *Node) run(lis net.Listener) error {
 	log.Info("Starting gRPC server")
 	n.server = grpc.NewServer()
-	session.RegisterSessionServiceServer(n.server, &primitive.SessionServer{
-		Server: &primitive.Server{
-			Protocol: n.protocol,
-		},
-	})
 	for _, primitive := range n.registry.GetPrimitives() {
-		primitive.RegisterServer(n.server, n.protocol)
+		primitive.RegisterServer(n.server, n.client)
 	}
 	return n.server.Serve(lis)
 }
@@ -154,7 +147,7 @@ func (n *Node) run(lis net.Listener) error {
 // Stop stops the node
 func (n *Node) Stop() error {
 	n.server.GracefulStop()
-	if err := n.protocol.Stop(); err != nil {
+	if err := n.client.Close(); err != nil {
 		return err
 	}
 	return nil

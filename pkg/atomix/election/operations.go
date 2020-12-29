@@ -14,6 +14,9 @@
 
 package election
 
+// Type is the leader election primitive type
+const Type = "election"
+
 const (
 	opEnter    = "Enter"
 	opWithdraw = "Withdraw"

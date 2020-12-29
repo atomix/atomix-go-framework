@@ -16,7 +16,7 @@ package lock
 
 import (
 	"container/list"
-	"github.com/atomix/go-framework/pkg/atomix/primitive"
+	"github.com/atomix/go-framework/pkg/atomix/storage"
 	"github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
@@ -24,17 +24,38 @@ import (
 	"time"
 )
 
+// RegisterService registers the election primitive service on the given node
+func RegisterService(node *storage.Node) {
+	node.RegisterService(Type, &ServiceType{})
+}
+
+// ServiceType is the election primitive service
+type ServiceType struct{}
+
+// NewService creates a new election service
+func (p *ServiceType) NewService(scheduler storage.Scheduler, context storage.ServiceContext) storage.Service {
+	service := &Service{
+		Service: storage.NewService(scheduler, context),
+		queue:   list.New(),
+		timers:  make(map[storage.Index]storage.Timer),
+	}
+	service.init()
+	return service
+}
+
+var _ storage.PrimitiveService = &ServiceType{}
+
 // Service is a state machine for a list primitive
 type Service struct {
-	primitive.Service
+	storage.Service
 	lock   *lockHolder
 	queue  *list.List
-	timers map[primitive.Index]primitive.Timer
+	timers map[storage.Index]storage.Timer
 }
 
 type lockHolder struct {
-	index   primitive.Index
-	session primitive.SessionID
+	index   storage.Index
+	session storage.SessionID
 	expire  *time.Time
 	stream  stream.WriteStream
 }
@@ -94,8 +115,8 @@ func (l *Service) Restore(reader io.Reader) error {
 
 	if snapshot.Lock != nil {
 		l.lock = &lockHolder{
-			index:   primitive.Index(snapshot.Lock.Index),
-			session: primitive.SessionID(snapshot.Lock.SessionId),
+			index:   storage.Index(snapshot.Lock.Index),
+			session: storage.SessionID(snapshot.Lock.SessionId),
 			expire:  snapshot.Lock.Expire,
 		}
 	}
@@ -103,13 +124,13 @@ func (l *Service) Restore(reader io.Reader) error {
 	l.queue = list.New()
 	for _, lock := range snapshot.Queue {
 		element := l.queue.PushBack(&lockHolder{
-			index:   primitive.Index(lock.Index),
-			session: primitive.SessionID(lock.SessionId),
+			index:   storage.Index(lock.Index),
+			session: storage.SessionID(lock.SessionId),
 			expire:  lock.Expire,
 		})
 
 		if lock.Expire != nil {
-			index := primitive.Index(lock.Index)
+			index := storage.Index(lock.Index)
 			l.timers[index] = l.ScheduleOnce(lock.Expire.Sub(l.Timestamp()), func() {
 				delete(l.timers, index)
 				l.queue.Remove(element)
@@ -120,7 +141,7 @@ func (l *Service) Restore(reader io.Reader) error {
 }
 
 // Lock attempts to acquire the lock for the current session
-func (l *Service) Lock(bytes []byte, stream primitive.Stream) {
+func (l *Service) Lock(bytes []byte, stream storage.Stream) {
 	request := &LockRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		stream.Error(err)
@@ -197,13 +218,13 @@ func (l *Service) Unlock(bytes []byte) ([]byte, error) {
 		// If the commit's session does not match the current lock holder, preserve the existing lock.
 		// If the current lock ID does not match the requested lock ID, preserve the existing lock.
 		// However, ensure the associated lock request is removed from the queue.
-		if (request.Index == 0 && l.lock.session != session.ID()) || (request.Index > 0 && l.lock.index != primitive.Index(request.Index)) {
+		if (request.Index == 0 && l.lock.session != session.ID()) || (request.Index > 0 && l.lock.index != storage.Index(request.Index)) {
 			unlocked := false
 			element := l.queue.Front()
 			for element != nil {
 				next := element.Next()
 				holder := element.Value.(*lockHolder)
-				if (request.Index == 0 && holder.session == session.ID()) || (request.Index > 0 && holder.index == primitive.Index(request.Index)) {
+				if (request.Index == 0 && holder.session == session.ID()) || (request.Index > 0 && holder.index == storage.Index(request.Index)) {
 					l.queue.Remove(element)
 					timer, ok := l.timers[holder.index]
 					if ok {
@@ -260,23 +281,23 @@ func (l *Service) IsLocked(bytes []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	locked := l.lock != nil && (request.Index == 0 || l.lock.index == primitive.Index(request.Index))
+	locked := l.lock != nil && (request.Index == 0 || l.lock.index == storage.Index(request.Index))
 	return proto.Marshal(&IsLockedResponse{
 		Locked: locked,
 	})
 }
 
 // SessionExpired releases the lock when the owning session expires
-func (l *Service) SessionExpired(session primitive.Session) {
+func (l *Service) SessionExpired(session storage.Session) {
 	l.releaseLock(session)
 }
 
 // SessionClosed releases the lock when the owning session is closed
-func (l *Service) SessionClosed(session primitive.Session) {
+func (l *Service) SessionClosed(session storage.Session) {
 	l.releaseLock(session)
 }
 
-func (l *Service) releaseLock(session primitive.Session) {
+func (l *Service) releaseLock(session storage.Session) {
 	// Remove all instances of the session from the queue.
 	element := l.queue.Front()
 	for element != nil {

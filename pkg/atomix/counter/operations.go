@@ -14,6 +14,8 @@
 
 package counter
 
+const Type = "counter"
+
 const (
 	opGet       = "Get"
 	opSet       = "Set"

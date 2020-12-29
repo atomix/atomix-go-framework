@@ -18,20 +18,41 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/atomix/go-framework/pkg/atomix/primitive"
+	"github.com/atomix/go-framework/pkg/atomix/storage"
 	"github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
 )
 
+// RegisterService registers the election primitive service on the given node
+func RegisterService(node *storage.Node) {
+	node.RegisterService(Type, &ServiceType{})
+}
+
+// ServiceType is the election primitive service
+type ServiceType struct{}
+
+// NewService creates a new election service
+func (p *ServiceType) NewService(scheduler storage.Scheduler, context storage.ServiceContext) storage.Service {
+	service := &Service{
+		Service:   storage.NewService(scheduler, context),
+		indexes:   make(map[uint64]*LinkedLogEntryValue),
+		listeners: make(map[storage.SessionID]map[storage.StreamID]listener),
+	}
+	service.init()
+	return service
+}
+
+var _ storage.PrimitiveService = &ServiceType{}
+
 // Service is a state machine for a log primitive
 type Service struct {
-	primitive.Service
+	storage.Service
 	lastIndex  uint64
 	indexes    map[uint64]*LinkedLogEntryValue
 	firstEntry *LinkedLogEntryValue
 	lastEntry  *LinkedLogEntryValue
-	listeners  map[primitive.SessionID]map[primitive.StreamID]listener
+	listeners  map[storage.SessionID]map[storage.StreamID]listener
 }
 
 // init initializes the log service
@@ -108,16 +129,16 @@ func (m *Service) Restore(reader io.Reader) error {
 		return err
 	}
 
-	m.listeners = make(map[primitive.SessionID]map[primitive.StreamID]listener)
+	m.listeners = make(map[storage.SessionID]map[storage.StreamID]listener)
 	for _, snapshotListener := range listeners {
-		sessionListeners, ok := m.listeners[primitive.SessionID(snapshotListener.SessionId)]
+		sessionListeners, ok := m.listeners[storage.SessionID(snapshotListener.SessionId)]
 		if !ok {
-			sessionListeners = make(map[primitive.StreamID]listener)
-			m.listeners[primitive.SessionID(snapshotListener.SessionId)] = sessionListeners
+			sessionListeners = make(map[storage.StreamID]listener)
+			m.listeners[storage.SessionID(snapshotListener.SessionId)] = sessionListeners
 		}
-		sessionListeners[primitive.StreamID(snapshotListener.StreamId)] = listener{
+		sessionListeners[storage.StreamID(snapshotListener.StreamId)] = listener{
 			index:  snapshotListener.Index,
-			stream: m.Session(primitive.SessionID(snapshotListener.SessionId)).Stream(primitive.StreamID(snapshotListener.StreamId)),
+			stream: m.Session(storage.SessionID(snapshotListener.SessionId)).Stream(storage.StreamID(snapshotListener.StreamId)),
 		}
 	}
 
@@ -465,7 +486,7 @@ func (m *Service) Clear(value []byte) ([]byte, error) {
 }
 
 // Events sends change events to the client
-func (m *Service) Events(bytes []byte, stream primitive.Stream) {
+func (m *Service) Events(bytes []byte, stream storage.Stream) {
 	request := &ListenRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		stream.Error(err)
@@ -480,7 +501,7 @@ func (m *Service) Events(bytes []byte, stream primitive.Stream) {
 	}
 	listeners, ok := m.listeners[stream.Session().ID()]
 	if !ok {
-		listeners = make(map[primitive.StreamID]listener)
+		listeners = make(map[storage.StreamID]listener)
 		m.listeners[stream.Session().ID()] = listeners
 	}
 	listeners[stream.ID()] = lis
@@ -530,7 +551,7 @@ func (m *Service) sendEvent(event *ListenResponse) {
 }
 
 // Entries returns a stream of entries to the client
-func (m *Service) Entries(value []byte, stream primitive.Stream) {
+func (m *Service) Entries(value []byte, stream storage.Stream) {
 	defer stream.Close()
 	entry := m.firstEntry
 	for entry != nil {

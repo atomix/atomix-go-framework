@@ -14,6 +14,8 @@
 
 package log
 
+const Type = "log"
+
 const (
 	opAppend     = "Append"
 	opRemove     = "Remove"

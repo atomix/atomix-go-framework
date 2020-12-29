@@ -14,6 +14,8 @@
 
 package set
 
+const Type = "set"
+
 const (
 	opSize     = "Size"
 	opContains = "Contains"

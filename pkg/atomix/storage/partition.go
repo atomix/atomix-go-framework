@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package primitive
+package storage
 
 import (
 	"context"
@@ -51,9 +51,9 @@ type Partition interface {
 	// Leader returns the current leader
 	Leader() string
 
-	// Write sends a write request
-	Write(ctx context.Context, input []byte, stream stream.WriteStream) error
+	// ExecuteCommand executes a write request
+	ExecuteCommand(ctx context.Context, input []byte, stream stream.WriteStream) error
 
-	// Read sends a read request
-	Read(ctx context.Context, input []byte, stream stream.WriteStream) error
+	// ExecuteQuery executes a read request
+	ExecuteQuery(ctx context.Context, input []byte, stream stream.WriteStream) error
 }

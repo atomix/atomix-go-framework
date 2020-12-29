@@ -12,17 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package primitive
+package storage
 
-import (
-	"google.golang.org/grpc"
-)
-
-// Primitive is a primitive type
-type Primitive interface {
-	// RegisterServer registers the primitive server with the gRPC server
-	RegisterServer(server *grpc.Server, protocol Protocol)
-
+// PrimitiveService is an interface for registering a primitive service
+type PrimitiveService interface {
 	// NewService creates a new primitive service
 	NewService(scheduler Scheduler, context ServiceContext) Service
 }
@@ -30,39 +23,39 @@ type Primitive interface {
 // Registry is a primitive registry
 type Registry interface {
 	// Register registers a primitive
-	Register(primitiveType string, primitive Primitive)
+	Register(primitiveType string, primitive PrimitiveService)
 
 	// GetPrimitives gets a list of primitives
-	GetPrimitives() []Primitive
+	GetPrimitives() []PrimitiveService
 
 	// GetPrimitive gets a primitive by type
-	GetPrimitive(primitiveType string) Primitive
+	GetPrimitive(primitiveType string) PrimitiveService
 }
 
 // primitiveRegistry is the default primitive registry
 type primitiveRegistry struct {
-	primitives map[string]Primitive
+	primitives map[string]PrimitiveService
 }
 
-func (r *primitiveRegistry) Register(primitiveType string, primitive Primitive) {
+func (r *primitiveRegistry) Register(primitiveType string, primitive PrimitiveService) {
 	r.primitives[primitiveType] = primitive
 }
 
-func (r *primitiveRegistry) GetPrimitives() []Primitive {
-	primitives := make([]Primitive, 0, len(r.primitives))
+func (r *primitiveRegistry) GetPrimitives() []PrimitiveService {
+	primitives := make([]PrimitiveService, 0, len(r.primitives))
 	for _, primitive := range r.primitives {
 		primitives = append(primitives, primitive)
 	}
 	return primitives
 }
 
-func (r *primitiveRegistry) GetPrimitive(primitiveType string) Primitive {
+func (r *primitiveRegistry) GetPrimitive(primitiveType string) PrimitiveService {
 	return r.primitives[primitiveType]
 }
 
 // NewRegistry creates a new primitive registry
 func NewRegistry() Registry {
 	return &primitiveRegistry{
-		primitives: make(map[string]Primitive),
+		primitives: make(map[string]PrimitiveService),
 	}
 }

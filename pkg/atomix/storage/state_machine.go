@@ -12,29 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package primitive
+package storage
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/cluster"
+	streams "github.com/atomix/go-framework/pkg/atomix/stream"
+	"io"
 )
 
-// ProtocolContext provides the current state of the protocol
-type ProtocolContext interface {
-	// NodeID is the local node identifier
-	NodeID() string
-}
+// StateMachine applies commands from a protocol to a collection of state machines
+type StateMachine interface {
+	// Snapshot writes the state machine snapshot to the given writer
+	Snapshot(writer io.Writer) error
 
-// Protocol is the interface to be implemented by replication protocols
-type Protocol interface {
-	// Partition returns a partition
-	Partition(partitionID PartitionID) Partition
+	// Install reads the state machine snapshot from the given reader
+	Install(reader io.Reader) error
 
-	// Partitions returns the protocol partitions
-	Partitions() []Partition
+	// Command applies a command to the state machine
+	Command(bytes []byte, stream streams.WriteStream)
 
-	// Start starts the protocol
-	Start(cluster cluster.Cluster, registry Registry) error
-
-	// Stop stops the protocol
-	Stop() error
+	// Query applies a query to the state machine
+	Query(bytes []byte, stream streams.WriteStream)
 }

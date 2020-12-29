@@ -17,27 +17,54 @@ package counter
 import (
 	"context"
 	api "github.com/atomix/api/go/atomix/storage/counter"
-	"github.com/atomix/go-framework/pkg/atomix/primitive"
+	"github.com/atomix/go-framework/pkg/atomix/proxy"
+	"github.com/atomix/go-framework/pkg/atomix/storage"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 )
+
+// RegisterServer registers the primitive server on the given node
+func RegisterServer(node *proxy.Node) {
+	node.RegisterServer(Type, &ServerType{})
+}
+
+// ServerType is the counter server type
+type ServerType struct{}
+
+// RegisterServer registers the counter server with the protocol
+func (s *ServerType) RegisterServer(server *grpc.Server, client *proxy.Client) {
+	api.RegisterCounterServiceServer(server, &Server{
+		Proxy: proxy.NewProxy(client),
+	})
+}
+
+// NewService creates a new counter service
+func (s *ServerType) NewService(scheduler storage.Scheduler, context storage.ServiceContext) storage.Service {
+	service := &Service{
+		Service: storage.NewService(scheduler, context),
+	}
+	service.init()
+	return service
+}
+
+var _ proxy.PrimitiveServer = &ServerType{}
 
 // Server is an implementation of CounterServiceServer for the counter primitive
 type Server struct {
-	*primitive.Server
+	*proxy.Proxy
 }
 
 // Create opens a new session
 func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
-	header, err := s.DoCreateService(ctx, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	err := partition.DoCreateService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
 
-	response := &api.CreateResponse{
-		Header: *header,
-	}
+	response := &api.CreateResponse{}
 	log.Tracef("Sending CreateResponse %+v", response)
 	return response, nil
 }
@@ -53,7 +80,8 @@ func (s *Server) Set(ctx context.Context, request *api.SetRequest) (*api.SetResp
 		return nil, err
 	}
 
-	out, header, err := s.DoCommand(ctx, opSet, in, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	out, err := partition.DoCommand(ctx, opSet, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -63,9 +91,7 @@ func (s *Server) Set(ctx context.Context, request *api.SetRequest) (*api.SetResp
 		return nil, err
 	}
 
-	response := &api.SetResponse{
-		Header: *header,
-	}
+	response := &api.SetResponse{}
 	log.Tracef("Sending SetResponse %+v", response)
 	return response, nil
 }
@@ -79,7 +105,8 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 		return nil, err
 	}
 
-	out, header, err := s.DoQuery(ctx, opGet, in, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	out, err := partition.DoQuery(ctx, opGet, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +117,6 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 	}
 
 	response := &api.GetResponse{
-		Header: *header,
 		Value:  getResponse.Value,
 	}
 	log.Tracef("Sending GetResponse %+v", response)
@@ -108,7 +134,8 @@ func (s *Server) Increment(ctx context.Context, request *api.IncrementRequest) (
 		return nil, err
 	}
 
-	out, header, err := s.DoCommand(ctx, opIncrement, in, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	out, err := partition.DoCommand(ctx, opIncrement, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +146,6 @@ func (s *Server) Increment(ctx context.Context, request *api.IncrementRequest) (
 	}
 
 	response := &api.IncrementResponse{
-		Header:        *header,
 		PreviousValue: incrementResponse.PreviousValue,
 		NextValue:     incrementResponse.NextValue,
 	}
@@ -138,7 +164,8 @@ func (s *Server) Decrement(ctx context.Context, request *api.DecrementRequest) (
 		return nil, err
 	}
 
-	out, header, err := s.DoCommand(ctx, opDecrement, in, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	out, err := partition.DoCommand(ctx, opDecrement, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +176,6 @@ func (s *Server) Decrement(ctx context.Context, request *api.DecrementRequest) (
 	}
 
 	response := &api.DecrementResponse{
-		Header:        *header,
 		PreviousValue: decrementResponse.PreviousValue,
 		NextValue:     decrementResponse.NextValue,
 	}
@@ -169,7 +195,8 @@ func (s *Server) CheckAndSet(ctx context.Context, request *api.CheckAndSetReques
 		return nil, err
 	}
 
-	out, header, err := s.DoCommand(ctx, opCAS, in, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	out, err := partition.DoCommand(ctx, opCAS, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +207,6 @@ func (s *Server) CheckAndSet(ctx context.Context, request *api.CheckAndSetReques
 	}
 
 	response := &api.CheckAndSetResponse{
-		Header:    *header,
 		Succeeded: casResponse.Succeeded,
 	}
 	log.Tracef("Sending CheckAndSetResponse %+v", response)
@@ -190,25 +216,22 @@ func (s *Server) CheckAndSet(ctx context.Context, request *api.CheckAndSetReques
 // Close closes a session
 func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
+	partition := s.PartitionFor(request.Header.Primitive)
 	if request.Delete {
-		header, err := s.DoDeleteService(ctx, request.Header)
+		err := partition.DoDeleteService(ctx, request.Header)
 		if err != nil {
 			return nil, err
 		}
-		response := &api.CloseResponse{
-			Header: *header,
-		}
+		response := &api.CloseResponse{}
 		log.Tracef("Sending CloseResponse %+v", response)
 		return response, nil
 	}
 
-	header, err := s.DoCloseService(ctx, request.Header)
+	err := partition.DoCloseService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
-	response := &api.CloseResponse{
-		Header: *header,
-	}
+	response := &api.CloseResponse{}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil
 }

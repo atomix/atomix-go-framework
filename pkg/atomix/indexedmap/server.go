@@ -16,31 +16,47 @@ package indexedmap
 
 import (
 	"context"
-	"github.com/atomix/api/go/atomix/storage"
+	storageapi "github.com/atomix/api/go/atomix/storage"
 	api "github.com/atomix/api/go/atomix/storage/indexedmap"
 	"github.com/atomix/api/go/atomix/storage/timestamp"
-	"github.com/atomix/go-framework/pkg/atomix/primitive"
+	"github.com/atomix/go-framework/pkg/atomix/proxy"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 )
+
+// RegisterPrimitive registers the election primitive on the given node
+func RegisterServer(node *proxy.Node) {
+	node.RegisterServer(Type, &ServerType{})
+}
+
+// ServerType is the election primitive server
+type ServerType struct{}
+
+// RegisterServer registers the election server with the protocol
+func (p *ServerType) RegisterServer(server *grpc.Server, client *proxy.Client) {
+	api.RegisterIndexedMapServiceServer(server, &Server{
+		Proxy: proxy.NewProxy(client),
+	})
+}
+
+var _ proxy.PrimitiveServer = &ServerType{}
 
 // Server is an implementation of MapServiceServer for the map primitive
 type Server struct {
-	api.IndexedMapServiceServer
-	*primitive.Server
+	*proxy.Proxy
 }
 
 // Create opens a new session
 func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	log.Tracef("Received CreateRequest %+v", request)
-	header, err := s.DoCreateService(ctx, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	err := partition.DoCreateService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
-	response := &api.CreateResponse{
-		Header: *header,
-	}
+	response := &api.CreateResponse{}
 	log.Tracef("Sending CreateResponse %+v", response)
 	return response, nil
 }
@@ -49,24 +65,22 @@ func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.C
 func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	log.Tracef("Received CloseRequest %+v", request)
 	if request.Delete {
-		header, err := s.DoDeleteService(ctx, request.Header)
+		partition := s.PartitionFor(request.Header.Primitive)
+		err := partition.DoDeleteService(ctx, request.Header)
 		if err != nil {
 			return nil, err
 		}
-		response := &api.CloseResponse{
-			Header: *header,
-		}
+		response := &api.CloseResponse{}
 		log.Tracef("Sending CloseResponse %+v", response)
 		return response, nil
 	}
 
-	header, err := s.DoCloseService(ctx, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	err := partition.DoCloseService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
-	response := &api.CloseResponse{
-		Header: *header,
-	}
+	response := &api.CloseResponse{}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil
 }
@@ -79,7 +93,8 @@ func (s *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeR
 		return nil, err
 	}
 
-	out, header, err := s.DoQuery(ctx, opSize, in, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	out, err := partition.DoQuery(ctx, opSize, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -90,8 +105,7 @@ func (s *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeR
 	}
 
 	response := &api.SizeResponse{
-		Header: *header,
-		Size_:  sizeResponse.Size_,
+		Size_: sizeResponse.Size_,
 	}
 	log.Tracef("Sending SizeResponse %+v", response)
 	return response, nil
@@ -107,7 +121,8 @@ func (s *Server) Exists(ctx context.Context, request *api.ExistsRequest) (*api.E
 		return nil, err
 	}
 
-	out, header, err := s.DoQuery(ctx, opExists, in, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	out, err := partition.DoQuery(ctx, opExists, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +133,6 @@ func (s *Server) Exists(ctx context.Context, request *api.ExistsRequest) (*api.E
 	}
 
 	response := &api.ExistsResponse{
-		Header:      *header,
 		ContainsKey: containsResponse.ContainsKey,
 	}
 	log.Tracef("Sending ExistsResponse %+v", response)
@@ -140,7 +154,8 @@ func (s *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResp
 		return nil, err
 	}
 
-	out, header, err := s.DoCommand(ctx, opPut, in, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	out, err := partition.DoCommand(ctx, opPut, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +166,6 @@ func (s *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResp
 	}
 
 	response := &api.PutResponse{
-		Header: *header,
 		Entry: &api.Entry{
 			Key:   request.Key,
 			Value: putResponse.PreviousValue,
@@ -182,7 +196,8 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 		return nil, err
 	}
 
-	out, header, err := s.DoQuery(ctx, opGet, in, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	out, err := partition.DoQuery(ctx, opGet, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +208,6 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 	}
 
 	response := &api.GetResponse{
-		Header: *header,
 		Entry: &api.Entry{
 			Key:   request.Key,
 			Value: getResponse.Value,
@@ -221,7 +235,8 @@ func (s *Server) FirstEntry(ctx context.Context, request *api.FirstEntryRequest)
 		return nil, err
 	}
 
-	out, header, err := s.DoQuery(ctx, opFirstEntry, in, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	out, err := partition.DoQuery(ctx, opFirstEntry, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +247,6 @@ func (s *Server) FirstEntry(ctx context.Context, request *api.FirstEntryRequest)
 	}
 
 	response := &api.FirstEntryResponse{
-		Header: *header,
 		Entry: &api.Entry{
 			Key:   firstEntryResponse.Key,
 			Value: firstEntryResponse.Value,
@@ -260,7 +274,8 @@ func (s *Server) LastEntry(ctx context.Context, request *api.LastEntryRequest) (
 		return nil, err
 	}
 
-	out, header, err := s.DoQuery(ctx, opLastEntry, in, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	out, err := partition.DoQuery(ctx, opLastEntry, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +286,6 @@ func (s *Server) LastEntry(ctx context.Context, request *api.LastEntryRequest) (
 	}
 
 	response := &api.LastEntryResponse{
-		Header: *header,
 		Entry: &api.Entry{
 			Key:   lastEntryResponse.Key,
 			Value: lastEntryResponse.Value,
@@ -301,7 +315,8 @@ func (s *Server) PrevEntry(ctx context.Context, request *api.PrevEntryRequest) (
 		return nil, err
 	}
 
-	out, header, err := s.DoQuery(ctx, opPrevEntry, in, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	out, err := partition.DoQuery(ctx, opPrevEntry, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +327,6 @@ func (s *Server) PrevEntry(ctx context.Context, request *api.PrevEntryRequest) (
 	}
 
 	response := &api.PrevEntryResponse{
-		Header: *header,
 		Entry: &api.Entry{
 			Key:   prevEntryResponse.Key,
 			Value: prevEntryResponse.Value,
@@ -342,7 +356,8 @@ func (s *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (
 		return nil, err
 	}
 
-	out, header, err := s.DoQuery(ctx, opNextEntry, in, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	out, err := partition.DoQuery(ctx, opNextEntry, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -353,7 +368,6 @@ func (s *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (
 	}
 
 	response := &api.NextEntryResponse{
-		Header: *header,
 		Entry: &api.Entry{
 			Key:   nextEntryResponse.Key,
 			Value: nextEntryResponse.Value,
@@ -389,7 +403,8 @@ func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 		return nil, err
 	}
 
-	out, header, err := s.DoCommand(ctx, opRemove, in, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	out, err := partition.DoCommand(ctx, opRemove, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -400,7 +415,6 @@ func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 	}
 
 	response := &api.RemoveResponse{
-		Header: *header,
 		Entry: &api.Entry{
 			Key:   request.Key,
 			Value: removeResponse.PreviousValue,
@@ -428,7 +442,8 @@ func (s *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.Cle
 		return nil, err
 	}
 
-	out, header, err := s.DoCommand(ctx, opClear, in, request.Header)
+	partition := s.PartitionFor(request.Header.Primitive)
+	out, err := partition.DoCommand(ctx, opClear, in, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -438,9 +453,7 @@ func (s *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.Cle
 		return nil, err
 	}
 
-	response := &api.ClearResponse{
-		Header: *header,
-	}
+	response := &api.ClearResponse{}
 	log.Tracef("Sending ClearResponse %+v", response)
 	return response, nil
 }
@@ -458,7 +471,8 @@ func (s *Server) Events(request *api.EventRequest, srv api.IndexedMapService_Eve
 	}
 
 	stream := streams.NewBufferedStream()
-	if err := s.DoCommandStream(srv.Context(), opEvents, in, request.Header, stream); err != nil {
+	partition := s.PartitionFor(request.Header.Primitive)
+	if err := partition.DoCommandStream(srv.Context(), opEvents, in, request.Header, stream); err != nil {
 		return err
 	}
 
@@ -473,25 +487,31 @@ func (s *Server) Events(request *api.EventRequest, srv api.IndexedMapService_Eve
 		}
 
 		response := &ListenResponse{}
-		output := result.Value.(primitive.SessionOutput)
+		output := result.Value.(proxy.SessionOutput)
 		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}
 
 		var eventResponse *api.EventResponse
-		switch output.Header.State.Type {
-		case storage.ResponseType_OPEN_STREAM:
+		switch output.Type {
+		case storageapi.ResponseType_OPEN_STREAM:
 			eventResponse = &api.EventResponse{
-				Header: *output.Header,
+				Header: storageapi.ResponseHeader{
+					Type: storageapi.ResponseType_OPEN_STREAM,
+				},
 			}
-		case storage.ResponseType_CLOSE_STREAM:
+		case storageapi.ResponseType_CLOSE_STREAM:
 			eventResponse = &api.EventResponse{
-				Header: *output.Header,
+				Header: storageapi.ResponseHeader{
+					Type: storageapi.ResponseType_CLOSE_STREAM,
+				},
 			}
 		default:
 			eventResponse = &api.EventResponse{
-				Header: *output.Header,
-				Type:   getEventType(response.Type),
+				Header: storageapi.ResponseHeader{
+					Type: storageapi.ResponseType_RESPONSE,
+				},
+				Type: getEventType(response.Type),
 				Entry: api.Entry{
 					Key:   response.Key,
 					Value: response.Value,
@@ -527,7 +547,8 @@ func (s *Server) Entries(request *api.EntriesRequest, srv api.IndexedMapService_
 	}
 
 	stream := streams.NewBufferedStream()
-	if err := s.DoQueryStream(srv.Context(), opEntries, in, request.Header, stream); err != nil {
+	partition := s.PartitionFor(request.Header.Primitive)
+	if err := partition.DoQueryStream(srv.Context(), opEntries, in, request.Header, stream); err != nil {
 		log.Errorf("EntriesRequest failed: %v", err)
 		return err
 	}
@@ -544,24 +565,30 @@ func (s *Server) Entries(request *api.EntriesRequest, srv api.IndexedMapService_
 		}
 
 		response := &EntriesResponse{}
-		output := result.Value.(primitive.SessionOutput)
+		output := result.Value.(proxy.SessionOutput)
 		if err = proto.Unmarshal(output.Value.([]byte), response); err != nil {
 			return err
 		}
 
 		var entriesResponse *api.EntriesResponse
-		switch output.Header.State.Type {
-		case storage.ResponseType_OPEN_STREAM:
+		switch output.Type {
+		case storageapi.ResponseType_OPEN_STREAM:
 			entriesResponse = &api.EntriesResponse{
-				Header: *output.Header,
+				Header: storageapi.ResponseHeader{
+					Type: storageapi.ResponseType_OPEN_STREAM,
+				},
 			}
-		case storage.ResponseType_CLOSE_STREAM:
+		case storageapi.ResponseType_CLOSE_STREAM:
 			entriesResponse = &api.EntriesResponse{
-				Header: *output.Header,
+				Header: storageapi.ResponseHeader{
+					Type: storageapi.ResponseType_CLOSE_STREAM,
+				},
 			}
 		default:
 			entriesResponse = &api.EntriesResponse{
-				Header: *output.Header,
+				Header: storageapi.ResponseHeader{
+					Type: storageapi.ResponseType_RESPONSE,
+				},
 				Entry: api.Entry{
 					Key:   response.Key,
 					Value: response.Value,

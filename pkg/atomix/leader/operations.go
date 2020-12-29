@@ -14,6 +14,8 @@
 
 package leader
 
+const Type = "leaderlatch"
+
 const (
 	opLatch    = "Latch"
 	opGetLatch = "GetLatch"
