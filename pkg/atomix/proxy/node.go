@@ -25,11 +25,10 @@ import (
 )
 
 // NewNode creates a new node running the given protocol
-func NewNode(nodeID string, config storageapi.StorageConfig, opts ...NodeOption) *Node {
+func NewNode(cluster *cluster.Cluster, opts ...NodeOption) *Node {
 	node := &Node{
-		ID:       nodeID,
-		config:   config,
-		client:   NewClient(config),
+		Cluster:  cluster,
+		client:   NewClient(cluster),
 		registry: NewRegistry(),
 		startCh:  make(chan error),
 	}
@@ -82,6 +81,7 @@ func (o *portOption) apply(node *Node) {
 // Node is an Atomix node
 type Node struct {
 	ID       string
+	Cluster  *cluster.Cluster
 	config   storageapi.StorageConfig
 	client   *Client
 	registry Registry
@@ -98,23 +98,8 @@ func (n *Node) RegisterServer(t string, primitive PrimitiveServer) {
 
 // Start starts the node
 func (n *Node) Start() error {
-	members := make(map[string]cluster.Member)
-	for _, member := range n.config.Replicas {
-		members[member.ID] = cluster.Member{
-			ID:           member.ID,
-			Host:         member.Host,
-			ProtocolPort: int(member.ProtocolPort),
-			APIPort:      int(member.APIPort),
-		}
-	}
-
-	cluster := cluster.Cluster{
-		MemberID: n.ID,
-		Members:  members,
-	}
-
 	log.Info("Starting protocol")
-	err := n.client.Connect(cluster)
+	err := n.client.Connect()
 	if err != nil {
 		return err
 	}

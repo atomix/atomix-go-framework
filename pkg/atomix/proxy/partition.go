@@ -16,22 +16,20 @@ package proxy
 
 import (
 	"context"
-	"fmt"
-	storageapi "github.com/atomix/api/go/atomix/storage"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/storage"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"google.golang.org/grpc"
 	"io"
+	"math/rand"
 	"sync"
 	"time"
 )
 
 // NewPartition creates a new proxy partition
-func NewPartition(config storageapi.StoragePartition) *Partition {
+func NewPartition(p *cluster.Partition) *Partition {
 	partition := &Partition{
-		ID:     PartitionID(config.PartitionID.Partition),
-		config: config,
+		Partition: p,
 	}
 	partition.Session = NewSession(partition)
 	return partition
@@ -42,14 +40,13 @@ type PartitionID int
 
 // Partition is a proxy partition
 type Partition struct {
+	*cluster.Partition
 	*Session
-	ID      PartitionID
-	config  storageapi.StoragePartition
-	conn    *grpc.ClientConn
-	client  storage.StorageServiceClient
-	cluster cluster.Cluster
-	leader  string
-	mu      sync.RWMutex
+	ID     PartitionID
+	conn   *grpc.ClientConn
+	client storage.StorageServiceClient
+	leader *cluster.Replica
+	mu     sync.RWMutex
 }
 
 // doCommand submits a command to the service
@@ -525,8 +522,7 @@ func (p *Partition) doDeleteService(ctx context.Context, service storage.Service
 	return response.Response.Status, response.Response.GetCommand().Context, nil
 }
 
-func (p *Partition) Connect(cluster cluster.Cluster) error {
-	p.cluster = cluster
+func (p *Partition) Connect() error {
 	conn, err := p.connect()
 	if err != nil {
 		return err
@@ -558,13 +554,15 @@ func (p *Partition) connect() (*grpc.ClientConn, error) {
 		return conn, nil
 	}
 
-	if p.leader == "" {
-		for _, member := range p.cluster.Members {
-			p.leader = fmt.Sprintf("%s:%d", member.Host, member.APIPort)
+	if p.leader == nil {
+		replicas := make([]*cluster.Replica, 0)
+		for _, replica := range p.Replicas() {
+			replicas = append(replicas, replica)
 		}
+		p.leader = replicas[rand.Intn(len(replicas))]
 	}
 
-	conn, err := grpc.Dial(p.leader, grpc.WithInsecure())
+	conn, err := p.leader.Connect(context.Background(), cluster.WithDialOption(grpc.WithInsecure()))
 	if err != nil {
 		return nil, err
 	}
@@ -573,15 +571,15 @@ func (p *Partition) connect() (*grpc.ClientConn, error) {
 }
 
 // reconnect reconnects the client to the given leader if necessary
-func (p *Partition) reconnect(leader string) {
-	if leader == "" {
+func (p *Partition) reconnect(leader *cluster.Replica) {
+	if leader == nil {
 		return
 	}
 
 	p.mu.RLock()
 	connLeader := p.leader
 	p.mu.RUnlock()
-	if connLeader == leader {
+	if connLeader.ID == leader.ID {
 		return
 	}
 

@@ -16,7 +16,6 @@ package storage
 
 import (
 	"fmt"
-	storageapi "github.com/atomix/api/go/atomix/storage"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	log "github.com/sirupsen/logrus"
@@ -25,10 +24,9 @@ import (
 )
 
 // NewNode creates a new node running the given protocol
-func NewNode(nodeID string, config storageapi.StorageConfig, protocol Protocol, opts ...NodeOption) *Node {
+func NewNode(cluster *cluster.Cluster, protocol Protocol, opts ...NodeOption) *Node {
 	node := &Node{
-		ID:       nodeID,
-		config:   config,
+		Cluster:  cluster,
 		protocol: protocol,
 		registry: NewRegistry(),
 		startCh:  make(chan error),
@@ -81,8 +79,7 @@ func (o *portOption) apply(node *Node) {
 
 // Node is an Atomix node
 type Node struct {
-	ID       string
-	config   storageapi.StorageConfig
+	Cluster  *cluster.Cluster
 	protocol Protocol
 	registry Registry
 	port     int
@@ -98,23 +95,8 @@ func (n *Node) RegisterService(t string, primitive PrimitiveService) {
 
 // Start starts the node
 func (n *Node) Start() error {
-	members := make(map[string]cluster.Member)
-	for _, member := range n.config.Replicas {
-		members[member.ID] = cluster.Member{
-			ID:           member.ID,
-			Host:         member.Host,
-			ProtocolPort: int(member.ProtocolPort),
-			APIPort:      int(member.APIPort),
-		}
-	}
-
-	cluster := cluster.Cluster{
-		MemberID: n.ID,
-		Members:  members,
-	}
-
 	log.Info("Starting protocol")
-	err := n.protocol.Start(cluster, n.registry)
+	err := n.protocol.Start(n.Cluster, n.registry)
 	if err != nil {
 		return err
 	}

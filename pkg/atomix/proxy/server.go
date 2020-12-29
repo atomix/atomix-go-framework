@@ -12,23 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package storage
+package proxy
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/cluster"
+	"context"
+	"github.com/atomix/api/go/atomix/proxy"
 )
 
-// Protocol is the interface to be implemented by replication protocols
-type Protocol interface {
-	// Partition returns a partition
-	Partition(partitionID PartitionID) Partition
-
-	// Partitions returns the protocol partitions
-	Partitions() []Partition
-
-	// Start starts the protocol
-	Start(cluster *cluster.Cluster, registry Registry) error
-
-	// Stop stops the protocol
-	Stop() error
+// Server is a base server for servers that support sessions
+type Server struct {
 }
+
+func (s *Server) Update(ctx context.Context, request *proxy.UpdateRequest) (*proxy.UpdateResponse, error) {
+	panic("implement me")
+}
+
+var _ proxy.ProxyServiceServer = &Server{}

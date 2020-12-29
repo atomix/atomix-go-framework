@@ -22,22 +22,24 @@ import (
 )
 
 // NewClient creates a new proxy client
-func NewClient(config storageapi.StorageConfig) *Client {
-	partitions := make([]*Partition, 0, len(config.Partitions))
-	partitionsByID := make(map[PartitionID]*Partition)
-	for _, partitionConfig := range config.Partitions {
-		partition := NewPartition(partitionConfig)
-		partitions = append(partitions, partition)
-		partitionsByID[partition.ID] = partition
+func NewClient(cluster *cluster.Cluster) *Client {
+	partitions := cluster.Partitions()
+	proxyPartitions := make([]*Partition, 0, len(partitions))
+	proxyPartitionsByID := make(map[PartitionID]*Partition)
+	for _, partition := range partitions {
+		proxyPartition := NewPartition(partition)
+		proxyPartitions = append(proxyPartitions, proxyPartition)
+		proxyPartitionsByID[proxyPartition.ID] = proxyPartition
 	}
 	return &Client{
-		partitions:     partitions,
-		partitionsByID: partitionsByID,
+		partitions:     proxyPartitions,
+		partitionsByID: proxyPartitionsByID,
 	}
 }
 
 // Client is a client for communicating with the storage layer
 type Client struct {
+	cluster        *cluster.Cluster
 	partitions     []*Partition
 	partitionsByID map[PartitionID]*Partition
 }
@@ -62,9 +64,9 @@ func (p *Client) Partitions() []*Partition {
 	return p.partitions
 }
 
-func (p *Client) Connect(cluster cluster.Cluster) error {
+func (p *Client) Connect() error {
 	return async.IterAsync(len(p.partitions), func(i int) error {
-		return p.partitions[i].Connect(cluster)
+		return p.partitions[i].Connect()
 	})
 }
 

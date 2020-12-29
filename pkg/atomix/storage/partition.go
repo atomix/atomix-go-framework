@@ -25,8 +25,6 @@ type Index uint64
 
 // PartitionContext provides the current state of the partition
 type PartitionContext interface {
-	ProtocolContext
-
 	// PartitionID is the partition identifier
 	PartitionID() PartitionID
 
