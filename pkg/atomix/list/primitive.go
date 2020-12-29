@@ -15,15 +15,14 @@
 package list
 
 import (
-	api "github.com/atomix/api/proto/atomix/list"
-	primitiveapi "github.com/atomix/api/proto/atomix/primitive"
+	api "github.com/atomix/api/go/atomix/storage/list"
 	"github.com/atomix/go-framework/pkg/atomix"
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	"google.golang.org/grpc"
 )
 
 // Type is the list primitive type
-const Type = primitiveapi.PrimitiveType_LIST
+const Type = "list"
 
 // RegisterPrimitive registers the primitive on the given node
 func RegisterPrimitive(node *atomix.Node) {
@@ -37,7 +36,7 @@ type Primitive struct{}
 func (p *Primitive) RegisterServer(server *grpc.Server, protocol primitive.Protocol) {
 	api.RegisterListServiceServer(server, &Server{
 		Server: &primitive.Server{
-			Type:     primitive.ServiceType_LIST,
+			Type:     Type,
 			Protocol: protocol,
 		},
 	})

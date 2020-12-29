@@ -16,9 +16,8 @@ package atomix
 
 import (
 	"fmt"
-	"github.com/atomix/api/proto/atomix/database"
-	primitiveapi "github.com/atomix/api/proto/atomix/primitive"
-	"github.com/atomix/api/proto/atomix/session"
+	"github.com/atomix/api/go/atomix/storage"
+	"github.com/atomix/api/go/atomix/storage/session"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/util"
@@ -28,7 +27,7 @@ import (
 )
 
 // NewNode creates a new node running the given protocol
-func NewNode(nodeID string, config *database.DatabaseConfig, protocol primitive.Protocol, opts ...NodeOption) *Node {
+func NewNode(nodeID string, config storage.StorageConfig, protocol primitive.Protocol, opts ...NodeOption) *Node {
 	node := &Node{
 		ID:       nodeID,
 		config:   config,
@@ -85,7 +84,7 @@ func (o *portOption) apply(node *Node) {
 // Node is an Atomix node
 type Node struct {
 	ID       string
-	config   *database.DatabaseConfig
+	config   storage.StorageConfig
 	protocol primitive.Protocol
 	registry primitive.Registry
 	port     int
@@ -95,7 +94,7 @@ type Node struct {
 }
 
 // RegisterPrimitive registers a primitive type
-func (n *Node) RegisterPrimitive(t primitiveapi.PrimitiveType, primitive primitive.Primitive) {
+func (n *Node) RegisterPrimitive(t string, primitive primitive.Primitive) {
 	n.registry.Register(t, primitive)
 }
 

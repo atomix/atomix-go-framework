@@ -17,8 +17,8 @@ package log
 import (
 	"context"
 
-	"github.com/atomix/api/proto/atomix/headers"
-	api "github.com/atomix/api/proto/atomix/log"
+	"github.com/atomix/api/go/atomix/storage"
+	api "github.com/atomix/api/go/atomix/storage/log"
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
@@ -38,7 +38,7 @@ func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.C
 		return nil, err
 	}
 	response := &api.CreateResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending CreateResponse %+v", response)
 	return response, nil
@@ -53,7 +53,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 			return nil, err
 		}
 		response := &api.CloseResponse{
-			Header: header,
+			Header: *header,
 		}
 		log.Tracef("Sending CloseResponse %+v", response)
 		return response, nil
@@ -64,7 +64,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return nil, err
 	}
 	response := &api.CloseResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil
@@ -89,7 +89,7 @@ func (s *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeR
 	}
 
 	response := &api.SizeResponse{
-		Header: header,
+		Header: *header,
 		Size_:  sizeResponse.Size_,
 	}
 	log.Tracef("Sending SizeResponse %+v", response)
@@ -117,7 +117,7 @@ func (s *Server) Exists(ctx context.Context, request *api.ExistsRequest) (*api.E
 	}
 
 	response := &api.ExistsResponse{
-		Header:        header,
+		Header:        *header,
 		ContainsIndex: containsResponse.ContainsIndex,
 	}
 	log.Tracef("Sending ExistsResponse %+v", response)
@@ -146,8 +146,7 @@ func (s *Server) Append(ctx context.Context, request *api.AppendRequest) (*api.A
 	}
 
 	response := &api.AppendResponse{
-		Header:    header,
-		Status:    getResponseStatus(appendResponse.Status),
+		Header:    *header,
 		Index:     appendResponse.Index,
 		Timestamp: appendResponse.Timestamp,
 	}
@@ -176,7 +175,7 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 	}
 
 	response := &api.GetResponse{
-		Header:    header,
+		Header:    *header,
 		Index:     getResponse.Index,
 		Value:     getResponse.Value,
 		Timestamp: getResponse.Timestamp,
@@ -204,7 +203,7 @@ func (s *Server) FirstEntry(ctx context.Context, request *api.FirstEntryRequest)
 	}
 
 	response := &api.FirstEntryResponse{
-		Header:    header,
+		Header:    *header,
 		Index:     firstEntryResponse.Index,
 		Value:     firstEntryResponse.Value,
 		Timestamp: firstEntryResponse.Timestamp,
@@ -232,7 +231,7 @@ func (s *Server) LastEntry(ctx context.Context, request *api.LastEntryRequest) (
 	}
 
 	response := &api.LastEntryResponse{
-		Header:    header,
+		Header:    *header,
 		Index:     lastEntryResponse.Index,
 		Value:     lastEntryResponse.Value,
 		Timestamp: lastEntryResponse.Timestamp,
@@ -262,7 +261,7 @@ func (s *Server) PrevEntry(ctx context.Context, request *api.PrevEntryRequest) (
 	}
 
 	response := &api.PrevEntryResponse{
-		Header:    header,
+		Header:    *header,
 		Index:     prevEntryResponse.Index,
 		Value:     prevEntryResponse.Value,
 		Timestamp: prevEntryResponse.Timestamp,
@@ -292,7 +291,7 @@ func (s *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (
 	}
 
 	response := &api.NextEntryResponse{
-		Header:    header,
+		Header:    *header,
 		Index:     nextEntryResponse.Index,
 		Value:     nextEntryResponse.Value,
 		Timestamp: nextEntryResponse.Timestamp,
@@ -323,8 +322,7 @@ func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 	}
 
 	response := &api.RemoveResponse{
-		Header:        header,
-		Status:        getResponseStatus(removeResponse.Status),
+		Header:        *header,
 		Index:         removeResponse.Index,
 		PreviousValue: removeResponse.PreviousValue,
 	}
@@ -365,18 +363,18 @@ func (s *Server) Events(request *api.EventRequest, srv api.LogService_EventsServ
 		}
 
 		var eventResponse *api.EventResponse
-		switch output.Header.Type {
-		case headers.ResponseType_OPEN_STREAM:
+		switch output.Header.State.Type {
+		case storage.ResponseType_OPEN_STREAM:
 			eventResponse = &api.EventResponse{
-				Header: output.Header,
+				Header: *output.Header,
 			}
-		case headers.ResponseType_CLOSE_STREAM:
+		case storage.ResponseType_CLOSE_STREAM:
 			eventResponse = &api.EventResponse{
-				Header: output.Header,
+				Header: *output.Header,
 			}
 		default:
 			eventResponse = &api.EventResponse{
-				Header:    output.Header,
+				Header:    *output.Header,
 				Type:      getEventType(response.Type),
 				Index:     response.Index,
 				Value:     response.Value,
@@ -425,18 +423,18 @@ func (s *Server) Entries(request *api.EntriesRequest, srv api.LogService_Entries
 		}
 
 		var entriesResponse *api.EntriesResponse
-		switch output.Header.Type {
-		case headers.ResponseType_OPEN_STREAM:
+		switch output.Header.State.Type {
+		case storage.ResponseType_OPEN_STREAM:
 			entriesResponse = &api.EntriesResponse{
-				Header: output.Header,
+				Header: *output.Header,
 			}
-		case headers.ResponseType_CLOSE_STREAM:
+		case storage.ResponseType_CLOSE_STREAM:
 			entriesResponse = &api.EntriesResponse{
-				Header: output.Header,
+				Header: *output.Header,
 			}
 		default:
 			entriesResponse = &api.EntriesResponse{
-				Header:    output.Header,
+				Header:    *output.Header,
 				Index:     response.Index,
 				Value:     response.Value,
 				Timestamp: response.Timestamp,
@@ -471,24 +469,10 @@ func (s *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.Cle
 	}
 
 	response := &api.ClearResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending ClearResponse %+v", response)
 	return response, nil
-}
-
-func getResponseStatus(status UpdateStatus) api.ResponseStatus {
-	switch status {
-	case UpdateStatus_OK:
-		return api.ResponseStatus_OK
-	case UpdateStatus_NOOP:
-		return api.ResponseStatus_NOOP
-	case UpdateStatus_PRECONDITION_FAILED:
-		return api.ResponseStatus_PRECONDITION_FAILED
-	case UpdateStatus_WRITE_LOCK:
-		return api.ResponseStatus_WRITE_LOCK
-	}
-	return api.ResponseStatus_OK
 }
 
 func getEventType(eventType ListenResponse_Type) api.EventResponse_Type {

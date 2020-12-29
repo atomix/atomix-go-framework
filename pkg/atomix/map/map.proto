@@ -94,12 +94,11 @@ message PutRequest {
 }
 
 message PutResponse {
-    UpdateStatus status = 1;
-    bytes previous_value = 2;
-    uint64 previous_version = 3;
-    uint64 new_version = 4;
-    google.protobuf.Timestamp created = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
-    google.protobuf.Timestamp updated = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    bytes previous_value = 1;
+    uint64 previous_version = 2;
+    uint64 new_version = 3;
+    google.protobuf.Timestamp created = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    google.protobuf.Timestamp updated = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message ReplaceRequest {
@@ -111,12 +110,11 @@ message ReplaceRequest {
 }
 
 message ReplaceResponse {
-    UpdateStatus status = 1;
-    bytes previous_value = 2;
-    uint64 previous_version = 3;
-    uint64 new_version = 4;
-    google.protobuf.Timestamp created = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
-    google.protobuf.Timestamp updated = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    bytes previous_value = 1;
+    uint64 previous_version = 2;
+    uint64 new_version = 3;
+    google.protobuf.Timestamp created = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    google.protobuf.Timestamp updated = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message GetRequest {
@@ -137,11 +135,10 @@ message RemoveRequest {
 }
 
 message RemoveResponse {
-    UpdateStatus status = 1;
-    bytes previous_value = 2;
-    uint64 previous_version = 3;
-    google.protobuf.Timestamp created = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
-    google.protobuf.Timestamp updated = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    bytes previous_value = 1;
+    uint64 previous_version = 2;
+    google.protobuf.Timestamp created = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    google.protobuf.Timestamp updated = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message ClearRequest {
@@ -176,11 +173,4 @@ message UnlistenRequest {
 }
 
 message UnlistenResponse {
-}
-
-enum UpdateStatus {
-    OK = 0;
-    NOOP = 1;
-    WRITE_LOCK = 2;
-    PRECONDITION_FAILED = 3;
 }

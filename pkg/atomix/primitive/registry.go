@@ -15,7 +15,6 @@
 package primitive
 
 import (
-	"github.com/atomix/api/proto/atomix/primitive"
 	"google.golang.org/grpc"
 )
 
@@ -31,21 +30,21 @@ type Primitive interface {
 // Registry is a primitive registry
 type Registry interface {
 	// Register registers a primitive
-	Register(primitiveType primitive.PrimitiveType, primitive Primitive)
+	Register(primitiveType string, primitive Primitive)
 
 	// GetPrimitives gets a list of primitives
 	GetPrimitives() []Primitive
 
 	// GetPrimitive gets a primitive by type
-	GetPrimitive(primitiveType primitive.PrimitiveType) Primitive
+	GetPrimitive(primitiveType string) Primitive
 }
 
 // primitiveRegistry is the default primitive registry
 type primitiveRegistry struct {
-	primitives map[primitive.PrimitiveType]Primitive
+	primitives map[string]Primitive
 }
 
-func (r *primitiveRegistry) Register(primitiveType primitive.PrimitiveType, primitive Primitive) {
+func (r *primitiveRegistry) Register(primitiveType string, primitive Primitive) {
 	r.primitives[primitiveType] = primitive
 }
 
@@ -57,13 +56,13 @@ func (r *primitiveRegistry) GetPrimitives() []Primitive {
 	return primitives
 }
 
-func (r *primitiveRegistry) GetPrimitive(primitiveType primitive.PrimitiveType) Primitive {
+func (r *primitiveRegistry) GetPrimitive(primitiveType string) Primitive {
 	return r.primitives[primitiveType]
 }
 
 // NewRegistry creates a new primitive registry
 func NewRegistry() Registry {
 	return &primitiveRegistry{
-		primitives: make(map[primitive.PrimitiveType]Primitive),
+		primitives: make(map[string]Primitive),
 	}
 }

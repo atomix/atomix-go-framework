@@ -18,7 +18,6 @@ import (
 	"container/list"
 	"encoding/binary"
 	"fmt"
-	"github.com/atomix/api/proto/atomix/primitive"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/gogo/protobuf/proto"
@@ -208,7 +207,7 @@ func (m *Manager) installServices(reader io.Reader) error {
 			if err = proto.Unmarshal(bytes, &serviceID); err != nil {
 				return err
 			}
-			primitive := m.registry.GetPrimitive(primitive.PrimitiveType(serviceID.Type))
+			primitive := m.registry.GetPrimitive(serviceID.Type)
 			service := primitive.NewService(m.scheduler, newServiceContext(m.context, ServiceID(serviceID)))
 			services[ServiceID(serviceID)] = service
 			if err := service.Restore(reader); err != nil {
@@ -366,7 +365,7 @@ func (m *Manager) applyServiceCommandCreate(request *ServiceCommandRequest, cont
 
 	service, ok := m.services[serviceID]
 	if !ok {
-		primitive := m.registry.GetPrimitive(primitive.PrimitiveType(request.Service.Type))
+		primitive := m.registry.GetPrimitive(request.Service.Type)
 		if primitive == nil {
 			stream.Result(proto.Marshal(&SessionResponse{
 				Response: &SessionResponse_Command{
@@ -766,7 +765,7 @@ func (m *Manager) applyServiceQueryMetadata(request *ServiceQueryRequest, contex
 	serviceType := request.GetMetadata().Type
 	namespace := request.GetMetadata().Namespace
 	for name, service := range m.services {
-		if (serviceType == 0 || service.ServiceType() == serviceType) && (namespace == "" || name.Namespace == namespace) {
+		if (serviceType == "" || service.ServiceType() == serviceType) && (namespace == "" || name.Namespace == namespace) {
 			services = append(services, &ServiceId{
 				Type:      service.ServiceType(),
 				Namespace: name.Namespace,

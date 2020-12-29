@@ -16,8 +16,7 @@ package primitive
 
 import (
 	"context"
-	"github.com/atomix/api/proto/atomix/headers"
-	"github.com/atomix/api/proto/atomix/primitive"
+	"github.com/atomix/api/go/atomix/storage"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
@@ -27,17 +26,21 @@ import (
 // Server is a base server for servers that support sessions
 type Server struct {
 	Protocol Protocol
-	Type     ServiceType
+	Type     string
 }
 
 // DoCommand submits a command to the service
-func (s *Server) DoCommand(ctx context.Context, name string, input []byte, header *headers.RequestHeader) ([]byte, *headers.ResponseHeader, error) {
+func (s *Server) DoCommand(ctx context.Context, name string, input []byte, header storage.RequestHeader) ([]byte, *storage.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(PartitionID(header.Partition))
+	partition := s.Protocol.Partition(PartitionID(header.State.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
-		return nil, &headers.ResponseHeader{
-			Status: headers.ResponseStatus_NOT_LEADER,
-			Leader: partition.Leader(),
+		return nil, &storage.ResponseHeader{
+			Status: storage.ResponseStatus{
+				Code: storage.ResponseCode_NOT_LEADER,
+			},
+			State: &storage.ResponseState{
+				Leader: partition.Leader(),
+			},
 		}, nil
 	}
 
@@ -45,8 +48,8 @@ func (s *Server) DoCommand(ctx context.Context, name string, input []byte, heade
 		Request: &SessionRequest_Command{
 			Command: &SessionCommandRequest{
 				Context: &SessionCommandContext{
-					SessionID:      header.SessionID,
-					SequenceNumber: header.RequestID,
+					SessionID:      header.State.SessionID,
+					SequenceNumber: header.State.RequestID,
 				},
 				Command: &ServiceCommandRequest{
 					Service: &ServiceId{
@@ -96,26 +99,34 @@ func (s *Server) DoCommand(ctx context.Context, name string, input []byte, heade
 	}
 
 	commandResponse := sessionResponse.GetCommand()
-	responseHeader := &headers.ResponseHeader{
-		SessionID:  header.SessionID,
-		StreamID:   commandResponse.Context.StreamID,
-		ResponseID: commandResponse.Context.Sequence,
-		Index:      commandResponse.Context.Index,
-		Status:     headers.ResponseStatus(commandResponse.Context.Status),
-		Message:    commandResponse.Context.Message,
+	responseHeader := &storage.ResponseHeader{
+		Status: storage.ResponseStatus{
+			Code:    storage.ResponseCode(commandResponse.Context.Status),
+			Message: commandResponse.Context.Message,
+		},
+		State: &storage.ResponseState{
+			SessionID:  header.State.SessionID,
+			StreamID:   commandResponse.Context.StreamID,
+			ResponseID: commandResponse.Context.Sequence,
+			Index:      commandResponse.Context.Index,
+		},
 	}
 	return commandResponse.Response.GetOperation().Result, responseHeader, nil
 }
 
 // DoCommandStream submits a streaming command to the service
-func (s *Server) DoCommandStream(ctx context.Context, name string, input []byte, header *headers.RequestHeader, stream streams.WriteStream) error {
+func (s *Server) DoCommandStream(ctx context.Context, name string, input []byte, header storage.RequestHeader, stream streams.WriteStream) error {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(PartitionID(header.Partition))
+	partition := s.Protocol.Partition(PartitionID(header.State.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		stream.Value(SessionOutput{
-			Header: &headers.ResponseHeader{
-				Status: headers.ResponseStatus_NOT_LEADER,
-				Leader: partition.Leader(),
+			Header: &storage.ResponseHeader{
+				Status: storage.ResponseStatus{
+					Code: storage.ResponseCode_NOT_LEADER,
+				},
+				State: &storage.ResponseState{
+					Leader: partition.Leader(),
+				},
 			},
 		})
 		stream.Close()
@@ -126,8 +137,8 @@ func (s *Server) DoCommandStream(ctx context.Context, name string, input []byte,
 		Request: &SessionRequest_Command{
 			Command: &SessionCommandRequest{
 				Context: &SessionCommandContext{
-					SessionID:      header.SessionID,
-					SequenceNumber: header.RequestID,
+					SessionID:      header.State.SessionID,
+					SequenceNumber: header.State.RequestID,
 				},
 				Command: &ServiceCommandRequest{
 					Service: &ServiceId{
@@ -167,14 +178,18 @@ func (s *Server) DoCommandStream(ctx context.Context, name string, input []byte,
 		}
 
 		commandResponse := sessionResponse.GetCommand()
-		responseHeader := &headers.ResponseHeader{
-			SessionID:  header.SessionID,
-			StreamID:   commandResponse.Context.StreamID,
-			ResponseID: commandResponse.Context.Sequence,
-			Index:      commandResponse.Context.Index,
-			Type:       headers.ResponseType(commandResponse.Context.Type),
-			Status:     headers.ResponseStatus(commandResponse.Context.Status),
-			Message:    commandResponse.Context.Message,
+		responseHeader := &storage.ResponseHeader{
+			Status: storage.ResponseStatus{
+				Code:    storage.ResponseCode(commandResponse.Context.Status),
+				Message: commandResponse.Context.Message,
+			},
+			State: &storage.ResponseState{
+				SessionID:  header.State.SessionID,
+				StreamID:   commandResponse.Context.StreamID,
+				ResponseID: commandResponse.Context.Sequence,
+				Index:      commandResponse.Context.Index,
+				Type:       storage.ResponseType(commandResponse.Context.Type),
+			},
 		}
 
 		var result []byte
@@ -196,13 +211,17 @@ func (s *Server) DoCommandStream(ctx context.Context, name string, input []byte,
 }
 
 // DoQuery submits a query to the service
-func (s *Server) DoQuery(ctx context.Context, name string, input []byte, header *headers.RequestHeader) ([]byte, *headers.ResponseHeader, error) {
+func (s *Server) DoQuery(ctx context.Context, name string, input []byte, header storage.RequestHeader) ([]byte, *storage.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(PartitionID(header.Partition))
+	partition := s.Protocol.Partition(PartitionID(header.State.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
-		return nil, &headers.ResponseHeader{
-			Status: headers.ResponseStatus_NOT_LEADER,
-			Leader: partition.Leader(),
+		return nil, &storage.ResponseHeader{
+			Status: storage.ResponseStatus{
+				Code: storage.ResponseCode_NOT_LEADER,
+			},
+			State: &storage.ResponseState{
+				Leader: partition.Leader(),
+			},
 		}, nil
 	}
 
@@ -210,9 +229,9 @@ func (s *Server) DoQuery(ctx context.Context, name string, input []byte, header 
 		Request: &SessionRequest_Query{
 			Query: &SessionQueryRequest{
 				Context: &SessionQueryContext{
-					SessionID:          header.SessionID,
-					LastIndex:          header.Index,
-					LastSequenceNumber: header.RequestID,
+					SessionID:          header.State.SessionID,
+					LastIndex:          header.State.Index,
+					LastSequenceNumber: header.State.RequestID,
 				},
 				Query: &ServiceQueryRequest{
 					Service: &ServiceId{
@@ -262,24 +281,32 @@ func (s *Server) DoQuery(ctx context.Context, name string, input []byte, header 
 	}
 
 	queryResponse := sessionResponse.GetQuery()
-	responseHeader := &headers.ResponseHeader{
-		SessionID: header.SessionID,
-		Index:     queryResponse.Context.Index,
-		Status:    headers.ResponseStatus(queryResponse.Context.Status),
-		Message:   queryResponse.Context.Message,
+	responseHeader := &storage.ResponseHeader{
+		Status: storage.ResponseStatus{
+			Code:    storage.ResponseCode(queryResponse.Context.Status),
+			Message: queryResponse.Context.Message,
+		},
+		State: &storage.ResponseState{
+			SessionID: header.State.SessionID,
+			Index:     queryResponse.Context.Index,
+		},
 	}
 	return queryResponse.Response.GetOperation().Result, responseHeader, nil
 }
 
 // DoQueryStream submits a streaming query to the service
-func (s *Server) DoQueryStream(ctx context.Context, name string, input []byte, header *headers.RequestHeader, stream streams.WriteStream) error {
+func (s *Server) DoQueryStream(ctx context.Context, name string, input []byte, header storage.RequestHeader, stream streams.WriteStream) error {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(PartitionID(header.Partition))
+	partition := s.Protocol.Partition(PartitionID(header.State.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
 		stream.Value(SessionOutput{
-			Header: &headers.ResponseHeader{
-				Status: headers.ResponseStatus_NOT_LEADER,
-				Leader: partition.Leader(),
+			Header: &storage.ResponseHeader{
+				Status: storage.ResponseStatus{
+					Code: storage.ResponseCode_NOT_LEADER,
+				},
+				State: &storage.ResponseState{
+					Leader: partition.Leader(),
+				},
 			},
 		})
 		stream.Close()
@@ -290,9 +317,9 @@ func (s *Server) DoQueryStream(ctx context.Context, name string, input []byte, h
 		Request: &SessionRequest_Query{
 			Query: &SessionQueryRequest{
 				Context: &SessionQueryContext{
-					SessionID:          header.SessionID,
-					LastIndex:          header.Index,
-					LastSequenceNumber: header.RequestID,
+					SessionID:          header.State.SessionID,
+					LastIndex:          header.State.Index,
+					LastSequenceNumber: header.State.RequestID,
 				},
 				Query: &ServiceQueryRequest{
 					Service: &ServiceId{
@@ -322,12 +349,16 @@ func (s *Server) DoQueryStream(ctx context.Context, name string, input []byte, h
 			return nil, errors.Proto(errors.NewInternal(err.Error()))
 		}
 		queryResponse := sessionResponse.GetQuery()
-		responseHeader := &headers.ResponseHeader{
-			SessionID: header.SessionID,
-			Index:     queryResponse.Context.Index,
-			Type:      headers.ResponseType(queryResponse.Context.Type),
-			Status:    headers.ResponseStatus(queryResponse.Context.Status),
-			Message:   queryResponse.Context.Message,
+		responseHeader := &storage.ResponseHeader{
+			Status: storage.ResponseStatus{
+				Code:    storage.ResponseCode(queryResponse.Context.Status),
+				Message: queryResponse.Context.Message,
+			},
+			State: &storage.ResponseState{
+				SessionID: header.State.SessionID,
+				Index:     queryResponse.Context.Index,
+				Type:      storage.ResponseType(queryResponse.Context.Type),
+			},
 		}
 		var result []byte
 		if queryResponse.Response != nil {
@@ -347,13 +378,17 @@ func (s *Server) DoQueryStream(ctx context.Context, name string, input []byte, h
 }
 
 // DoMetadata submits a metadata query to the service
-func (s *Server) DoMetadata(ctx context.Context, serviceType primitive.PrimitiveType, namespace string, header *headers.RequestHeader) ([]*ServiceId, *headers.ResponseHeader, error) {
+func (s *Server) DoMetadata(ctx context.Context, serviceType string, namespace string, header storage.RequestHeader) ([]*ServiceId, *storage.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(PartitionID(header.Partition))
+	partition := s.Protocol.Partition(PartitionID(header.State.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
-		return nil, &headers.ResponseHeader{
-			Status: headers.ResponseStatus_NOT_LEADER,
-			Leader: partition.Leader(),
+		return nil, &storage.ResponseHeader{
+			Status: storage.ResponseStatus{
+				Code: storage.ResponseCode_NOT_LEADER,
+			},
+			State: &storage.ResponseState{
+				Leader: partition.Leader(),
+			},
 		}, nil
 	}
 
@@ -361,14 +396,14 @@ func (s *Server) DoMetadata(ctx context.Context, serviceType primitive.Primitive
 		Request: &SessionRequest_Query{
 			Query: &SessionQueryRequest{
 				Context: &SessionQueryContext{
-					SessionID:          header.SessionID,
-					LastIndex:          header.Index,
-					LastSequenceNumber: header.RequestID,
+					SessionID:          header.State.SessionID,
+					LastIndex:          header.State.Index,
+					LastSequenceNumber: header.State.RequestID,
 				},
 				Query: &ServiceQueryRequest{
 					Request: &ServiceQueryRequest_Metadata{
 						Metadata: &ServiceMetadataRequest{
-							Type:      ServiceType(serviceType),
+							Type:      serviceType,
 							Namespace: namespace,
 						},
 					},
@@ -408,23 +443,31 @@ func (s *Server) DoMetadata(ctx context.Context, serviceType primitive.Primitive
 	}
 
 	queryResponse := sessionResponse.GetQuery()
-	responseHeader := &headers.ResponseHeader{
-		SessionID: header.SessionID,
-		Index:     queryResponse.Context.Index,
-		Status:    headers.ResponseStatus(queryResponse.Context.Status),
-		Message:   queryResponse.Context.Message,
+	responseHeader := &storage.ResponseHeader{
+		Status: storage.ResponseStatus{
+			Code:    storage.ResponseCode(queryResponse.Context.Status),
+			Message: queryResponse.Context.Message,
+		},
+		State: &storage.ResponseState{
+			SessionID: header.State.SessionID,
+			Index:     queryResponse.Context.Index,
+		},
 	}
 	return queryResponse.Response.GetMetadata().Services, responseHeader, nil
 }
 
 // DoOpenSession opens a new session
-func (s *Server) DoOpenSession(ctx context.Context, header *headers.RequestHeader, timeout *time.Duration) (*headers.ResponseHeader, error) {
+func (s *Server) DoOpenSession(ctx context.Context, header storage.RequestHeader, timeout *time.Duration) (*storage.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(PartitionID(header.Partition))
+	partition := s.Protocol.Partition(PartitionID(header.State.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
-		return &headers.ResponseHeader{
-			Status: headers.ResponseStatus_NOT_LEADER,
-			Leader: partition.Leader(),
+		return &storage.ResponseHeader{
+			Status: storage.ResponseStatus{
+				Code: storage.ResponseCode_NOT_LEADER,
+			},
+			State: &storage.ResponseState{
+				Leader: partition.Leader(),
+			},
 		}, nil
 	}
 
@@ -467,20 +510,26 @@ func (s *Server) DoOpenSession(ctx context.Context, header *headers.RequestHeade
 	}
 
 	sessionID := sessionResponse.GetOpenSession().SessionID
-	return &headers.ResponseHeader{
-		SessionID: sessionID,
-		Index:     sessionID,
+	return &storage.ResponseHeader{
+		State: &storage.ResponseState{
+			SessionID: sessionID,
+			Index:     sessionID,
+		},
 	}, nil
 }
 
 // DoKeepAliveSession keeps a session alive
-func (s *Server) DoKeepAliveSession(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
+func (s *Server) DoKeepAliveSession(ctx context.Context, header storage.RequestHeader) (*storage.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(PartitionID(header.Partition))
+	partition := s.Protocol.Partition(PartitionID(header.State.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
-		return &headers.ResponseHeader{
-			Status: headers.ResponseStatus_NOT_LEADER,
-			Leader: partition.Leader(),
+		return &storage.ResponseHeader{
+			Status: storage.ResponseStatus{
+				Code: storage.ResponseCode_NOT_LEADER,
+			},
+			State: &storage.ResponseState{
+				Leader: partition.Leader(),
+			},
 		}, nil
 	}
 
@@ -488,15 +537,15 @@ func (s *Server) DoKeepAliveSession(ctx context.Context, header *headers.Request
 	stream := streams.NewUnaryStream()
 
 	streams := make(map[uint64]uint64)
-	for _, stream := range header.Streams {
+	for _, stream := range header.State.Streams {
 		streams[stream.StreamID] = stream.ResponseID
 	}
 
 	sessionRequest := &SessionRequest{
 		Request: &SessionRequest_KeepAlive{
 			KeepAlive: &KeepAliveRequest{
-				SessionID:       header.SessionID,
-				CommandSequence: header.RequestID,
+				SessionID:       header.State.SessionID,
+				CommandSequence: header.State.RequestID,
 				Streams:         streams,
 			},
 		},
@@ -528,26 +577,32 @@ func (s *Server) DoKeepAliveSession(ctx context.Context, header *headers.Request
 	if err != nil {
 		return nil, errors.Proto(errors.NewInternal(err.Error()))
 	}
-	return &headers.ResponseHeader{
-		SessionID: header.SessionID,
+	return &storage.ResponseHeader{
+		State: &storage.ResponseState{
+			SessionID: header.State.SessionID,
+		},
 	}, nil
 }
 
 // DoCloseSession closes a session
-func (s *Server) DoCloseSession(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
+func (s *Server) DoCloseSession(ctx context.Context, header storage.RequestHeader) (*storage.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(PartitionID(header.Partition))
+	partition := s.Protocol.Partition(PartitionID(header.State.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
-		return &headers.ResponseHeader{
-			Status: headers.ResponseStatus_NOT_LEADER,
-			Leader: partition.Leader(),
+		return &storage.ResponseHeader{
+			Status: storage.ResponseStatus{
+				Code: storage.ResponseCode_NOT_LEADER,
+			},
+			State: &storage.ResponseState{
+				Leader: partition.Leader(),
+			},
 		}, nil
 	}
 
 	sessionRequest := &SessionRequest{
 		Request: &SessionRequest_CloseSession{
 			CloseSession: &CloseSessionRequest{
-				SessionID: header.SessionID,
+				SessionID: header.State.SessionID,
 			},
 		},
 	}
@@ -581,19 +636,22 @@ func (s *Server) DoCloseSession(ctx context.Context, header *headers.RequestHead
 	if err != nil {
 		return nil, errors.Proto(errors.NewInternal(err.Error()))
 	}
-	return &headers.ResponseHeader{
-		SessionID: header.SessionID,
+	return &storage.ResponseHeader{
 	}, nil
 }
 
 // DoCreateService creates the service
-func (s *Server) DoCreateService(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
+func (s *Server) DoCreateService(ctx context.Context, header storage.RequestHeader) (*storage.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(PartitionID(header.Partition))
+	partition := s.Protocol.Partition(PartitionID(header.State.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
-		return &headers.ResponseHeader{
-			Status: headers.ResponseStatus_NOT_LEADER,
-			Leader: partition.Leader(),
+		return &storage.ResponseHeader{
+			Status: storage.ResponseStatus{
+				Code: storage.ResponseCode_NOT_LEADER,
+			},
+			State: &storage.ResponseState{
+				Leader: partition.Leader(),
+			},
 		}, nil
 	}
 
@@ -601,8 +659,8 @@ func (s *Server) DoCreateService(ctx context.Context, header *headers.RequestHea
 		Request: &SessionRequest_Command{
 			Command: &SessionCommandRequest{
 				Context: &SessionCommandContext{
-					SessionID:      header.SessionID,
-					SequenceNumber: header.RequestID,
+					SessionID:      header.State.SessionID,
+					SequenceNumber: header.State.RequestID,
 				},
 				Command: &ServiceCommandRequest{
 					Service: &ServiceId{
@@ -649,25 +707,33 @@ func (s *Server) DoCreateService(ctx context.Context, header *headers.RequestHea
 	}
 
 	commandResponse := sessionResponse.GetCommand()
-	responseHeader := &headers.ResponseHeader{
-		SessionID:  header.SessionID,
-		StreamID:   commandResponse.Context.StreamID,
-		ResponseID: commandResponse.Context.Sequence,
-		Index:      commandResponse.Context.Index,
-		Status:     headers.ResponseStatus(commandResponse.Context.Status),
-		Message:    commandResponse.Context.Message,
+	responseHeader := &storage.ResponseHeader{
+		Status: storage.ResponseStatus{
+			Code:    storage.ResponseCode(commandResponse.Context.Status),
+			Message: commandResponse.Context.Message,
+		},
+		State: &storage.ResponseState{
+			SessionID:  header.State.SessionID,
+			StreamID:   commandResponse.Context.StreamID,
+			ResponseID: commandResponse.Context.Sequence,
+			Index:      commandResponse.Context.Index,
+		},
 	}
 	return responseHeader, nil
 }
 
 // DoCloseService closes the service
-func (s *Server) DoCloseService(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
+func (s *Server) DoCloseService(ctx context.Context, header storage.RequestHeader) (*storage.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(PartitionID(header.Partition))
+	partition := s.Protocol.Partition(PartitionID(header.State.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
-		return &headers.ResponseHeader{
-			Status: headers.ResponseStatus_NOT_LEADER,
-			Leader: partition.Leader(),
+		return &storage.ResponseHeader{
+			Status: storage.ResponseStatus{
+				Code: storage.ResponseCode_NOT_LEADER,
+			},
+			State: &storage.ResponseState{
+				Leader: partition.Leader(),
+			},
 		}, nil
 	}
 
@@ -675,8 +741,8 @@ func (s *Server) DoCloseService(ctx context.Context, header *headers.RequestHead
 		Request: &SessionRequest_Command{
 			Command: &SessionCommandRequest{
 				Context: &SessionCommandContext{
-					SessionID:      header.SessionID,
-					SequenceNumber: header.RequestID,
+					SessionID:      header.State.SessionID,
+					SequenceNumber: header.State.RequestID,
 				},
 				Command: &ServiceCommandRequest{
 					Service: &ServiceId{
@@ -723,25 +789,33 @@ func (s *Server) DoCloseService(ctx context.Context, header *headers.RequestHead
 	}
 
 	commandResponse := sessionResponse.GetCommand()
-	responseHeader := &headers.ResponseHeader{
-		SessionID:  header.SessionID,
-		StreamID:   commandResponse.Context.StreamID,
-		ResponseID: commandResponse.Context.Sequence,
-		Index:      commandResponse.Context.Index,
-		Status:     headers.ResponseStatus(commandResponse.Context.Status),
-		Message:    commandResponse.Context.Message,
+	responseHeader := &storage.ResponseHeader{
+		Status: storage.ResponseStatus{
+			Code:    storage.ResponseCode(commandResponse.Context.Status),
+			Message: commandResponse.Context.Message,
+		},
+		State: &storage.ResponseState{
+			SessionID:  header.State.SessionID,
+			StreamID:   commandResponse.Context.StreamID,
+			ResponseID: commandResponse.Context.Sequence,
+			Index:      commandResponse.Context.Index,
+		},
 	}
 	return responseHeader, nil
 }
 
 // DoDeleteService deletes the service
-func (s *Server) DoDeleteService(ctx context.Context, header *headers.RequestHeader) (*headers.ResponseHeader, error) {
+func (s *Server) DoDeleteService(ctx context.Context, header storage.RequestHeader) (*storage.ResponseHeader, error) {
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(PartitionID(header.Partition))
+	partition := s.Protocol.Partition(PartitionID(header.State.Partition))
 	if partition.MustLeader() && !partition.IsLeader() {
-		return &headers.ResponseHeader{
-			Status: headers.ResponseStatus_NOT_LEADER,
-			Leader: partition.Leader(),
+		return &storage.ResponseHeader{
+			Status: storage.ResponseStatus{
+				Code: storage.ResponseCode_NOT_LEADER,
+			},
+			State: &storage.ResponseState{
+				Leader: partition.Leader(),
+			},
 		}, nil
 	}
 
@@ -749,8 +823,8 @@ func (s *Server) DoDeleteService(ctx context.Context, header *headers.RequestHea
 		Request: &SessionRequest_Command{
 			Command: &SessionCommandRequest{
 				Context: &SessionCommandContext{
-					SessionID:      header.SessionID,
-					SequenceNumber: header.RequestID,
+					SessionID:      header.State.SessionID,
+					SequenceNumber: header.State.RequestID,
 				},
 				Command: &ServiceCommandRequest{
 					Service: &ServiceId{
@@ -797,13 +871,17 @@ func (s *Server) DoDeleteService(ctx context.Context, header *headers.RequestHea
 	}
 
 	commandResponse := sessionResponse.GetCommand()
-	responseHeader := &headers.ResponseHeader{
-		SessionID:  header.SessionID,
-		StreamID:   commandResponse.Context.StreamID,
-		ResponseID: commandResponse.Context.Sequence,
-		Index:      commandResponse.Context.Index,
-		Status:     headers.ResponseStatus(commandResponse.Context.Status),
-		Message:    commandResponse.Context.Message,
+	responseHeader := &storage.ResponseHeader{
+		Status: storage.ResponseStatus{
+			Code:    storage.ResponseCode(commandResponse.Context.Status),
+			Message: commandResponse.Context.Message,
+		},
+		State: &storage.ResponseState{
+			SessionID:  header.State.SessionID,
+			StreamID:   commandResponse.Context.StreamID,
+			ResponseID: commandResponse.Context.Sequence,
+			Index:      commandResponse.Context.Index,
+		},
 	}
 	return responseHeader, nil
 }
@@ -811,5 +889,5 @@ func (s *Server) DoDeleteService(ctx context.Context, header *headers.RequestHea
 // SessionOutput is a result for session-supporting servers containing session header information
 type SessionOutput struct {
 	streams.Result
-	Header *headers.ResponseHeader
+	Header *storage.ResponseHeader
 }

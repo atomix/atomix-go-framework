@@ -29,7 +29,7 @@ type ServiceContext interface {
 	ServiceID() ServiceID
 
 	// ServiceType returns the service type
-	ServiceType() ServiceType
+	ServiceType() string
 
 	// CurrentOperation returns the current operation identifier
 	CurrentOperation() OperationID
@@ -74,7 +74,7 @@ func (c *serviceContext) ServiceID() ServiceID {
 	return c.serviceID
 }
 
-func (c *serviceContext) ServiceType() ServiceType {
+func (c *serviceContext) ServiceType() string {
 	return c.serviceID.Type
 }
 

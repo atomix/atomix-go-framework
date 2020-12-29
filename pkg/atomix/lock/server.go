@@ -16,8 +16,8 @@ package lock
 
 import (
 	"context"
-	"github.com/atomix/api/proto/atomix/headers"
-	api "github.com/atomix/api/proto/atomix/lock"
+	"github.com/atomix/api/go/atomix/storage"
+	api "github.com/atomix/api/go/atomix/storage/lock"
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
@@ -39,7 +39,7 @@ func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.C
 		return nil, err
 	}
 	response := &api.CreateResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending CreateResponse %+v", response)
 	return response, nil
@@ -54,7 +54,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 			return nil, err
 		}
 		response := &api.CloseResponse{
-			Header: header,
+			Header: *header,
 		}
 		log.Tracef("Sending CloseResponse %+v", response)
 		return response, nil
@@ -65,7 +65,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return nil, err
 	}
 	response := &api.CloseResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil
@@ -99,13 +99,13 @@ func (s *Server) Lock(ctx context.Context, request *api.LockRequest) (*api.LockR
 
 		output := result.Value.(primitive.SessionOutput)
 
-		if output.Header.Type == headers.ResponseType_RESPONSE {
+		if output.Header.State.Type == storage.ResponseType_RESPONSE {
 			lockResponse := &LockResponse{}
 			if err = proto.Unmarshal(output.Value.([]byte), lockResponse); err != nil {
 				return nil, err
 			}
 			response := &api.LockResponse{
-				Header:  output.Header,
+				Header:  *output.Header,
 				Version: uint64(lockResponse.Index),
 			}
 			log.Tracef("Sending LockResponse %+v", response)
@@ -135,7 +135,7 @@ func (s *Server) Unlock(ctx context.Context, request *api.UnlockRequest) (*api.U
 	}
 
 	response := &api.UnlockResponse{
-		Header:   header,
+		Header:   *header,
 		Unlocked: unlockResponse.Succeeded,
 	}
 	log.Tracef("Sending UnlockResponse %+v", response)
@@ -163,7 +163,7 @@ func (s *Server) IsLocked(ctx context.Context, request *api.IsLockedRequest) (*a
 	}
 
 	response := &api.IsLockedResponse{
-		Header:   header,
+		Header:   *header,
 		IsLocked: isLockedResponse.Locked,
 	}
 	log.Tracef("Sending IsLockedResponse %+v", response)

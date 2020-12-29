@@ -16,8 +16,8 @@ package set
 
 import (
 	"context"
-	"github.com/atomix/api/proto/atomix/headers"
-	api "github.com/atomix/api/proto/atomix/set"
+	"github.com/atomix/api/go/atomix/storage"
+	api "github.com/atomix/api/go/atomix/storage/set"
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/gogo/protobuf/proto"
@@ -48,7 +48,7 @@ func (s *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeR
 	}
 
 	response := &api.SizeResponse{
-		Header: header,
+		Header: *header,
 		Size_:  sizeResponse.Size_,
 	}
 	log.Tracef("Sending SizeResponse %+v", response)
@@ -76,7 +76,7 @@ func (s *Server) Contains(ctx context.Context, request *api.ContainsRequest) (*a
 	}
 
 	response := &api.ContainsResponse{
-		Header:   header,
+		Header:   *header,
 		Contains: containsResponse.Contains,
 	}
 	log.Tracef("Sending ContainsResponse %+v", response)
@@ -104,7 +104,7 @@ func (s *Server) Add(ctx context.Context, request *api.AddRequest) (*api.AddResp
 	}
 
 	response := &api.AddResponse{
-		Header: header,
+		Header: *header,
 		Added:  addResponse.Added,
 	}
 	log.Tracef("Sending AddResponse %+v", response)
@@ -132,7 +132,7 @@ func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 	}
 
 	response := &api.RemoveResponse{
-		Header:  header,
+		Header:  *header,
 		Removed: removeResponse.Removed,
 	}
 	log.Tracef("Sending RemoveResponse %+v", response)
@@ -158,7 +158,7 @@ func (s *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.Cle
 	}
 
 	response := &api.ClearResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending ClearResponse %+v", response)
 	return response, nil
@@ -196,18 +196,18 @@ func (s *Server) Events(request *api.EventRequest, srv api.SetService_EventsServ
 		}
 
 		var eventResponse *api.EventResponse
-		switch output.Header.Type {
-		case headers.ResponseType_OPEN_STREAM:
+		switch output.Header.State.Type {
+		case storage.ResponseType_OPEN_STREAM:
 			eventResponse = &api.EventResponse{
-				Header: output.Header,
+				Header: *output.Header,
 			}
-		case headers.ResponseType_CLOSE_STREAM:
+		case storage.ResponseType_CLOSE_STREAM:
 			eventResponse = &api.EventResponse{
-				Header: output.Header,
+				Header: *output.Header,
 			}
 		default:
 			eventResponse = &api.EventResponse{
-				Header: output.Header,
+				Header: *output.Header,
 				Type:   getEventType(response.Type),
 				Value:  response.Value,
 			}
@@ -252,18 +252,18 @@ func (s *Server) Iterate(request *api.IterateRequest, srv api.SetService_Iterate
 		}
 
 		var iterateResponse *api.IterateResponse
-		switch output.Header.Type {
-		case headers.ResponseType_OPEN_STREAM:
+		switch output.Header.State.Type {
+		case storage.ResponseType_OPEN_STREAM:
 			iterateResponse = &api.IterateResponse{
-				Header: output.Header,
+				Header: *output.Header,
 			}
-		case headers.ResponseType_CLOSE_STREAM:
+		case storage.ResponseType_CLOSE_STREAM:
 			iterateResponse = &api.IterateResponse{
-				Header: output.Header,
+				Header: *output.Header,
 			}
 		default:
 			iterateResponse = &api.IterateResponse{
-				Header: output.Header,
+				Header: *output.Header,
 				Value:  response.Value,
 			}
 		}
@@ -285,7 +285,7 @@ func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.C
 		return nil, err
 	}
 	response := &api.CreateResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending CreateResponse %+v", response)
 	return response, nil
@@ -300,7 +300,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 			return nil, err
 		}
 		response := &api.CloseResponse{
-			Header: header,
+			Header: *header,
 		}
 		log.Tracef("Sending CloseResponse %+v", response)
 		return response, nil
@@ -311,7 +311,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return nil, err
 	}
 	response := &api.CloseResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil

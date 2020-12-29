@@ -46,23 +46,9 @@ message SessionStreamSnapshot {
 }
 
 message ServiceId {
-    ServiceType type = 1;
+    string type = 1;
     string name = 2;
     string namespace = 3;
-}
-
-enum ServiceType {
-    UNKNOWN_SERVICE = 0;
-    COUNTER = 1;
-    ELECTION = 2;
-    INDEXED_MAP = 3;
-    LEADER_LATCH = 4;
-    LIST = 5;
-    LOCK = 6;
-    LOG = 7;
-    MAP = 8;
-    SET = 9;
-    VALUE = 10;
 }
 
 message SessionRequest {
@@ -198,7 +184,7 @@ message ServiceDeleteResponse {
 }
 
 message ServiceMetadataRequest {
-    ServiceType type = 1;
+    string type = 1;
     string namespace = 2;
 }
 

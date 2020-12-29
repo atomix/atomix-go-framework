@@ -16,8 +16,8 @@ package value
 
 import (
 	"context"
-	"github.com/atomix/api/proto/atomix/headers"
-	api "github.com/atomix/api/proto/atomix/value"
+	"github.com/atomix/api/go/atomix/storage"
+	api "github.com/atomix/api/go/atomix/storage/value"
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/gogo/protobuf/proto"
@@ -52,7 +52,7 @@ func (s *Server) Set(ctx context.Context, request *api.SetRequest) (*api.SetResp
 	}
 
 	response := &api.SetResponse{
-		Header:    header,
+		Header:    *header,
 		Version:   setResponse.Version,
 		Succeeded: setResponse.Succeeded,
 	}
@@ -79,7 +79,7 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 	}
 
 	response := &api.GetResponse{
-		Header:  header,
+		Header:  *header,
 		Value:   getResponse.Value,
 		Version: getResponse.Version,
 	}
@@ -117,18 +117,18 @@ func (s *Server) Events(request *api.EventRequest, srv api.ValueService_EventsSe
 		}
 
 		var eventResponse *api.EventResponse
-		switch output.Header.Type {
-		case headers.ResponseType_OPEN_STREAM:
+		switch output.Header.State.Type {
+		case storage.ResponseType_OPEN_STREAM:
 			eventResponse = &api.EventResponse{
-				Header: output.Header,
+				Header: *output.Header,
 			}
-		case headers.ResponseType_CLOSE_STREAM:
+		case storage.ResponseType_CLOSE_STREAM:
 			eventResponse = &api.EventResponse{
-				Header: output.Header,
+				Header: *output.Header,
 			}
 		default:
 			eventResponse = &api.EventResponse{
-				Header:          output.Header,
+				Header:          *output.Header,
 				Type:            getEventType(response.Type),
 				PreviousValue:   response.PreviousValue,
 				PreviousVersion: response.PreviousVersion,
@@ -154,7 +154,7 @@ func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.C
 		return nil, err
 	}
 	response := &api.CreateResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending CreateResponse %+v", response)
 	return response, nil
@@ -169,7 +169,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 			return nil, err
 		}
 		response := &api.CloseResponse{
-			Header: header,
+			Header: *header,
 		}
 		log.Tracef("Sending CloseResponse %+v", response)
 		return response, nil
@@ -180,7 +180,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return nil, err
 	}
 	response := &api.CloseResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil

@@ -16,8 +16,9 @@ package _map //nolint:golint
 
 import (
 	"context"
-	"github.com/atomix/api/proto/atomix/headers"
-	api "github.com/atomix/api/proto/atomix/map"
+	"github.com/atomix/api/go/atomix/storage"
+	api "github.com/atomix/api/go/atomix/storage/map"
+	"github.com/atomix/api/go/atomix/storage/timestamp"
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
@@ -37,7 +38,7 @@ func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.C
 		return nil, err
 	}
 	response := &api.CreateResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending CreateResponse %+v", response)
 	return response, nil
@@ -52,7 +53,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 			return nil, err
 		}
 		response := &api.CloseResponse{
-			Header: header,
+			Header: *header,
 		}
 		log.Tracef("Sending CloseResponse %+v", response)
 		return response, nil
@@ -63,7 +64,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return nil, err
 	}
 	response := &api.CloseResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil
@@ -88,7 +89,7 @@ func (s *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeR
 	}
 
 	response := &api.SizeResponse{
-		Header: header,
+		Header: *header,
 		Size_:  sizeResponse.Size_,
 	}
 	log.Tracef("Sending SizeResponse %+v", response)
@@ -116,7 +117,7 @@ func (s *Server) Exists(ctx context.Context, request *api.ExistsRequest) (*api.E
 	}
 
 	response := &api.ExistsResponse{
-		Header:      header,
+		Header:      *header,
 		ContainsKey: containsResponse.ContainsKey,
 	}
 	log.Tracef("Sending ExistsResponse %+v", response)
@@ -148,50 +149,22 @@ func (s *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResp
 	}
 
 	response := &api.PutResponse{
-		Header:          header,
-		Status:          getResponseStatus(putResponse.Status),
-		Created:         putResponse.Created,
-		Updated:         putResponse.Updated,
-		PreviousValue:   putResponse.PreviousValue,
-		PreviousVersion: putResponse.PreviousVersion,
+		Header: *header,
+		Entry: &api.Entry{
+			Key:   request.Key,
+			Value: putResponse.PreviousValue,
+			Timestamp: timestamp.Timestamp{
+				Timestamp: &timestamp.Timestamp_LogicalTimestamp{
+					LogicalTimestamp: &timestamp.LogicalTimestamp{
+						Value: putResponse.PreviousVersion,
+					},
+				},
+			},
+			Created: putResponse.Created,
+			Updated: putResponse.Updated,
+		},
 	}
 	log.Tracef("Sending PutResponse %+v", response)
-	return response, nil
-}
-
-// Replace replaces a key/value pair in the map
-func (s *Server) Replace(ctx context.Context, request *api.ReplaceRequest) (*api.ReplaceResponse, error) {
-	log.Tracef("Received ReplaceRequest %+v", request)
-	in, err := proto.Marshal(&ReplaceRequest{
-		Key:             request.Key,
-		PreviousValue:   request.PreviousValue,
-		PreviousVersion: request.PreviousVersion,
-		NewValue:        request.NewValue,
-		TTL:             request.TTL,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	out, header, err := s.DoCommand(ctx, opReplace, in, request.Header)
-	if err != nil {
-		return nil, err
-	}
-
-	replaceResponse := &ReplaceResponse{}
-	if err = proto.Unmarshal(out, replaceResponse); err != nil {
-		return nil, err
-	}
-
-	response := &api.ReplaceResponse{
-		Header:          header,
-		Status:          getResponseStatus(replaceResponse.Status),
-		Created:         replaceResponse.Created,
-		Updated:         replaceResponse.Updated,
-		PreviousValue:   replaceResponse.PreviousValue,
-		PreviousVersion: replaceResponse.PreviousVersion,
-	}
-	log.Tracef("Sending ReplaceResponse %+v", response)
 	return response, nil
 }
 
@@ -216,11 +189,20 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 	}
 
 	response := &api.GetResponse{
-		Header:  header,
-		Value:   getResponse.Value,
-		Version: getResponse.Version,
-		Created: getResponse.Created,
-		Updated: getResponse.Updated,
+		Header: *header,
+		Entry: &api.Entry{
+			Key:   request.Key,
+			Value: getResponse.Value,
+			Timestamp: timestamp.Timestamp{
+				Timestamp: &timestamp.Timestamp_LogicalTimestamp{
+					LogicalTimestamp: &timestamp.LogicalTimestamp{
+						Value: getResponse.Version,
+					},
+				},
+			},
+			Created: getResponse.Created,
+			Updated: getResponse.Updated,
+		},
 	}
 	log.Tracef("Sending GetRequest %+v", response)
 	return response, nil
@@ -229,10 +211,13 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 // Remove removes a key from the map
 func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.RemoveResponse, error) {
 	log.Tracef("Received RemoveRequest %+v", request)
+	var version uint64
+	if request.Timestamp != nil {
+		version = request.Timestamp.GetLogicalTimestamp().Value
+	}
 	in, err := proto.Marshal(&RemoveRequest{
 		Key:     request.Key,
-		Value:   request.Value,
-		Version: request.Version,
+		Version: version,
 	})
 	if err != nil {
 		return nil, err
@@ -249,10 +234,20 @@ func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 	}
 
 	response := &api.RemoveResponse{
-		Header:          header,
-		Status:          getResponseStatus(serviceResponse.Status),
-		PreviousValue:   serviceResponse.PreviousValue,
-		PreviousVersion: serviceResponse.PreviousVersion,
+		Header: *header,
+		Entry: &api.Entry{
+			Key:   request.Key,
+			Value: serviceResponse.PreviousValue,
+			Timestamp: timestamp.Timestamp{
+				Timestamp: &timestamp.Timestamp_LogicalTimestamp{
+					LogicalTimestamp: &timestamp.LogicalTimestamp{
+						Value: serviceResponse.PreviousVersion,
+					},
+				},
+			},
+			Created: serviceResponse.Created,
+			Updated: serviceResponse.Updated,
+		},
 	}
 	log.Tracef("Sending RemoveRequest %+v", response)
 	return response, nil
@@ -277,7 +272,7 @@ func (s *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.Cle
 	}
 
 	response := &api.ClearResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending ClearResponse %+v", response)
 	return response, nil
@@ -316,24 +311,32 @@ func (s *Server) Events(request *api.EventRequest, srv api.MapService_EventsServ
 		}
 
 		var eventResponse *api.EventResponse
-		switch output.Header.Type {
-		case headers.ResponseType_OPEN_STREAM:
+		switch output.Header.State.Type {
+		case storage.ResponseType_OPEN_STREAM:
 			eventResponse = &api.EventResponse{
-				Header: output.Header,
+				Header: *output.Header,
 			}
-		case headers.ResponseType_CLOSE_STREAM:
+		case storage.ResponseType_CLOSE_STREAM:
 			eventResponse = &api.EventResponse{
-				Header: output.Header,
+				Header: *output.Header,
 			}
 		default:
 			eventResponse = &api.EventResponse{
-				Header:  output.Header,
-				Type:    getEventType(response.Type),
-				Key:     response.Key,
-				Value:   response.Value,
-				Version: response.Version,
-				Created: response.Created,
-				Updated: response.Updated,
+				Header: *output.Header,
+				Type:   getEventType(response.Type),
+				Entry: api.Entry{
+					Key:   response.Key,
+					Value: response.Value,
+					Timestamp: timestamp.Timestamp{
+						Timestamp: &timestamp.Timestamp_LogicalTimestamp{
+							LogicalTimestamp: &timestamp.LogicalTimestamp{
+								Value: response.Version,
+							},
+						},
+					},
+					Created: response.Created,
+					Updated: response.Updated,
+				},
 			}
 		}
 
@@ -376,23 +379,31 @@ func (s *Server) Entries(request *api.EntriesRequest, srv api.MapService_Entries
 		}
 
 		var entriesResponse *api.EntriesResponse
-		switch output.Header.Type {
-		case headers.ResponseType_OPEN_STREAM:
+		switch output.Header.State.Type {
+		case storage.ResponseType_OPEN_STREAM:
 			entriesResponse = &api.EntriesResponse{
-				Header: output.Header,
+				Header: *output.Header,
 			}
-		case headers.ResponseType_CLOSE_STREAM:
+		case storage.ResponseType_CLOSE_STREAM:
 			entriesResponse = &api.EntriesResponse{
-				Header: output.Header,
+				Header: *output.Header,
 			}
 		default:
 			entriesResponse = &api.EntriesResponse{
-				Header:  output.Header,
-				Key:     response.Key,
-				Value:   response.Value,
-				Version: response.Version,
-				Created: response.Created,
-				Updated: response.Updated,
+				Header: *output.Header,
+				Entry: api.Entry{
+					Key:   response.Key,
+					Value: response.Value,
+					Timestamp: timestamp.Timestamp{
+						Timestamp: &timestamp.Timestamp_LogicalTimestamp{
+							LogicalTimestamp: &timestamp.LogicalTimestamp{
+								Value: response.Version,
+							},
+						},
+					},
+					Created: response.Created,
+					Updated: response.Updated,
+				},
 			}
 		}
 
@@ -403,20 +414,6 @@ func (s *Server) Entries(request *api.EntriesRequest, srv api.MapService_Entries
 	}
 	log.Tracef("Finished EntriesRequest %+v", request)
 	return nil
-}
-
-func getResponseStatus(status UpdateStatus) api.ResponseStatus {
-	switch status {
-	case UpdateStatus_OK:
-		return api.ResponseStatus_OK
-	case UpdateStatus_NOOP:
-		return api.ResponseStatus_NOOP
-	case UpdateStatus_PRECONDITION_FAILED:
-		return api.ResponseStatus_PRECONDITION_FAILED
-	case UpdateStatus_WRITE_LOCK:
-		return api.ResponseStatus_WRITE_LOCK
-	}
-	return api.ResponseStatus_OK
 }
 
 func getEventType(eventType ListenResponse_Type) api.EventResponse_Type {

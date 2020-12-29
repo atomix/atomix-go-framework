@@ -229,16 +229,14 @@ func (m *Service) Append(value []byte) ([]byte, error) {
 			Timestamp: newEntry.Timestamp,
 		})
 		return proto.Marshal(&AppendResponse{
-			Status: UpdateStatus_OK,
-			Index:  newEntry.Index,
+			Index: newEntry.Index,
 		})
 	}
 
 	// If the value is equal to the current value, return a no-op.
 	if bytes.Equal(oldEntry.Value, request.Value) {
 		return proto.Marshal(&AppendResponse{
-			Status: UpdateStatus_NOOP,
-			Index:  oldEntry.Index,
+			Index: oldEntry.Index,
 		})
 	}
 
@@ -275,7 +273,6 @@ func (m *Service) Append(value []byte) ([]byte, error) {
 	})
 
 	return proto.Marshal(&AppendResponse{
-		Status:    UpdateStatus_OK,
 		Index:     newEntry.Index,
 		Timestamp: newEntry.Timestamp,
 	})
@@ -294,9 +291,7 @@ func (m *Service) Remove(bytes []byte) ([]byte, error) {
 	}
 
 	if entry == nil {
-		return proto.Marshal(&RemoveResponse{
-			Status: UpdateStatus_NOOP,
-		})
+		return proto.Marshal(&RemoveResponse{})
 	}
 
 	// Delete the entry from the log.
@@ -322,7 +317,6 @@ func (m *Service) Remove(bytes []byte) ([]byte, error) {
 	})
 
 	return proto.Marshal(&RemoveResponse{
-		Status:        UpdateStatus_OK,
 		Index:         entry.Index,
 		PreviousValue: entry.Value,
 		Timestamp:     entry.Timestamp,

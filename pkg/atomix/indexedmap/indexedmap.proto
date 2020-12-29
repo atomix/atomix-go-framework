@@ -95,14 +95,13 @@ message PutRequest {
 }
 
 message PutResponse {
-    UpdateStatus status = 1;
-    uint64 index = 2;
-    string key = 3;
-    bytes previous_value = 4;
-    uint64 previous_version = 5;
-    uint64 new_version = 6;
-    google.protobuf.Timestamp created = 7 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
-    google.protobuf.Timestamp updated = 8 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    uint64 index = 1;
+    string key = 2;
+    bytes previous_value = 3;
+    uint64 previous_version = 4;
+    uint64 new_version = 5;
+    google.protobuf.Timestamp created = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    google.protobuf.Timestamp updated = 7 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message ReplaceRequest {
@@ -115,14 +114,13 @@ message ReplaceRequest {
 }
 
 message ReplaceResponse {
-    UpdateStatus status = 1;
-    uint64 index = 2;
-    string key = 3;
-    bytes previous_value = 4;
-    uint64 previous_version = 5;
-    uint64 new_version = 6;
-    google.protobuf.Timestamp created = 7 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
-    google.protobuf.Timestamp updated = 8 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    uint64 index = 1;
+    string key = 2;
+    bytes previous_value = 3;
+    uint64 previous_version = 4;
+    uint64 new_version = 5;
+    google.protobuf.Timestamp created = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    google.protobuf.Timestamp updated = 7 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message GetRequest {
@@ -197,13 +195,12 @@ message RemoveRequest {
 }
 
 message RemoveResponse {
-    UpdateStatus status = 1;
-    uint64 index = 2;
-    string key = 3;
-    bytes previous_value = 4;
-    uint64 previous_version = 5;
-    google.protobuf.Timestamp created = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
-    google.protobuf.Timestamp updated = 7 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    uint64 index = 1;
+    string key = 2;
+    bytes previous_value = 3;
+    uint64 previous_version = 4;
+    google.protobuf.Timestamp created = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    google.protobuf.Timestamp updated = 6 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
 message ClearRequest {
@@ -241,11 +238,4 @@ message UnlistenRequest {
 }
 
 message UnlistenResponse {
-}
-
-enum UpdateStatus {
-    OK = 0;
-    NOOP = 1;
-    WRITE_LOCK = 2;
-    PRECONDITION_FAILED = 3;
 }

@@ -17,7 +17,7 @@ package primitive
 import (
 	"container/list"
 	"context"
-	api "github.com/atomix/api/proto/atomix/session"
+	api "github.com/atomix/api/go/atomix/storage/session"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/gogo/protobuf/proto"
@@ -301,7 +301,7 @@ func (s *SessionServer) OpenSession(ctx context.Context, request *api.OpenSessio
 		return nil, err
 	}
 	response := &api.OpenSessionResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending OpenSessionResponse %+v", response)
 	return response, nil
@@ -315,7 +315,7 @@ func (s *SessionServer) KeepAlive(ctx context.Context, request *api.KeepAliveReq
 		return nil, err
 	}
 	response := &api.KeepAliveResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending KeepAliveResponse %+v", response)
 	return response, nil
@@ -329,7 +329,7 @@ func (s *SessionServer) CloseSession(ctx context.Context, request *api.CloseSess
 		return nil, err
 	}
 	response := &api.CloseSessionResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending CloseSessionResponse %+v", response)
 	return response, nil

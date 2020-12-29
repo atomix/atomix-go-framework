@@ -43,7 +43,6 @@ message AppendRequest {
 }
 
 message AppendResponse {
-    ResponseStatus status = 1;
 }
 
 message SetRequest {
@@ -52,7 +51,6 @@ message SetRequest {
 }
 
 message SetResponse {
-    ResponseStatus status = 1;
 }
 
 message InsertRequest {
@@ -61,7 +59,6 @@ message InsertRequest {
 }
 
 message InsertResponse {
-    ResponseStatus status = 1;
 }
 
 message GetRequest {
@@ -69,8 +66,7 @@ message GetRequest {
 }
 
 message GetResponse {
-    ResponseStatus status = 1;
-    string value = 2;
+    string value = 1;
 }
 
 message RemoveRequest {
@@ -78,8 +74,7 @@ message RemoveRequest {
 }
 
 message RemoveResponse {
-    ResponseStatus status = 1;
-    string value = 2;
+    string value = 1;
 }
 
 message ClearRequest {
@@ -116,11 +111,4 @@ message IterateRequest {
 
 message IterateResponse {
     string value = 1;
-}
-
-enum ResponseStatus {
-    OK = 0;
-    NOOP = 1;
-    WRITE_LOCK = 2;
-    OUT_OF_BOUNDS = 3;
 }

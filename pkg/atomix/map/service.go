@@ -36,7 +36,6 @@ type Service struct {
 // init initializes the map service
 func (m *Service) init() {
 	m.RegisterUnaryOperation(opPut, m.Put)
-	m.RegisterUnaryOperation(opReplace, m.Replace)
 	m.RegisterUnaryOperation(opRemove, m.Remove)
 	m.RegisterUnaryOperation(opGet, m.Get)
 	m.RegisterUnaryOperation(opExists, m.Exists)
@@ -159,7 +158,9 @@ func (m *Service) Put(value []byte) ([]byte, error) {
 		})
 
 		return proto.Marshal(&PutResponse{
-			Status: UpdateStatus_OK,
+			NewVersion: newValue.Version,
+			Created:    newValue.Created,
+			Updated:    newValue.Updated,
 		})
 	}
 
@@ -174,7 +175,6 @@ func (m *Service) Put(value []byte) ([]byte, error) {
 	// If the value is equal to the current value, return a no-op.
 	if bytes.Equal(oldValue.Value, request.Value) {
 		return proto.Marshal(&PutResponse{
-			Status:          UpdateStatus_NOOP,
 			PreviousValue:   oldValue.Value,
 			PreviousVersion: oldValue.Version,
 		})
@@ -204,65 +204,8 @@ func (m *Service) Put(value []byte) ([]byte, error) {
 	})
 
 	return proto.Marshal(&PutResponse{
-		Status:          UpdateStatus_OK,
 		PreviousValue:   oldValue.Value,
 		PreviousVersion: oldValue.Version,
-		Created:         newValue.Created,
-		Updated:         newValue.Updated,
-	})
-}
-
-// Replace replaces a key/value pair in the map
-func (m *Service) Replace(value []byte) ([]byte, error) {
-	request := &ReplaceRequest{}
-	if err := proto.Unmarshal(value, request); err != nil {
-		return nil, err
-	}
-
-	oldValue, ok := m.entries[request.Key]
-	if !ok {
-		return nil, errors.NewNotFound("entry for key %s not found", request.Key)
-	}
-
-	// If the version was specified and does not match the entry version, fail the replace.
-	if request.PreviousVersion != 0 && request.PreviousVersion != oldValue.Version {
-		return nil, errors.NewConflict("previous version %d does not match stored entry version %d", request.PreviousVersion, oldValue.Version)
-	}
-
-	// If the value was specified and does not match the entry value, fail the replace.
-	if len(request.PreviousValue) != 0 && bytes.Equal(request.PreviousValue, oldValue.Value) {
-		return nil, errors.NewConflict("previous value %v does not match stored entry value %v", request.PreviousValue, oldValue.Value)
-	}
-
-	// If we've made it this far, update the entry.
-	// Create a new entry value and set it in the map.
-	newValue := &MapEntryValue{
-		Value:   request.NewValue,
-		Version: uint64(m.Index()),
-		TTL:     request.TTL,
-		Created: oldValue.Created,
-		Updated: m.Timestamp(),
-	}
-	m.entries[request.Key] = newValue
-
-	// Schedule the timeout for the value if necessary.
-	m.scheduleTTL(request.Key, newValue)
-
-	// Publish an event to listener streams.
-	m.sendEvent(&ListenResponse{
-		Type:    ListenResponse_UPDATED,
-		Key:     request.Key,
-		Value:   newValue.Value,
-		Version: newValue.Version,
-		Created: newValue.Created,
-		Updated: newValue.Updated,
-	})
-
-	return proto.Marshal(&ReplaceResponse{
-		Status:          UpdateStatus_OK,
-		PreviousValue:   oldValue.Value,
-		PreviousVersion: oldValue.Version,
-		NewVersion:      newValue.Version,
 		Created:         newValue.Created,
 		Updated:         newValue.Updated,
 	})
@@ -302,7 +245,6 @@ func (m *Service) Remove(bytes []byte) ([]byte, error) {
 	})
 
 	return proto.Marshal(&RemoveResponse{
-		Status:          UpdateStatus_OK,
 		PreviousValue:   value.Value,
 		PreviousVersion: value.Version,
 		Created:         value.Created,

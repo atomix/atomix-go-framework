@@ -107,9 +107,7 @@ func (l *Service) Append(bytes []byte) ([]byte, error) {
 		Value: request.Value,
 	})
 
-	return proto.Marshal(&AppendResponse{
-		Status: ResponseStatus_OK,
-	})
+	return proto.Marshal(&AppendResponse{})
 }
 
 // Insert inserts a value at a specific index in the list
@@ -141,9 +139,7 @@ func (l *Service) Insert(bytes []byte) ([]byte, error) {
 		Value: request.Value,
 	})
 
-	return proto.Marshal(&InsertResponse{
-		Status: ResponseStatus_OK,
-	})
+	return proto.Marshal(&InsertResponse{})
 }
 
 // Set sets the value at a specific index in the list
@@ -172,9 +168,7 @@ func (l *Service) Set(bytes []byte) ([]byte, error) {
 		Value: request.Value,
 	})
 
-	return proto.Marshal(&SetResponse{
-		Status: ResponseStatus_OK,
-	})
+	return proto.Marshal(&SetResponse{})
 }
 
 // Get gets the value at a specific index in the list
@@ -191,8 +185,7 @@ func (l *Service) Get(bytes []byte) ([]byte, error) {
 
 	value := l.values[index]
 	return proto.Marshal(&GetResponse{
-		Status: ResponseStatus_OK,
-		Value:  value,
+		Value: value,
 	})
 }
 
@@ -218,8 +211,7 @@ func (l *Service) Remove(bytes []byte) ([]byte, error) {
 	})
 
 	return proto.Marshal(&RemoveResponse{
-		Status: ResponseStatus_OK,
-		Value:  value,
+		Value: value,
 	})
 }
 

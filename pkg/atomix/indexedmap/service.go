@@ -16,6 +16,7 @@ package indexedmap
 
 import (
 	"bytes"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
@@ -38,7 +39,6 @@ type Service struct {
 // init initializes the map service
 func (m *Service) init() {
 	m.RegisterUnaryOperation(opPut, m.Put)
-	m.RegisterUnaryOperation(opReplace, m.Replace)
 	m.RegisterUnaryOperation(opRemove, m.Remove)
 	m.RegisterUnaryOperation(opGet, m.Get)
 	m.RegisterUnaryOperation(opFirstEntry, m.FirstEntry)
@@ -183,9 +183,7 @@ func (m *Service) Put(value []byte) ([]byte, error) {
 	if request.Index > 0 {
 		oldEntry = m.indexes[request.Index]
 		if oldEntry != nil && oldEntry.Key != request.Key {
-			return proto.Marshal(&PutResponse{
-				Status: UpdateStatus_PRECONDITION_FAILED,
-			})
+			return nil, errors.NewConflict("key %s does not match index", request.Index)
 		}
 	} else {
 		oldEntry = m.entries[request.Key]
@@ -194,9 +192,7 @@ func (m *Service) Put(value []byte) ([]byte, error) {
 	if oldEntry == nil {
 		// If the version is positive then reject the request.
 		if !request.IfEmpty && request.Version > 0 {
-			return proto.Marshal(&PutResponse{
-				Status: UpdateStatus_PRECONDITION_FAILED,
-			})
+			return nil, errors.NewNotFound("key %s not found", request.Key)
 		}
 
 		// Increment the index for a new entry
@@ -265,28 +261,22 @@ func (m *Service) Put(value []byte) ([]byte, error) {
 		})
 
 		return proto.Marshal(&PutResponse{
-			Status: UpdateStatus_OK,
-			Index:  newEntry.Index,
-			Key:    newEntry.Key,
+			Index: newEntry.Index,
+			Key:   newEntry.Key,
 		})
 	}
 
 	// If the version is -1 then reject the request.
 	// If the version is positive then compare the version to the current version.
-	if request.IfEmpty || (!request.IfEmpty && request.Version > 0 && request.Version != oldEntry.Version) {
-		return proto.Marshal(&PutResponse{
-			Status:          UpdateStatus_PRECONDITION_FAILED,
-			Index:           oldEntry.Index,
-			Key:             oldEntry.Key,
-			PreviousValue:   oldEntry.Value,
-			PreviousVersion: oldEntry.Version,
-		})
+	if request.IfEmpty {
+		return nil, errors.NewAlreadyExists("key %s already exists", request.Key)
+	} else if request.Version > 0 && request.Version != oldEntry.Version {
+		return nil, errors.NewConflict("request version %s does not match stored entry version %d", request.Version, oldEntry.Version)
 	}
 
 	// If the value is equal to the current value, return a no-op.
 	if bytes.Equal(oldEntry.Value, request.Value) {
 		return proto.Marshal(&PutResponse{
-			Status:          UpdateStatus_NOOP,
 			Index:           oldEntry.Index,
 			Key:             oldEntry.Key,
 			PreviousValue:   oldEntry.Value,
@@ -338,102 +328,10 @@ func (m *Service) Put(value []byte) ([]byte, error) {
 	})
 
 	return proto.Marshal(&PutResponse{
-		Status:          UpdateStatus_OK,
 		Index:           newEntry.Index,
 		Key:             newEntry.Key,
 		PreviousValue:   oldEntry.Value,
 		PreviousVersion: oldEntry.Version,
-		Created:         newEntry.Created,
-		Updated:         newEntry.Updated,
-	})
-}
-
-// Replace replaces a key/value pair in the map
-func (m *Service) Replace(value []byte) ([]byte, error) {
-	request := &ReplaceRequest{}
-	if err := proto.Unmarshal(value, request); err != nil {
-		return nil, err
-	}
-
-	var oldEntry *LinkedMapEntryValue
-	if request.Index > 0 {
-		oldEntry = m.indexes[request.Index]
-	} else {
-		oldEntry = m.entries[request.Key]
-	}
-
-	if oldEntry == nil {
-		return proto.Marshal(&ReplaceResponse{
-			Status: UpdateStatus_PRECONDITION_FAILED,
-		})
-	}
-
-	// If the version was specified and does not match the entry version, fail the replace.
-	if request.PreviousVersion != 0 && request.PreviousVersion != oldEntry.Version {
-		return proto.Marshal(&ReplaceResponse{
-			Status: UpdateStatus_PRECONDITION_FAILED,
-		})
-	}
-
-	// If the value was specified and does not match the entry value, fail the replace.
-	if len(request.PreviousValue) != 0 && bytes.Equal(request.PreviousValue, oldEntry.Value) {
-		return proto.Marshal(&ReplaceResponse{
-			Status: UpdateStatus_PRECONDITION_FAILED,
-		})
-	}
-
-	// If we've made it this far, update the entry.
-	// Create a new entry value and set it in the map.
-	newEntry := &LinkedMapEntryValue{
-		MapEntryValue: &MapEntryValue{
-			Index:   oldEntry.Index,
-			Key:     oldEntry.Key,
-			Value:   request.NewValue,
-			Version: uint64(m.Index()),
-			TTL:     request.TTL,
-			Created: oldEntry.Created,
-			Updated: m.Timestamp(),
-		},
-		Prev: oldEntry.Prev,
-		Next: oldEntry.Next,
-	}
-
-	m.entries[newEntry.Key] = newEntry
-	m.indexes[newEntry.Index] = newEntry
-
-	// Update links for previous and next entries
-	if newEntry.Prev != nil {
-		oldEntry.Prev.Next = newEntry
-	} else {
-		m.firstEntry = newEntry
-	}
-	if newEntry.Next != nil {
-		oldEntry.Next.Prev = newEntry
-	} else {
-		m.lastEntry = newEntry
-	}
-
-	// Schedule the timeout for the value if necessary.
-	m.scheduleTTL(request.Key, newEntry)
-
-	// Publish an event to listener streams.
-	m.sendEvent(&ListenResponse{
-		Type:    ListenResponse_UPDATED,
-		Key:     request.Key,
-		Index:   newEntry.Index,
-		Value:   newEntry.Value,
-		Version: newEntry.Version,
-		Created: newEntry.Created,
-		Updated: newEntry.Updated,
-	})
-
-	return proto.Marshal(&ReplaceResponse{
-		Status:          UpdateStatus_OK,
-		Index:           newEntry.Index,
-		Key:             newEntry.Key,
-		PreviousValue:   oldEntry.Value,
-		PreviousVersion: oldEntry.Version,
-		NewVersion:      newEntry.Version,
 		Created:         newEntry.Created,
 		Updated:         newEntry.Updated,
 	})
@@ -454,16 +352,12 @@ func (m *Service) Remove(bytes []byte) ([]byte, error) {
 	}
 
 	if entry == nil {
-		return proto.Marshal(&RemoveResponse{
-			Status: UpdateStatus_NOOP,
-		})
+		return nil, errors.NewNotFound("key '%s' not found", request.Key)
 	}
 
 	// If the request version is set, verify that the request version matches the entry version.
 	if request.Version > 0 && request.Version != entry.Version {
-		return proto.Marshal(&RemoveResponse{
-			Status: UpdateStatus_PRECONDITION_FAILED,
-		})
+		return nil, errors.NewConflict("request version %s does not match stored entry version %d", request.Version, entry.Version)
 	}
 
 	// Delete the entry from the map.
@@ -497,7 +391,6 @@ func (m *Service) Remove(bytes []byte) ([]byte, error) {
 	})
 
 	return proto.Marshal(&RemoveResponse{
-		Status:          UpdateStatus_OK,
 		Index:           entry.Index,
 		Key:             entry.Key,
 		PreviousValue:   entry.Value,

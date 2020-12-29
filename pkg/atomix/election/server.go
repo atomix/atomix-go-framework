@@ -16,8 +16,9 @@ package election
 
 import (
 	"context"
-	api "github.com/atomix/api/proto/atomix/election"
-	"github.com/atomix/api/proto/atomix/headers"
+	"github.com/atomix/api/go/atomix/storage"
+	api "github.com/atomix/api/go/atomix/storage/election"
+	"github.com/atomix/api/go/atomix/storage/timestamp"
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/gogo/protobuf/proto"
@@ -50,9 +51,11 @@ func (s *Server) Enter(ctx context.Context, request *api.EnterRequest) (*api.Ent
 	}
 
 	response := &api.EnterResponse{
-		Header: header,
+		Header: *header,
 		Term: &api.Term{
-			ID:         enterResponse.Term.ID,
+			ID: timestamp.Epoch{
+				Value: enterResponse.Term.ID,
+			},
 			Timestamp:  enterResponse.Term.Timestamp,
 			Leader:     enterResponse.Term.Leader,
 			Candidates: enterResponse.Term.Candidates,
@@ -83,9 +86,11 @@ func (s *Server) Withdraw(ctx context.Context, request *api.WithdrawRequest) (*a
 	}
 
 	response := &api.WithdrawResponse{
-		Header: header,
+		Header: *header,
 		Term: &api.Term{
-			ID:         withdrawResponse.Term.ID,
+			ID: timestamp.Epoch{
+				Value: withdrawResponse.Term.ID,
+			},
 			Timestamp:  withdrawResponse.Term.Timestamp,
 			Leader:     withdrawResponse.Term.Leader,
 			Candidates: withdrawResponse.Term.Candidates,
@@ -116,9 +121,11 @@ func (s *Server) Anoint(ctx context.Context, request *api.AnointRequest) (*api.A
 	}
 
 	response := &api.AnointResponse{
-		Header: header,
+		Header: *header,
 		Term: &api.Term{
-			ID:         anointResponse.Term.ID,
+			ID: timestamp.Epoch{
+				Value: anointResponse.Term.ID,
+			},
 			Timestamp:  anointResponse.Term.Timestamp,
 			Leader:     anointResponse.Term.Leader,
 			Candidates: anointResponse.Term.Candidates,
@@ -149,9 +156,11 @@ func (s *Server) Promote(ctx context.Context, request *api.PromoteRequest) (*api
 	}
 
 	response := &api.PromoteResponse{
-		Header: header,
+		Header: *header,
 		Term: &api.Term{
-			ID:         promoteResponse.Term.ID,
+			ID: timestamp.Epoch{
+				Value: promoteResponse.Term.ID,
+			},
 			Timestamp:  promoteResponse.Term.Timestamp,
 			Leader:     promoteResponse.Term.Leader,
 			Candidates: promoteResponse.Term.Candidates,
@@ -182,9 +191,11 @@ func (s *Server) Evict(ctx context.Context, request *api.EvictRequest) (*api.Evi
 	}
 
 	response := &api.EvictResponse{
-		Header: header,
+		Header: *header,
 		Term: &api.Term{
-			ID:         evictResponse.Term.ID,
+			ID: timestamp.Epoch{
+				Value: evictResponse.Term.ID,
+			},
 			Timestamp:  evictResponse.Term.Timestamp,
 			Leader:     evictResponse.Term.Leader,
 			Candidates: evictResponse.Term.Candidates,
@@ -213,9 +224,11 @@ func (s *Server) GetTerm(ctx context.Context, request *api.GetTermRequest) (*api
 	}
 
 	response := &api.GetTermResponse{
-		Header: header,
+		Header: *header,
 		Term: &api.Term{
-			ID:         getResponse.Term.ID,
+			ID: timestamp.Epoch{
+				Value: getResponse.Term.ID,
+			},
 			Timestamp:  getResponse.Term.Timestamp,
 			Leader:     getResponse.Term.Leader,
 			Candidates: getResponse.Term.Candidates,
@@ -255,21 +268,23 @@ func (s *Server) Events(request *api.EventRequest, srv api.LeaderElectionService
 		}
 
 		var eventResponse *api.EventResponse
-		switch output.Header.Type {
-		case headers.ResponseType_OPEN_STREAM:
+		switch output.Header.State.Type {
+		case storage.ResponseType_OPEN_STREAM:
 			eventResponse = &api.EventResponse{
-				Header: output.Header,
+				Header: *output.Header,
 			}
-		case headers.ResponseType_CLOSE_STREAM:
+		case storage.ResponseType_CLOSE_STREAM:
 			eventResponse = &api.EventResponse{
-				Header: output.Header,
+				Header: *output.Header,
 			}
 		default:
 			eventResponse = &api.EventResponse{
-				Header: output.Header,
+				Header: *output.Header,
 				Type:   api.EventResponse_CHANGED,
 				Term: &api.Term{
-					ID:         response.Term.ID,
+					ID: timestamp.Epoch{
+						Value: response.Term.ID,
+					},
 					Timestamp:  response.Term.Timestamp,
 					Leader:     response.Term.Leader,
 					Candidates: response.Term.Candidates,
@@ -294,7 +309,7 @@ func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.C
 		return nil, err
 	}
 	response := &api.CreateResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending CreateResponse %+v", response)
 	return response, nil
@@ -309,7 +324,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 			return nil, err
 		}
 		response := &api.CloseResponse{
-			Header: header,
+			Header: *header,
 		}
 		log.Tracef("Sending CloseResponse %+v", response)
 		return response, nil
@@ -320,7 +335,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return nil, err
 	}
 	response := &api.CloseResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil

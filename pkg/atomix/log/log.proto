@@ -68,9 +68,8 @@ message AppendRequest {
 }
 
 message AppendResponse {
-    UpdateStatus status = 1;
-    uint64 index = 2;
-    google.protobuf.Timestamp timestamp = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    uint64 index = 1;
+    google.protobuf.Timestamp timestamp = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 
 }
 
@@ -127,10 +126,9 @@ message RemoveRequest {
 }
 
 message RemoveResponse {
-    UpdateStatus status = 1;
-    uint64 index = 2;
-    bytes previous_value = 3;
-    google.protobuf.Timestamp timestamp = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    uint64 index = 1;
+    bytes previous_value = 2;
+    google.protobuf.Timestamp timestamp = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 
 }
 message ClearRequest {
@@ -183,11 +181,4 @@ message UnlistenRequest {
 }
 
 message UnlistenResponse {
-}
-
-enum UpdateStatus {
-    OK = 0;
-    NOOP = 1;
-    WRITE_LOCK = 2;
-    PRECONDITION_FAILED = 3;
 }

@@ -16,8 +16,9 @@ package leader
 
 import (
 	"context"
-	"github.com/atomix/api/proto/atomix/headers"
-	api "github.com/atomix/api/proto/atomix/leader"
+	"github.com/atomix/api/go/atomix/storage"
+	api "github.com/atomix/api/go/atomix/storage/leader"
+	"github.com/atomix/api/go/atomix/storage/timestamp"
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/gogo/protobuf/proto"
@@ -50,9 +51,11 @@ func (s *Server) Latch(ctx context.Context, request *api.LatchRequest) (*api.Lat
 	}
 
 	response := &api.LatchResponse{
-		Header: header,
+		Header: *header,
 		Latch: &api.Latch{
-			ID:           enterResponse.Latch.ID,
+			ID: timestamp.Epoch{
+				Value: enterResponse.Latch.ID,
+			},
 			Leader:       enterResponse.Latch.Leader,
 			Participants: enterResponse.Latch.Participants,
 		},
@@ -80,9 +83,11 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 	}
 
 	response := &api.GetResponse{
-		Header: header,
+		Header: *header,
 		Latch: &api.Latch{
-			ID:           getResponse.Latch.ID,
+			ID: timestamp.Epoch{
+				Value: getResponse.Latch.ID,
+			},
 			Leader:       getResponse.Latch.Leader,
 			Participants: getResponse.Latch.Participants,
 		},
@@ -121,21 +126,23 @@ func (s *Server) Events(request *api.EventRequest, srv api.LeaderLatchService_Ev
 		}
 
 		var eventResponse *api.EventResponse
-		switch output.Header.Type {
-		case headers.ResponseType_OPEN_STREAM:
+		switch output.Header.State.Type {
+		case storage.ResponseType_OPEN_STREAM:
 			eventResponse = &api.EventResponse{
-				Header: output.Header,
+				Header: *output.Header,
 			}
-		case headers.ResponseType_CLOSE_STREAM:
+		case storage.ResponseType_CLOSE_STREAM:
 			eventResponse = &api.EventResponse{
-				Header: output.Header,
+				Header: *output.Header,
 			}
 		default:
 			eventResponse = &api.EventResponse{
-				Header: output.Header,
+				Header: *output.Header,
 				Type:   api.EventResponse_CHANGED,
 				Latch: &api.Latch{
-					ID:           response.Latch.ID,
+					ID: timestamp.Epoch{
+						Value: response.Latch.ID,
+					},
 					Leader:       response.Latch.Leader,
 					Participants: response.Latch.Participants,
 				},
@@ -159,7 +166,7 @@ func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.C
 		return nil, err
 	}
 	response := &api.CreateResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending CreateResponse %+v", response)
 	return response, nil
@@ -174,7 +181,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 			return nil, err
 		}
 		response := &api.CloseResponse{
-			Header: header,
+			Header: *header,
 		}
 		log.Tracef("Sending CloseResponse %+v", response)
 		return response, nil
@@ -185,7 +192,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return nil, err
 	}
 	response := &api.CloseResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil

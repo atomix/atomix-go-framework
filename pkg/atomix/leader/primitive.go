@@ -15,15 +15,14 @@
 package leader
 
 import (
-	api "github.com/atomix/api/proto/atomix/leader"
-	primitiveapi "github.com/atomix/api/proto/atomix/primitive"
+	api "github.com/atomix/api/go/atomix/storage/leader"
 	"github.com/atomix/go-framework/pkg/atomix"
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	"google.golang.org/grpc"
 )
 
 // Type is the leader latch primitive type
-const Type = primitiveapi.PrimitiveType_LEADER_LATCH
+const Type = "leaderlatch"
 
 // RegisterPrimitive registers the primitive on the given node
 func RegisterPrimitive(node *atomix.Node) {
@@ -37,7 +36,7 @@ type Primitive struct{}
 func (p *Primitive) RegisterServer(server *grpc.Server, protocol primitive.Protocol) {
 	api.RegisterLeaderLatchServiceServer(server, &Server{
 		Server: &primitive.Server{
-			Type:     primitive.ServiceType_LEADER_LATCH,
+			Type:     Type,
 			Protocol: protocol,
 		},
 	})

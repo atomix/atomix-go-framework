@@ -15,15 +15,14 @@
 package value
 
 import (
-	primitiveapi "github.com/atomix/api/proto/atomix/primitive"
-	api "github.com/atomix/api/proto/atomix/value"
+	api "github.com/atomix/api/go/atomix/storage/value"
 	"github.com/atomix/go-framework/pkg/atomix"
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	"google.golang.org/grpc"
 )
 
 // Type is the value primitive type
-const Type = primitiveapi.PrimitiveType_VALUE
+const Type = "value"
 
 // RegisterPrimitive registers the primitive on the given node
 func RegisterPrimitive(node *atomix.Node) {
@@ -37,7 +36,7 @@ type Primitive struct{}
 func (p *Primitive) RegisterServer(server *grpc.Server, protocol primitive.Protocol) {
 	api.RegisterValueServiceServer(server, &Server{
 		Server: &primitive.Server{
-			Type:     primitive.ServiceType_VALUE,
+			Type:     Type,
 			Protocol: protocol,
 		},
 	})

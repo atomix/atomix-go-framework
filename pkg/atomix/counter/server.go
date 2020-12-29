@@ -16,7 +16,7 @@ package counter
 
 import (
 	"context"
-	api "github.com/atomix/api/proto/atomix/counter"
+	api "github.com/atomix/api/go/atomix/storage/counter"
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
@@ -36,7 +36,7 @@ func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.C
 	}
 
 	response := &api.CreateResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending CreateResponse %+v", response)
 	return response, nil
@@ -64,7 +64,7 @@ func (s *Server) Set(ctx context.Context, request *api.SetRequest) (*api.SetResp
 	}
 
 	response := &api.SetResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending SetResponse %+v", response)
 	return response, nil
@@ -90,7 +90,7 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 	}
 
 	response := &api.GetResponse{
-		Header: header,
+		Header: *header,
 		Value:  getResponse.Value,
 	}
 	log.Tracef("Sending GetResponse %+v", response)
@@ -119,7 +119,7 @@ func (s *Server) Increment(ctx context.Context, request *api.IncrementRequest) (
 	}
 
 	response := &api.IncrementResponse{
-		Header:        header,
+		Header:        *header,
 		PreviousValue: incrementResponse.PreviousValue,
 		NextValue:     incrementResponse.NextValue,
 	}
@@ -149,7 +149,7 @@ func (s *Server) Decrement(ctx context.Context, request *api.DecrementRequest) (
 	}
 
 	response := &api.DecrementResponse{
-		Header:        header,
+		Header:        *header,
 		PreviousValue: decrementResponse.PreviousValue,
 		NextValue:     decrementResponse.NextValue,
 	}
@@ -180,7 +180,7 @@ func (s *Server) CheckAndSet(ctx context.Context, request *api.CheckAndSetReques
 	}
 
 	response := &api.CheckAndSetResponse{
-		Header:    header,
+		Header:    *header,
 		Succeeded: casResponse.Succeeded,
 	}
 	log.Tracef("Sending CheckAndSetResponse %+v", response)
@@ -196,7 +196,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 			return nil, err
 		}
 		response := &api.CloseResponse{
-			Header: header,
+			Header: *header,
 		}
 		log.Tracef("Sending CloseResponse %+v", response)
 		return response, nil
@@ -207,7 +207,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return nil, err
 	}
 	response := &api.CloseResponse{
-		Header: header,
+		Header: *header,
 	}
 	log.Tracef("Sending CloseResponse %+v", response)
 	return response, nil

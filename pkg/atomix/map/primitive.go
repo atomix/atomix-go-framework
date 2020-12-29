@@ -15,15 +15,14 @@
 package _map //nolint:golint
 
 import (
-	api "github.com/atomix/api/proto/atomix/map"
-	primitiveapi "github.com/atomix/api/proto/atomix/primitive"
+	api "github.com/atomix/api/go/atomix/storage/map"
 	"github.com/atomix/go-framework/pkg/atomix"
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	"google.golang.org/grpc"
 )
 
 // Type is the map primitive type
-const Type = primitiveapi.PrimitiveType_MAP
+const Type = "map"
 
 // RegisterPrimitive registers the primitive on the given node
 func RegisterPrimitive(node *atomix.Node) {
@@ -37,7 +36,7 @@ type Primitive struct{}
 func (p *Primitive) RegisterServer(server *grpc.Server, protocol primitive.Protocol) {
 	api.RegisterMapServiceServer(server, &Server{
 		Server: &primitive.Server{
-			Type:     primitive.ServiceType_MAP,
+			Type:     Type,
 			Protocol: protocol,
 		},
 	})

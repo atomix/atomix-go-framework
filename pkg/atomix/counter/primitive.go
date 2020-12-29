@@ -15,15 +15,14 @@
 package counter
 
 import (
-	api "github.com/atomix/api/proto/atomix/counter"
-	primitiveapi "github.com/atomix/api/proto/atomix/primitive"
+	api "github.com/atomix/api/go/atomix/storage/counter"
 	"github.com/atomix/go-framework/pkg/atomix"
 	"github.com/atomix/go-framework/pkg/atomix/primitive"
 	"google.golang.org/grpc"
 )
 
 // Type is the counter primitive type
-const Type = primitiveapi.PrimitiveType_COUNTER
+const Type = "counter"
 
 // RegisterPrimitive registers the primitive on the given node
 func RegisterPrimitive(node *atomix.Node) {
@@ -37,7 +36,7 @@ type Primitive struct{}
 func (p *Primitive) RegisterServer(server *grpc.Server, protocol primitive.Protocol) {
 	api.RegisterCounterServiceServer(server, &Server{
 		Server: &primitive.Server{
-			Type:     primitive.ServiceType_COUNTER,
+			Type:     Type,
 			Protocol: protocol,
 		},
 	})
