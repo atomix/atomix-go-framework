@@ -16,7 +16,7 @@ package errors
 
 import (
 	"fmt"
-	"github.com/atomix/api/proto/atomix/headers"
+	"github.com/atomix/api/go/atomix/storage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -66,43 +66,79 @@ func (e *TypedError) Error() string {
 var _ error = &TypedError{}
 
 // Status gets the proto status for the given error
-func Status(err error) headers.ResponseStatus {
+func Status(err error) storage.ResponseCode {
 	if err == nil {
-		return headers.ResponseStatus_OK
+		return storage.ResponseCode_OK
 	}
 
 	typed, ok := err.(*TypedError)
 	if !ok {
-		return headers.ResponseStatus_ERROR
+		return storage.ResponseCode_ERROR
 	}
 
 	switch typed.Type {
 	case Unknown:
-		return headers.ResponseStatus_UNKNOWN
+		return storage.ResponseCode_UNKNOWN
 	case Canceled:
-		return headers.ResponseStatus_CANCELED
+		return storage.ResponseCode_CANCELED
 	case NotFound:
-		return headers.ResponseStatus_NOT_FOUND
+		return storage.ResponseCode_NOT_FOUND
 	case AlreadyExists:
-		return headers.ResponseStatus_ALREADY_EXISTS
+		return storage.ResponseCode_ALREADY_EXISTS
 	case Unauthorized:
-		return headers.ResponseStatus_UNAUTHORIZED
+		return storage.ResponseCode_UNAUTHORIZED
 	case Forbidden:
-		return headers.ResponseStatus_FORBIDDEN
+		return storage.ResponseCode_FORBIDDEN
 	case Conflict:
-		return headers.ResponseStatus_CONFLICT
+		return storage.ResponseCode_CONFLICT
 	case Invalid:
-		return headers.ResponseStatus_INVALID
+		return storage.ResponseCode_INVALID
 	case Unavailable:
-		return headers.ResponseStatus_UNAVAILABLE
+		return storage.ResponseCode_UNAVAILABLE
 	case NotSupported:
-		return headers.ResponseStatus_NOT_SUPPORTED
+		return storage.ResponseCode_NOT_SUPPORTED
 	case Timeout:
-		return headers.ResponseStatus_TIMEOUT
+		return storage.ResponseCode_TIMEOUT
 	case Internal:
-		return headers.ResponseStatus_INTERNAL
+		return storage.ResponseCode_INTERNAL
 	default:
-		return headers.ResponseStatus_ERROR
+		return storage.ResponseCode_ERROR
+	}
+}
+
+// FromHeader creates a typed error from a response header
+func FromHeader(header storage.ResponseHeader) error {
+	switch header.Status.Code {
+	case storage.ResponseCode_OK:
+		return nil
+	case storage.ResponseCode_ERROR:
+		return NewUnknown(header.Status.Message)
+	case storage.ResponseCode_UNKNOWN:
+		return NewUnknown(header.Status.Message)
+	case storage.ResponseCode_CANCELED:
+		return NewCanceled(header.Status.Message)
+	case storage.ResponseCode_NOT_FOUND:
+		return NewNotFound(header.Status.Message)
+	case storage.ResponseCode_ALREADY_EXISTS:
+		return NewAlreadyExists(header.Status.Message)
+	case storage.ResponseCode_UNAUTHORIZED:
+		return NewUnauthorized(header.Status.Message)
+	case storage.ResponseCode_FORBIDDEN:
+		return NewForbidden(header.Status.Message)
+	case storage.ResponseCode_CONFLICT:
+		return NewConflict(header.Status.Message)
+	case storage.ResponseCode_INVALID:
+		return NewInvalid(header.Status.Message)
+	case storage.ResponseCode_UNAVAILABLE:
+		return NewUnavailable(header.Status.Message)
+	case storage.ResponseCode_NOT_SUPPORTED:
+		return NewNotSupported(header.Status.Message)
+	case storage.ResponseCode_TIMEOUT:
+		return NewTimeout(header.Status.Message)
+	case storage.ResponseCode_INTERNAL:
+		return NewInternal(header.Status.Message)
+	default:
+		return NewUnknown(header.Status.Message)
 	}
 }
 
