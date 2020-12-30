@@ -64,12 +64,6 @@ func (p *Client) Partitions() []*Partition {
 	return p.partitions
 }
 
-func (p *Client) Connect() error {
-	return async.IterAsync(len(p.partitions), func(i int) error {
-		return p.partitions[i].Connect()
-	})
-}
-
 func (p *Client) Close() error {
 	return async.IterAsync(len(p.partitions), func(i int) error {
 		return p.partitions[i].Close()

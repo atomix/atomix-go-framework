@@ -66,11 +66,6 @@ func (n *Node) Start() error {
 		return err
 	}
 
-	err = n.client.Connect()
-	if err != nil {
-		return err
-	}
-
 	// Set the ready file to indicate startup of the protocol is complete.
 	ready := util.NewFileReady()
 	_ = ready.Set()
