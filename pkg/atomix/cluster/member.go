@@ -16,37 +16,34 @@ package cluster
 
 import (
 	"fmt"
+	storageapi "github.com/atomix/api/go/atomix/storage"
 	"google.golang.org/grpc"
 	"net"
 )
 
 // NewMember returns a new local group member
-func NewMember(id ReplicaID, host string, port int, services ...Service) *Member {
+func NewMember(config storageapi.StorageReplica) *Member {
 	return &Member{
-		services: services,
-		Replica: &Replica{
-			ID:   id,
-			Host: host,
-			Port: port,
-		},
+		Replica: NewReplica(config),
 	}
 }
 
 // Service is a peer-to-peer primitive service
-type Service func(ReplicaID, *grpc.Server)
+type Service func(*grpc.Server)
 
 // Member is a local group member
 type Member struct {
 	*Replica
-	services []Service
-	stopCh   chan struct{}
+	server *grpc.Server
 }
 
 // serve begins serving the local member
-func (m *Member) serve(opts ...grpc.ServerOption) error {
-	server := grpc.NewServer(opts...)
-	for _, service := range m.services {
-		service(m.ID, server)
+func (m *Member) Serve(opts ...ServeOption) error {
+	options := applyServeOptions(opts...)
+
+	m.server = grpc.NewServer(options.grpcOptions...)
+	for _, service := range options.services {
+		service(m.server)
 	}
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", m.Port))
@@ -55,19 +52,16 @@ func (m *Member) serve(opts ...grpc.ServerOption) error {
 	}
 
 	go func() {
-		err := server.Serve(lis)
+		err := m.server.Serve(lis)
 		if err != nil {
 			fmt.Println(err)
 		}
-	}()
-	go func() {
-		<-m.stopCh
-		server.Stop()
 	}()
 	return nil
 }
 
 // Stop stops the local member serving
-func (m *Member) Stop() {
-	close(m.stopCh)
+func (m *Member) Stop() error {
+	m.server.Stop()
+	return nil
 }

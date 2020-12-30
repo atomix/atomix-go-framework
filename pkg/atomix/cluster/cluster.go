@@ -16,32 +16,53 @@ package cluster
 
 import (
 	"context"
-	"errors"
-	"github.com/atomix/api/go/atomix/storage"
+	storageapi "github.com/atomix/api/go/atomix/storage"
 	"sync"
-	"time"
 )
 
-// NewGroup creates a new peer group
-func NewCluster(config storage.StorageConfig, opts ...Option) *Cluster {
+// NewCluster creates a new cluster
+func NewCluster(config storageapi.StorageConfig, opts ...Option) *Cluster {
 	options := applyOptions(opts...)
 
 	var member *Member
 	if options.memberID != "" {
-		services := options.services
-		if services == nil {
-			services = []Service{}
+		var replica *storageapi.StorageReplica
+		for _, replicaConfig := range config.Replicas {
+			if replicaConfig.ID == options.memberID {
+				replica = &replicaConfig
+				break
+			}
 		}
-		member = NewMember(ReplicaID(options.memberID), options.peerHost, options.peerPort, services...)
+
+		peerHost := options.peerHost
+		if peerHost == "" && replica != nil {
+			peerHost = replica.Host
+		}
+		peerPort := options.peerPort
+		if peerPort == 0 && replica != nil {
+			peerPort = int(replica.APIPort)
+		}
+
+		if replica == nil {
+			replica = &storageapi.StorageReplica{
+				ID:           options.memberID,
+				NodeID:       options.nodeID,
+				Host:         peerHost,
+				APIPort:      int32(peerPort),
+				ProtocolPort: int32(peerPort),
+			}
+		}
+		member = NewMember(*replica)
 	}
 
-	return &Cluster{
+	cluster := &Cluster{
 		member:   member,
 		replicas: make(ReplicaSet),
 		options:  *options,
-		leaveCh:  make(chan struct{}),
 		watchers: make([]chan<- PartitionSet, 0),
 	}
+	_ = cluster.Update(config)
+	return cluster
 }
 
 // Cluster manages the peer group for a client
@@ -51,14 +72,12 @@ type Cluster struct {
 	replicas   ReplicaSet
 	partitions PartitionSet
 	watchers   []chan<- PartitionSet
-	closer     context.CancelFunc
-	leaveCh    chan struct{}
 	mu         sync.RWMutex
 }
 
 // Member returns the local group member
-func (c *Cluster) Member() *Replica {
-	return c.member.Replica
+func (c *Cluster) Member() *Member {
+	return c.member
 }
 
 // Replica returns a replica by ID
@@ -87,10 +106,10 @@ func (c *Cluster) Partitions() PartitionSet {
 }
 
 // Update updates the cluster configuration
-func (c *Cluster) Update(config storage.StorageConfig) error {
+func (c *Cluster) Update(config storageapi.StorageConfig) error {
 	c.mu.Lock()
 
-	replicaConfigs := make(map[ReplicaID]storage.StorageReplica)
+	replicaConfigs := make(map[ReplicaID]storageapi.StorageReplica)
 	for _, replicaConfig := range config.Replicas {
 		replicaConfigs[ReplicaID(replicaConfig.ID)] = replicaConfig
 	}
@@ -107,7 +126,7 @@ func (c *Cluster) Update(config storage.StorageConfig) error {
 		}
 	}
 
-	partitionConfigs := make(map[PartitionID]storage.StoragePartition)
+	partitionConfigs := make(map[PartitionID]storageapi.StoragePartition)
 	for _, partition := range config.Partitions {
 		partitionConfigs[PartitionID(partition.PartitionID)] = partition
 	}
@@ -176,21 +195,10 @@ func (c *Cluster) Watch(ctx context.Context, ch chan<- PartitionSet) error {
 	return nil
 }
 
-// Close closes the group
+// Close closes the cluster
 func (c *Cluster) Close() error {
-	c.mu.RLock()
-	closer := c.closer
-	leaveCh := c.leaveCh
-	c.mu.RUnlock()
-	timeout := time.Minute
-	if closer != nil {
-		closer()
-		select {
-		case <-leaveCh:
-			return nil
-		case <-time.After(timeout):
-			return errors.New("leave timed out")
-		}
+	if c.member != nil {
+		return c.member.Stop()
 	}
 	return nil
 }

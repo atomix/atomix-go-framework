@@ -20,9 +20,7 @@ import (
 
 func applyOptions(opts ...Option) *options {
 	options := &options{
-		peerPort:      8080,
-		services:      make([]Service, 0),
-		serverOptions: make([]grpc.ServerOption, 0),
+		peerPort: 8080,
 	}
 	for _, opt := range opts {
 		opt.apply(options)
@@ -31,11 +29,10 @@ func applyOptions(opts ...Option) *options {
 }
 
 type options struct {
-	memberID      string
-	peerHost      string
-	peerPort      int
-	services      []Service
-	serverOptions []grpc.ServerOption
+	memberID string
+	nodeID   string
+	peerHost string
+	peerPort int
 }
 
 // Option provides a peer option
@@ -57,6 +54,19 @@ func (o *memberIDOption) apply(options *options) {
 	if options.peerHost == "" {
 		options.peerHost = o.id
 	}
+}
+
+// WithNodeID configures the peer's node ID
+func WithNodeID(nodeID string) Option {
+	return &nodeIDOption{id: nodeID}
+}
+
+type nodeIDOption struct {
+	id string
+}
+
+func (o *nodeIDOption) apply(options *options) {
+	options.nodeID = o.id
 }
 
 // WithHost configures the peer's host
@@ -85,8 +95,29 @@ func (o *portOption) apply(options *options) {
 	options.peerPort = o.port
 }
 
+func applyServeOptions(opts ...ServeOption) *serveOptions {
+	options := &serveOptions{
+		services:    make([]Service, 0),
+		grpcOptions: make([]grpc.ServerOption, 0),
+	}
+	for _, opt := range opts {
+		opt.apply(options)
+	}
+	return options
+}
+
+type serveOptions struct {
+	services    []Service
+	grpcOptions []grpc.ServerOption
+}
+
+// ServeOption provides a member serve option
+type ServeOption interface {
+	apply(options *serveOptions)
+}
+
 // WithService configures a peer-to-peer service
-func WithService(service Service) Option {
+func WithService(service Service) ServeOption {
 	return &serviceOption{
 		service: service,
 	}
@@ -96,12 +127,12 @@ type serviceOption struct {
 	service Service
 }
 
-func (o *serviceOption) apply(options *options) {
+func (o *serviceOption) apply(options *serveOptions) {
 	options.services = append(options.services, o.service)
 }
 
 // WithServices configures peer-to-peer services
-func WithServices(services ...Service) Option {
+func WithServices(services ...Service) ServeOption {
 	return &servicesOption{
 		services: services,
 	}
@@ -111,12 +142,12 @@ type servicesOption struct {
 	services []Service
 }
 
-func (o *servicesOption) apply(options *options) {
+func (o *servicesOption) apply(options *serveOptions) {
 	options.services = append(options.services, o.services...)
 }
 
 // WithServerOption configures a server option
-func WithServerOption(option grpc.ServerOption) Option {
+func WithServerOption(option grpc.ServerOption) ServeOption {
 	return &serverOptionOption{
 		option: option,
 	}
@@ -126,12 +157,12 @@ type serverOptionOption struct {
 	option grpc.ServerOption
 }
 
-func (o *serverOptionOption) apply(options *options) {
-	options.serverOptions = append(options.serverOptions, o.option)
+func (o *serverOptionOption) apply(options *serveOptions) {
+	options.grpcOptions = append(options.grpcOptions, o.option)
 }
 
 // WithServerOptions configures server options
-func WithServerOptions(options ...grpc.ServerOption) Option {
+func WithServerOptions(options ...grpc.ServerOption) ServeOption {
 	return &serverOptionsOption{
 		options: options,
 	}
@@ -141,8 +172,8 @@ type serverOptionsOption struct {
 	options []grpc.ServerOption
 }
 
-func (o *serverOptionsOption) apply(options *options) {
-	options.serverOptions = append(options.serverOptions, o.options...)
+func (o *serverOptionsOption) apply(options *serveOptions) {
+	options.grpcOptions = append(options.grpcOptions, o.options...)
 }
 
 func applyConnectOptions(opts ...ConnectOption) *connectOptions {
