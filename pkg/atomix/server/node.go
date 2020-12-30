@@ -28,7 +28,6 @@ func NewNode(cluster *cluster.Cluster) *Node {
 	return &Node{
 		Cluster:  cluster,
 		registry: NewRegistry(),
-		startCh:  make(chan error),
 	}
 }
 
@@ -36,7 +35,6 @@ func NewNode(cluster *cluster.Cluster) *Node {
 type Node struct {
 	Cluster  *cluster.Cluster
 	registry Registry
-	startCh  chan error
 }
 
 // RegisterService registers a primitive service

@@ -15,6 +15,7 @@
 package proxy
 
 import (
+	"github.com/atomix/api/go/atomix/proxy"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/atomix/go-framework/pkg/atomix/util/logging"
@@ -29,7 +30,6 @@ func NewNode(cluster *cluster.Cluster) *Node {
 		Cluster:  cluster,
 		client:   NewClient(cluster),
 		registry: NewRegistry(),
-		startCh:  make(chan error),
 	}
 }
 
@@ -38,7 +38,6 @@ type Node struct {
 	Cluster  *cluster.Cluster
 	client   *Client
 	registry Registry
-	startCh  chan error
 }
 
 // RegisterService registers a primitive service
@@ -57,6 +56,9 @@ func (n *Node) Start() error {
 			server.RegisterServer(s, n.client)
 		}
 	}
+	services = append(services, func(s *grpc.Server) {
+		proxy.RegisterProxyServiceServer(s, &Server{cluster: n.Cluster})
+	})
 
 	err := n.Cluster.Member().Serve(cluster.WithServices(services...))
 	if err != nil {

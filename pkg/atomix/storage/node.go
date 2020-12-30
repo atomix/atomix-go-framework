@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"github.com/atomix/api/go/atomix/storage"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/atomix/go-framework/pkg/atomix/util/logging"
@@ -29,7 +30,6 @@ func NewNode(cluster *cluster.Cluster, protocol Protocol) *Node {
 		Cluster:  cluster,
 		protocol: protocol,
 		registry: NewRegistry(),
-		startCh:  make(chan error),
 	}
 }
 
@@ -38,7 +38,6 @@ type Node struct {
 	Cluster  *cluster.Cluster
 	protocol Protocol
 	registry Registry
-	startCh  chan error
 }
 
 // RegisterService registers a primitive service
@@ -50,9 +49,13 @@ func (n *Node) RegisterService(t string, primitive PrimitiveService) {
 func (n *Node) Start() error {
 	log.Info("Starting protocol")
 
-	err := n.Cluster.Member().Serve(cluster.WithService(func(server *grpc.Server) {
-		RegisterStorageServiceServer(server, &Server{Protocol: n.protocol})
-	}))
+	err := n.Cluster.Member().Serve(
+		cluster.WithService(func(server *grpc.Server) {
+			RegisterStorageServiceServer(server, &Server{Protocol: n.protocol})
+		}),
+		cluster.WithService(func(server *grpc.Server) {
+			storage.RegisterStorageServiceServer(server, &ConfigServer{cluster: n.Cluster})
+		}))
 	if err != nil {
 		return err
 	}
