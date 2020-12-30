@@ -15,9 +15,6 @@
 package rsm
 
 import (
-	"context"
-	"github.com/atomix/api/go/atomix/storage"
-	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 )
@@ -85,17 +82,3 @@ func (s *Server) Request(request *StorageRequest, stream StorageService_RequestS
 }
 
 var _ StorageServiceServer = &Server{}
-
-// ConfigServer is a server for updating the storage configuration
-type ConfigServer struct {
-	cluster *cluster.Cluster
-}
-
-func (s *ConfigServer) Update(ctx context.Context, request *storage.UpdateRequest) (*storage.UpdateResponse, error) {
-	if err := s.cluster.Update(request.Config); err != nil {
-		return nil, err
-	}
-	return &storage.UpdateResponse{}, nil
-}
-
-var _ storage.StorageServiceServer = &ConfigServer{}

@@ -15,8 +15,9 @@
 package rsm
 
 import (
-	"github.com/atomix/api/go/atomix/storage"
+	storageapi "github.com/atomix/api/go/atomix/storage"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
+	"github.com/atomix/go-framework/pkg/atomix/storage"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
@@ -54,7 +55,7 @@ func (n *Node) Start() error {
 			RegisterStorageServiceServer(server, &Server{Protocol: n.protocol})
 		}),
 		cluster.WithService(func(server *grpc.Server) {
-			storage.RegisterStorageServiceServer(server, &ConfigServer{cluster: n.Cluster})
+			storageapi.RegisterStorageServiceServer(server, storage.NewServer(n.Cluster))
 		}))
 	if err != nil {
 		return err
