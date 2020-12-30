@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package rsm
+package passthrough
 
 import (
 	proxyapi "github.com/atomix/api/go/atomix/proxy"

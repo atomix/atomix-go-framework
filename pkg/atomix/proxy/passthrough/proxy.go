@@ -12,24 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package rsm
+package passthrough
 
-import (
-	"context"
-	"github.com/atomix/api/go/atomix/proxy"
-	"github.com/atomix/go-framework/pkg/atomix/cluster"
-)
+// NewProxy creates a new proxy server
+func NewProxy(client *Client) *Proxy {
+	return &Proxy{
+		Client: client,
+	}
+}
 
 // Server is a base server for servers that support sessions
-type Server struct {
-	cluster *cluster.Cluster
+type Proxy struct {
+	*Client
 }
-
-func (s *Server) Update(ctx context.Context, request *proxy.UpdateRequest) (*proxy.UpdateResponse, error) {
-	if err := s.cluster.Update(request.Config); err != nil {
-		return nil, err
-	}
-	return &proxy.UpdateResponse{}, nil
-}
-
-var _ proxy.ProxyServiceServer = &Server{}
