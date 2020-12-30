@@ -15,49 +15,41 @@
 package leader
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/storage"
+	"github.com/atomix/go-framework/pkg/atomix/storage/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
 	"io"
 )
 
-// RegisterService registers the election primitive service on the given node
-func RegisterService(node *storage.Node) {
-	node.RegisterService(Type, &ServiceType{})
+// RegisterRSMService registers the election primitive service on the given node
+func RegisterRSMService(node *rsm.Node) {
+	node.RegisterService(Type, func(scheduler rsm.Scheduler, context rsm.ServiceContext) rsm.Service {
+		service := &RSMService{
+			Service:      rsm.NewService(scheduler, context),
+			participants: make([]*LatchParticipant, 0),
+		}
+		service.init()
+		return service
+	})
 }
 
-// ServiceType is the election primitive service
-type ServiceType struct{}
-
-// NewService creates a new election service
-func (p *ServiceType) NewService(scheduler storage.Scheduler, context storage.ServiceContext) storage.Service {
-	service := &Service{
-		Service:      storage.NewService(scheduler, context),
-		participants: make([]*LatchParticipant, 0),
-	}
-	service.init()
-	return service
-}
-
-var _ storage.PrimitiveService = &ServiceType{}
-
-// Service is a state machine for an election primitive
-type Service struct {
-	storage.Service
+// RSMService is a state machine for an election primitive
+type RSMService struct {
+	rsm.Service
 	leader       *LatchParticipant
 	latch        uint64
 	participants []*LatchParticipant
 }
 
 // init initializes the election service
-func (e *Service) init() {
+func (e *RSMService) init() {
 	e.RegisterUnaryOperation(opLatch, e.Latch)
 	e.RegisterUnaryOperation(opGetLatch, e.GetLatch)
 	e.RegisterStreamOperation(opEvents, e.Events)
 }
 
 // Backup takes a snapshot of the service
-func (e *Service) Backup(writer io.Writer) error {
+func (e *RSMService) Backup(writer io.Writer) error {
 	snapshot := &LatchSnapshot{
 		Latch:        e.latch,
 		Leader:       e.leader,
@@ -71,7 +63,7 @@ func (e *Service) Backup(writer io.Writer) error {
 }
 
 // Restore restores the service from a snapshot
-func (e *Service) Restore(reader io.Reader) error {
+func (e *RSMService) Restore(reader io.Reader) error {
 	bytes, err := util.ReadBytes(reader)
 	if err != nil {
 		return err
@@ -88,20 +80,20 @@ func (e *Service) Restore(reader io.Reader) error {
 }
 
 // SessionExpired is called when a session is expired by the server
-func (e *Service) SessionExpired(session storage.Session) {
+func (e *RSMService) SessionExpired(session rsm.Session) {
 	e.close(session)
 }
 
 // SessionClosed is called when a session is closed by the client
-func (e *Service) SessionClosed(session storage.Session) {
+func (e *RSMService) SessionClosed(session rsm.Session) {
 	e.close(session)
 }
 
 // close elects a new leader when a session is closed
-func (e *Service) close(session storage.Session) {
+func (e *RSMService) close(session rsm.Session) {
 	candidates := make([]*LatchParticipant, 0, len(e.participants))
 	for _, candidate := range e.participants {
-		if storage.SessionID(candidate.SessionID) != session.ID() {
+		if rsm.SessionID(candidate.SessionID) != session.ID() {
 			candidates = append(candidates, candidate)
 		}
 	}
@@ -109,7 +101,7 @@ func (e *Service) close(session storage.Session) {
 	if len(candidates) != len(e.participants) {
 		e.participants = candidates
 
-		if storage.SessionID(e.leader.SessionID) == session.ID() {
+		if rsm.SessionID(e.leader.SessionID) == session.ID() {
 			e.leader = nil
 			if len(e.participants) > 0 {
 				e.leader = e.participants[0]
@@ -125,7 +117,7 @@ func (e *Service) close(session storage.Session) {
 }
 
 // getLatch returns the current election latch
-func (e *Service) getLatch() *Latch {
+func (e *RSMService) getLatch() *Latch {
 	var leader string
 	if e.leader != nil {
 		leader = e.leader.ID
@@ -138,7 +130,7 @@ func (e *Service) getLatch() *Latch {
 }
 
 // getParticipants returns a slice of candidate IDs
-func (e *Service) getParticipants() []string {
+func (e *RSMService) getParticipants() []string {
 	candidates := make([]string, len(e.participants))
 	for i, candidate := range e.participants {
 		candidates[i] = candidate.ID
@@ -147,7 +139,7 @@ func (e *Service) getParticipants() []string {
 }
 
 // Latch attempts to acquire the latch
-func (e *Service) Latch(bytes []byte) ([]byte, error) {
+func (e *RSMService) Latch(bytes []byte) ([]byte, error) {
 	request := &LatchRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -175,18 +167,18 @@ func (e *Service) Latch(bytes []byte) ([]byte, error) {
 }
 
 // GetLatch gets the current latch
-func (e *Service) GetLatch(bytes []byte) ([]byte, error) {
+func (e *RSMService) GetLatch(bytes []byte) ([]byte, error) {
 	return proto.Marshal(&GetResponse{
 		Latch: e.getLatch(),
 	})
 }
 
 // Events registers the given channel to receive election events
-func (e *Service) Events(bytes []byte, stream storage.Stream) {
+func (e *RSMService) Events(bytes []byte, stream rsm.Stream) {
 	// Keep the stream open for events
 }
 
-func (e *Service) sendEvent(event *ListenResponse) {
+func (e *RSMService) sendEvent(event *ListenResponse) {
 	bytes, err := proto.Marshal(event)
 	for _, session := range e.Sessions() {
 		for _, stream := range session.StreamsOf(opEvents) {

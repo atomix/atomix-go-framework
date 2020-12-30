@@ -12,21 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package server
+package rsm
 
 import (
+	"github.com/atomix/api/go/atomix/proxy"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
 )
 
-var log = logging.GetLogger("atomix", "server")
+var log = logging.GetLogger("atomix", "proxy")
 
 // NewNode creates a new server node
 func NewNode(cluster *cluster.Cluster) *Node {
 	return &Node{
 		Cluster:  cluster,
+		client:   NewClient(cluster),
 		registry: NewRegistry(),
 	}
 }
@@ -34,27 +36,36 @@ func NewNode(cluster *cluster.Cluster) *Node {
 // Node is an Atomix node
 type Node struct {
 	Cluster  *cluster.Cluster
+	client   *Client
 	registry Registry
 }
 
-// RegisterService registers a service
-func (n *Node) RegisterService(service RegisterServiceFunc) {
-	n.registry.Register(service)
+// RegisterService registers a primitive service
+func (n *Node) RegisterProxy(t string, proxy RegisterProxyFunc) {
+	n.registry.Register(t, proxy)
 }
 
 // Start starts the node
 func (n *Node) Start() error {
-	log.Info("Starting server")
+	log.Info("Starting protocol")
 
-	servers := n.registry.GetServices()
+	servers := n.registry.GetProxies()
 	services := make([]cluster.Service, len(servers))
 	for i, f := range servers {
 		services[i] = func(s *grpc.Server) {
-			f(s)
+			f(s, n.client)
 		}
 	}
+	services = append(services, func(s *grpc.Server) {
+		proxy.RegisterProxyServiceServer(s, &Server{cluster: n.Cluster})
+	})
 
 	err := n.Cluster.Member().Serve(cluster.WithServices(services...))
+	if err != nil {
+		return err
+	}
+
+	err = n.client.Connect()
 	if err != nil {
 		return err
 	}
@@ -67,5 +78,8 @@ func (n *Node) Start() error {
 
 // Stop stops the node
 func (n *Node) Stop() error {
+	if err := n.client.Close(); err != nil {
+		return err
+	}
 	return n.Cluster.Close()
 }

@@ -15,40 +15,32 @@
 package set
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/storage"
+	"github.com/atomix/go-framework/pkg/atomix/storage/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
 	"io"
 )
 
-// RegisterService registers the election primitive service on the given node
-func RegisterService(node *storage.Node) {
-	node.RegisterService(Type, &ServiceType{})
+// RegisterRSMService registers the election primitive service on the given node
+func RegisterRSMService(node *rsm.Node) {
+	node.RegisterService(Type, func(scheduler rsm.Scheduler, context rsm.ServiceContext) rsm.Service {
+		service := &RSMService{
+			Service: rsm.NewService(scheduler, context),
+			values:  make(map[string]bool),
+		}
+		service.init()
+		return service
+	})
 }
 
-// ServiceType is the election primitive service
-type ServiceType struct{}
-
-// NewService creates a new election service
-func (p *ServiceType) NewService(scheduler storage.Scheduler, context storage.ServiceContext) storage.Service {
-	service := &Service{
-		Service: storage.NewService(scheduler, context),
-		values:  make(map[string]bool),
-	}
-	service.init()
-	return service
-}
-
-var _ storage.PrimitiveService = &ServiceType{}
-
-// Service is a state machine for a list primitive
-type Service struct {
-	storage.Service
+// RSMService is a state machine for a list primitive
+type RSMService struct {
+	rsm.Service
 	values map[string]bool
 }
 
 // init initializes the list service
-func (s *Service) init() {
+func (s *RSMService) init() {
 	s.RegisterUnaryOperation(opSize, s.Size)
 	s.RegisterUnaryOperation(opContains, s.Contains)
 	s.RegisterUnaryOperation(opAdd, s.Add)
@@ -59,14 +51,14 @@ func (s *Service) init() {
 }
 
 // Backup takes a snapshot of the service
-func (s *Service) Backup(writer io.Writer) error {
+func (s *RSMService) Backup(writer io.Writer) error {
 	return util.WriteMap(writer, s.values, func(key string, value bool) ([]byte, error) {
 		return []byte(key), nil
 	})
 }
 
 // Restore restores the service from a snapshot
-func (s *Service) Restore(reader io.Reader) error {
+func (s *RSMService) Restore(reader io.Reader) error {
 	s.values = make(map[string]bool)
 	return util.ReadMap(reader, s.values, func(data []byte) (string, bool, error) {
 		return string(data), true, nil
@@ -74,14 +66,14 @@ func (s *Service) Restore(reader io.Reader) error {
 }
 
 // Size gets the number of elements in the set
-func (s *Service) Size(bytes []byte) ([]byte, error) {
+func (s *RSMService) Size(bytes []byte) ([]byte, error) {
 	return proto.Marshal(&SizeResponse{
 		Size_: uint32(len(s.values)),
 	})
 }
 
 // Contains checks whether the set contains an element
-func (s *Service) Contains(bytes []byte) ([]byte, error) {
+func (s *RSMService) Contains(bytes []byte) ([]byte, error) {
 	request := &ContainsRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -94,7 +86,7 @@ func (s *Service) Contains(bytes []byte) ([]byte, error) {
 }
 
 // Add adds an element to the set
-func (s *Service) Add(bytes []byte) ([]byte, error) {
+func (s *RSMService) Add(bytes []byte) ([]byte, error) {
 	request := &AddRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -118,7 +110,7 @@ func (s *Service) Add(bytes []byte) ([]byte, error) {
 }
 
 // Remove removes an element from the set
-func (s *Service) Remove(bytes []byte) ([]byte, error) {
+func (s *RSMService) Remove(bytes []byte) ([]byte, error) {
 	request := &RemoveRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -142,13 +134,13 @@ func (s *Service) Remove(bytes []byte) ([]byte, error) {
 }
 
 // Clear removes all elements from the set
-func (s *Service) Clear(bytes []byte) ([]byte, error) {
+func (s *RSMService) Clear(bytes []byte) ([]byte, error) {
 	s.values = make(map[string]bool)
 	return proto.Marshal(&ClearResponse{})
 }
 
 // Events registers a channel on which to send set change events
-func (s *Service) Events(bytes []byte, stream storage.Stream) {
+func (s *RSMService) Events(bytes []byte, stream rsm.Stream) {
 	request := &ListenRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		stream.Error(err)
@@ -167,7 +159,7 @@ func (s *Service) Events(bytes []byte, stream storage.Stream) {
 }
 
 // Iterate sends all current set elements on the given channel
-func (s *Service) Iterate(bytes []byte, stream storage.Stream) {
+func (s *RSMService) Iterate(bytes []byte, stream rsm.Stream) {
 	defer stream.Close()
 	for value := range s.values {
 		stream.Result(proto.Marshal(&IterateResponse{
@@ -176,7 +168,7 @@ func (s *Service) Iterate(bytes []byte, stream storage.Stream) {
 	}
 }
 
-func (s *Service) sendEvent(event *ListenResponse) {
+func (s *RSMService) sendEvent(event *ListenResponse) {
 	bytes, err := proto.Marshal(event)
 	for _, session := range s.Sessions() {
 		for _, stream := range session.StreamsOf(opEvents) {

@@ -16,7 +16,7 @@ package lock
 
 import (
 	"container/list"
-	"github.com/atomix/go-framework/pkg/atomix/storage"
+	"github.com/atomix/go-framework/pkg/atomix/storage/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
@@ -24,51 +24,43 @@ import (
 	"time"
 )
 
-// RegisterService registers the election primitive service on the given node
-func RegisterService(node *storage.Node) {
-	node.RegisterService(Type, &ServiceType{})
+// RegisterRSMService registers the election primitive service on the given node
+func RegisterRSMService(node *rsm.Node) {
+	node.RegisterService(Type, func(scheduler rsm.Scheduler, context rsm.ServiceContext) rsm.Service {
+		service := &RSMService{
+			Service: rsm.NewService(scheduler, context),
+			queue:   list.New(),
+			timers:  make(map[rsm.Index]rsm.Timer),
+		}
+		service.init()
+		return service
+	})
 }
 
-// ServiceType is the election primitive service
-type ServiceType struct{}
-
-// NewService creates a new election service
-func (p *ServiceType) NewService(scheduler storage.Scheduler, context storage.ServiceContext) storage.Service {
-	service := &Service{
-		Service: storage.NewService(scheduler, context),
-		queue:   list.New(),
-		timers:  make(map[storage.Index]storage.Timer),
-	}
-	service.init()
-	return service
-}
-
-var _ storage.PrimitiveService = &ServiceType{}
-
-// Service is a state machine for a list primitive
-type Service struct {
-	storage.Service
+// RSMService is a state machine for a list primitive
+type RSMService struct {
+	rsm.Service
 	lock   *lockHolder
 	queue  *list.List
-	timers map[storage.Index]storage.Timer
+	timers map[rsm.Index]rsm.Timer
 }
 
 type lockHolder struct {
-	index   storage.Index
-	session storage.SessionID
+	index   rsm.Index
+	session rsm.SessionID
 	expire  *time.Time
 	stream  stream.WriteStream
 }
 
 // init initializes the lock service
-func (l *Service) init() {
+func (l *RSMService) init() {
 	l.RegisterStreamOperation(opLock, l.Lock)
 	l.RegisterUnaryOperation(opUnlock, l.Unlock)
 	l.RegisterUnaryOperation(opIsLocked, l.IsLocked)
 }
 
 // Backup takes a snapshot of the service
-func (l *Service) Backup(writer io.Writer) error {
+func (l *RSMService) Backup(writer io.Writer) error {
 	var lock *LockCall
 	if l.lock != nil {
 		lock = &LockCall{
@@ -102,7 +94,7 @@ func (l *Service) Backup(writer io.Writer) error {
 }
 
 // Restore restores the service from a snapshot
-func (l *Service) Restore(reader io.Reader) error {
+func (l *RSMService) Restore(reader io.Reader) error {
 	bytes, err := util.ReadBytes(reader)
 	if err != nil {
 		return err
@@ -115,8 +107,8 @@ func (l *Service) Restore(reader io.Reader) error {
 
 	if snapshot.Lock != nil {
 		l.lock = &lockHolder{
-			index:   storage.Index(snapshot.Lock.Index),
-			session: storage.SessionID(snapshot.Lock.SessionId),
+			index:   rsm.Index(snapshot.Lock.Index),
+			session: rsm.SessionID(snapshot.Lock.SessionId),
 			expire:  snapshot.Lock.Expire,
 		}
 	}
@@ -124,13 +116,13 @@ func (l *Service) Restore(reader io.Reader) error {
 	l.queue = list.New()
 	for _, lock := range snapshot.Queue {
 		element := l.queue.PushBack(&lockHolder{
-			index:   storage.Index(lock.Index),
-			session: storage.SessionID(lock.SessionId),
+			index:   rsm.Index(lock.Index),
+			session: rsm.SessionID(lock.SessionId),
 			expire:  lock.Expire,
 		})
 
 		if lock.Expire != nil {
-			index := storage.Index(lock.Index)
+			index := rsm.Index(lock.Index)
 			l.timers[index] = l.ScheduleOnce(lock.Expire.Sub(l.Timestamp()), func() {
 				delete(l.timers, index)
 				l.queue.Remove(element)
@@ -141,7 +133,7 @@ func (l *Service) Restore(reader io.Reader) error {
 }
 
 // Lock attempts to acquire the lock for the current session
-func (l *Service) Lock(bytes []byte, stream storage.Stream) {
+func (l *RSMService) Lock(bytes []byte, stream rsm.Stream) {
 	request := &LockRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		stream.Error(err)
@@ -207,7 +199,7 @@ func (l *Service) Lock(bytes []byte, stream storage.Stream) {
 }
 
 // Unlock releases the current lock
-func (l *Service) Unlock(bytes []byte) ([]byte, error) {
+func (l *RSMService) Unlock(bytes []byte) ([]byte, error) {
 	request := &UnlockRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -218,13 +210,13 @@ func (l *Service) Unlock(bytes []byte) ([]byte, error) {
 		// If the commit's session does not match the current lock holder, preserve the existing lock.
 		// If the current lock ID does not match the requested lock ID, preserve the existing lock.
 		// However, ensure the associated lock request is removed from the queue.
-		if (request.Index == 0 && l.lock.session != session.ID()) || (request.Index > 0 && l.lock.index != storage.Index(request.Index)) {
+		if (request.Index == 0 && l.lock.session != session.ID()) || (request.Index > 0 && l.lock.index != rsm.Index(request.Index)) {
 			unlocked := false
 			element := l.queue.Front()
 			for element != nil {
 				next := element.Next()
 				holder := element.Value.(*lockHolder)
-				if (request.Index == 0 && holder.session == session.ID()) || (request.Index > 0 && holder.index == storage.Index(request.Index)) {
+				if (request.Index == 0 && holder.session == session.ID()) || (request.Index > 0 && holder.index == rsm.Index(request.Index)) {
 					l.queue.Remove(element)
 					timer, ok := l.timers[holder.index]
 					if ok {
@@ -275,29 +267,29 @@ func (l *Service) Unlock(bytes []byte) ([]byte, error) {
 }
 
 // IsLocked checks whether the lock is held by a specific session
-func (l *Service) IsLocked(bytes []byte) ([]byte, error) {
+func (l *RSMService) IsLocked(bytes []byte) ([]byte, error) {
 	request := &IsLockedRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
 	}
 
-	locked := l.lock != nil && (request.Index == 0 || l.lock.index == storage.Index(request.Index))
+	locked := l.lock != nil && (request.Index == 0 || l.lock.index == rsm.Index(request.Index))
 	return proto.Marshal(&IsLockedResponse{
 		Locked: locked,
 	})
 }
 
 // SessionExpired releases the lock when the owning session expires
-func (l *Service) SessionExpired(session storage.Session) {
+func (l *RSMService) SessionExpired(session rsm.Session) {
 	l.releaseLock(session)
 }
 
 // SessionClosed releases the lock when the owning session is closed
-func (l *Service) SessionClosed(session storage.Session) {
+func (l *RSMService) SessionClosed(session rsm.Session) {
 	l.releaseLock(session)
 }
 
-func (l *Service) releaseLock(session storage.Session) {
+func (l *RSMService) releaseLock(session rsm.Session) {
 	// Remove all instances of the session from the queue.
 	element := l.queue.Front()
 	for element != nil {

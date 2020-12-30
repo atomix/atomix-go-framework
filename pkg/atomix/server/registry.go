@@ -18,47 +18,38 @@ import (
 	"google.golang.org/grpc"
 )
 
-// PrimitiveServer is an interface for registering a primitive proxy server
-type PrimitiveServer interface {
-	RegisterServer(server *grpc.Server)
-}
+// RegisterServiceFunc is a function for registering a service
+type RegisterServiceFunc func(server *grpc.Server)
 
 // Registry is a primitive registry
 type Registry interface {
-	// Register registers a primitive
-	Register(primitiveType string, primitive PrimitiveServer)
+	// Register registers a service
+	Register(service RegisterServiceFunc)
 
 	// GetPrimitives gets a list of primitives
-	GetPrimitives() []PrimitiveServer
-
-	// GetPrimitive gets a primitive by type
-	GetPrimitive(primitiveType string) PrimitiveServer
+	GetServices() []RegisterServiceFunc
 }
 
 // primitiveRegistry is the default primitive registry
 type primitiveRegistry struct {
-	primitives map[string]PrimitiveServer
+	services []RegisterServiceFunc
 }
 
-func (r *primitiveRegistry) Register(primitiveType string, primitive PrimitiveServer) {
-	r.primitives[primitiveType] = primitive
+func (r *primitiveRegistry) Register(service RegisterServiceFunc) {
+	r.services = append(r.services, service)
 }
 
-func (r *primitiveRegistry) GetPrimitives() []PrimitiveServer {
-	primitives := make([]PrimitiveServer, 0, len(r.primitives))
-	for _, primitive := range r.primitives {
+func (r *primitiveRegistry) GetServices() []RegisterServiceFunc {
+	primitives := make([]RegisterServiceFunc, 0, len(r.services))
+	for _, primitive := range r.services {
 		primitives = append(primitives, primitive)
 	}
 	return primitives
 }
 
-func (r *primitiveRegistry) GetPrimitive(primitiveType string) PrimitiveServer {
-	return r.primitives[primitiveType]
-}
-
 // NewRegistry creates a new primitive registry
 func NewRegistry() Registry {
 	return &primitiveRegistry{
-		primitives: make(map[string]PrimitiveServer),
+		services: make([]RegisterServiceFunc, 0),
 	}
 }

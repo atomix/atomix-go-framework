@@ -15,39 +15,31 @@
 package counter
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/storage"
+	"github.com/atomix/go-framework/pkg/atomix/storage/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/gogo/protobuf/proto"
 	"io"
 )
 
-// RegisterService registers the primitive service on the given node
-func RegisterService(node *storage.Node) {
-	node.RegisterService(Type, &ServiceType{})
+// RegisterRSMService registers the primitive service on the given node
+func RegisterRSMService(node *rsm.Node) {
+	node.RegisterService(Type, func(scheduler rsm.Scheduler, context rsm.ServiceContext) rsm.Service {
+		service := &RSMService{
+			Service: rsm.NewService(scheduler, context),
+		}
+		service.init()
+		return service
+	})
 }
 
-// ServiceType is the counter service type
-type ServiceType struct{}
-
-// NewService creates a new counter service
-func (s *ServiceType) NewService(scheduler storage.Scheduler, context storage.ServiceContext) storage.Service {
-	service := &Service{
-		Service: storage.NewService(scheduler, context),
-	}
-	service.init()
-	return service
-}
-
-var _ storage.PrimitiveService = &ServiceType{}
-
-// Service is a state machine for a counter primitive
-type Service struct {
-	storage.Service
+// RSMService is a state machine for a counter primitive
+type RSMService struct {
+	rsm.Service
 	value int64
 }
 
 // init initializes the list service
-func (c *Service) init() {
+func (c *RSMService) init() {
 	c.RegisterUnaryOperation(opGet, c.Get)
 	c.RegisterUnaryOperation(opSet, c.Set)
 	c.RegisterUnaryOperation(opIncrement, c.Increment)
@@ -56,7 +48,7 @@ func (c *Service) init() {
 }
 
 // Backup backs up the service
-func (c *Service) Backup(writer io.Writer) error {
+func (c *RSMService) Backup(writer io.Writer) error {
 	snapshot := &CounterSnapshot{
 		Value: c.value,
 	}
@@ -68,7 +60,7 @@ func (c *Service) Backup(writer io.Writer) error {
 }
 
 // Restore restores the service from a backup
-func (c *Service) Restore(reader io.Reader) error {
+func (c *RSMService) Restore(reader io.Reader) error {
 	bytes, err := util.ReadBytes(reader)
 	if err != nil {
 		return err
@@ -83,14 +75,14 @@ func (c *Service) Restore(reader io.Reader) error {
 }
 
 // Get gets the current value of the counter
-func (c *Service) Get(bytes []byte) ([]byte, error) {
+func (c *RSMService) Get(bytes []byte) ([]byte, error) {
 	return proto.Marshal(&GetResponse{
 		Value: c.value,
 	})
 }
 
 // Set sets the value of the counter
-func (c *Service) Set(bytes []byte) ([]byte, error) {
+func (c *RSMService) Set(bytes []byte) ([]byte, error) {
 	request := &SetRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -101,7 +93,7 @@ func (c *Service) Set(bytes []byte) ([]byte, error) {
 }
 
 // Increment increments the value of the counter by a delta
-func (c *Service) Increment(bytes []byte) ([]byte, error) {
+func (c *RSMService) Increment(bytes []byte) ([]byte, error) {
 	request := &IncrementRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -116,7 +108,7 @@ func (c *Service) Increment(bytes []byte) ([]byte, error) {
 }
 
 // Decrement decrements the value of the counter by a delta
-func (c *Service) Decrement(bytes []byte) ([]byte, error) {
+func (c *RSMService) Decrement(bytes []byte) ([]byte, error) {
 	request := &DecrementRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -131,7 +123,7 @@ func (c *Service) Decrement(bytes []byte) ([]byte, error) {
 }
 
 // CAS updates the value of the counter if it matches a current value
-func (c *Service) CAS(bytes []byte) ([]byte, error) {
+func (c *RSMService) CAS(bytes []byte) ([]byte, error) {
 	request := &CheckAndSetRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err

@@ -12,21 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package server
+package rsm
 
 import (
+	"github.com/atomix/api/go/atomix/storage"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
 )
 
-var log = logging.GetLogger("atomix", "server")
+var log = logging.GetLogger("atomix", "storage")
 
-// NewNode creates a new server node
-func NewNode(cluster *cluster.Cluster) *Node {
+// NewNode creates a new node running the given protocol
+func NewNode(cluster *cluster.Cluster, protocol Protocol) *Node {
 	return &Node{
 		Cluster:  cluster,
+		protocol: protocol,
 		registry: NewRegistry(),
 	}
 }
@@ -34,27 +36,31 @@ func NewNode(cluster *cluster.Cluster) *Node {
 // Node is an Atomix node
 type Node struct {
 	Cluster  *cluster.Cluster
+	protocol Protocol
 	registry Registry
 }
 
-// RegisterService registers a service
-func (n *Node) RegisterService(service RegisterServiceFunc) {
-	n.registry.Register(service)
+// RegisterService registers a primitive service
+func (n *Node) RegisterService(t string, f NewServiceFunc) {
+	n.registry.Register(t, f)
 }
 
 // Start starts the node
 func (n *Node) Start() error {
-	log.Info("Starting server")
+	log.Info("Starting protocol")
 
-	servers := n.registry.GetServices()
-	services := make([]cluster.Service, len(servers))
-	for i, f := range servers {
-		services[i] = func(s *grpc.Server) {
-			f(s)
-		}
+	err := n.Cluster.Member().Serve(
+		cluster.WithService(func(server *grpc.Server) {
+			RegisterStorageServiceServer(server, &Server{Protocol: n.protocol})
+		}),
+		cluster.WithService(func(server *grpc.Server) {
+			storage.RegisterStorageServiceServer(server, &ConfigServer{cluster: n.Cluster})
+		}))
+	if err != nil {
+		return err
 	}
 
-	err := n.Cluster.Member().Serve(cluster.WithServices(services...))
+	err = n.protocol.Start(n.Cluster, n.registry)
 	if err != nil {
 		return err
 	}
@@ -67,5 +73,8 @@ func (n *Node) Start() error {
 
 // Stop stops the node
 func (n *Node) Stop() error {
+	if err := n.protocol.Stop(); err != nil {
+		return err
+	}
 	return n.Cluster.Close()
 }

@@ -16,40 +16,32 @@ package list
 
 import (
 	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/storage"
+	"github.com/atomix/go-framework/pkg/atomix/storage/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
 	"io"
 )
 
-// RegisterService registers the election primitive service on the given node
-func RegisterService(node *storage.Node) {
-	node.RegisterService(Type, &ServiceType{})
+// RegisterRSMService registers the election primitive service on the given node
+func RegisterRSMService(node *rsm.Node) {
+	node.RegisterService(Type, func(scheduler rsm.Scheduler, context rsm.ServiceContext) rsm.Service {
+		service := &RSMService{
+			Service: rsm.NewService(scheduler, context),
+			values:  make([]string, 0),
+		}
+		service.init()
+		return service
+	})
 }
 
-// ServiceType is the election primitive service
-type ServiceType struct{}
-
-// NewService creates a new election service
-func (p *ServiceType) NewService(scheduler storage.Scheduler, context storage.ServiceContext) storage.Service {
-	service := &Service{
-		Service: storage.NewService(scheduler, context),
-		values:  make([]string, 0),
-	}
-	service.init()
-	return service
-}
-
-var _ storage.PrimitiveService = &ServiceType{}
-
-// Service is a state machine for a list primitive
-type Service struct {
-	storage.Service
+// RSMService is a state machine for a list primitive
+type RSMService struct {
+	rsm.Service
 	values []string
 }
 
 // init initializes the list service
-func (l *Service) init() {
+func (l *RSMService) init() {
 	l.RegisterUnaryOperation(opSize, l.Size)
 	l.RegisterUnaryOperation(opContains, l.Contains)
 	l.RegisterUnaryOperation(opAppend, l.Append)
@@ -63,7 +55,7 @@ func (l *Service) init() {
 }
 
 // Backup takes a snapshot of the service
-func (l *Service) Backup(writer io.Writer) error {
+func (l *RSMService) Backup(writer io.Writer) error {
 	if err := util.WriteVarInt(writer, len(l.values)); err != nil {
 		return err
 	}
@@ -73,7 +65,7 @@ func (l *Service) Backup(writer io.Writer) error {
 }
 
 // Restore restores the service from a snapshot
-func (l *Service) Restore(reader io.Reader) error {
+func (l *RSMService) Restore(reader io.Reader) error {
 	length, err := util.ReadVarInt(reader)
 	if err != nil {
 		return err
@@ -85,14 +77,14 @@ func (l *Service) Restore(reader io.Reader) error {
 }
 
 // Size gets the size of the list
-func (l *Service) Size(bytes []byte) ([]byte, error) {
+func (l *RSMService) Size(bytes []byte) ([]byte, error) {
 	return proto.Marshal(&SizeResponse{
 		Size_: uint32(len(l.values)),
 	})
 }
 
 // Contains checks whether the list contains a value
-func (l *Service) Contains(bytes []byte) ([]byte, error) {
+func (l *RSMService) Contains(bytes []byte) ([]byte, error) {
 	request := &ContainsRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -112,7 +104,7 @@ func (l *Service) Contains(bytes []byte) ([]byte, error) {
 }
 
 // Append adds a value to the end of the list
-func (l *Service) Append(bytes []byte) ([]byte, error) {
+func (l *RSMService) Append(bytes []byte) ([]byte, error) {
 	request := &AppendRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -131,7 +123,7 @@ func (l *Service) Append(bytes []byte) ([]byte, error) {
 }
 
 // Insert inserts a value at a specific index in the list
-func (l *Service) Insert(bytes []byte) ([]byte, error) {
+func (l *RSMService) Insert(bytes []byte) ([]byte, error) {
 	request := &InsertRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -163,7 +155,7 @@ func (l *Service) Insert(bytes []byte) ([]byte, error) {
 }
 
 // Set sets the value at a specific index in the list
-func (l *Service) Set(bytes []byte) ([]byte, error) {
+func (l *RSMService) Set(bytes []byte) ([]byte, error) {
 	request := &SetRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -192,7 +184,7 @@ func (l *Service) Set(bytes []byte) ([]byte, error) {
 }
 
 // Get gets the value at a specific index in the list
-func (l *Service) Get(bytes []byte) ([]byte, error) {
+func (l *RSMService) Get(bytes []byte) ([]byte, error) {
 	request := &GetRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -210,7 +202,7 @@ func (l *Service) Get(bytes []byte) ([]byte, error) {
 }
 
 // Remove removes an index from the list
-func (l *Service) Remove(bytes []byte) ([]byte, error) {
+func (l *RSMService) Remove(bytes []byte) ([]byte, error) {
 	request := &RemoveRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -236,13 +228,13 @@ func (l *Service) Remove(bytes []byte) ([]byte, error) {
 }
 
 // Clear removes all indexes from the list
-func (l *Service) Clear(bytes []byte) ([]byte, error) {
+func (l *RSMService) Clear(bytes []byte) ([]byte, error) {
 	l.values = make([]string, 0)
 	return proto.Marshal(&ClearResponse{})
 }
 
 // Events registers a channel to send list change events
-func (l *Service) Events(bytes []byte, stream storage.Stream) {
+func (l *RSMService) Events(bytes []byte, stream rsm.Stream) {
 	request := &ListenRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		stream.Error(err)
@@ -262,7 +254,7 @@ func (l *Service) Events(bytes []byte, stream storage.Stream) {
 }
 
 // Iterate sends all current values on the given channel
-func (l *Service) Iterate(bytes []byte, stream storage.Stream) {
+func (l *RSMService) Iterate(bytes []byte, stream rsm.Stream) {
 	defer stream.Close()
 	for _, value := range l.values {
 		stream.Result(proto.Marshal(&IterateResponse{
@@ -271,7 +263,7 @@ func (l *Service) Iterate(bytes []byte, stream storage.Stream) {
 	}
 }
 
-func (l *Service) sendEvent(event *ListenResponse) {
+func (l *RSMService) sendEvent(event *ListenResponse) {
 	bytes, err := proto.Marshal(event)
 	for _, session := range l.Sessions() {
 		for _, stream := range session.StreamsOf(opEvents) {

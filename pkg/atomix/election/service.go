@@ -15,36 +15,28 @@
 package election
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/storage"
+	"github.com/atomix/go-framework/pkg/atomix/storage/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
 	"io"
 	"time"
 )
 
-// RegisterService registers the election primitive service on the given node
-func RegisterService(node *storage.Node) {
-	node.RegisterService(Type, &ServiceType{})
+// RegisterRSMService registers the election primitive service on the given node
+func RegisterRSMService(node *rsm.Node) {
+	node.RegisterService(Type, func(scheduler rsm.Scheduler, context rsm.ServiceContext) rsm.Service {
+		service := &RSMService{
+			Service:    rsm.NewService(scheduler, context),
+			candidates: make([]*ElectionRegistration, 0),
+		}
+		service.init()
+		return service
+	})
 }
 
-// ServiceType is the election primitive service
-type ServiceType struct{}
-
-// NewService creates a new election service
-func (p *ServiceType) NewService(scheduler storage.Scheduler, context storage.ServiceContext) storage.Service {
-	service := &Service{
-		Service:    storage.NewService(scheduler, context),
-		candidates: make([]*ElectionRegistration, 0),
-	}
-	service.init()
-	return service
-}
-
-var _ storage.PrimitiveService = &ServiceType{}
-
-// Service is a state machine for an election primitive
-type Service struct {
-	storage.Service
+// RSMService is a state machine for an election primitive
+type RSMService struct {
+	rsm.Service
 	leader     *ElectionRegistration
 	term       uint64
 	timestamp  *time.Time
@@ -52,7 +44,7 @@ type Service struct {
 }
 
 // init initializes the election service
-func (e *Service) init() {
+func (e *RSMService) init() {
 	e.RegisterUnaryOperation(opEnter, e.Enter)
 	e.RegisterUnaryOperation(opWithdraw, e.Withdraw)
 	e.RegisterUnaryOperation(opAnoint, e.Anoint)
@@ -63,7 +55,7 @@ func (e *Service) init() {
 }
 
 // Backup takes a snapshot of the service
-func (e *Service) Backup(writer io.Writer) error {
+func (e *RSMService) Backup(writer io.Writer) error {
 	snapshot := &ElectionSnapshot{
 		Term:       e.term,
 		Timestamp:  e.timestamp,
@@ -78,7 +70,7 @@ func (e *Service) Backup(writer io.Writer) error {
 }
 
 // Restore restores the service from a snapshot
-func (e *Service) Restore(reader io.Reader) error {
+func (e *RSMService) Restore(reader io.Reader) error {
 	bytes, err := util.ReadBytes(reader)
 	if err != nil {
 		return err
@@ -96,20 +88,20 @@ func (e *Service) Restore(reader io.Reader) error {
 }
 
 // SessionExpired is called when a session is expired by the server
-func (e *Service) SessionExpired(session storage.Session) {
+func (e *RSMService) SessionExpired(session rsm.Session) {
 	e.close(session)
 }
 
 // SessionClosed is called when a session is closed by the client
-func (e *Service) SessionClosed(session storage.Session) {
+func (e *RSMService) SessionClosed(session rsm.Session) {
 	e.close(session)
 }
 
 // close elects a new leader when a session is closed
-func (e *Service) close(session storage.Session) {
+func (e *RSMService) close(session rsm.Session) {
 	candidates := make([]*ElectionRegistration, 0, len(e.candidates))
 	for _, candidate := range e.candidates {
-		if storage.SessionID(candidate.SessionID) != session.ID() {
+		if rsm.SessionID(candidate.SessionID) != session.ID() {
 			candidates = append(candidates, candidate)
 		}
 	}
@@ -117,7 +109,7 @@ func (e *Service) close(session storage.Session) {
 	if len(candidates) != len(e.candidates) {
 		e.candidates = candidates
 
-		if storage.SessionID(e.leader.SessionID) == session.ID() {
+		if rsm.SessionID(e.leader.SessionID) == session.ID() {
 			e.leader = nil
 			if len(e.candidates) > 0 {
 				e.leader = e.candidates[0]
@@ -135,7 +127,7 @@ func (e *Service) close(session storage.Session) {
 }
 
 // getTerm returns the current election term
-func (e *Service) getTerm() *Term {
+func (e *RSMService) getTerm() *Term {
 	var leader string
 	if e.leader != nil {
 		leader = e.leader.ID
@@ -149,7 +141,7 @@ func (e *Service) getTerm() *Term {
 }
 
 // getCandidates returns a slice of candidate IDs
-func (e *Service) getCandidates() []string {
+func (e *RSMService) getCandidates() []string {
 	candidates := make([]string, len(e.candidates))
 	for i, candidate := range e.candidates {
 		candidates[i] = candidate.ID
@@ -158,7 +150,7 @@ func (e *Service) getCandidates() []string {
 }
 
 // Enter enters a candidate in the election
-func (e *Service) Enter(bytes []byte) ([]byte, error) {
+func (e *RSMService) Enter(bytes []byte) ([]byte, error) {
 	request := &EnterRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -199,7 +191,7 @@ func (e *Service) Enter(bytes []byte) ([]byte, error) {
 }
 
 // Withdraw withdraws a candidate from the election
-func (e *Service) Withdraw(bytes []byte) ([]byte, error) {
+func (e *RSMService) Withdraw(bytes []byte) ([]byte, error) {
 	request := &WithdrawRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -237,7 +229,7 @@ func (e *Service) Withdraw(bytes []byte) ([]byte, error) {
 }
 
 // Anoint assigns leadership to a candidate
-func (e *Service) Anoint(bytes []byte) ([]byte, error) {
+func (e *RSMService) Anoint(bytes []byte) ([]byte, error) {
 	request := &AnointRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -288,7 +280,7 @@ func (e *Service) Anoint(bytes []byte) ([]byte, error) {
 }
 
 // Promote increases the priority of a candidate
-func (e *Service) Promote(bytes []byte) ([]byte, error) {
+func (e *RSMService) Promote(bytes []byte) ([]byte, error) {
 	request := &PromoteRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -349,7 +341,7 @@ func (e *Service) Promote(bytes []byte) ([]byte, error) {
 }
 
 // Evict removes a candidate from the election
-func (e *Service) Evict(bytes []byte) ([]byte, error) {
+func (e *RSMService) Evict(bytes []byte) ([]byte, error) {
 	request := &EvictRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -387,18 +379,18 @@ func (e *Service) Evict(bytes []byte) ([]byte, error) {
 }
 
 // GetTerm gets the current election term
-func (e *Service) GetTerm(bytes []byte) ([]byte, error) {
+func (e *RSMService) GetTerm(bytes []byte) ([]byte, error) {
 	return proto.Marshal(&GetTermResponse{
 		Term: e.getTerm(),
 	})
 }
 
 // Events registers the given channel to receive election events
-func (e *Service) Events(bytes []byte, stream storage.Stream) {
+func (e *RSMService) Events(bytes []byte, stream rsm.Stream) {
 	// Keep the stream open for events
 }
 
-func (e *Service) sendEvent(event *ListenResponse) {
+func (e *RSMService) sendEvent(event *ListenResponse) {
 	bytes, err := proto.Marshal(event)
 	for _, session := range e.Sessions() {
 		for _, stream := range session.StreamsOf(opEvents) {

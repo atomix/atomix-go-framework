@@ -16,47 +16,39 @@ package value
 
 import (
 	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/storage"
+	"github.com/atomix/go-framework/pkg/atomix/storage/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
 	"io"
 )
 
-// RegisterService registers the election primitive service on the given node
-func RegisterService(node *storage.Node) {
-	node.RegisterService(Type, &ServiceType{})
+// RegisterRSMService registers the election primitive service on the given node
+func RegisterRSMService(node *rsm.Node) {
+	node.RegisterService(Type, func(scheduler rsm.Scheduler, context rsm.ServiceContext) rsm.Service {
+		service := &RSMService{
+			Service: rsm.NewService(scheduler, context),
+		}
+		service.init()
+		return service
+	})
 }
 
-// ServiceType is the election primitive service
-type ServiceType struct{}
-
-// NewService creates a new election service
-func (p *ServiceType) NewService(scheduler storage.Scheduler, context storage.ServiceContext) storage.Service {
-	service := &Service{
-		Service: storage.NewService(scheduler, context),
-	}
-	service.init()
-	return service
-}
-
-var _ storage.PrimitiveService = &ServiceType{}
-
-// Service is a state machine for a list primitive
-type Service struct {
-	storage.Service
+// RSMService is a state machine for a list primitive
+type RSMService struct {
+	rsm.Service
 	value   []byte
 	version uint64
 }
 
 // init initializes the list service
-func (v *Service) init() {
+func (v *RSMService) init() {
 	v.RegisterUnaryOperation(opSet, v.Set)
 	v.RegisterUnaryOperation(opGet, v.Get)
 	v.RegisterStreamOperation(opEvents, v.Events)
 }
 
 // Backup takes a snapshot of the service
-func (v *Service) Backup(writer io.Writer) error {
+func (v *RSMService) Backup(writer io.Writer) error {
 	if err := util.WriteVarUint64(writer, v.version); err != nil {
 		return err
 	}
@@ -67,7 +59,7 @@ func (v *Service) Backup(writer io.Writer) error {
 }
 
 // Restore restores the service from a snapshot
-func (v *Service) Restore(reader io.Reader) error {
+func (v *RSMService) Restore(reader io.Reader) error {
 	version, err := util.ReadVarUint64(reader)
 	if err != nil {
 		return err
@@ -82,7 +74,7 @@ func (v *Service) Restore(reader io.Reader) error {
 }
 
 // Set sets the value
-func (v *Service) Set(bytes []byte) ([]byte, error) {
+func (v *RSMService) Set(bytes []byte) ([]byte, error) {
 	request := &SetRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -114,7 +106,7 @@ func (v *Service) Set(bytes []byte) ([]byte, error) {
 }
 
 // Get gets the current value
-func (v *Service) Get(bytes []byte) ([]byte, error) {
+func (v *RSMService) Get(bytes []byte) ([]byte, error) {
 	request := &GetRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -127,11 +119,11 @@ func (v *Service) Get(bytes []byte) ([]byte, error) {
 }
 
 // Events registers a channel on which to send events
-func (v *Service) Events(bytes []byte, stream storage.Stream) {
+func (v *RSMService) Events(bytes []byte, stream rsm.Stream) {
 	// Keep the stream open for events
 }
 
-func (v *Service) sendEvent(event *ListenResponse) {
+func (v *RSMService) sendEvent(event *ListenResponse) {
 	bytes, err := proto.Marshal(event)
 	for _, session := range v.Sessions() {
 		for _, stream := range session.StreamsOf(opEvents) {

@@ -18,45 +18,37 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/atomix/go-framework/pkg/atomix/storage"
+	"github.com/atomix/go-framework/pkg/atomix/storage/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
 )
 
-// RegisterService registers the election primitive service on the given node
-func RegisterService(node *storage.Node) {
-	node.RegisterService(Type, &ServiceType{})
+// RegisterRSMService registers the election primitive service on the given node
+func RegisterRSMService(node *rsm.Node) {
+	node.RegisterService(Type, func(scheduler rsm.Scheduler, context rsm.ServiceContext) rsm.Service {
+		service := &RSMService{
+			Service:   rsm.NewService(scheduler, context),
+			indexes:   make(map[uint64]*LinkedLogEntryValue),
+			listeners: make(map[rsm.SessionID]map[rsm.StreamID]listener),
+		}
+		service.init()
+		return service
+	})
 }
 
-// ServiceType is the election primitive service
-type ServiceType struct{}
-
-// NewService creates a new election service
-func (p *ServiceType) NewService(scheduler storage.Scheduler, context storage.ServiceContext) storage.Service {
-	service := &Service{
-		Service:   storage.NewService(scheduler, context),
-		indexes:   make(map[uint64]*LinkedLogEntryValue),
-		listeners: make(map[storage.SessionID]map[storage.StreamID]listener),
-	}
-	service.init()
-	return service
-}
-
-var _ storage.PrimitiveService = &ServiceType{}
-
-// Service is a state machine for a log primitive
-type Service struct {
-	storage.Service
+// RSMService is a state machine for a log primitive
+type RSMService struct {
+	rsm.Service
 	lastIndex  uint64
 	indexes    map[uint64]*LinkedLogEntryValue
 	firstEntry *LinkedLogEntryValue
 	lastEntry  *LinkedLogEntryValue
-	listeners  map[storage.SessionID]map[storage.StreamID]listener
+	listeners  map[rsm.SessionID]map[rsm.StreamID]listener
 }
 
 // init initializes the log service
-func (m *Service) init() {
+func (m *RSMService) init() {
 	m.RegisterUnaryOperation(opAppend, m.Append)
 	m.RegisterUnaryOperation(opRemove, m.Remove)
 	m.RegisterUnaryOperation(opGet, m.Get)
@@ -79,7 +71,7 @@ type LinkedLogEntryValue struct {
 }
 
 // Backup takes a snapshot of the service
-func (m *Service) Backup(writer io.Writer) error {
+func (m *RSMService) Backup(writer io.Writer) error {
 	listeners := make([]*Listener, 0)
 	for sessionID, sessionListeners := range m.listeners {
 		for streamID, sessionListener := range sessionListeners {
@@ -111,7 +103,7 @@ func (m *Service) Backup(writer io.Writer) error {
 }
 
 // Restore restores the service from a snapshot
-func (m *Service) Restore(reader io.Reader) error {
+func (m *RSMService) Restore(reader io.Reader) error {
 	length, err := util.ReadVarInt(reader)
 	if err != nil {
 		return err
@@ -129,16 +121,16 @@ func (m *Service) Restore(reader io.Reader) error {
 		return err
 	}
 
-	m.listeners = make(map[storage.SessionID]map[storage.StreamID]listener)
+	m.listeners = make(map[rsm.SessionID]map[rsm.StreamID]listener)
 	for _, snapshotListener := range listeners {
-		sessionListeners, ok := m.listeners[storage.SessionID(snapshotListener.SessionId)]
+		sessionListeners, ok := m.listeners[rsm.SessionID(snapshotListener.SessionId)]
 		if !ok {
-			sessionListeners = make(map[storage.StreamID]listener)
-			m.listeners[storage.SessionID(snapshotListener.SessionId)] = sessionListeners
+			sessionListeners = make(map[rsm.StreamID]listener)
+			m.listeners[rsm.SessionID(snapshotListener.SessionId)] = sessionListeners
 		}
-		sessionListeners[storage.StreamID(snapshotListener.StreamId)] = listener{
+		sessionListeners[rsm.StreamID(snapshotListener.StreamId)] = listener{
 			index:  snapshotListener.Index,
-			stream: m.Session(storage.SessionID(snapshotListener.SessionId)).Stream(storage.StreamID(snapshotListener.StreamId)),
+			stream: m.Session(rsm.SessionID(snapshotListener.SessionId)).Stream(rsm.StreamID(snapshotListener.StreamId)),
 		}
 	}
 
@@ -187,7 +179,7 @@ func (m *Service) Restore(reader io.Reader) error {
 }
 
 // Append appends a value to the end of the log
-func (m *Service) Append(value []byte) ([]byte, error) {
+func (m *RSMService) Append(value []byte) ([]byte, error) {
 	request := &AppendRequest{}
 	if err := proto.Unmarshal(value, request); err != nil {
 		return nil, err
@@ -300,7 +292,7 @@ func (m *Service) Append(value []byte) ([]byte, error) {
 }
 
 // Remove removes a key/value pair from the log
-func (m *Service) Remove(bytes []byte) ([]byte, error) {
+func (m *RSMService) Remove(bytes []byte) ([]byte, error) {
 	request := &RemoveRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -345,7 +337,7 @@ func (m *Service) Remove(bytes []byte) ([]byte, error) {
 }
 
 // Get gets a value from the log
-func (m *Service) Get(bytes []byte) ([]byte, error) {
+func (m *RSMService) Get(bytes []byte) ([]byte, error) {
 	request := &GetRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -368,7 +360,7 @@ func (m *Service) Get(bytes []byte) ([]byte, error) {
 }
 
 // FirstEntry gets the first entry from the log
-func (m *Service) FirstEntry(bytes []byte) ([]byte, error) {
+func (m *RSMService) FirstEntry(bytes []byte) ([]byte, error) {
 	request := &FirstEntryRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -385,7 +377,7 @@ func (m *Service) FirstEntry(bytes []byte) ([]byte, error) {
 }
 
 // LastEntry gets the last entry from the log
-func (m *Service) LastEntry(bytes []byte) ([]byte, error) {
+func (m *RSMService) LastEntry(bytes []byte) ([]byte, error) {
 	request := &LastEntryRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -402,7 +394,7 @@ func (m *Service) LastEntry(bytes []byte) ([]byte, error) {
 }
 
 // PrevEntry gets the previous entry from the log
-func (m *Service) PrevEntry(bytes []byte) ([]byte, error) {
+func (m *RSMService) PrevEntry(bytes []byte) ([]byte, error) {
 	request := &PrevEntryRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -430,7 +422,7 @@ func (m *Service) PrevEntry(bytes []byte) ([]byte, error) {
 }
 
 // NextEntry gets the next entry from the log
-func (m *Service) NextEntry(bytes []byte) ([]byte, error) {
+func (m *RSMService) NextEntry(bytes []byte) ([]byte, error) {
 	request := &NextEntryRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -458,7 +450,7 @@ func (m *Service) NextEntry(bytes []byte) ([]byte, error) {
 }
 
 // Exists checks if the log contains an index
-func (m *Service) Exists(bytes []byte) ([]byte, error) {
+func (m *RSMService) Exists(bytes []byte) ([]byte, error) {
 	request := &ContainsIndexRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -471,14 +463,14 @@ func (m *Service) Exists(bytes []byte) ([]byte, error) {
 }
 
 // Size returns the size of the log
-func (m *Service) Size(bytes []byte) ([]byte, error) {
+func (m *RSMService) Size(bytes []byte) ([]byte, error) {
 	return proto.Marshal(&SizeResponse{
 		Size_: int32(len(m.indexes)),
 	})
 }
 
 // Clear removes all entries from the log
-func (m *Service) Clear(value []byte) ([]byte, error) {
+func (m *RSMService) Clear(value []byte) ([]byte, error) {
 	m.indexes = make(map[uint64]*LinkedLogEntryValue)
 	m.firstEntry = nil
 	m.lastEntry = nil
@@ -486,7 +478,7 @@ func (m *Service) Clear(value []byte) ([]byte, error) {
 }
 
 // Events sends change events to the client
-func (m *Service) Events(bytes []byte, stream storage.Stream) {
+func (m *RSMService) Events(bytes []byte, stream rsm.Stream) {
 	request := &ListenRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		stream.Error(err)
@@ -501,7 +493,7 @@ func (m *Service) Events(bytes []byte, stream storage.Stream) {
 	}
 	listeners, ok := m.listeners[stream.Session().ID()]
 	if !ok {
-		listeners = make(map[storage.StreamID]listener)
+		listeners = make(map[rsm.StreamID]listener)
 		m.listeners[stream.Session().ID()] = listeners
 	}
 	listeners[stream.ID()] = lis
@@ -531,7 +523,7 @@ func (m *Service) Events(bytes []byte, stream storage.Stream) {
 	}
 }
 
-func (m *Service) sendEvent(event *ListenResponse) {
+func (m *RSMService) sendEvent(event *ListenResponse) {
 	bytes, _ := proto.Marshal(event)
 	for sessionID, listeners := range m.listeners {
 
@@ -551,7 +543,7 @@ func (m *Service) sendEvent(event *ListenResponse) {
 }
 
 // Entries returns a stream of entries to the client
-func (m *Service) Entries(value []byte, stream storage.Stream) {
+func (m *RSMService) Entries(value []byte, stream rsm.Stream) {
 	defer stream.Close()
 	entry := m.firstEntry
 	for entry != nil {

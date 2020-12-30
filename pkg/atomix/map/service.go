@@ -19,44 +19,36 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"io"
 
-	"github.com/atomix/go-framework/pkg/atomix/storage"
+	"github.com/atomix/go-framework/pkg/atomix/storage/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
 )
 
-// RegisterService registers the election primitive service on the given node
-func RegisterService(node *storage.Node) {
-	node.RegisterService(Type, &ServiceType{})
+// RegisterRSMService registers the election primitive service on the given node
+func RegisterRSMService(node *rsm.Node) {
+	node.RegisterService(Type, func(scheduler rsm.Scheduler, context rsm.ServiceContext) rsm.Service {
+		service := &RSMService{
+			Service:   rsm.NewService(scheduler, context),
+			entries:   make(map[string]*MapEntryValue),
+			timers:    make(map[string]rsm.Timer),
+			listeners: make(map[rsm.SessionID]map[rsm.StreamID]listener),
+		}
+		service.init()
+		return service
+	})
 }
 
-// ServiceType is the election primitive service
-type ServiceType struct{}
-
-// NewService creates a new election service
-func (p *ServiceType) NewService(scheduler storage.Scheduler, context storage.ServiceContext) storage.Service {
-	service := &Service{
-		Service:   storage.NewService(scheduler, context),
-		entries:   make(map[string]*MapEntryValue),
-		timers:    make(map[string]storage.Timer),
-		listeners: make(map[storage.SessionID]map[storage.StreamID]listener),
-	}
-	service.init()
-	return service
-}
-
-var _ storage.PrimitiveService = &ServiceType{}
-
-// Service is a state machine for a map primitive
-type Service struct {
-	storage.Service
+// RSMService is a state machine for a map primitive
+type RSMService struct {
+	rsm.Service
 	entries   map[string]*MapEntryValue
-	timers    map[string]storage.Timer
-	listeners map[storage.SessionID]map[storage.StreamID]listener
+	timers    map[string]rsm.Timer
+	listeners map[rsm.SessionID]map[rsm.StreamID]listener
 }
 
 // init initializes the map service
-func (m *Service) init() {
+func (m *RSMService) init() {
 	m.RegisterUnaryOperation(opPut, m.Put)
 	m.RegisterUnaryOperation(opRemove, m.Remove)
 	m.RegisterUnaryOperation(opGet, m.Get)
@@ -68,7 +60,7 @@ func (m *Service) init() {
 }
 
 // Backup takes a snapshot of the service
-func (m *Service) Backup(writer io.Writer) error {
+func (m *RSMService) Backup(writer io.Writer) error {
 	listeners := make([]*Listener, 0)
 	for sessionID, sessionListeners := range m.listeners {
 		for streamID, sessionListener := range sessionListeners {
@@ -96,7 +88,7 @@ func (m *Service) Backup(writer io.Writer) error {
 }
 
 // Restore restores the service from a snapshot
-func (m *Service) Restore(reader io.Reader) error {
+func (m *RSMService) Restore(reader io.Reader) error {
 	length, err := util.ReadVarInt(reader)
 	if err != nil {
 		return err
@@ -114,16 +106,16 @@ func (m *Service) Restore(reader io.Reader) error {
 		return err
 	}
 
-	m.listeners = make(map[storage.SessionID]map[storage.StreamID]listener)
+	m.listeners = make(map[rsm.SessionID]map[rsm.StreamID]listener)
 	for _, snapshotListener := range listeners {
-		sessionListeners, ok := m.listeners[storage.SessionID(snapshotListener.SessionId)]
+		sessionListeners, ok := m.listeners[rsm.SessionID(snapshotListener.SessionId)]
 		if !ok {
-			sessionListeners = make(map[storage.StreamID]listener)
-			m.listeners[storage.SessionID(snapshotListener.SessionId)] = sessionListeners
+			sessionListeners = make(map[rsm.StreamID]listener)
+			m.listeners[rsm.SessionID(snapshotListener.SessionId)] = sessionListeners
 		}
-		sessionListeners[storage.StreamID(snapshotListener.StreamId)] = listener{
+		sessionListeners[rsm.StreamID(snapshotListener.StreamId)] = listener{
 			key:    snapshotListener.Key,
-			stream: m.Session(storage.SessionID(snapshotListener.SessionId)).Stream(storage.StreamID(snapshotListener.StreamId)),
+			stream: m.Session(rsm.SessionID(snapshotListener.SessionId)).Stream(rsm.StreamID(snapshotListener.StreamId)),
 		}
 	}
 
@@ -143,7 +135,7 @@ func (m *Service) Restore(reader io.Reader) error {
 }
 
 // Put puts a key/value pair in the map
-func (m *Service) Put(value []byte) ([]byte, error) {
+func (m *RSMService) Put(value []byte) ([]byte, error) {
 	request := &PutRequest{}
 	if err := proto.Unmarshal(value, request); err != nil {
 		return nil, err
@@ -234,7 +226,7 @@ func (m *Service) Put(value []byte) ([]byte, error) {
 }
 
 // Remove removes a key/value pair from the map
-func (m *Service) Remove(bytes []byte) ([]byte, error) {
+func (m *RSMService) Remove(bytes []byte) ([]byte, error) {
 	request := &RemoveRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -275,7 +267,7 @@ func (m *Service) Remove(bytes []byte) ([]byte, error) {
 }
 
 // Get gets a value from the map
-func (m *Service) Get(bytes []byte) ([]byte, error) {
+func (m *RSMService) Get(bytes []byte) ([]byte, error) {
 	request := &GetRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -294,7 +286,7 @@ func (m *Service) Get(bytes []byte) ([]byte, error) {
 }
 
 // Exists checks if the map contains a key
-func (m *Service) Exists(bytes []byte) ([]byte, error) {
+func (m *RSMService) Exists(bytes []byte) ([]byte, error) {
 	request := &ContainsKeyRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		return nil, err
@@ -307,20 +299,20 @@ func (m *Service) Exists(bytes []byte) ([]byte, error) {
 }
 
 // Size returns the size of the map
-func (m *Service) Size(bytes []byte) ([]byte, error) {
+func (m *RSMService) Size(bytes []byte) ([]byte, error) {
 	return proto.Marshal(&SizeResponse{
 		Size_: uint32(len(m.entries)),
 	})
 }
 
 // Clear removes all entries from the map
-func (m *Service) Clear(value []byte) ([]byte, error) {
+func (m *RSMService) Clear(value []byte) ([]byte, error) {
 	m.entries = make(map[string]*MapEntryValue)
 	return proto.Marshal(&ClearResponse{})
 }
 
 // Events sends change events to the client
-func (m *Service) Events(bytes []byte, stream storage.Stream) {
+func (m *RSMService) Events(bytes []byte, stream rsm.Stream) {
 	request := &ListenRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		stream.Error(err)
@@ -335,7 +327,7 @@ func (m *Service) Events(bytes []byte, stream storage.Stream) {
 	}
 	listeners, ok := m.listeners[stream.Session().ID()]
 	if !ok {
-		listeners = make(map[storage.StreamID]listener)
+		listeners = make(map[rsm.StreamID]listener)
 		m.listeners[stream.Session().ID()] = listeners
 	}
 	listeners[stream.ID()] = l
@@ -356,7 +348,7 @@ func (m *Service) Events(bytes []byte, stream storage.Stream) {
 }
 
 // Entries returns a stream of entries to the client
-func (m *Service) Entries(value []byte, stream storage.Stream) {
+func (m *RSMService) Entries(value []byte, stream rsm.Stream) {
 	defer stream.Close()
 	for key, entry := range m.entries {
 		stream.Result(proto.Marshal(&EntriesResponse{
@@ -369,7 +361,7 @@ func (m *Service) Entries(value []byte, stream storage.Stream) {
 	}
 }
 
-func (m *Service) scheduleTTL(key string, value *MapEntryValue) {
+func (m *RSMService) scheduleTTL(key string, value *MapEntryValue) {
 	m.cancelTTL(key)
 	if value.TTL != nil && *value.TTL > 0 {
 		m.timers[key] = m.ScheduleOnce(value.Created.Add(*value.TTL).Sub(m.Timestamp()), func() {
@@ -386,14 +378,14 @@ func (m *Service) scheduleTTL(key string, value *MapEntryValue) {
 	}
 }
 
-func (m *Service) cancelTTL(key string) {
+func (m *RSMService) cancelTTL(key string) {
 	timer, ok := m.timers[key]
 	if ok {
 		timer.Cancel()
 	}
 }
 
-func (m *Service) sendEvent(event *ListenResponse) {
+func (m *RSMService) sendEvent(event *ListenResponse) {
 	bytes, _ := proto.Marshal(event)
 	for sessionID, listeners := range m.listeners {
 		session := m.Session(sessionID)
