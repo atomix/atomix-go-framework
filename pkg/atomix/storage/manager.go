@@ -27,8 +27,6 @@ import (
 	"time"
 )
 
-var log = logging.GetLogger("atomix", "storage")
-
 // NewManager returns an initialized Manager
 func NewManager(cluster *cluster.Cluster, registry Registry, context PartitionContext) *Manager {
 	return &Manager{

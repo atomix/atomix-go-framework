@@ -19,10 +19,12 @@ import (
 	api "github.com/atomix/api/go/atomix/storage/counter"
 	"github.com/atomix/go-framework/pkg/atomix/proxy"
 	"github.com/atomix/go-framework/pkg/atomix/storage"
+	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"github.com/gogo/protobuf/proto"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
+
+var log = logging.GetLogger("atomix", "counter")
 
 // RegisterServer registers the primitive server on the given node
 func RegisterServer(node *proxy.Node) {
@@ -57,7 +59,7 @@ type Server struct {
 
 // Create opens a new session
 func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
-	log.Tracef("Received CreateRequest %+v", request)
+	log.Debugf("Received CreateRequest %+v", request)
 	partition := s.PartitionFor(request.Header.Primitive)
 	err := partition.DoCreateService(ctx, request.Header)
 	if err != nil {
@@ -65,13 +67,13 @@ func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.C
 	}
 
 	response := &api.CreateResponse{}
-	log.Tracef("Sending CreateResponse %+v", response)
+	log.Debugf("Sending CreateResponse %+v", response)
 	return response, nil
 }
 
 // Set sets the current value of the counter
 func (s *Server) Set(ctx context.Context, request *api.SetRequest) (*api.SetResponse, error) {
-	log.Tracef("Received SetRequest %+v", request)
+	log.Debugf("Received SetRequest %+v", request)
 
 	in, err := proto.Marshal(&SetRequest{
 		Value: request.Value,
@@ -92,13 +94,13 @@ func (s *Server) Set(ctx context.Context, request *api.SetRequest) (*api.SetResp
 	}
 
 	response := &api.SetResponse{}
-	log.Tracef("Sending SetResponse %+v", response)
+	log.Debugf("Sending SetResponse %+v", response)
 	return response, nil
 }
 
 // Get gets the current value of the counter
 func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
-	log.Tracef("Received GetRequest %+v", request)
+	log.Debugf("Received GetRequest %+v", request)
 
 	in, err := proto.Marshal(&GetRequest{})
 	if err != nil {
@@ -117,15 +119,15 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 	}
 
 	response := &api.GetResponse{
-		Value:  getResponse.Value,
+		Value: getResponse.Value,
 	}
-	log.Tracef("Sending GetResponse %+v", response)
+	log.Debugf("Sending GetResponse %+v", response)
 	return response, nil
 }
 
 // Increment increments the value of the counter by a delta
 func (s *Server) Increment(ctx context.Context, request *api.IncrementRequest) (*api.IncrementResponse, error) {
-	log.Tracef("Received IncrementRequest %+v", request)
+	log.Debugf("Received IncrementRequest %+v", request)
 
 	in, err := proto.Marshal(&IncrementRequest{
 		Delta: request.Delta,
@@ -149,13 +151,13 @@ func (s *Server) Increment(ctx context.Context, request *api.IncrementRequest) (
 		PreviousValue: incrementResponse.PreviousValue,
 		NextValue:     incrementResponse.NextValue,
 	}
-	log.Tracef("Sending IncrementResponse %+v", response)
+	log.Debugf("Sending IncrementResponse %+v", response)
 	return response, nil
 }
 
 // Decrement decrements the value of the counter by a delta
 func (s *Server) Decrement(ctx context.Context, request *api.DecrementRequest) (*api.DecrementResponse, error) {
-	log.Tracef("Received DecrementRequest %+v", request)
+	log.Debugf("Received DecrementRequest %+v", request)
 
 	in, err := proto.Marshal(&DecrementRequest{
 		Delta: request.Delta,
@@ -179,13 +181,13 @@ func (s *Server) Decrement(ctx context.Context, request *api.DecrementRequest) (
 		PreviousValue: decrementResponse.PreviousValue,
 		NextValue:     decrementResponse.NextValue,
 	}
-	log.Tracef("Sending DecrementResponse %+v", response)
+	log.Debugf("Sending DecrementResponse %+v", response)
 	return response, nil
 }
 
 // CheckAndSet updates the value of the counter conditionally
 func (s *Server) CheckAndSet(ctx context.Context, request *api.CheckAndSetRequest) (*api.CheckAndSetResponse, error) {
-	log.Tracef("Received CheckAndSetRequest %+v", request)
+	log.Debugf("Received CheckAndSetRequest %+v", request)
 
 	in, err := proto.Marshal(&CheckAndSetRequest{
 		Expect: request.Expect,
@@ -209,13 +211,13 @@ func (s *Server) CheckAndSet(ctx context.Context, request *api.CheckAndSetReques
 	response := &api.CheckAndSetResponse{
 		Succeeded: casResponse.Succeeded,
 	}
-	log.Tracef("Sending CheckAndSetResponse %+v", response)
+	log.Debugf("Sending CheckAndSetResponse %+v", response)
 	return response, nil
 }
 
 // Close closes a session
 func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
-	log.Tracef("Received CloseRequest %+v", request)
+	log.Debugf("Received CloseRequest %+v", request)
 	partition := s.PartitionFor(request.Header.Primitive)
 	if request.Delete {
 		err := partition.DoDeleteService(ctx, request.Header)
@@ -223,7 +225,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 			return nil, err
 		}
 		response := &api.CloseResponse{}
-		log.Tracef("Sending CloseResponse %+v", response)
+		log.Debugf("Sending CloseResponse %+v", response)
 		return response, nil
 	}
 
@@ -232,6 +234,6 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return nil, err
 	}
 	response := &api.CloseResponse{}
-	log.Tracef("Sending CloseResponse %+v", response)
+	log.Debugf("Sending CloseResponse %+v", response)
 	return response, nil
 }

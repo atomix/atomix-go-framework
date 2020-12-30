@@ -20,10 +20,12 @@ import (
 	api "github.com/atomix/api/go/atomix/storage/list"
 	"github.com/atomix/go-framework/pkg/atomix/proxy"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
+	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"github.com/golang/protobuf/proto"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
+
+var log = logging.GetLogger("atomix", "list")
 
 // RegisterPrimitive registers the election primitive on the given node
 func RegisterServer(node *proxy.Node) {
@@ -49,20 +51,20 @@ type Server struct {
 
 // Create opens a new session
 func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
-	log.Tracef("Received CreateRequest %+v", request)
+	log.Debugf("Received CreateRequest %+v", request)
 	partition := s.PartitionFor(request.Header.Primitive)
 	err := partition.DoCreateService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
 	response := &api.CreateResponse{}
-	log.Tracef("Sending CreateResponse %+v", response)
+	log.Debugf("Sending CreateResponse %+v", response)
 	return response, nil
 }
 
 // Close closes a session
 func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
-	log.Tracef("Received CloseRequest %+v", request)
+	log.Debugf("Received CloseRequest %+v", request)
 	if request.Delete {
 		partition := s.PartitionFor(request.Header.Primitive)
 		err := partition.DoDeleteService(ctx, request.Header)
@@ -70,7 +72,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 			return nil, err
 		}
 		response := &api.CloseResponse{}
-		log.Tracef("Sending CloseResponse %+v", response)
+		log.Debugf("Sending CloseResponse %+v", response)
 		return response, nil
 	}
 
@@ -80,13 +82,13 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return nil, err
 	}
 	response := &api.CloseResponse{}
-	log.Tracef("Sending CloseResponse %+v", response)
+	log.Debugf("Sending CloseResponse %+v", response)
 	return response, nil
 }
 
 // Size gets the number of elements in the list
 func (s *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeResponse, error) {
-	log.Tracef("Received SizeRequest %+v", request)
+	log.Debugf("Received SizeRequest %+v", request)
 	in, err := proto.Marshal(&SizeRequest{})
 	if err != nil {
 		return nil, err
@@ -106,13 +108,13 @@ func (s *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeR
 	response := &api.SizeResponse{
 		Size_: sizeResponse.Size_,
 	}
-	log.Tracef("Sending SizeResponse %+v", response)
+	log.Debugf("Sending SizeResponse %+v", response)
 	return response, nil
 }
 
 // Contains checks whether the list contains a value
 func (s *Server) Contains(ctx context.Context, request *api.ContainsRequest) (*api.ContainsResponse, error) {
-	log.Tracef("Received ContainsRequest %+v", request)
+	log.Debugf("Received ContainsRequest %+v", request)
 	in, err := proto.Marshal(&ContainsRequest{
 		Value: request.Value,
 	})
@@ -134,13 +136,13 @@ func (s *Server) Contains(ctx context.Context, request *api.ContainsRequest) (*a
 	response := &api.ContainsResponse{
 		Contains: containsResponse.Contains,
 	}
-	log.Tracef("Sending ContainsResponse %+v", response)
+	log.Debugf("Sending ContainsResponse %+v", response)
 	return response, nil
 }
 
 // Append adds a value to the end of the list
 func (s *Server) Append(ctx context.Context, request *api.AppendRequest) (*api.AppendResponse, error) {
-	log.Tracef("Received AppendRequest %+v", request)
+	log.Debugf("Received AppendRequest %+v", request)
 	in, err := proto.Marshal(&AppendRequest{
 		Value: request.Value,
 	})
@@ -160,13 +162,13 @@ func (s *Server) Append(ctx context.Context, request *api.AppendRequest) (*api.A
 	}
 
 	response := &api.AppendResponse{}
-	log.Tracef("Sending AppendResponse %+v", response)
+	log.Debugf("Sending AppendResponse %+v", response)
 	return response, nil
 }
 
 // Insert inserts a value at a specific index
 func (s *Server) Insert(ctx context.Context, request *api.InsertRequest) (*api.InsertResponse, error) {
-	log.Tracef("Received InsertRequest %+v", request)
+	log.Debugf("Received InsertRequest %+v", request)
 	in, err := proto.Marshal(&InsertRequest{
 		Index: request.Index,
 		Value: request.Value,
@@ -187,13 +189,13 @@ func (s *Server) Insert(ctx context.Context, request *api.InsertRequest) (*api.I
 	}
 
 	response := &api.InsertResponse{}
-	log.Tracef("Sending InsertResponse %+v", response)
+	log.Debugf("Sending InsertResponse %+v", response)
 	return response, nil
 }
 
 // Set sets the value at a specific index
 func (s *Server) Set(ctx context.Context, request *api.SetRequest) (*api.SetResponse, error) {
-	log.Tracef("Received SetRequest %+v", request)
+	log.Debugf("Received SetRequest %+v", request)
 	in, err := proto.Marshal(&SetRequest{
 		Index: request.Index,
 		Value: request.Value,
@@ -214,13 +216,13 @@ func (s *Server) Set(ctx context.Context, request *api.SetRequest) (*api.SetResp
 	}
 
 	response := &api.SetResponse{}
-	log.Tracef("Sending SetResponse %+v", response)
+	log.Debugf("Sending SetResponse %+v", response)
 	return response, nil
 }
 
 // Get gets the value at a specific index
 func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
-	log.Tracef("Received GetRequest %+v", request)
+	log.Debugf("Received GetRequest %+v", request)
 	in, err := proto.Marshal(&GetRequest{
 		Index: request.Index,
 	})
@@ -242,13 +244,13 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 	response := &api.GetResponse{
 		Value: getResponse.Value,
 	}
-	log.Tracef("Sending GetResponse %+v", response)
+	log.Debugf("Sending GetResponse %+v", response)
 	return response, nil
 }
 
 // Remove removes an index from the list
 func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.RemoveResponse, error) {
-	log.Tracef("Received RemoveRequest %+v", request)
+	log.Debugf("Received RemoveRequest %+v", request)
 	in, err := proto.Marshal(&RemoveRequest{
 		Index: request.Index,
 	})
@@ -270,13 +272,13 @@ func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 	response := &api.RemoveResponse{
 		Value: removeResponse.Value,
 	}
-	log.Tracef("Sending RemoveResponse %+v", response)
+	log.Debugf("Sending RemoveResponse %+v", response)
 	return response, nil
 }
 
 // Clear removes all indexes from the list
 func (s *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.ClearResponse, error) {
-	log.Tracef("Received ClearRequest %+v", request)
+	log.Debugf("Received ClearRequest %+v", request)
 	in, err := proto.Marshal(&ClearRequest{})
 	if err != nil {
 		return nil, err
@@ -294,13 +296,13 @@ func (s *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.Cle
 	}
 
 	response := &api.ClearResponse{}
-	log.Tracef("Sending ClearResponse %+v", response)
+	log.Debugf("Sending ClearResponse %+v", response)
 	return response, nil
 }
 
 // Events listens for list change events
 func (s *Server) Events(request *api.EventRequest, srv api.ListService_EventsServer) error {
-	log.Tracef("Received EventRequest %+v", request)
+	log.Debugf("Received EventRequest %+v", request)
 	in, err := proto.Marshal(&ListenRequest{
 		Replay: request.Replay,
 	})
@@ -355,19 +357,19 @@ func (s *Server) Events(request *api.EventRequest, srv api.ListService_EventsSer
 			}
 		}
 
-		log.Tracef("Sending EventResponse %+v", eventResponse)
+		log.Debugf("Sending EventResponse %+v", eventResponse)
 		if err = srv.Send(eventResponse); err != nil {
 			return err
 		}
 	}
 
-	log.Tracef("Finished EventRequest %+v", request)
+	log.Debugf("Finished EventRequest %+v", request)
 	return nil
 }
 
 // Iterate lists all the value in the list
 func (s *Server) Iterate(request *api.IterateRequest, srv api.ListService_IterateServer) error {
-	log.Tracef("Received IterateRequest %+v", request)
+	log.Debugf("Received IterateRequest %+v", request)
 	in, err := proto.Marshal(&IterateRequest{})
 	if err != nil {
 		return err
@@ -418,13 +420,13 @@ func (s *Server) Iterate(request *api.IterateRequest, srv api.ListService_Iterat
 			}
 		}
 
-		log.Tracef("Sending IterateResponse %+v", iterateResponse)
+		log.Debugf("Sending IterateResponse %+v", iterateResponse)
 		if err = srv.Send(iterateResponse); err != nil {
 			return err
 		}
 	}
 
-	log.Tracef("Finished IterateRequest %+v", request)
+	log.Debugf("Finished IterateRequest %+v", request)
 	return nil
 }
 

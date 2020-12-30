@@ -21,10 +21,12 @@ import (
 	"github.com/atomix/api/go/atomix/storage/timestamp"
 	"github.com/atomix/go-framework/pkg/atomix/proxy"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
+	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"github.com/golang/protobuf/proto"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
+
+var log = logging.GetLogger("atomix", "indexedmap")
 
 // RegisterPrimitive registers the election primitive on the given node
 func RegisterServer(node *proxy.Node) {
@@ -50,20 +52,20 @@ type Server struct {
 
 // Create opens a new session
 func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
-	log.Tracef("Received CreateRequest %+v", request)
+	log.Debugf("Received CreateRequest %+v", request)
 	partition := s.PartitionFor(request.Header.Primitive)
 	err := partition.DoCreateService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
 	response := &api.CreateResponse{}
-	log.Tracef("Sending CreateResponse %+v", response)
+	log.Debugf("Sending CreateResponse %+v", response)
 	return response, nil
 }
 
 // Close closes a session
 func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
-	log.Tracef("Received CloseRequest %+v", request)
+	log.Debugf("Received CloseRequest %+v", request)
 	if request.Delete {
 		partition := s.PartitionFor(request.Header.Primitive)
 		err := partition.DoDeleteService(ctx, request.Header)
@@ -71,7 +73,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 			return nil, err
 		}
 		response := &api.CloseResponse{}
-		log.Tracef("Sending CloseResponse %+v", response)
+		log.Debugf("Sending CloseResponse %+v", response)
 		return response, nil
 	}
 
@@ -81,13 +83,13 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return nil, err
 	}
 	response := &api.CloseResponse{}
-	log.Tracef("Sending CloseResponse %+v", response)
+	log.Debugf("Sending CloseResponse %+v", response)
 	return response, nil
 }
 
 // Size gets the number of entries in the map
 func (s *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeResponse, error) {
-	log.Tracef("Received SizeRequest %+v", request)
+	log.Debugf("Received SizeRequest %+v", request)
 	in, err := proto.Marshal(&SizeRequest{})
 	if err != nil {
 		return nil, err
@@ -107,13 +109,13 @@ func (s *Server) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeR
 	response := &api.SizeResponse{
 		Size_: sizeResponse.Size_,
 	}
-	log.Tracef("Sending SizeResponse %+v", response)
+	log.Debugf("Sending SizeResponse %+v", response)
 	return response, nil
 }
 
 // Exists checks whether the map contains a key
 func (s *Server) Exists(ctx context.Context, request *api.ExistsRequest) (*api.ExistsResponse, error) {
-	log.Tracef("Received ExistsRequest %+v", request)
+	log.Debugf("Received ExistsRequest %+v", request)
 	in, err := proto.Marshal(&ContainsKeyRequest{
 		Key: request.Key,
 	})
@@ -135,13 +137,13 @@ func (s *Server) Exists(ctx context.Context, request *api.ExistsRequest) (*api.E
 	response := &api.ExistsResponse{
 		ContainsKey: containsResponse.ContainsKey,
 	}
-	log.Tracef("Sending ExistsResponse %+v", response)
+	log.Debugf("Sending ExistsResponse %+v", response)
 	return response, nil
 }
 
 // Put puts a key/value pair into the map
 func (s *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResponse, error) {
-	log.Tracef("Received PutRequest %+v", request)
+	log.Debugf("Received PutRequest %+v", request)
 	in, err := proto.Marshal(&PutRequest{
 		Index:   request.Index,
 		Key:     request.Key,
@@ -181,13 +183,13 @@ func (s *Server) Put(ctx context.Context, request *api.PutRequest) (*api.PutResp
 			Updated: putResponse.Updated,
 		},
 	}
-	log.Tracef("Sending PutResponse %+v", response)
+	log.Debugf("Sending PutResponse %+v", response)
 	return response, nil
 }
 
 // Get gets the value of a key
 func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
-	log.Tracef("Received GetRequest %+v", request)
+	log.Debugf("Received GetRequest %+v", request)
 	in, err := proto.Marshal(&GetRequest{
 		Index: request.Index,
 		Key:   request.Key,
@@ -223,13 +225,13 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 			Updated: getResponse.Updated,
 		},
 	}
-	log.Tracef("Sending GetResponse %+v", response)
+	log.Debugf("Sending GetResponse %+v", response)
 	return response, nil
 }
 
 // FirstEntry gets the first entry in the map
 func (s *Server) FirstEntry(ctx context.Context, request *api.FirstEntryRequest) (*api.FirstEntryResponse, error) {
-	log.Tracef("Received FirstEntryRequest %+v", request)
+	log.Debugf("Received FirstEntryRequest %+v", request)
 	in, err := proto.Marshal(&FirstEntryRequest{})
 	if err != nil {
 		return nil, err
@@ -262,13 +264,13 @@ func (s *Server) FirstEntry(ctx context.Context, request *api.FirstEntryRequest)
 			Updated: firstEntryResponse.Updated,
 		},
 	}
-	log.Tracef("Sending FirstEntryResponse %+v", response)
+	log.Debugf("Sending FirstEntryResponse %+v", response)
 	return response, nil
 }
 
 // LastEntry gets the last entry in the map
 func (s *Server) LastEntry(ctx context.Context, request *api.LastEntryRequest) (*api.LastEntryResponse, error) {
-	log.Tracef("Received LastEntryRequest %+v", request)
+	log.Debugf("Received LastEntryRequest %+v", request)
 	in, err := proto.Marshal(&LastEntryRequest{})
 	if err != nil {
 		return nil, err
@@ -301,13 +303,13 @@ func (s *Server) LastEntry(ctx context.Context, request *api.LastEntryRequest) (
 			Updated: lastEntryResponse.Updated,
 		},
 	}
-	log.Tracef("Sending LastEntryResponse %+v", response)
+	log.Debugf("Sending LastEntryResponse %+v", response)
 	return response, nil
 }
 
 // PrevEntry gets the previous entry in the map
 func (s *Server) PrevEntry(ctx context.Context, request *api.PrevEntryRequest) (*api.PrevEntryResponse, error) {
-	log.Tracef("Received PrevEntryRequest %+v", request)
+	log.Debugf("Received PrevEntryRequest %+v", request)
 	in, err := proto.Marshal(&PrevEntryRequest{
 		Index: request.Index,
 	})
@@ -342,13 +344,13 @@ func (s *Server) PrevEntry(ctx context.Context, request *api.PrevEntryRequest) (
 			Updated: prevEntryResponse.Updated,
 		},
 	}
-	log.Tracef("Sending PrevEntryResponse %+v", response)
+	log.Debugf("Sending PrevEntryResponse %+v", response)
 	return response, nil
 }
 
 // NextEntry gets the next entry in the map
 func (s *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (*api.NextEntryResponse, error) {
-	log.Tracef("Received NextEntryRequest %+v", request)
+	log.Debugf("Received NextEntryRequest %+v", request)
 	in, err := proto.Marshal(&NextEntryRequest{
 		Index: request.Index,
 	})
@@ -383,13 +385,13 @@ func (s *Server) NextEntry(ctx context.Context, request *api.NextEntryRequest) (
 			Updated: nextEntryResponse.Updated,
 		},
 	}
-	log.Tracef("Sending NextEntryResponse %+v", response)
+	log.Debugf("Sending NextEntryResponse %+v", response)
 	return response, nil
 }
 
 // Remove removes a key from the map
 func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.RemoveResponse, error) {
-	log.Tracef("Received RemoveRequest %+v", request)
+	log.Debugf("Received RemoveRequest %+v", request)
 	var version uint64
 	if request.Timestamp != nil {
 		version = request.Timestamp.GetLogicalTimestamp().Value
@@ -430,13 +432,13 @@ func (s *Server) Remove(ctx context.Context, request *api.RemoveRequest) (*api.R
 			Updated: removeResponse.Updated,
 		},
 	}
-	log.Tracef("Sending RemoveRequest %+v", response)
+	log.Debugf("Sending RemoveRequest %+v", response)
 	return response, nil
 }
 
 // Clear removes all keys from the map
 func (s *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.ClearResponse, error) {
-	log.Tracef("Received ClearRequest %+v", request)
+	log.Debugf("Received ClearRequest %+v", request)
 	in, err := proto.Marshal(&ClearRequest{})
 	if err != nil {
 		return nil, err
@@ -454,13 +456,13 @@ func (s *Server) Clear(ctx context.Context, request *api.ClearRequest) (*api.Cle
 	}
 
 	response := &api.ClearResponse{}
-	log.Tracef("Sending ClearResponse %+v", response)
+	log.Debugf("Sending ClearResponse %+v", response)
 	return response, nil
 }
 
 // Events listens for map change events
 func (s *Server) Events(request *api.EventRequest, srv api.IndexedMapService_EventsServer) error {
-	log.Tracef("Received EventRequest %+v", request)
+	log.Debugf("Received EventRequest %+v", request)
 	in, err := proto.Marshal(&ListenRequest{
 		Replay: request.Replay,
 		Key:    request.Key,
@@ -529,18 +531,18 @@ func (s *Server) Events(request *api.EventRequest, srv api.IndexedMapService_Eve
 			}
 		}
 
-		log.Tracef("Sending EventResponse %+v", eventResponse)
+		log.Debugf("Sending EventResponse %+v", eventResponse)
 		if err = srv.Send(eventResponse); err != nil {
 			return err
 		}
 	}
-	log.Tracef("Finished EventRequest %+v", request)
+	log.Debugf("Finished EventRequest %+v", request)
 	return nil
 }
 
 // Entries lists all entries currently in the map
 func (s *Server) Entries(request *api.EntriesRequest, srv api.IndexedMapService_EntriesServer) error {
-	log.Tracef("Received EntriesRequest %+v", request)
+	log.Debugf("Received EntriesRequest %+v", request)
 	in, err := proto.Marshal(&EntriesRequest{})
 	if err != nil {
 		return err
@@ -606,12 +608,12 @@ func (s *Server) Entries(request *api.EntriesRequest, srv api.IndexedMapService_
 			}
 		}
 
-		log.Tracef("Sending EntriesResponse %+v", entriesResponse)
+		log.Debugf("Sending EntriesResponse %+v", entriesResponse)
 		if err = srv.Send(entriesResponse); err != nil {
 			return err
 		}
 	}
-	log.Tracef("Finished EntriesRequest %+v", request)
+	log.Debugf("Finished EntriesRequest %+v", request)
 	return nil
 }
 

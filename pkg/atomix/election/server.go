@@ -21,10 +21,12 @@ import (
 	"github.com/atomix/api/go/atomix/storage/timestamp"
 	"github.com/atomix/go-framework/pkg/atomix/proxy"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
+	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"github.com/gogo/protobuf/proto"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
+
+var log = logging.GetLogger("atomix", "election")
 
 // RegisterPrimitive registers the election primitive on the given node
 func RegisterServer(node *proxy.Node) {
@@ -50,7 +52,7 @@ type Server struct {
 
 // Enter enters a candidate in the election
 func (s *Server) Enter(ctx context.Context, request *api.EnterRequest) (*api.EnterResponse, error) {
-	log.Tracef("Received EnterRequest %+v", request)
+	log.Debugf("Received EnterRequest %+v", request)
 	in, err := proto.Marshal(&EnterRequest{
 		ID: request.CandidateID,
 	})
@@ -79,13 +81,13 @@ func (s *Server) Enter(ctx context.Context, request *api.EnterRequest) (*api.Ent
 			Candidates: enterResponse.Term.Candidates,
 		},
 	}
-	log.Tracef("Sending EnterResponse %+v", response)
+	log.Debugf("Sending EnterResponse %+v", response)
 	return response, nil
 }
 
 // Withdraw withdraws a candidate from the election
 func (s *Server) Withdraw(ctx context.Context, request *api.WithdrawRequest) (*api.WithdrawResponse, error) {
-	log.Tracef("Received WithdrawRequest %+v", request)
+	log.Debugf("Received WithdrawRequest %+v", request)
 	in, err := proto.Marshal(&WithdrawRequest{
 		ID: request.CandidateID,
 	})
@@ -114,13 +116,13 @@ func (s *Server) Withdraw(ctx context.Context, request *api.WithdrawRequest) (*a
 			Candidates: withdrawResponse.Term.Candidates,
 		},
 	}
-	log.Tracef("Sending WithdrawResponse %+v", response)
+	log.Debugf("Sending WithdrawResponse %+v", response)
 	return response, nil
 }
 
 // Anoint assigns leadership to a candidate
 func (s *Server) Anoint(ctx context.Context, request *api.AnointRequest) (*api.AnointResponse, error) {
-	log.Tracef("Received AnointRequest %+v", request)
+	log.Debugf("Received AnointRequest %+v", request)
 	in, err := proto.Marshal(&AnointRequest{
 		ID: request.CandidateID,
 	})
@@ -149,13 +151,13 @@ func (s *Server) Anoint(ctx context.Context, request *api.AnointRequest) (*api.A
 			Candidates: anointResponse.Term.Candidates,
 		},
 	}
-	log.Tracef("Sending AnointResponse %+v", response)
+	log.Debugf("Sending AnointResponse %+v", response)
 	return response, nil
 }
 
 // Promote increases the priority of a candidate
 func (s *Server) Promote(ctx context.Context, request *api.PromoteRequest) (*api.PromoteResponse, error) {
-	log.Tracef("Received PromoteRequest %+v", request)
+	log.Debugf("Received PromoteRequest %+v", request)
 	in, err := proto.Marshal(&PromoteRequest{
 		ID: request.CandidateID,
 	})
@@ -184,13 +186,13 @@ func (s *Server) Promote(ctx context.Context, request *api.PromoteRequest) (*api
 			Candidates: promoteResponse.Term.Candidates,
 		},
 	}
-	log.Tracef("Sending PromoteResponse %+v", response)
+	log.Debugf("Sending PromoteResponse %+v", response)
 	return response, nil
 }
 
 // Evict removes a candidate from the election
 func (s *Server) Evict(ctx context.Context, request *api.EvictRequest) (*api.EvictResponse, error) {
-	log.Tracef("Received EvictRequest %+v", request)
+	log.Debugf("Received EvictRequest %+v", request)
 	in, err := proto.Marshal(&EvictRequest{
 		ID: request.CandidateID,
 	})
@@ -219,13 +221,13 @@ func (s *Server) Evict(ctx context.Context, request *api.EvictRequest) (*api.Evi
 			Candidates: evictResponse.Term.Candidates,
 		},
 	}
-	log.Tracef("Sending EvictResponse %+v", response)
+	log.Debugf("Sending EvictResponse %+v", response)
 	return response, nil
 }
 
 // GetTerm gets the current election term
 func (s *Server) GetTerm(ctx context.Context, request *api.GetTermRequest) (*api.GetTermResponse, error) {
-	log.Tracef("Received GetTermRequest %+v", request)
+	log.Debugf("Received GetTermRequest %+v", request)
 	in, err := proto.Marshal(&GetTermRequest{})
 	if err != nil {
 		return nil, err
@@ -252,13 +254,13 @@ func (s *Server) GetTerm(ctx context.Context, request *api.GetTermRequest) (*api
 			Candidates: getResponse.Term.Candidates,
 		},
 	}
-	log.Tracef("Sending GetTermResponse %+v", response)
+	log.Debugf("Sending GetTermResponse %+v", response)
 	return response, nil
 }
 
 // Events lists for election change events
 func (s *Server) Events(request *api.EventRequest, srv api.LeaderElectionService_EventsServer) error {
-	log.Tracef("Received EventRequest %+v", request)
+	log.Debugf("Received EventRequest %+v", request)
 	in, err := proto.Marshal(&ListenRequest{})
 	if err != nil {
 		return err
@@ -317,31 +319,31 @@ func (s *Server) Events(request *api.EventRequest, srv api.LeaderElectionService
 			}
 		}
 
-		log.Tracef("Sending EventResponse %+v", eventResponse)
+		log.Debugf("Sending EventResponse %+v", eventResponse)
 		if err = srv.Send(eventResponse); err != nil {
 			return err
 		}
 	}
-	log.Tracef("Finished EventRequest %+v", request)
+	log.Debugf("Finished EventRequest %+v", request)
 	return nil
 }
 
 // Create opens a new session
 func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
-	log.Tracef("Received CreateRequest %+v", request)
+	log.Debugf("Received CreateRequest %+v", request)
 	partition := s.PartitionFor(request.Header.Primitive)
 	err := partition.DoCreateService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
 	response := &api.CreateResponse{}
-	log.Tracef("Sending CreateResponse %+v", response)
+	log.Debugf("Sending CreateResponse %+v", response)
 	return response, nil
 }
 
 // Close closes a session
 func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
-	log.Tracef("Received CloseRequest %+v", request)
+	log.Debugf("Received CloseRequest %+v", request)
 	if request.Delete {
 		partition := s.PartitionFor(request.Header.Primitive)
 		err := partition.DoDeleteService(ctx, request.Header)
@@ -349,7 +351,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 			return nil, err
 		}
 		response := &api.CloseResponse{}
-		log.Tracef("Sending CloseResponse %+v", response)
+		log.Debugf("Sending CloseResponse %+v", response)
 		return response, nil
 	}
 
@@ -359,6 +361,6 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return nil, err
 	}
 	response := &api.CloseResponse{}
-	log.Tracef("Sending CloseResponse %+v", response)
+	log.Debugf("Sending CloseResponse %+v", response)
 	return response, nil
 }

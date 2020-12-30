@@ -17,8 +17,11 @@ package storage
 import (
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/util"
+	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
 )
+
+var log = logging.GetLogger("atomix", "storage")
 
 // NewNode creates a new node running the given protocol
 func NewNode(cluster *cluster.Cluster, protocol Protocol) *Node {

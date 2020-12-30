@@ -21,10 +21,12 @@ import (
 	"github.com/atomix/api/go/atomix/storage/timestamp"
 	"github.com/atomix/go-framework/pkg/atomix/proxy"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
+	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"github.com/gogo/protobuf/proto"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
+
+var log = logging.GetLogger("atomix", "leader")
 
 // RegisterPrimitive registers the election primitive on the given node
 func RegisterServer(node *proxy.Node) {
@@ -50,7 +52,7 @@ type Server struct {
 
 // Latch enters a candidate in the election
 func (s *Server) Latch(ctx context.Context, request *api.LatchRequest) (*api.LatchResponse, error) {
-	log.Tracef("Received EnterRequest %+v", request)
+	log.Debugf("Received EnterRequest %+v", request)
 	in, err := proto.Marshal(&LatchRequest{
 		ID: request.ParticipantID,
 	})
@@ -78,13 +80,13 @@ func (s *Server) Latch(ctx context.Context, request *api.LatchRequest) (*api.Lat
 			Participants: enterResponse.Latch.Participants,
 		},
 	}
-	log.Tracef("Sending EnterResponse %+v", response)
+	log.Debugf("Sending EnterResponse %+v", response)
 	return response, nil
 }
 
 // Get gets the current latch
 func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
-	log.Tracef("Received GetRequest %+v", request)
+	log.Debugf("Received GetRequest %+v", request)
 	in, err := proto.Marshal(&GetRequest{})
 	if err != nil {
 		return nil, err
@@ -110,13 +112,13 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 			Participants: getResponse.Latch.Participants,
 		},
 	}
-	log.Tracef("Sending GetTermResponse %+v", response)
+	log.Debugf("Sending GetTermResponse %+v", response)
 	return response, nil
 }
 
 // Events lists for election change events
 func (s *Server) Events(request *api.EventRequest, srv api.LeaderLatchService_EventsServer) error {
-	log.Tracef("Received EventRequest %+v", request)
+	log.Debugf("Received EventRequest %+v", request)
 	in, err := proto.Marshal(&ListenRequest{})
 	if err != nil {
 		return err
@@ -174,31 +176,31 @@ func (s *Server) Events(request *api.EventRequest, srv api.LeaderLatchService_Ev
 			}
 		}
 
-		log.Tracef("Sending EventResponse %+v", eventResponse)
+		log.Debugf("Sending EventResponse %+v", eventResponse)
 		if err = srv.Send(eventResponse); err != nil {
 			return err
 		}
 	}
-	log.Tracef("Finished EventRequest %+v", request)
+	log.Debugf("Finished EventRequest %+v", request)
 	return nil
 }
 
 // Create opens a new session
 func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
-	log.Tracef("Received CreateRequest %+v", request)
+	log.Debugf("Received CreateRequest %+v", request)
 	partition := s.PartitionFor(request.Header.Primitive)
 	err := partition.DoCreateService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
 	response := &api.CreateResponse{}
-	log.Tracef("Sending CreateResponse %+v", response)
+	log.Debugf("Sending CreateResponse %+v", response)
 	return response, nil
 }
 
 // Close closes a session
 func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
-	log.Tracef("Received CloseRequest %+v", request)
+	log.Debugf("Received CloseRequest %+v", request)
 	if request.Delete {
 		partition := s.PartitionFor(request.Header.Primitive)
 		err := partition.DoDeleteService(ctx, request.Header)
@@ -206,7 +208,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 			return nil, err
 		}
 		response := &api.CloseResponse{}
-		log.Tracef("Sending CloseResponse %+v", response)
+		log.Debugf("Sending CloseResponse %+v", response)
 		return response, nil
 	}
 
@@ -216,6 +218,6 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return nil, err
 	}
 	response := &api.CloseResponse{}
-	log.Tracef("Sending CloseResponse %+v", response)
+	log.Debugf("Sending CloseResponse %+v", response)
 	return response, nil
 }

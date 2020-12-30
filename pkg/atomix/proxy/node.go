@@ -17,9 +17,11 @@ package proxy
 import (
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/util"
-	log "github.com/sirupsen/logrus"
+	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
 )
+
+var log = logging.GetLogger("atomix", "proxy")
 
 // NewNode creates a new server node
 func NewNode(cluster *cluster.Cluster) *Node {

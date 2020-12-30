@@ -20,12 +20,14 @@ import (
 	api "github.com/atomix/api/go/atomix/storage/lock"
 	"github.com/atomix/go-framework/pkg/atomix/proxy"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
+	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"github.com/golang/protobuf/proto"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+var log = logging.GetLogger("atomix", "lock")
 
 // RegisterPrimitive registers the election primitive on the given node
 func RegisterServer(node *proxy.Node) {
@@ -51,20 +53,20 @@ type Server struct {
 
 // Create opens a new session
 func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
-	log.Tracef("Received CreateRequest %+v", request)
+	log.Debugf("Received CreateRequest %+v", request)
 	partition := s.PartitionFor(request.Header.Primitive)
 	err := partition.DoCreateService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
 	response := &api.CreateResponse{}
-	log.Tracef("Sending CreateResponse %+v", response)
+	log.Debugf("Sending CreateResponse %+v", response)
 	return response, nil
 }
 
 // Close closes a session
 func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
-	log.Tracef("Received CloseRequest %+v", request)
+	log.Debugf("Received CloseRequest %+v", request)
 	if request.Delete {
 		partition := s.PartitionFor(request.Header.Primitive)
 		err := partition.DoDeleteService(ctx, request.Header)
@@ -72,7 +74,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 			return nil, err
 		}
 		response := &api.CloseResponse{}
-		log.Tracef("Sending CloseResponse %+v", response)
+		log.Debugf("Sending CloseResponse %+v", response)
 		return response, nil
 	}
 
@@ -82,13 +84,13 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return nil, err
 	}
 	response := &api.CloseResponse{}
-	log.Tracef("Sending CloseResponse %+v", response)
+	log.Debugf("Sending CloseResponse %+v", response)
 	return response, nil
 }
 
 // Lock acquires a lock
 func (s *Server) Lock(ctx context.Context, request *api.LockRequest) (*api.LockResponse, error) {
-	log.Tracef("Received LockRequest %+v", request)
+	log.Debugf("Received LockRequest %+v", request)
 
 	in, err := proto.Marshal(&LockRequest{
 		Timeout: request.Timeout,
@@ -123,7 +125,7 @@ func (s *Server) Lock(ctx context.Context, request *api.LockRequest) (*api.LockR
 			response := &api.LockResponse{
 				Version: uint64(lockResponse.Index),
 			}
-			log.Tracef("Sending LockResponse %+v", response)
+			log.Debugf("Sending LockResponse %+v", response)
 			return response, nil
 		}
 	}
@@ -131,7 +133,7 @@ func (s *Server) Lock(ctx context.Context, request *api.LockRequest) (*api.LockR
 
 // Unlock releases the lock
 func (s *Server) Unlock(ctx context.Context, request *api.UnlockRequest) (*api.UnlockResponse, error) {
-	log.Tracef("Received UnlockRequest %+v", request)
+	log.Debugf("Received UnlockRequest %+v", request)
 	in, err := proto.Marshal(&UnlockRequest{
 		Index: int64(request.Version),
 	})
@@ -153,13 +155,13 @@ func (s *Server) Unlock(ctx context.Context, request *api.UnlockRequest) (*api.U
 	response := &api.UnlockResponse{
 		Unlocked: unlockResponse.Succeeded,
 	}
-	log.Tracef("Sending UnlockResponse %+v", response)
+	log.Debugf("Sending UnlockResponse %+v", response)
 	return response, nil
 }
 
 // IsLocked checks whether the lock is held by any session
 func (s *Server) IsLocked(ctx context.Context, request *api.IsLockedRequest) (*api.IsLockedResponse, error) {
-	log.Tracef("Received IsLockedRequest %+v", request)
+	log.Debugf("Received IsLockedRequest %+v", request)
 	in, err := proto.Marshal(&IsLockedRequest{
 		Index: int64(request.Version),
 	})
@@ -181,6 +183,6 @@ func (s *Server) IsLocked(ctx context.Context, request *api.IsLockedRequest) (*a
 	response := &api.IsLockedResponse{
 		IsLocked: isLockedResponse.Locked,
 	}
-	log.Tracef("Sending IsLockedResponse %+v", response)
+	log.Debugf("Sending IsLockedResponse %+v", response)
 	return response, nil
 }

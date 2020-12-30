@@ -20,10 +20,12 @@ import (
 	api "github.com/atomix/api/go/atomix/storage/value"
 	"github.com/atomix/go-framework/pkg/atomix/proxy"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
+	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"github.com/gogo/protobuf/proto"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
+
+var log = logging.GetLogger("atomix", "value")
 
 // RegisterPrimitive registers the election primitive on the given node
 func RegisterServer(node *proxy.Node) {
@@ -49,7 +51,7 @@ type Server struct {
 
 // Set sets the value
 func (s *Server) Set(ctx context.Context, request *api.SetRequest) (*api.SetResponse, error) {
-	log.Tracef("Received SetRequest %+v", request)
+	log.Debugf("Received SetRequest %+v", request)
 	in, err := proto.Marshal(&SetRequest{
 		ExpectVersion: request.ExpectVersion,
 		ExpectValue:   request.ExpectValue,
@@ -74,13 +76,13 @@ func (s *Server) Set(ctx context.Context, request *api.SetRequest) (*api.SetResp
 		Version:   setResponse.Version,
 		Succeeded: setResponse.Succeeded,
 	}
-	log.Tracef("Sending SetResponse %+v", response)
+	log.Debugf("Sending SetResponse %+v", response)
 	return response, nil
 }
 
 // Get gets the current value and version
 func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
-	log.Tracef("Received GetRequest %+v", request)
+	log.Debugf("Received GetRequest %+v", request)
 	in, err := proto.Marshal(&GetRequest{})
 	if err != nil {
 		return nil, err
@@ -101,13 +103,13 @@ func (s *Server) Get(ctx context.Context, request *api.GetRequest) (*api.GetResp
 		Value:   getResponse.Value,
 		Version: getResponse.Version,
 	}
-	log.Tracef("Sending GetResponse %+v", response)
+	log.Debugf("Sending GetResponse %+v", response)
 	return response, nil
 }
 
 // Events listens for value change events
 func (s *Server) Events(request *api.EventRequest, srv api.ValueService_EventsServer) error {
-	log.Tracef("Received EventRequest %+v", request)
+	log.Debugf("Received EventRequest %+v", request)
 	in, err := proto.Marshal(&ListenRequest{})
 	if err != nil {
 		return err
@@ -162,31 +164,31 @@ func (s *Server) Events(request *api.EventRequest, srv api.ValueService_EventsSe
 			}
 		}
 
-		log.Tracef("Sending EventResponse %+v", eventResponse)
+		log.Debugf("Sending EventResponse %+v", eventResponse)
 		if err = srv.Send(eventResponse); err != nil {
 			return err
 		}
 	}
-	log.Tracef("Finished EventRequest %+v", request)
+	log.Debugf("Finished EventRequest %+v", request)
 	return nil
 }
 
 // Create opens a new session
 func (s *Server) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
-	log.Tracef("Received CreateRequest %+v", request)
+	log.Debugf("Received CreateRequest %+v", request)
 	partition := s.PartitionFor(request.Header.Primitive)
 	err := partition.DoCreateService(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
 	response := &api.CreateResponse{}
-	log.Tracef("Sending CreateResponse %+v", response)
+	log.Debugf("Sending CreateResponse %+v", response)
 	return response, nil
 }
 
 // Close closes a session
 func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
-	log.Tracef("Received CloseRequest %+v", request)
+	log.Debugf("Received CloseRequest %+v", request)
 	if request.Delete {
 		partition := s.PartitionFor(request.Header.Primitive)
 		err := partition.DoDeleteService(ctx, request.Header)
@@ -194,7 +196,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 			return nil, err
 		}
 		response := &api.CloseResponse{}
-		log.Tracef("Sending CloseResponse %+v", response)
+		log.Debugf("Sending CloseResponse %+v", response)
 		return response, nil
 	}
 
@@ -204,7 +206,7 @@ func (s *Server) Close(ctx context.Context, request *api.CloseRequest) (*api.Clo
 		return nil, err
 	}
 	response := &api.CloseResponse{}
-	log.Tracef("Sending CloseResponse %+v", response)
+	log.Debugf("Sending CloseResponse %+v", response)
 	return response, nil
 }
 
