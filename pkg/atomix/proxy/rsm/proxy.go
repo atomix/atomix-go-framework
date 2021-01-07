@@ -21,7 +21,7 @@ func NewProxy(client *Client) *Proxy {
 	}
 }
 
-// Server is a base server for servers that support sessions
+// Proxy is a base server for proxies that support sessions
 type Proxy struct {
 	*Client
 }

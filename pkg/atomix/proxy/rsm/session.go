@@ -16,7 +16,7 @@ package rsm
 
 import (
 	"context"
-	storageapi "github.com/atomix/api/go/atomix/storage"
+	primitiveapi "github.com/atomix/api/go/atomix/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/storage/rsm"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/google/uuid"
@@ -81,9 +81,9 @@ type Session struct {
 }
 
 // DoCommand submits a command to the service
-func (s *Session) DoCommand(ctx context.Context, name string, input []byte, header storageapi.RequestHeader) ([]byte, error) {
-	service := getService(header.Primitive)
-	requestContext := s.nextCommandContext(header.Primitive)
+func (s *Session) DoCommand(ctx context.Context, name string, input []byte, header primitiveapi.RequestHeader) ([]byte, error) {
+	service := getService(header.PrimitiveID)
+	requestContext := s.nextCommandContext(header.PrimitiveID)
 	response, responseStatus, responseContext, err := s.Partition.doCommand(ctx, name, input, service, requestContext)
 	if err != nil {
 		return nil, err
@@ -96,9 +96,9 @@ func (s *Session) DoCommand(ctx context.Context, name string, input []byte, head
 }
 
 // DoCommandStream submits a streaming command to the service
-func (s *Session) DoCommandStream(ctx context.Context, name string, input []byte, header storageapi.RequestHeader, outStream streams.WriteStream) error {
-	service := getService(header.Primitive)
-	streamState, requestContext := s.nextStream(header.Primitive)
+func (s *Session) DoCommandStream(ctx context.Context, name string, input []byte, header primitiveapi.RequestHeader, outStream streams.WriteStream) error {
+	service := getService(header.PrimitiveID)
+	streamState, requestContext := s.nextStream(header.PrimitiveID)
 	ch := make(chan streams.Result)
 	inStream := streams.NewChannelStream(ch)
 	err := s.Partition.doCommandStream(ctx, name, input, service, requestContext, inStream)
@@ -114,15 +114,13 @@ func (s *Session) DoCommandStream(ctx context.Context, name string, input []byte
 				if streamState.serialize(response.Context) {
 					outStream.Value(SessionOutput{
 						Result: result,
-						Type:   storageapi.ResponseType_OPEN_STREAM,
+						Header: primitiveapi.ResponseHeader{
+							ResponseType: primitiveapi.ResponseType_RESPONSE_STREAM,
+						},
 					})
 				}
 			case rsm.SessionResponseType_CLOSE_STREAM:
 				if streamState.serialize(response.Context) {
-					outStream.Value(SessionOutput{
-						Result: result,
-						Type:   storageapi.ResponseType_CLOSE_STREAM,
-					})
 					outStream.Close()
 					streamState.Close()
 					return
@@ -135,7 +133,9 @@ func (s *Session) DoCommandStream(ctx context.Context, name string, input []byte
 				if streamState.serialize(response.Context) {
 					outStream.Value(SessionOutput{
 						Result: result,
-						Type:   storageapi.ResponseType_RESPONSE,
+						Header: primitiveapi.ResponseHeader{
+							ResponseType: primitiveapi.ResponseType_RESPONSE,
+						},
 					})
 				}
 			}
@@ -145,9 +145,9 @@ func (s *Session) DoCommandStream(ctx context.Context, name string, input []byte
 }
 
 // DoQuery submits a query to the service
-func (s *Session) DoQuery(ctx context.Context, name string, input []byte, header storageapi.RequestHeader) ([]byte, error) {
-	service := getService(header.Primitive)
-	requestContext := s.getQueryContext(header.Primitive)
+func (s *Session) DoQuery(ctx context.Context, name string, input []byte, header primitiveapi.RequestHeader) ([]byte, error) {
+	service := getService(header.PrimitiveID)
+	requestContext := s.getQueryContext(header.PrimitiveID)
 	response, responseStatus, responseContext, err := s.Partition.doQuery(ctx, name, input, service, requestContext)
 	if err != nil {
 		return nil, err
@@ -160,9 +160,9 @@ func (s *Session) DoQuery(ctx context.Context, name string, input []byte, header
 }
 
 // DoQueryStream submits a streaming query to the service
-func (s *Session) DoQueryStream(ctx context.Context, name string, input []byte, header storageapi.RequestHeader, stream streams.WriteStream) error {
-	service := getService(header.Primitive)
-	requestContext := s.getQueryContext(header.Primitive)
+func (s *Session) DoQueryStream(ctx context.Context, name string, input []byte, header primitiveapi.RequestHeader, stream streams.WriteStream) error {
+	service := getService(header.PrimitiveID)
+	requestContext := s.getQueryContext(header.PrimitiveID)
 	err := s.Partition.doQueryStream(ctx, name, input, service, requestContext, stream)
 	if err != nil {
 		return err
@@ -179,16 +179,18 @@ func (s *Session) DoQueryStream(ctx context.Context, name string, input []byte, 
 				Value: value,
 				Error: err,
 			},
-			Type: getResponseType(response.Type),
+			Header: primitiveapi.ResponseHeader{
+				ResponseType: getResponseType(response.Type),
+			},
 		}, err
 	})
 	return nil
 }
 
 // DoCreateService creates the service
-func (s *Session) DoCreateService(ctx context.Context, header storageapi.RequestHeader) error {
-	service := getService(header.Primitive)
-	requestContext := s.nextCommandContext(header.Primitive)
+func (s *Session) DoCreateService(ctx context.Context, header primitiveapi.RequestHeader) error {
+	service := getService(header.PrimitiveID)
+	requestContext := s.nextCommandContext(header.PrimitiveID)
 	responseStatus, responseContext, err := s.Partition.doCreateService(ctx, service, requestContext)
 	if err != nil {
 		return err
@@ -201,9 +203,9 @@ func (s *Session) DoCreateService(ctx context.Context, header storageapi.Request
 }
 
 // DoCloseService closes the service
-func (s *Session) DoCloseService(ctx context.Context, header storageapi.RequestHeader) error {
-	service := getService(header.Primitive)
-	requestContext := s.nextCommandContext(header.Primitive)
+func (s *Session) DoCloseService(ctx context.Context, header primitiveapi.RequestHeader) error {
+	service := getService(header.PrimitiveID)
+	requestContext := s.nextCommandContext(header.PrimitiveID)
 	responseStatus, responseContext, err := s.Partition.doCloseService(ctx, service, requestContext)
 	if err != nil {
 		return err
@@ -216,9 +218,9 @@ func (s *Session) DoCloseService(ctx context.Context, header storageapi.RequestH
 }
 
 // DoDeleteService deletes the service
-func (s *Session) DoDeleteService(ctx context.Context, header storageapi.RequestHeader) error {
-	service := getService(header.Primitive)
-	requestContext := s.nextCommandContext(header.Primitive)
+func (s *Session) DoDeleteService(ctx context.Context, header primitiveapi.RequestHeader) error {
+	service := getService(header.PrimitiveID)
+	requestContext := s.nextCommandContext(header.PrimitiveID)
 	responseStatus, responseContext, err := s.Partition.doDeleteService(ctx, service, requestContext)
 	if err != nil {
 		return err
@@ -232,7 +234,7 @@ func (s *Session) DoDeleteService(ctx context.Context, header storageapi.Request
 
 // open creates the session and begins keep-alives
 func (s *Session) open(ctx context.Context) error {
-	requestContext, _ := s.getStateContexts(storageapi.PrimitiveId{})
+	requestContext, _ := s.getStateContexts(primitiveapi.PrimitiveId{})
 	responseStatus, responseContext, err := s.Partition.doOpenSession(ctx, requestContext, &s.Timeout)
 	if err != nil {
 		return err
@@ -257,7 +259,7 @@ func (s *Session) open(ctx context.Context) error {
 
 // keepAlive keeps the session alive
 func (s *Session) keepAlive(ctx context.Context) error {
-	requestContext, streamContexts := s.getStateContexts(storageapi.PrimitiveId{})
+	requestContext, streamContexts := s.getStateContexts(primitiveapi.PrimitiveId{})
 	responseStatus, responseContext, err := s.Partition.doKeepAliveSession(ctx, requestContext, streamContexts)
 	if err != nil {
 		return err
@@ -280,7 +282,7 @@ func (s *Session) Close() error {
 
 // close closes the session
 func (s *Session) close(ctx context.Context) error {
-	requestContext, _ := s.getStateContexts(storageapi.PrimitiveId{})
+	requestContext, _ := s.getStateContexts(primitiveapi.PrimitiveId{})
 	responseStatus, responseContext, err := s.Partition.doCloseSession(ctx, requestContext)
 	if err != nil {
 		return err
@@ -295,7 +297,7 @@ func (s *Session) close(ctx context.Context) error {
 }
 
 // getStateContexts gets the header for the current state of the session
-func (s *Session) getStateContexts(primitive storageapi.PrimitiveId) (rsm.SessionCommandContext, []rsm.SessionStreamContext) {
+func (s *Session) getStateContexts(primitive primitiveapi.PrimitiveId) (rsm.SessionCommandContext, []rsm.SessionStreamContext) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return rsm.SessionCommandContext{
@@ -305,7 +307,7 @@ func (s *Session) getStateContexts(primitive storageapi.PrimitiveId) (rsm.Sessio
 }
 
 // getQueryContext gets the current read header
-func (s *Session) getQueryContext(primitive storageapi.PrimitiveId) rsm.SessionQueryContext {
+func (s *Session) getQueryContext(primitive primitiveapi.PrimitiveId) rsm.SessionQueryContext {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return rsm.SessionQueryContext{
@@ -316,7 +318,7 @@ func (s *Session) getQueryContext(primitive storageapi.PrimitiveId) rsm.SessionQ
 }
 
 // nextCommandContext returns the next write context
-func (s *Session) nextCommandContext(primitive storageapi.PrimitiveId) rsm.SessionCommandContext {
+func (s *Session) nextCommandContext(primitive primitiveapi.PrimitiveId) rsm.SessionCommandContext {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.requestID = s.requestID + 1
@@ -327,7 +329,7 @@ func (s *Session) nextCommandContext(primitive storageapi.PrimitiveId) rsm.Sessi
 }
 
 // nextStreamHeader returns the next write stream and header
-func (s *Session) nextStream(primitive storageapi.PrimitiveId) (*StreamState, rsm.SessionCommandContext) {
+func (s *Session) nextStream(primitive primitiveapi.PrimitiveId) (*StreamState, rsm.SessionCommandContext) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.requestID = s.requestID + 1
@@ -439,64 +441,23 @@ func (s *StreamState) Close() {
 // SessionOutput is a result for session-supporting servers containing session header information
 type SessionOutput struct {
 	streams.Result
-	Type storageapi.ResponseType
+	Header primitiveapi.ResponseHeader
 }
 
 // getService returns the service ID for the given primitive
-func getService(primitive storageapi.PrimitiveId) rsm.ServiceId {
+func getService(primitive primitiveapi.PrimitiveId) rsm.ServiceId {
 	return rsm.ServiceId{
-		Type:      primitive.Type,
-		Namespace: primitive.Namespace,
-		Name:      primitive.Name,
+		Type: primitive.Type,
+		Name: primitive.Name,
 	}
 }
 
-func getResponseType(t rsm.SessionResponseType) storageapi.ResponseType {
+func getResponseType(t rsm.SessionResponseType) primitiveapi.ResponseType {
 	switch t {
 	case rsm.SessionResponseType_RESPONSE:
-		return storageapi.ResponseType_RESPONSE
+		return primitiveapi.ResponseType_RESPONSE
 	case rsm.SessionResponseType_OPEN_STREAM:
-		return storageapi.ResponseType_OPEN_STREAM
-	case rsm.SessionResponseType_CLOSE_STREAM:
-		return storageapi.ResponseType_CLOSE_STREAM
+		return primitiveapi.ResponseType_RESPONSE_STREAM
 	}
-	return storageapi.ResponseType_RESPONSE
-}
-
-func getResponseStatus(status rsm.SessionResponseStatus) storageapi.ResponseStatus {
-	return storageapi.ResponseStatus{
-		Code:    getResponseCode(status.Code),
-		Message: status.Message,
-	}
-}
-
-func getResponseCode(code rsm.SessionResponseCode) storageapi.ResponseCode {
-	switch code {
-	case rsm.SessionResponseCode_UNKNOWN:
-		return storageapi.ResponseCode_UNKNOWN
-	case rsm.SessionResponseCode_CANCELED:
-		return storageapi.ResponseCode_CANCELED
-	case rsm.SessionResponseCode_NOT_FOUND:
-		return storageapi.ResponseCode_NOT_FOUND
-	case rsm.SessionResponseCode_ALREADY_EXISTS:
-		return storageapi.ResponseCode_ALREADY_EXISTS
-	case rsm.SessionResponseCode_UNAUTHORIZED:
-		return storageapi.ResponseCode_UNAUTHORIZED
-	case rsm.SessionResponseCode_FORBIDDEN:
-		return storageapi.ResponseCode_FORBIDDEN
-	case rsm.SessionResponseCode_CONFLICT:
-		return storageapi.ResponseCode_CONFLICT
-	case rsm.SessionResponseCode_INVALID:
-		return storageapi.ResponseCode_INVALID
-	case rsm.SessionResponseCode_UNAVAILABLE:
-		return storageapi.ResponseCode_UNAVAILABLE
-	case rsm.SessionResponseCode_NOT_SUPPORTED:
-		return storageapi.ResponseCode_NOT_SUPPORTED
-	case rsm.SessionResponseCode_TIMEOUT:
-		return storageapi.ResponseCode_TIMEOUT
-	case rsm.SessionResponseCode_INTERNAL:
-		return storageapi.ResponseCode_INTERNAL
-	default:
-		return storageapi.ResponseCode_ERROR
-	}
+	return primitiveapi.ResponseType_RESPONSE
 }

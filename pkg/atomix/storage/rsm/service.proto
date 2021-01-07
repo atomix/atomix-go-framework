@@ -48,7 +48,6 @@ message SessionStreamSnapshot {
 message ServiceId {
     string type = 1;
     string name = 2;
-    string namespace = 3;
 }
 
 message StorageRequest {
@@ -84,7 +83,8 @@ message SessionResponse {
 }
 
 message OpenSessionRequest {
-    google.protobuf.Duration timeout = 1 [(gogoproto.stdduration) = true];
+    string client_id = 1 [(gogoproto.customname) = "ClientID"];
+    google.protobuf.Duration timeout = 2 [(gogoproto.stdduration) = true];
 }
 
 message OpenSessionResponse {
@@ -197,7 +197,6 @@ message ServiceDeleteResponse {
 
 message ServiceMetadataRequest {
     string type = 1;
-    string namespace = 2;
 }
 
 message ServiceMetadataResponse {

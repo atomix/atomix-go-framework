@@ -15,7 +15,7 @@
 package passthrough
 
 import (
-	storageapi "github.com/atomix/api/go/atomix/storage"
+	primitiveapi "github.com/atomix/api/go/atomix/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/atomix/go-framework/pkg/atomix/util/async"
@@ -56,7 +56,7 @@ func (p *Client) PartitionBy(partitionKey []byte) *Partition {
 	return p.partitions[i]
 }
 
-func (p *Client) PartitionFor(primitiveID storageapi.PrimitiveId) *Partition {
+func (p *Client) PartitionFor(primitiveID primitiveapi.PrimitiveId) *Partition {
 	return p.PartitionBy([]byte(primitiveID.String()))
 }
 

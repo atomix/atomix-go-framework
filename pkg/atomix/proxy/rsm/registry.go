@@ -18,7 +18,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// RegisterProxyFunc is a function for registering a proxy
+// RegisterProxyFunc is a function for registering a proxy server
 type RegisterProxyFunc func(server *grpc.Server, client *Client)
 
 // Registry is a primitive registry

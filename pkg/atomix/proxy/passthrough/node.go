@@ -50,13 +50,17 @@ func (n *Node) RegisterProxy(t string, proxy RegisterProxyFunc) {
 func (n *Node) Start() error {
 	log.Info("Starting protocol")
 
-	servers := n.registry.GetProxies()
-	services := make([]cluster.Service, len(servers))
-	for i, f := range servers {
-		services[i] = func(s *grpc.Server) {
+	var newProxyService = func(f RegisterProxyFunc) cluster.Service {
+		return func(s *grpc.Server) {
 			f(s, n.client)
 		}
 	}
+	proxies := n.registry.GetProxies()
+	services := make([]cluster.Service, 0, len(proxies)+2)
+	for _, proxyFunc := range proxies {
+		services = append(services, newProxyService(proxyFunc))
+	}
+	services = append(services, newProxyService(RegisterPrimitiveServer))
 	services = append(services, func(s *grpc.Server) {
 		proxyapi.RegisterProxyServiceServer(s, proxy.NewServer(n.Cluster))
 	})

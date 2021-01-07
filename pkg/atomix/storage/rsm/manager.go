@@ -533,7 +533,7 @@ func (m *Manager) applyServiceCommandDelete(request ServiceCommandRequest, conte
 }
 
 func (m *Manager) applyOpenSession(request *OpenSessionRequest, stream streams.WriteStream) {
-	session := newSessionManager(m.cluster, m.context, request.Timeout)
+	session := newSessionManager(m.cluster, m.context, ClientID(request.ClientID), request.Timeout)
 	m.sessions[session.id] = session
 	stream.Result(proto.Marshal(&SessionResponse{
 		Response: &SessionResponse_OpenSession{

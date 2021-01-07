@@ -23,6 +23,9 @@ import (
 	"time"
 )
 
+// ClientID is a client identifier
+type ClientID string
+
 // SessionID is a session identifier
 type SessionID uint64
 
@@ -30,6 +33,9 @@ type SessionID uint64
 type Session interface {
 	// ID returns the session identifier
 	ID() SessionID
+
+	// ClientID returns the client identifier
+	ClientID() ClientID
 
 	// Streams returns all open streams
 	Streams() []Stream
@@ -42,7 +48,7 @@ type Session interface {
 }
 
 // newSessionManager creates a new session manager
-func newSessionManager(cluster *cluster.Cluster, ctx PartitionContext, timeout *time.Duration) *sessionManager {
+func newSessionManager(cluster *cluster.Cluster, ctx PartitionContext, clientID ClientID, timeout *time.Duration) *sessionManager {
 	if timeout == nil {
 		defaultTimeout := 30 * time.Second
 		timeout = &defaultTimeout
@@ -54,6 +60,7 @@ func newSessionManager(cluster *cluster.Cluster, ctx PartitionContext, timeout *
 		cluster:          cluster,
 		log:              log,
 		id:               SessionID(ctx.Index()),
+		clientID:         clientID,
 		timeout:          *timeout,
 		lastUpdated:      ctx.Timestamp(),
 		ctx:              ctx,
@@ -71,6 +78,7 @@ type sessionManager struct {
 	cluster          *cluster.Cluster
 	log              logging.Logger
 	id               SessionID
+	clientID         ClientID
 	timeout          time.Duration
 	lastUpdated      time.Time
 	ctx              PartitionContext
@@ -214,6 +222,10 @@ type serviceSession struct {
 
 func (s *serviceSession) ID() SessionID {
 	return s.id
+}
+
+func (s *serviceSession) ClientID() ClientID {
+	return s.clientID
 }
 
 func (s *serviceSession) Streams() []Stream {
