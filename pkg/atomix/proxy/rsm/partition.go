@@ -30,6 +30,7 @@ import (
 func NewPartition(p *cluster.Partition) *Partition {
 	partition := &Partition{
 		Partition: p,
+		ID:        PartitionID(p.ID),
 	}
 	partition.Session = NewSession(partition)
 	return partition
