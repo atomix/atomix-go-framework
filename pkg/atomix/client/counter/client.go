@@ -5,6 +5,7 @@ import (
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
 	counter "github.com/atomix/api/go/atomix/primitive/counter"
 	"github.com/atomix/go-framework/pkg/atomix/client"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
 )
@@ -59,7 +60,7 @@ func (c *counterClient) Set(ctx context.Context, input *counter.SetInput) (*coun
 	request.Input = *input
 	response, err := c.client.Set(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -71,7 +72,7 @@ func (c *counterClient) Get(ctx context.Context, input *counter.GetInput) (*coun
 	request.Input = *input
 	response, err := c.client.Get(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -83,7 +84,7 @@ func (c *counterClient) Increment(ctx context.Context, input *counter.IncrementI
 	request.Input = *input
 	response, err := c.client.Increment(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -95,7 +96,7 @@ func (c *counterClient) Decrement(ctx context.Context, input *counter.DecrementI
 	request.Input = *input
 	response, err := c.client.Decrement(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -107,7 +108,7 @@ func (c *counterClient) CheckAndSet(ctx context.Context, input *counter.CheckAnd
 	request.Input = *input
 	response, err := c.client.CheckAndSet(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -118,7 +119,7 @@ func (c *counterClient) Snapshot(ctx context.Context) (*counter.Snapshot, error)
 	}
 	response, err := c.client.Snapshot(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Snapshot, nil
 }
@@ -129,7 +130,10 @@ func (c *counterClient) Restore(ctx context.Context, input *counter.Snapshot) er
 	}
 	request.Snapshot = *input
 	_, err := c.client.Restore(ctx, request)
-	return err
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }
 
 var _ Client = &counterClient{}

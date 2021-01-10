@@ -17,6 +17,7 @@ package client
 import (
 	"context"
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"google.golang.org/grpc"
 )
 
@@ -74,7 +75,10 @@ func (p *primitiveClient) Create(ctx context.Context) error {
 		},
 	}
 	_, err := p.client.Open(ctx, request)
-	return err
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }
 
 func (p *primitiveClient) Close(ctx context.Context) error {
@@ -87,7 +91,10 @@ func (p *primitiveClient) Close(ctx context.Context) error {
 		},
 	}
 	_, err := p.client.Close(ctx, request)
-	return err
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }
 
 func (p *primitiveClient) Delete(ctx context.Context) error {
@@ -101,5 +108,8 @@ func (p *primitiveClient) Delete(ctx context.Context) error {
 		Delete: true,
 	}
 	_, err := p.client.Close(ctx, request)
-	return err
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }

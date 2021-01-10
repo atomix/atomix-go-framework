@@ -5,6 +5,7 @@ import (
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
 	election "github.com/atomix/api/go/atomix/primitive/election"
 	"github.com/atomix/go-framework/pkg/atomix/client"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
 	"io"
@@ -64,7 +65,7 @@ func (c *electionClient) Enter(ctx context.Context, input *election.EnterInput) 
 	request.Input = *input
 	response, err := c.client.Enter(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -76,7 +77,7 @@ func (c *electionClient) Withdraw(ctx context.Context, input *election.WithdrawI
 	request.Input = *input
 	response, err := c.client.Withdraw(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -88,7 +89,7 @@ func (c *electionClient) Anoint(ctx context.Context, input *election.AnointInput
 	request.Input = *input
 	response, err := c.client.Anoint(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -100,7 +101,7 @@ func (c *electionClient) Promote(ctx context.Context, input *election.PromoteInp
 	request.Input = *input
 	response, err := c.client.Promote(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -112,7 +113,7 @@ func (c *electionClient) Evict(ctx context.Context, input *election.EvictInput) 
 	request.Input = *input
 	response, err := c.client.Evict(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -124,7 +125,7 @@ func (c *electionClient) GetTerm(ctx context.Context, input *election.GetTermInp
 	request.Input = *input
 	response, err := c.client.GetTerm(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -137,7 +138,7 @@ func (c *electionClient) Events(ctx context.Context, input *election.EventsInput
 
 	stream, err := c.client.Events(ctx, request)
 	if err != nil {
-		return err
+		return errors.From(err)
 	}
 
 	handshakeCh := make(chan struct{})
@@ -173,7 +174,7 @@ func (c *electionClient) Snapshot(ctx context.Context) (*election.Snapshot, erro
 	}
 	response, err := c.client.Snapshot(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Snapshot, nil
 }
@@ -184,7 +185,10 @@ func (c *electionClient) Restore(ctx context.Context, input *election.Snapshot) 
 	}
 	request.Snapshot = *input
 	_, err := c.client.Restore(ctx, request)
-	return err
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }
 
 var _ Client = &electionClient{}

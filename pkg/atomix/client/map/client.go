@@ -5,6 +5,7 @@ import (
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
 	_map "github.com/atomix/api/go/atomix/primitive/map"
 	"github.com/atomix/go-framework/pkg/atomix/client"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
 	"io"
@@ -64,7 +65,7 @@ func (c *mapClient) Size(ctx context.Context) (*_map.SizeOutput, error) {
 	}
 	response, err := c.client.Size(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -76,7 +77,7 @@ func (c *mapClient) Exists(ctx context.Context, input *_map.ExistsInput) (*_map.
 	request.Input = *input
 	response, err := c.client.Exists(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -88,7 +89,7 @@ func (c *mapClient) Put(ctx context.Context, input *_map.PutInput) (*_map.PutOut
 	request.Input = *input
 	response, err := c.client.Put(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -100,7 +101,7 @@ func (c *mapClient) Get(ctx context.Context, input *_map.GetInput) (*_map.GetOut
 	request.Input = *input
 	response, err := c.client.Get(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -112,7 +113,7 @@ func (c *mapClient) Remove(ctx context.Context, input *_map.RemoveInput) (*_map.
 	request.Input = *input
 	response, err := c.client.Remove(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -122,7 +123,10 @@ func (c *mapClient) Clear(ctx context.Context) error {
 		Header: c.getRequestHeader(),
 	}
 	_, err := c.client.Clear(ctx, request)
-	return err
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }
 
 func (c *mapClient) Events(ctx context.Context, input *_map.EventsInput, ch chan<- _map.EventsOutput) error {
@@ -133,7 +137,7 @@ func (c *mapClient) Events(ctx context.Context, input *_map.EventsInput, ch chan
 
 	stream, err := c.client.Events(ctx, request)
 	if err != nil {
-		return err
+		return errors.From(err)
 	}
 
 	handshakeCh := make(chan struct{})
@@ -171,7 +175,7 @@ func (c *mapClient) Entries(ctx context.Context, input *_map.EntriesInput, ch ch
 
 	stream, err := c.client.Entries(ctx, request)
 	if err != nil {
-		return err
+		return errors.From(err)
 	}
 
 	handshakeCh := make(chan struct{})
@@ -208,7 +212,7 @@ func (c *mapClient) Snapshot(ctx context.Context, ch chan<- _map.SnapshotEntry) 
 
 	stream, err := c.client.Snapshot(ctx, request)
 	if err != nil {
-		return err
+		return errors.From(err)
 	}
 
 	handshakeCh := make(chan struct{})

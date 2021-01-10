@@ -64,6 +64,51 @@ func (e *TypedError) Error() string {
 
 var _ error = &TypedError{}
 
+// From returns the given gRPC error as an Atomix error
+func From(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	if _, ok := err.(*TypedError); ok {
+		return err
+	}
+
+	status, ok := status.FromError(err)
+	if !ok {
+		return err
+	}
+
+	switch status.Code() {
+	case codes.Unknown:
+		return NewUnknown(status.Message())
+	case codes.Canceled:
+		return NewCanceled(status.Message())
+	case codes.NotFound:
+		return NewNotFound(status.Message())
+	case codes.AlreadyExists:
+		return NewAlreadyExists(status.Message())
+	case codes.Unauthenticated:
+		return NewUnauthorized(status.Message())
+	case codes.PermissionDenied:
+		return NewForbidden(status.Message())
+	case codes.FailedPrecondition:
+		return NewConflict(status.Message())
+	case codes.InvalidArgument:
+		return NewInvalid(status.Message())
+	case codes.Unavailable:
+		return NewUnavailable(status.Message())
+	case codes.Unimplemented:
+		return NewNotSupported(status.Message())
+	case codes.DeadlineExceeded:
+		return NewTimeout(status.Message())
+	case codes.Internal:
+		return NewInternal(status.Message())
+	default:
+		return err
+	}
+}
+
 // Proto returns the given error as a gRPC error
 func Proto(err error) error {
 	if err == nil {

@@ -5,6 +5,7 @@ import (
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
 	indexedmap "github.com/atomix/api/go/atomix/primitive/indexedmap"
 	"github.com/atomix/go-framework/pkg/atomix/client"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
 	"io"
@@ -72,7 +73,7 @@ func (c *indexedMapClient) Size(ctx context.Context) (*indexedmap.SizeOutput, er
 	}
 	response, err := c.client.Size(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -84,7 +85,7 @@ func (c *indexedMapClient) Exists(ctx context.Context, input *indexedmap.ExistsI
 	request.Input = *input
 	response, err := c.client.Exists(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -96,7 +97,7 @@ func (c *indexedMapClient) Put(ctx context.Context, input *indexedmap.PutInput) 
 	request.Input = *input
 	response, err := c.client.Put(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -108,7 +109,7 @@ func (c *indexedMapClient) Get(ctx context.Context, input *indexedmap.GetInput) 
 	request.Input = *input
 	response, err := c.client.Get(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -119,7 +120,7 @@ func (c *indexedMapClient) FirstEntry(ctx context.Context) (*indexedmap.FirstEnt
 	}
 	response, err := c.client.FirstEntry(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -130,7 +131,7 @@ func (c *indexedMapClient) LastEntry(ctx context.Context) (*indexedmap.LastEntry
 	}
 	response, err := c.client.LastEntry(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -142,7 +143,7 @@ func (c *indexedMapClient) PrevEntry(ctx context.Context, input *indexedmap.Prev
 	request.Input = *input
 	response, err := c.client.PrevEntry(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -154,7 +155,7 @@ func (c *indexedMapClient) NextEntry(ctx context.Context, input *indexedmap.Next
 	request.Input = *input
 	response, err := c.client.NextEntry(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -166,7 +167,7 @@ func (c *indexedMapClient) Remove(ctx context.Context, input *indexedmap.RemoveI
 	request.Input = *input
 	response, err := c.client.Remove(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -176,7 +177,10 @@ func (c *indexedMapClient) Clear(ctx context.Context) error {
 		Header: c.getRequestHeader(),
 	}
 	_, err := c.client.Clear(ctx, request)
-	return err
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }
 
 func (c *indexedMapClient) Events(ctx context.Context, input *indexedmap.EventsInput, ch chan<- indexedmap.EventsOutput) error {
@@ -187,7 +191,7 @@ func (c *indexedMapClient) Events(ctx context.Context, input *indexedmap.EventsI
 
 	stream, err := c.client.Events(ctx, request)
 	if err != nil {
-		return err
+		return errors.From(err)
 	}
 
 	handshakeCh := make(chan struct{})
@@ -225,7 +229,7 @@ func (c *indexedMapClient) Entries(ctx context.Context, input *indexedmap.Entrie
 
 	stream, err := c.client.Entries(ctx, request)
 	if err != nil {
-		return err
+		return errors.From(err)
 	}
 
 	handshakeCh := make(chan struct{})
@@ -262,7 +266,7 @@ func (c *indexedMapClient) Snapshot(ctx context.Context, ch chan<- indexedmap.Sn
 
 	stream, err := c.client.Snapshot(ctx, request)
 	if err != nil {
-		return err
+		return errors.From(err)
 	}
 
 	handshakeCh := make(chan struct{})

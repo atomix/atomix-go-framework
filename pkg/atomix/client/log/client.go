@@ -5,6 +5,7 @@ import (
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
 	log "github.com/atomix/api/go/atomix/primitive/log"
 	"github.com/atomix/go-framework/pkg/atomix/client"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
 	"io"
@@ -72,7 +73,7 @@ func (c *logClient) Size(ctx context.Context) (*log.SizeOutput, error) {
 	}
 	response, err := c.client.Size(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -84,7 +85,7 @@ func (c *logClient) Exists(ctx context.Context, input *log.ExistsInput) (*log.Ex
 	request.Input = *input
 	response, err := c.client.Exists(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -96,7 +97,7 @@ func (c *logClient) Append(ctx context.Context, input *log.AppendInput) (*log.Ap
 	request.Input = *input
 	response, err := c.client.Append(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -108,7 +109,7 @@ func (c *logClient) Get(ctx context.Context, input *log.GetInput) (*log.GetOutpu
 	request.Input = *input
 	response, err := c.client.Get(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -119,7 +120,7 @@ func (c *logClient) FirstEntry(ctx context.Context) (*log.FirstEntryOutput, erro
 	}
 	response, err := c.client.FirstEntry(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -130,7 +131,7 @@ func (c *logClient) LastEntry(ctx context.Context) (*log.LastEntryOutput, error)
 	}
 	response, err := c.client.LastEntry(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -142,7 +143,7 @@ func (c *logClient) PrevEntry(ctx context.Context, input *log.PrevEntryInput) (*
 	request.Input = *input
 	response, err := c.client.PrevEntry(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -154,7 +155,7 @@ func (c *logClient) NextEntry(ctx context.Context, input *log.NextEntryInput) (*
 	request.Input = *input
 	response, err := c.client.NextEntry(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -166,7 +167,7 @@ func (c *logClient) Remove(ctx context.Context, input *log.RemoveInput) (*log.Re
 	request.Input = *input
 	response, err := c.client.Remove(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -176,7 +177,10 @@ func (c *logClient) Clear(ctx context.Context) error {
 		Header: c.getRequestHeader(),
 	}
 	_, err := c.client.Clear(ctx, request)
-	return err
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }
 
 func (c *logClient) Events(ctx context.Context, input *log.EventsInput, ch chan<- log.EventsOutput) error {
@@ -187,7 +191,7 @@ func (c *logClient) Events(ctx context.Context, input *log.EventsInput, ch chan<
 
 	stream, err := c.client.Events(ctx, request)
 	if err != nil {
-		return err
+		return errors.From(err)
 	}
 
 	handshakeCh := make(chan struct{})
@@ -225,7 +229,7 @@ func (c *logClient) Entries(ctx context.Context, input *log.EntriesInput, ch cha
 
 	stream, err := c.client.Entries(ctx, request)
 	if err != nil {
-		return err
+		return errors.From(err)
 	}
 
 	handshakeCh := make(chan struct{})
@@ -262,7 +266,7 @@ func (c *logClient) Snapshot(ctx context.Context, ch chan<- log.SnapshotEntry) e
 
 	stream, err := c.client.Snapshot(ctx, request)
 	if err != nil {
-		return err
+		return errors.From(err)
 	}
 
 	handshakeCh := make(chan struct{})

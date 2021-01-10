@@ -5,6 +5,7 @@ import (
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
 	set "github.com/atomix/api/go/atomix/primitive/set"
 	"github.com/atomix/go-framework/pkg/atomix/client"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
 	"io"
@@ -62,7 +63,7 @@ func (c *setClient) Size(ctx context.Context) (*set.SizeOutput, error) {
 	}
 	response, err := c.client.Size(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -74,7 +75,7 @@ func (c *setClient) Contains(ctx context.Context, input *set.ContainsInput) (*se
 	request.Input = *input
 	response, err := c.client.Contains(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -86,7 +87,7 @@ func (c *setClient) Add(ctx context.Context, input *set.AddInput) (*set.AddOutpu
 	request.Input = *input
 	response, err := c.client.Add(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -98,7 +99,7 @@ func (c *setClient) Remove(ctx context.Context, input *set.RemoveInput) (*set.Re
 	request.Input = *input
 	response, err := c.client.Remove(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -108,7 +109,10 @@ func (c *setClient) Clear(ctx context.Context) error {
 		Header: c.getRequestHeader(),
 	}
 	_, err := c.client.Clear(ctx, request)
-	return err
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }
 
 func (c *setClient) Events(ctx context.Context, input *set.EventsInput, ch chan<- set.EventsOutput) error {
@@ -119,7 +123,7 @@ func (c *setClient) Events(ctx context.Context, input *set.EventsInput, ch chan<
 
 	stream, err := c.client.Events(ctx, request)
 	if err != nil {
-		return err
+		return errors.From(err)
 	}
 
 	handshakeCh := make(chan struct{})
@@ -157,7 +161,7 @@ func (c *setClient) Elements(ctx context.Context, input *set.ElementsInput, ch c
 
 	stream, err := c.client.Elements(ctx, request)
 	if err != nil {
-		return err
+		return errors.From(err)
 	}
 
 	handshakeCh := make(chan struct{})
@@ -194,7 +198,7 @@ func (c *setClient) Snapshot(ctx context.Context, ch chan<- set.SnapshotEntry) e
 
 	stream, err := c.client.Snapshot(ctx, request)
 	if err != nil {
-		return err
+		return errors.From(err)
 	}
 
 	handshakeCh := make(chan struct{})

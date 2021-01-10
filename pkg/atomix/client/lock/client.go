@@ -5,6 +5,7 @@ import (
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
 	lock "github.com/atomix/api/go/atomix/primitive/lock"
 	"github.com/atomix/go-framework/pkg/atomix/client"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
 )
@@ -55,7 +56,7 @@ func (c *lockClient) Lock(ctx context.Context, input *lock.LockInput) (*lock.Loc
 	request.Input = *input
 	response, err := c.client.Lock(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -67,7 +68,7 @@ func (c *lockClient) Unlock(ctx context.Context, input *lock.UnlockInput) (*lock
 	request.Input = *input
 	response, err := c.client.Unlock(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -79,7 +80,7 @@ func (c *lockClient) IsLocked(ctx context.Context, input *lock.IsLockedInput) (*
 	request.Input = *input
 	response, err := c.client.IsLocked(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -90,7 +91,7 @@ func (c *lockClient) Snapshot(ctx context.Context) (*lock.Snapshot, error) {
 	}
 	response, err := c.client.Snapshot(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Snapshot, nil
 }
@@ -101,7 +102,10 @@ func (c *lockClient) Restore(ctx context.Context, input *lock.Snapshot) error {
 	}
 	request.Snapshot = *input
 	_, err := c.client.Restore(ctx, request)
-	return err
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }
 
 var _ Client = &lockClient{}

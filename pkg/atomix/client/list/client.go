@@ -5,6 +5,7 @@ import (
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
 	list "github.com/atomix/api/go/atomix/primitive/list"
 	"github.com/atomix/go-framework/pkg/atomix/client"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
 	"io"
@@ -68,7 +69,7 @@ func (c *listClient) Size(ctx context.Context) (*list.SizeOutput, error) {
 	}
 	response, err := c.client.Size(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -80,7 +81,7 @@ func (c *listClient) Contains(ctx context.Context, input *list.ContainsInput) (*
 	request.Input = *input
 	response, err := c.client.Contains(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -92,7 +93,7 @@ func (c *listClient) Append(ctx context.Context, input *list.AppendInput) (*list
 	request.Input = *input
 	response, err := c.client.Append(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -104,7 +105,7 @@ func (c *listClient) Insert(ctx context.Context, input *list.InsertInput) (*list
 	request.Input = *input
 	response, err := c.client.Insert(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -116,7 +117,7 @@ func (c *listClient) Get(ctx context.Context, input *list.GetInput) (*list.GetOu
 	request.Input = *input
 	response, err := c.client.Get(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -128,7 +129,7 @@ func (c *listClient) Set(ctx context.Context, input *list.SetInput) (*list.SetOu
 	request.Input = *input
 	response, err := c.client.Set(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -140,7 +141,7 @@ func (c *listClient) Remove(ctx context.Context, input *list.RemoveInput) (*list
 	request.Input = *input
 	response, err := c.client.Remove(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -150,7 +151,10 @@ func (c *listClient) Clear(ctx context.Context) error {
 		Header: c.getRequestHeader(),
 	}
 	_, err := c.client.Clear(ctx, request)
-	return err
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }
 
 func (c *listClient) Events(ctx context.Context, input *list.EventsInput, ch chan<- list.EventsOutput) error {
@@ -161,7 +165,7 @@ func (c *listClient) Events(ctx context.Context, input *list.EventsInput, ch cha
 
 	stream, err := c.client.Events(ctx, request)
 	if err != nil {
-		return err
+		return errors.From(err)
 	}
 
 	handshakeCh := make(chan struct{})
@@ -199,7 +203,7 @@ func (c *listClient) Elements(ctx context.Context, input *list.ElementsInput, ch
 
 	stream, err := c.client.Elements(ctx, request)
 	if err != nil {
-		return err
+		return errors.From(err)
 	}
 
 	handshakeCh := make(chan struct{})
@@ -236,7 +240,7 @@ func (c *listClient) Snapshot(ctx context.Context, ch chan<- list.SnapshotEntry)
 
 	stream, err := c.client.Snapshot(ctx, request)
 	if err != nil {
-		return err
+		return errors.From(err)
 	}
 
 	handshakeCh := make(chan struct{})

@@ -5,6 +5,7 @@ import (
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
 	leader "github.com/atomix/api/go/atomix/primitive/leader"
 	"github.com/atomix/go-framework/pkg/atomix/client"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
 	"io"
@@ -56,7 +57,7 @@ func (c *leaderLatchClient) Latch(ctx context.Context, input *leader.LatchInput)
 	request.Input = *input
 	response, err := c.client.Latch(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -68,7 +69,7 @@ func (c *leaderLatchClient) Get(ctx context.Context, input *leader.GetInput) (*l
 	request.Input = *input
 	response, err := c.client.Get(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Output, nil
 }
@@ -81,7 +82,7 @@ func (c *leaderLatchClient) Events(ctx context.Context, input *leader.EventsInpu
 
 	stream, err := c.client.Events(ctx, request)
 	if err != nil {
-		return err
+		return errors.From(err)
 	}
 
 	handshakeCh := make(chan struct{})
@@ -117,7 +118,7 @@ func (c *leaderLatchClient) Snapshot(ctx context.Context) (*leader.Snapshot, err
 	}
 	response, err := c.client.Snapshot(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return &response.Snapshot, nil
 }
@@ -128,7 +129,10 @@ func (c *leaderLatchClient) Restore(ctx context.Context, input *leader.Snapshot)
 	}
 	request.Snapshot = *input
 	_, err := c.client.Restore(ctx, request)
-	return err
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }
 
 var _ Client = &leaderLatchClient{}
