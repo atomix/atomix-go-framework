@@ -55,6 +55,7 @@ func (c *counterService) Increment(input *counter.IncrementInput) (*counter.Incr
 	c.value += input.Delta
 	return &counter.IncrementOutput{
 		PreviousValue: prevValue,
+		NextValue:     c.value,
 	}, nil
 }
 
@@ -63,6 +64,7 @@ func (c *counterService) Decrement(input *counter.DecrementInput) (*counter.Decr
 	c.value -= input.Delta
 	return &counter.DecrementOutput{
 		PreviousValue: prevValue,
+		NextValue:     c.value,
 	}, nil
 }
 

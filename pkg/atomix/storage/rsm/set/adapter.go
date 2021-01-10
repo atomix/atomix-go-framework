@@ -28,8 +28,9 @@ var newServiceFunc rsm.NewServiceFunc
 func registerServiceFunc(rsmf NewServiceFunc) {
 	newServiceFunc = func(scheduler rsm.Scheduler, context rsm.ServiceContext) rsm.Service {
 		service := &ServiceAdaptor{
-			rsm: rsmf(scheduler, context),
-			log: logging.GetLogger("atomix", "set", "service"),
+			Service: rsm.NewService(scheduler, context),
+			rsm:     rsmf(scheduler, context),
+			log:     logging.GetLogger("atomix", "set", "service"),
 		}
 		service.init()
 		return service
