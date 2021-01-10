@@ -62,7 +62,7 @@ func (m *Replica) Connect(ctx context.Context, opts ...ConnectOption) (*grpc.Cli
 		return m.conn, nil
 	}
 
-	conn, err := grpc.DialContext(ctx, fmt.Sprintf("%s:%d", m.Host, m.Port), append([]grpc.DialOption{grpc.WithBlock()}, options.dialOptions...)...)
+	conn, err := grpc.DialContext(ctx, fmt.Sprintf("%s:%d", m.Host, m.Port), options.dialOptions...)
 	if err != nil {
 		return nil, err
 	}

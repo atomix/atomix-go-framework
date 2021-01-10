@@ -56,10 +56,11 @@ func NewCluster(config storageapi.StorageConfig, opts ...Option) *Cluster {
 	}
 
 	cluster := &Cluster{
-		member:   member,
-		replicas: make(ReplicaSet),
-		options:  *options,
-		watchers: make([]chan<- PartitionSet, 0),
+		member:     member,
+		replicas:   make(ReplicaSet),
+		partitions: make(PartitionSet),
+		options:    *options,
+		watchers:   make([]chan<- PartitionSet, 0),
 	}
 	_ = cluster.Update(config)
 	return cluster
@@ -139,13 +140,13 @@ func (c *Cluster) Update(config storageapi.StorageConfig) error {
 
 	for id, partitionConfig := range partitionConfigs {
 		partition, ok := c.partitions[id]
-		if ok {
-			if err := partition.Update(partitionConfig); err != nil {
-				c.mu.Unlock()
-				return err
-			}
-		} else {
-			c.partitions[id] = NewPartition(partitionConfig, c)
+		if !ok {
+			partition = NewPartition(partitionConfig, c)
+			c.partitions[id] = partition
+		}
+		if err := partition.Update(partitionConfig); err != nil {
+			c.mu.Unlock()
+			return err
 		}
 	}
 
