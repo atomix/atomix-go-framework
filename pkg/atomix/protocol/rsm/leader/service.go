@@ -75,18 +75,23 @@ func (l *leaderService) updateLatch(newParticipants []string) (leader.Latch, err
 
 	var newLatch leader.Latch
 	if len(newParticipants) == 0 {
-		newLatch.ID = oldLatch.ID
+		newLatch.Meta.Revision = oldLatch.Meta.Revision
 	} else {
 		newLatch.Leader = newParticipants[0]
 		if oldLatch.Leader != newLatch.Leader {
-			newLatch.ID = meta.Epoch{
-				Value: oldLatch.ID.Value + 1,
+			newLatch.Meta.Revision = &meta.Revision{
+				Num: oldLatch.Meta.Revision.Num + 1,
 			}
 		} else {
-			newLatch.ID = oldLatch.ID
+			newLatch.Meta.Revision = oldLatch.Meta.Revision
 		}
 	}
 
+	newLatch.Meta.Timestamp = &meta.ObjectMeta_PhysicalTimestamp{
+		PhysicalTimestamp: &meta.PhysicalTimestamp{
+			Time: l.Timestamp(),
+		},
+	}
 	l.latch = newLatch
 	err := l.notify(&leader.EventsOutput{
 		Latch: &newLatch,

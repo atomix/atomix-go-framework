@@ -77,20 +77,23 @@ func (e *electionService) updateTerm(newCandidates []string) (*election.Term, er
 
 	newTerm := &election.Term{}
 	if len(newCandidates) == 0 {
-		newTerm.ID = oldTerm.ID
+		newTerm.Meta.Revision = oldTerm.Meta.Revision
 	} else {
 		newTerm.Leader = newCandidates[0]
 		if oldTerm.Leader != newTerm.Leader {
-			newTerm.ID = meta.Epoch{
-				Value: oldTerm.ID.Value + 1,
+			newTerm.Meta.Revision = &meta.Revision{
+				Num: oldTerm.Meta.Revision.Num + 1,
 			}
 		} else {
-			newTerm.ID = oldTerm.ID
+			newTerm.Meta.Revision = oldTerm.Meta.Revision
 		}
 	}
 
-	timestamp := e.Timestamp()
-	newTerm.Timestamp = &timestamp
+	newTerm.Meta.Timestamp = &meta.ObjectMeta_PhysicalTimestamp{
+		PhysicalTimestamp: &meta.PhysicalTimestamp{
+			Time: e.Timestamp(),
+		},
+	}
 	e.term = newTerm
 	err := e.notify(&election.EventsOutput{
 		Term: newTerm,
