@@ -15,6 +15,7 @@
 package value
 
 import (
+	"github.com/atomix/api/go/atomix/primitive/meta"
 	"github.com/atomix/api/go/atomix/primitive/value"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
@@ -33,8 +34,7 @@ func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
 // valueService is a state machine for a list primitive
 type valueService struct {
 	rsm.Service
-	value   []byte
-	version uint64
+	value   value.Value
 	streams []ServiceEventsStream
 }
 
@@ -48,36 +48,34 @@ func (v *valueService) notify(event *value.EventsOutput) error {
 }
 
 func (v *valueService) Set(input *value.SetInput) (*value.SetOutput, error) {
-	if input.ExpectVersion > 0 && input.ExpectVersion != v.version {
-		return nil, errors.NewConflict("expected version %d does not match actual version %d", input.ExpectVersion, v.version)
-	} else if input.ExpectValue != nil && len(input.ExpectValue) > 0 && (v.value == nil || !slicesEqual(v.value, input.ExpectValue)) {
-		return nil, errors.NewConflict("expected value %v does not match actual value %v", input.ExpectValue, v.value)
-	} else {
-		prevValue := v.value
-		prevVersion := v.version
-		v.value = input.Value
-		v.version++
-
-		err := v.notify(&value.EventsOutput{
-			Type:            value.EventsOutput_UPDATE,
-			PreviousValue:   prevValue,
-			PreviousVersion: prevVersion,
-			NewValue:        v.value,
-			NewVersion:      v.version,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return &value.SetOutput{
-			Version: v.version,
-		}, nil
+	if input.Value.Meta.Revision != nil && input.Value.Meta.Revision.Num != v.value.Meta.Revision.Num {
+		return nil, errors.NewConflict("expected version %d does not match actual version %d", input.Value.Meta.Revision.Num, v.value.Meta.Revision.Num)
 	}
+
+	v.value = value.Value{
+		Meta: meta.ObjectMeta{
+			Revision: &meta.Revision{
+				Num: v.value.Meta.Revision.Num + 1,
+			},
+		},
+		Value: input.Value.Value,
+	}
+
+	err := v.notify(&value.EventsOutput{
+		Type:  value.EventsOutput_UPDATE,
+		Value: v.value,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &value.SetOutput{
+		Meta: v.value.Meta,
+	}, nil
 }
 
 func (v *valueService) Get(input *value.GetInput) (*value.GetOutput, error) {
 	return &value.GetOutput{
-		Value:   v.value,
-		Version: v.version,
+		Value: &v.value,
 	}, nil
 }
 
