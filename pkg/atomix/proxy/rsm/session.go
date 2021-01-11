@@ -17,7 +17,7 @@ package rsm
 import (
 	"context"
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
-	"github.com/atomix/go-framework/pkg/atomix/storage/rsm"
+	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/google/uuid"
 	"sync"

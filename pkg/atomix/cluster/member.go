@@ -16,13 +16,13 @@ package cluster
 
 import (
 	"fmt"
-	storageapi "github.com/atomix/api/go/atomix/storage"
+	protocolapi "github.com/atomix/api/go/atomix/protocol"
 	"google.golang.org/grpc"
 	"net"
 )
 
 // NewMember returns a new local group member
-func NewMember(config storageapi.StorageReplica) *Member {
+func NewMember(config protocolapi.ProtocolReplica) *Member {
 	return &Member{
 		Replica: NewReplica(config),
 	}

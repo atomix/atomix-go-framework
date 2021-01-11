@@ -16,7 +16,7 @@ package cluster
 
 import (
 	"context"
-	"github.com/atomix/api/go/atomix/storage"
+	protocolapi "github.com/atomix/api/go/atomix/protocol"
 	"sync"
 )
 
@@ -24,7 +24,7 @@ import (
 type PartitionID uint32
 
 // NewPartition returns a new replica
-func NewPartition(config storage.StoragePartition, cluster *Cluster) *Partition {
+func NewPartition(config protocolapi.ProtocolPartition, cluster *Cluster) *Partition {
 	return &Partition{
 		ID:       PartitionID(config.PartitionID),
 		cluster:  cluster,
@@ -57,7 +57,7 @@ func (p *Partition) Replicas() ReplicaSet {
 }
 
 // Update updates the partition configuration
-func (p *Partition) Update(config storage.StoragePartition) error {
+func (p *Partition) Update(config protocolapi.ProtocolPartition) error {
 	p.mu.Lock()
 
 	replicas := make(map[ReplicaID]*Replica)

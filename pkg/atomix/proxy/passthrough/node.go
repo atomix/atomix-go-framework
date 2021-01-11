@@ -62,7 +62,7 @@ func (n *Node) Start() error {
 	}
 	services = append(services, newProxyService(RegisterPrimitiveServer))
 	services = append(services, func(s *grpc.Server) {
-		proxyapi.RegisterProxyServiceServer(s, proxy.NewServer(n.Cluster))
+		proxyapi.RegisterProxyConfigServiceServer(s, proxy.NewServer(n.Cluster))
 	})
 
 	err := n.Cluster.Member().Serve(cluster.WithServices(services...))

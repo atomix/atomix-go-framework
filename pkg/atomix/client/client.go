@@ -66,7 +66,7 @@ func (p *primitiveClient) Type() PrimitiveType {
 }
 
 func (p *primitiveClient) Create(ctx context.Context) error {
-	request := &primitiveapi.OpenRequest{
+	request := &primitiveapi.CreateRequest{
 		Header: primitiveapi.RequestHeader{
 			PrimitiveID: primitiveapi.PrimitiveId{
 				Type: string(p.primitiveType),
@@ -74,7 +74,7 @@ func (p *primitiveClient) Create(ctx context.Context) error {
 			},
 		},
 	}
-	_, err := p.client.Open(ctx, request)
+	_, err := p.client.Create(ctx, request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -98,16 +98,15 @@ func (p *primitiveClient) Close(ctx context.Context) error {
 }
 
 func (p *primitiveClient) Delete(ctx context.Context) error {
-	request := &primitiveapi.CloseRequest{
+	request := &primitiveapi.DeleteRequest{
 		Header: primitiveapi.RequestHeader{
 			PrimitiveID: primitiveapi.PrimitiveId{
 				Type: string(p.primitiveType),
 				Name: p.name,
 			},
 		},
-		Delete: true,
 	}
-	_, err := p.client.Close(ctx, request)
+	_, err := p.client.Delete(ctx, request)
 	if err != nil {
 		return errors.From(err)
 	}

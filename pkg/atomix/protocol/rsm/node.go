@@ -15,21 +15,21 @@
 package rsm
 
 import (
-	proxyapi "github.com/atomix/api/go/atomix/proxy"
+	protocolapi "github.com/atomix/api/go/atomix/protocol"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
-	"github.com/atomix/go-framework/pkg/atomix/proxy"
+	"github.com/atomix/go-framework/pkg/atomix/protocol"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
 )
 
-var log = logging.GetLogger("atomix", "proxy")
+var log = logging.GetLogger("atomix", "protocol")
 
-// NewNode creates a new server node
-func NewNode(cluster *cluster.Cluster) *Node {
+// NewNode creates a new node running the given protocol
+func NewNode(cluster *cluster.Cluster, protocol Protocol) *Node {
 	return &Node{
 		Cluster:  cluster,
-		client:   NewClient(cluster),
+		protocol: protocol,
 		registry: NewRegistry(),
 	}
 }
@@ -37,40 +37,31 @@ func NewNode(cluster *cluster.Cluster) *Node {
 // Node is an Atomix node
 type Node struct {
 	Cluster  *cluster.Cluster
-	client   *Client
+	protocol Protocol
 	registry Registry
 }
 
-// RegisterServer registers a primitive server
-func (n *Node) RegisterServer(t string, proxy RegisterProxyFunc) {
-	n.registry.Register(t, proxy)
+// RegisterService registers a primitive service
+func (n *Node) RegisterService(t string, f NewServiceFunc) {
+	n.registry.Register(t, f)
 }
 
 // Start starts the node
 func (n *Node) Start() error {
 	log.Info("Starting protocol")
 
-	var newProxyService = func(f RegisterProxyFunc) cluster.Service {
-		return func(s *grpc.Server) {
-			f(s, n.client)
-		}
-	}
-	proxies := n.registry.GetProxies()
-	services := make([]cluster.Service, 0, len(proxies)+2)
-	for _, proxyFunc := range proxies {
-		services = append(services, newProxyService(proxyFunc))
-	}
-	services = append(services, newProxyService(RegisterPrimitiveServer))
-	services = append(services, func(s *grpc.Server) {
-		proxyapi.RegisterProxyConfigServiceServer(s, proxy.NewServer(n.Cluster))
-	})
-
-	err := n.Cluster.Member().Serve(cluster.WithServices(services...))
+	err := n.Cluster.Member().Serve(
+		cluster.WithService(func(server *grpc.Server) {
+			RegisterStorageServiceServer(server, &Server{Protocol: n.protocol})
+		}),
+		cluster.WithService(func(server *grpc.Server) {
+			protocolapi.RegisterProtocolConfigServiceServer(server, protocol.NewServer(n.Cluster))
+		}))
 	if err != nil {
 		return err
 	}
 
-	err = n.client.Connect()
+	err = n.protocol.Start(n.Cluster, n.registry)
 	if err != nil {
 		return err
 	}
@@ -83,7 +74,7 @@ func (n *Node) Start() error {
 
 // Stop stops the node
 func (n *Node) Stop() error {
-	if err := n.client.Close(); err != nil {
+	if err := n.protocol.Stop(); err != nil {
 		return err
 	}
 	return n.Cluster.Close()

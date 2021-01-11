@@ -38,7 +38,7 @@ type PrimitiveServer struct {
 	log logging.Logger
 }
 
-func (s *PrimitiveServer) Open(ctx context.Context, request *primitiveapi.OpenRequest) (*primitiveapi.OpenResponse, error) {
+func (s *PrimitiveServer) Create(ctx context.Context, request *primitiveapi.CreateRequest) (*primitiveapi.CreateResponse, error) {
 	s.log.Debugf("Received OpenRequest %+v", request)
 	partitions := s.Partitions()
 	err := async.IterAsync(len(partitions), func(i int) error {
@@ -48,7 +48,7 @@ func (s *PrimitiveServer) Open(ctx context.Context, request *primitiveapi.OpenRe
 		s.log.Errorf("Request OpenRequest failed: %v", err)
 		return nil, err
 	}
-	response := &primitiveapi.OpenResponse{}
+	response := &primitiveapi.CreateResponse{}
 	s.log.Debugf("Sending OpenResponse %+v", response)
 	return response, nil
 }
@@ -56,21 +56,29 @@ func (s *PrimitiveServer) Open(ctx context.Context, request *primitiveapi.OpenRe
 func (s *PrimitiveServer) Close(ctx context.Context, request *primitiveapi.CloseRequest) (*primitiveapi.CloseResponse, error) {
 	s.log.Debugf("Received CloseRequest %+v", request)
 	partitions := s.Partitions()
-	var err error
-	if request.Delete {
-		err = async.IterAsync(len(partitions), func(i int) error {
-			return partitions[i].DoDeleteService(ctx, request.Header)
-		})
-	} else {
-		err = async.IterAsync(len(partitions), func(i int) error {
-			return partitions[i].DoCloseService(ctx, request.Header)
-		})
-	}
+	err := async.IterAsync(len(partitions), func(i int) error {
+		return partitions[i].DoCloseService(ctx, request.Header)
+	})
 	if err != nil {
 		s.log.Errorf("Request CloseRequest failed: %v", err)
 		return nil, err
 	}
 	response := &primitiveapi.CloseResponse{}
 	s.log.Debugf("Sending CloseResponse %+v", response)
+	return response, nil
+}
+
+func (s *PrimitiveServer) Delete(ctx context.Context, request *primitiveapi.DeleteRequest) (*primitiveapi.DeleteResponse, error) {
+	s.log.Debugf("Received DeleteRequest %+v", request)
+	partitions := s.Partitions()
+	err := async.IterAsync(len(partitions), func(i int) error {
+		return partitions[i].DoDeleteService(ctx, request.Header)
+	})
+	if err != nil {
+		s.log.Errorf("Request DeleteRequest failed: %v", err)
+		return nil, err
+	}
+	response := &primitiveapi.DeleteResponse{}
+	s.log.Debugf("Sending DeleteResponse %+v", response)
 	return response, nil
 }

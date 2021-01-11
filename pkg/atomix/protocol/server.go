@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package proxy
+package protocol
 
 import (
 	"context"
-	"github.com/atomix/api/go/atomix/proxy"
+	protocolapi "github.com/atomix/api/go/atomix/protocol"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 )
 
@@ -27,16 +27,16 @@ func NewServer(cluster *cluster.Cluster) *Server {
 	}
 }
 
-// Server is a proxy configuration server
+// Server is a server for updating the storage configuration
 type Server struct {
 	cluster *cluster.Cluster
 }
 
-func (s *Server) UpdateConfig(ctx context.Context, request *proxy.UpdateConfigRequest) (*proxy.UpdateConfigResponse, error) {
+func (s *Server) UpdateConfig(ctx context.Context, request *protocolapi.UpdateConfigRequest) (*protocolapi.UpdateConfigResponse, error) {
 	if err := s.cluster.Update(request.Config); err != nil {
 		return nil, err
 	}
-	return &proxy.UpdateConfigResponse{}, nil
+	return &protocolapi.UpdateConfigResponse{}, nil
 }
 
-var _ proxy.ProxyConfigServiceServer = &Server{}
+var _ protocolapi.ProtocolConfigServiceServer = &Server{}

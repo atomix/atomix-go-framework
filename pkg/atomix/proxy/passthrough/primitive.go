@@ -38,24 +38,24 @@ type PrimitiveServer struct {
 	log logging.Logger
 }
 
-func (s *PrimitiveServer) Open(ctx context.Context, request *primitiveapi.OpenRequest) (*primitiveapi.OpenResponse, error) {
-	s.log.Debugf("Received OpenRequest %+v", request)
+func (s *PrimitiveServer) Create(ctx context.Context, request *primitiveapi.CreateRequest) (*primitiveapi.CreateResponse, error) {
+	s.log.Debugf("Received CreateRequest %+v", request)
 	partitions := s.Partitions()
 	responses, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
 		conn, err := partitions[i].Connect()
 		if err != nil {
-			s.log.Errorf("Request OpenRequest failed: %v", err)
+			s.log.Errorf("Request CreateRequest failed: %v", err)
 			return nil, err
 		}
 		client := primitiveapi.NewPrimitiveServiceClient(conn)
-		return client.Open(ctx, request)
+		return client.Create(ctx, request)
 	})
 	if err != nil {
-		s.log.Errorf("Request OpenRequest failed: %v", err)
+		s.log.Errorf("Request CreateRequest failed: %v", err)
 		return nil, err
 	}
-	response := responses[0].(*primitiveapi.OpenResponse)
-	s.log.Debugf("Sending OpenResponse %+v", response)
+	response := responses[0].(*primitiveapi.CreateResponse)
+	s.log.Debugf("Sending CreateResponse %+v", response)
 	return response, nil
 }
 
@@ -77,5 +77,26 @@ func (s *PrimitiveServer) Close(ctx context.Context, request *primitiveapi.Close
 	}
 	response := responses[0].(*primitiveapi.CloseResponse)
 	s.log.Debugf("Sending CloseResponse %+v", response)
+	return response, nil
+}
+
+func (s *PrimitiveServer) Delete(ctx context.Context, request *primitiveapi.DeleteRequest) (*primitiveapi.DeleteResponse, error) {
+	s.log.Debugf("Received DeleteRequest %+v", request)
+	partitions := s.Partitions()
+	responses, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
+		conn, err := partitions[i].Connect()
+		if err != nil {
+			s.log.Errorf("Request DeleteRequest failed: %v", err)
+			return nil, err
+		}
+		client := primitiveapi.NewPrimitiveServiceClient(conn)
+		return client.Delete(ctx, request)
+	})
+	if err != nil {
+		s.log.Errorf("Request DeleteRequest failed: %v", err)
+		return nil, err
+	}
+	response := responses[0].(*primitiveapi.DeleteResponse)
+	s.log.Debugf("Sending DeleteResponse %+v", response)
 	return response, nil
 }

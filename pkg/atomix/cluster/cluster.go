@@ -16,17 +16,17 @@ package cluster
 
 import (
 	"context"
-	storageapi "github.com/atomix/api/go/atomix/storage"
+	protocolapi "github.com/atomix/api/go/atomix/protocol"
 	"sync"
 )
 
 // NewCluster creates a new cluster
-func NewCluster(config storageapi.StorageConfig, opts ...Option) *Cluster {
+func NewCluster(config protocolapi.ProtocolConfig, opts ...Option) *Cluster {
 	options := applyOptions(opts...)
 
 	var member *Member
 	if options.memberID != "" {
-		var replica *storageapi.StorageReplica
+		var replica *protocolapi.ProtocolReplica
 		for _, replicaConfig := range config.Replicas {
 			if replicaConfig.ID == options.memberID {
 				replica = &replicaConfig
@@ -44,7 +44,7 @@ func NewCluster(config storageapi.StorageConfig, opts ...Option) *Cluster {
 		}
 
 		if replica == nil {
-			replica = &storageapi.StorageReplica{
+			replica = &protocolapi.ProtocolReplica{
 				ID:           options.memberID,
 				NodeID:       options.nodeID,
 				Host:         peerHost,
@@ -107,10 +107,10 @@ func (c *Cluster) Partitions() PartitionSet {
 }
 
 // Update updates the cluster configuration
-func (c *Cluster) Update(config storageapi.StorageConfig) error {
+func (c *Cluster) Update(config protocolapi.ProtocolConfig) error {
 	c.mu.Lock()
 
-	replicaConfigs := make(map[ReplicaID]storageapi.StorageReplica)
+	replicaConfigs := make(map[ReplicaID]protocolapi.ProtocolReplica)
 	for _, replicaConfig := range config.Replicas {
 		replicaConfigs[ReplicaID(replicaConfig.ID)] = replicaConfig
 	}
@@ -127,7 +127,7 @@ func (c *Cluster) Update(config storageapi.StorageConfig) error {
 		}
 	}
 
-	partitionConfigs := make(map[PartitionID]storageapi.StoragePartition)
+	partitionConfigs := make(map[PartitionID]protocolapi.ProtocolPartition)
 	for _, partition := range config.Partitions {
 		partitionConfigs[PartitionID(partition.PartitionID)] = partition
 	}

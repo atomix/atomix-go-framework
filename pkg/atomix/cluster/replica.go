@@ -17,7 +17,7 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"github.com/atomix/api/go/atomix/storage"
+	protocolapi "github.com/atomix/api/go/atomix/protocol"
 	"google.golang.org/grpc"
 	"sync"
 )
@@ -26,7 +26,7 @@ import (
 type ReplicaID string
 
 // NewReplica returns a new replica
-func NewReplica(config storage.StorageReplica) *Replica {
+func NewReplica(config protocolapi.ProtocolReplica) *Replica {
 	return &Replica{
 		ID:     ReplicaID(config.ID),
 		NodeID: NodeID(config.NodeID),
