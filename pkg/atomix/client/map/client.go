@@ -13,9 +13,9 @@ import (
 
 const PrimitiveType client.PrimitiveType = "Map"
 
-func NewClient(name string, conn *grpc.ClientConn) Client {
+func NewClient(id client.ID, name string, conn *grpc.ClientConn) Client {
 	return &mapClient{
-		PrimitiveClient: client.NewPrimitiveClient(PrimitiveType, name, conn),
+		PrimitiveClient: client.NewPrimitiveClient(id, PrimitiveType, name, conn),
 		client:          _map.NewMapServiceClient(conn),
 		log:             logging.GetLogger("atomix", "client", "map"),
 	}

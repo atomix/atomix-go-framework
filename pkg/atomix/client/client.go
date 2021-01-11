@@ -21,11 +21,14 @@ import (
 	"google.golang.org/grpc"
 )
 
+type ID string
+
 type PrimitiveType string
 
 // NewPrimitiveClient creates a new primitive client
-func NewPrimitiveClient(primitiveType PrimitiveType, name string, conn *grpc.ClientConn) PrimitiveClient {
+func NewPrimitiveClient(clientID ID, primitiveType PrimitiveType, name string, conn *grpc.ClientConn) PrimitiveClient {
 	return &primitiveClient{
+		clientID:      clientID,
 		primitiveType: primitiveType,
 		name:          name,
 		client:        primitiveapi.NewPrimitiveServiceClient(conn),
@@ -34,6 +37,9 @@ func NewPrimitiveClient(primitiveType PrimitiveType, name string, conn *grpc.Cli
 
 // PrimitiveClient is the client interface for a primitive
 type PrimitiveClient interface {
+	// ID returns the client identifier
+	ID() ID
+
 	// Name returns the primitive name
 	Name() string
 
@@ -52,9 +58,14 @@ type PrimitiveClient interface {
 
 // primitiveClient is an implementation of the PrimitiveClient interface
 type primitiveClient struct {
+	clientID      ID
 	primitiveType PrimitiveType
 	name          string
 	client        primitiveapi.PrimitiveServiceClient
+}
+
+func (p *primitiveClient) ID() ID {
+	return p.clientID
 }
 
 func (p *primitiveClient) Name() string {

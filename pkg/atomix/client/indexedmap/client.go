@@ -13,9 +13,9 @@ import (
 
 const PrimitiveType client.PrimitiveType = "IndexedMap"
 
-func NewClient(name string, conn *grpc.ClientConn) Client {
+func NewClient(id client.ID, name string, conn *grpc.ClientConn) Client {
 	return &indexedMapClient{
-		PrimitiveClient: client.NewPrimitiveClient(PrimitiveType, name, conn),
+		PrimitiveClient: client.NewPrimitiveClient(id, PrimitiveType, name, conn),
 		client:          indexedmap.NewIndexedMapServiceClient(conn),
 		log:             logging.GetLogger("atomix", "client", "indexedmap"),
 	}

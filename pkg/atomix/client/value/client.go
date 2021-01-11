@@ -13,9 +13,9 @@ import (
 
 const PrimitiveType client.PrimitiveType = "Value"
 
-func NewClient(name string, conn *grpc.ClientConn) Client {
+func NewClient(id client.ID, name string, conn *grpc.ClientConn) Client {
 	return &valueClient{
-		PrimitiveClient: client.NewPrimitiveClient(PrimitiveType, name, conn),
+		PrimitiveClient: client.NewPrimitiveClient(id, PrimitiveType, name, conn),
 		client:          value.NewValueServiceClient(conn),
 		log:             logging.GetLogger("atomix", "client", "value"),
 	}

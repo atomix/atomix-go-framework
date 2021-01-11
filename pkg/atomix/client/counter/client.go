@@ -12,9 +12,9 @@ import (
 
 const PrimitiveType client.PrimitiveType = "Counter"
 
-func NewClient(name string, conn *grpc.ClientConn) Client {
+func NewClient(id client.ID, name string, conn *grpc.ClientConn) Client {
 	return &counterClient{
-		PrimitiveClient: client.NewPrimitiveClient(PrimitiveType, name, conn),
+		PrimitiveClient: client.NewPrimitiveClient(id, PrimitiveType, name, conn),
 		client:          counter.NewCounterServiceClient(conn),
 		log:             logging.GetLogger("atomix", "client", "counter"),
 	}

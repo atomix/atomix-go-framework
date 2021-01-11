@@ -13,9 +13,9 @@ import (
 
 const PrimitiveType client.PrimitiveType = "LeaderLatch"
 
-func NewClient(name string, conn *grpc.ClientConn) Client {
+func NewClient(id client.ID, name string, conn *grpc.ClientConn) Client {
 	return &leaderLatchClient{
-		PrimitiveClient: client.NewPrimitiveClient(PrimitiveType, name, conn),
+		PrimitiveClient: client.NewPrimitiveClient(id, PrimitiveType, name, conn),
 		client:          leader.NewLeaderLatchServiceClient(conn),
 		log:             logging.GetLogger("atomix", "client", "leaderlatch"),
 	}
