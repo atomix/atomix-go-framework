@@ -15,13 +15,21 @@ test: # @HELP run the unit tests and source code validation
 test: build license_check linters
 	go test github.com/atomix/go-framework/pkg/...
 
-primitives: # @HELP compile the protobuf files (using protoc-go Docker)
+protoc-gen-atomix: # @HELP build the source code
+protoc-gen-atomix:
+	GOOS=linux GOARCH=amd64 go build -o build/_output/protoc-gen-atomix ./cmd/protoc-gen-atomix
+
+codegen: # @HELP build codegen Docker image
+codegen: protoc-gen-atomix
+	docker build . -f build/codegen/Dockerfile -t atomix/go-codegen:latest
+
+primitives: codegen # @HELP compile the protobuf files (using protoc-go Docker)
 	docker run -it \
 		-v $(PARENT_DIR)/atomix-api:/go/src/github.com/atomix/api \
 		-v `pwd`:/go/src/github.com/atomix/go-framework \
 		-w /go/src/github.com/atomix/go-framework \
 		--entrypoint build/bin/generate-primitives.sh \
-		atomix/protoc-gen-atomix:latest
+		atomix/go-codegen:latest
 
 coverage: # @HELP generate unit test coverage data
 coverage: build linters license_check
