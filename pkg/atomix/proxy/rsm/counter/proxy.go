@@ -3,8 +3,9 @@ package counter
 import (
 	"context"
 	counter "github.com/atomix/api/go/atomix/primitive/counter"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 )
@@ -44,14 +45,14 @@ func (s *Proxy) Set(ctx context.Context, request *counter.SetRequest) (*counter.
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request SetRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	header := request.Header
 	partition := s.PartitionFor(header.PrimitiveID)
 	outputBytes, err := partition.DoCommand(ctx, setOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request SetRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &counter.SetResponse{}
@@ -59,7 +60,7 @@ func (s *Proxy) Set(ctx context.Context, request *counter.SetRequest) (*counter.
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request SetRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending SetResponse %+v", response)
 	return response, nil
@@ -73,14 +74,14 @@ func (s *Proxy) Get(ctx context.Context, request *counter.GetRequest) (*counter.
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	header := request.Header
 	partition := s.PartitionFor(header.PrimitiveID)
 	outputBytes, err := partition.DoQuery(ctx, getOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &counter.GetResponse{}
@@ -88,7 +89,7 @@ func (s *Proxy) Get(ctx context.Context, request *counter.GetRequest) (*counter.
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending GetResponse %+v", response)
 	return response, nil
@@ -102,14 +103,14 @@ func (s *Proxy) Increment(ctx context.Context, request *counter.IncrementRequest
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request IncrementRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	header := request.Header
 	partition := s.PartitionFor(header.PrimitiveID)
 	outputBytes, err := partition.DoCommand(ctx, incrementOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request IncrementRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &counter.IncrementResponse{}
@@ -117,7 +118,7 @@ func (s *Proxy) Increment(ctx context.Context, request *counter.IncrementRequest
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request IncrementRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending IncrementResponse %+v", response)
 	return response, nil
@@ -131,14 +132,14 @@ func (s *Proxy) Decrement(ctx context.Context, request *counter.DecrementRequest
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request DecrementRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	header := request.Header
 	partition := s.PartitionFor(header.PrimitiveID)
 	outputBytes, err := partition.DoCommand(ctx, decrementOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request DecrementRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &counter.DecrementResponse{}
@@ -146,7 +147,7 @@ func (s *Proxy) Decrement(ctx context.Context, request *counter.DecrementRequest
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request DecrementRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending DecrementResponse %+v", response)
 	return response, nil
@@ -160,14 +161,14 @@ func (s *Proxy) CheckAndSet(ctx context.Context, request *counter.CheckAndSetReq
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request CheckAndSetRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	header := request.Header
 	partition := s.PartitionFor(header.PrimitiveID)
 	outputBytes, err := partition.DoCommand(ctx, checkAndSetOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request CheckAndSetRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &counter.CheckAndSetResponse{}
@@ -175,7 +176,7 @@ func (s *Proxy) CheckAndSet(ctx context.Context, request *counter.CheckAndSetReq
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request CheckAndSetRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending CheckAndSetResponse %+v", response)
 	return response, nil
@@ -191,7 +192,7 @@ func (s *Proxy) Snapshot(ctx context.Context, request *counter.SnapshotRequest) 
 	outputBytes, err := partition.DoCommand(ctx, snapshotOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request SnapshotRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &counter.SnapshotResponse{}
@@ -199,7 +200,7 @@ func (s *Proxy) Snapshot(ctx context.Context, request *counter.SnapshotRequest) 
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request SnapshotRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending SnapshotResponse %+v", response)
 	return response, nil
@@ -213,14 +214,14 @@ func (s *Proxy) Restore(ctx context.Context, request *counter.RestoreRequest) (*
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request RestoreRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	header := request.Header
 	partition := s.PartitionFor(header.PrimitiveID)
 	_, err = partition.DoCommand(ctx, restoreOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request RestoreRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &counter.RestoreResponse{}

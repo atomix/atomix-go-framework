@@ -3,8 +3,8 @@ package lock
 import (
 	"context"
 	lock "github.com/atomix/api/go/atomix/primitive/lock"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/passthrough"
-	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
 )
 

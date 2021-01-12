@@ -17,8 +17,8 @@ package rsm
 import (
 	"container/list"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
-	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"github.com/gogo/protobuf/proto"
 )
 

@@ -3,8 +3,9 @@ package lock
 import (
 	"context"
 	lock "github.com/atomix/api/go/atomix/primitive/lock"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 )
@@ -42,14 +43,14 @@ func (s *Proxy) Lock(ctx context.Context, request *lock.LockRequest) (*lock.Lock
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request LockRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	header := request.Header
 	partition := s.PartitionFor(header.PrimitiveID)
 	outputBytes, err := partition.DoCommand(ctx, lockOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request LockRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &lock.LockResponse{}
@@ -57,7 +58,7 @@ func (s *Proxy) Lock(ctx context.Context, request *lock.LockRequest) (*lock.Lock
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request LockRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending LockResponse %+v", response)
 	return response, nil
@@ -71,14 +72,14 @@ func (s *Proxy) Unlock(ctx context.Context, request *lock.UnlockRequest) (*lock.
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request UnlockRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	header := request.Header
 	partition := s.PartitionFor(header.PrimitiveID)
 	outputBytes, err := partition.DoCommand(ctx, unlockOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request UnlockRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &lock.UnlockResponse{}
@@ -86,7 +87,7 @@ func (s *Proxy) Unlock(ctx context.Context, request *lock.UnlockRequest) (*lock.
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request UnlockRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending UnlockResponse %+v", response)
 	return response, nil
@@ -100,14 +101,14 @@ func (s *Proxy) IsLocked(ctx context.Context, request *lock.IsLockedRequest) (*l
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request IsLockedRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	header := request.Header
 	partition := s.PartitionFor(header.PrimitiveID)
 	outputBytes, err := partition.DoQuery(ctx, isLockedOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request IsLockedRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &lock.IsLockedResponse{}
@@ -115,7 +116,7 @@ func (s *Proxy) IsLocked(ctx context.Context, request *lock.IsLockedRequest) (*l
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request IsLockedRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending IsLockedResponse %+v", response)
 	return response, nil
@@ -131,7 +132,7 @@ func (s *Proxy) Snapshot(ctx context.Context, request *lock.SnapshotRequest) (*l
 	outputBytes, err := partition.DoCommand(ctx, snapshotOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request SnapshotRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &lock.SnapshotResponse{}
@@ -139,7 +140,7 @@ func (s *Proxy) Snapshot(ctx context.Context, request *lock.SnapshotRequest) (*l
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request SnapshotRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending SnapshotResponse %+v", response)
 	return response, nil
@@ -153,14 +154,14 @@ func (s *Proxy) Restore(ctx context.Context, request *lock.RestoreRequest) (*loc
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request RestoreRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	header := request.Header
 	partition := s.PartitionFor(header.PrimitiveID)
 	_, err = partition.DoCommand(ctx, restoreOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request RestoreRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &lock.RestoreResponse{}

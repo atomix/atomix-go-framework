@@ -3,9 +3,10 @@ package election
 import (
 	"context"
 	election "github.com/atomix/api/go/atomix/primitive/election"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
-	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 )
@@ -47,14 +48,14 @@ func (s *Proxy) Enter(ctx context.Context, request *election.EnterRequest) (*ele
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request EnterRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	header := request.Header
 	partition := s.PartitionFor(header.PrimitiveID)
 	outputBytes, err := partition.DoCommand(ctx, enterOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request EnterRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &election.EnterResponse{}
@@ -62,7 +63,7 @@ func (s *Proxy) Enter(ctx context.Context, request *election.EnterRequest) (*ele
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request EnterRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending EnterResponse %+v", response)
 	return response, nil
@@ -76,14 +77,14 @@ func (s *Proxy) Withdraw(ctx context.Context, request *election.WithdrawRequest)
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request WithdrawRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	header := request.Header
 	partition := s.PartitionFor(header.PrimitiveID)
 	outputBytes, err := partition.DoCommand(ctx, withdrawOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request WithdrawRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &election.WithdrawResponse{}
@@ -91,7 +92,7 @@ func (s *Proxy) Withdraw(ctx context.Context, request *election.WithdrawRequest)
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request WithdrawRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending WithdrawResponse %+v", response)
 	return response, nil
@@ -105,14 +106,14 @@ func (s *Proxy) Anoint(ctx context.Context, request *election.AnointRequest) (*e
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request AnointRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	header := request.Header
 	partition := s.PartitionFor(header.PrimitiveID)
 	outputBytes, err := partition.DoCommand(ctx, anointOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request AnointRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &election.AnointResponse{}
@@ -120,7 +121,7 @@ func (s *Proxy) Anoint(ctx context.Context, request *election.AnointRequest) (*e
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request AnointRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending AnointResponse %+v", response)
 	return response, nil
@@ -134,14 +135,14 @@ func (s *Proxy) Promote(ctx context.Context, request *election.PromoteRequest) (
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request PromoteRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	header := request.Header
 	partition := s.PartitionFor(header.PrimitiveID)
 	outputBytes, err := partition.DoCommand(ctx, promoteOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request PromoteRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &election.PromoteResponse{}
@@ -149,7 +150,7 @@ func (s *Proxy) Promote(ctx context.Context, request *election.PromoteRequest) (
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request PromoteRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending PromoteResponse %+v", response)
 	return response, nil
@@ -163,14 +164,14 @@ func (s *Proxy) Evict(ctx context.Context, request *election.EvictRequest) (*ele
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request EvictRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	header := request.Header
 	partition := s.PartitionFor(header.PrimitiveID)
 	outputBytes, err := partition.DoCommand(ctx, evictOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request EvictRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &election.EvictResponse{}
@@ -178,7 +179,7 @@ func (s *Proxy) Evict(ctx context.Context, request *election.EvictRequest) (*ele
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request EvictRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending EvictResponse %+v", response)
 	return response, nil
@@ -192,14 +193,14 @@ func (s *Proxy) GetTerm(ctx context.Context, request *election.GetTermRequest) (
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request GetTermRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	header := request.Header
 	partition := s.PartitionFor(header.PrimitiveID)
 	outputBytes, err := partition.DoQuery(ctx, getTermOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request GetTermRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &election.GetTermResponse{}
@@ -207,7 +208,7 @@ func (s *Proxy) GetTerm(ctx context.Context, request *election.GetTermRequest) (
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request GetTermRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending GetTermResponse %+v", response)
 	return response, nil
@@ -221,7 +222,7 @@ func (s *Proxy) Events(request *election.EventsRequest, srv election.LeaderElect
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request EventsRequest failed: %v", err)
-		return err
+		return errors.Proto(err)
 	}
 
 	stream := streams.NewBufferedStream()
@@ -231,7 +232,7 @@ func (s *Proxy) Events(request *election.EventsRequest, srv election.LeaderElect
 	err = partition.DoCommandStream(srv.Context(), eventsOp, inputBytes, request.Header, stream)
 	if err != nil {
 		s.log.Errorf("Request EventsRequest failed: %v", err)
-		return err
+		return errors.Proto(err)
 	}
 
 	for {
@@ -242,7 +243,7 @@ func (s *Proxy) Events(request *election.EventsRequest, srv election.LeaderElect
 
 		if result.Failed() {
 			s.log.Errorf("Request EventsRequest failed: %v", result.Error)
-			return result.Error
+			return errors.Proto(result.Error)
 		}
 
 		sessionOutput := result.Value.(rsm.SessionOutput)
@@ -254,13 +255,13 @@ func (s *Proxy) Events(request *election.EventsRequest, srv election.LeaderElect
 		err = proto.Unmarshal(outputBytes, output)
 		if err != nil {
 			s.log.Errorf("Request EventsRequest failed: %v", err)
-			return err
+			return errors.Proto(err)
 		}
 
 		s.log.Debugf("Sending EventsResponse %+v", response)
 		if err = srv.Send(response); err != nil {
 			s.log.Errorf("Response EventsResponse failed: %v", err)
-			return err
+			return errors.Proto(err)
 		}
 	}
 	s.log.Debugf("Finished EventsRequest %+v", request)
@@ -277,7 +278,7 @@ func (s *Proxy) Snapshot(ctx context.Context, request *election.SnapshotRequest)
 	outputBytes, err := partition.DoCommand(ctx, snapshotOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request SnapshotRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &election.SnapshotResponse{}
@@ -285,7 +286,7 @@ func (s *Proxy) Snapshot(ctx context.Context, request *election.SnapshotRequest)
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request SnapshotRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending SnapshotResponse %+v", response)
 	return response, nil
@@ -299,14 +300,14 @@ func (s *Proxy) Restore(ctx context.Context, request *election.RestoreRequest) (
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request RestoreRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	header := request.Header
 	partition := s.PartitionFor(header.PrimitiveID)
 	_, err = partition.DoCommand(ctx, restoreOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request RestoreRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &election.RestoreResponse{}

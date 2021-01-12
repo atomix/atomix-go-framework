@@ -3,10 +3,11 @@ package _map
 import (
 	"context"
 	_map "github.com/atomix/api/go/atomix/primitive/map"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/atomix/go-framework/pkg/atomix/util/async"
-	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 	"io"
@@ -53,7 +54,7 @@ func (s *Proxy) Size(ctx context.Context, request *_map.SizeRequest) (*_map.Size
 	})
 	if err != nil {
 		s.log.Errorf("Request SizeRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	outputs := make([]_map.SizeOutput, 0, len(outputsBytes))
 	for _, outputBytes := range outputsBytes {
@@ -61,7 +62,7 @@ func (s *Proxy) Size(ctx context.Context, request *_map.SizeRequest) (*_map.Size
 		err = proto.Unmarshal(outputBytes.([]byte), &output)
 		if err != nil {
 			s.log.Errorf("Request SizeRequest failed: %v", err)
-			return nil, err
+			return nil, errors.Proto(err)
 		}
 		outputs = append(outputs, output)
 	}
@@ -82,14 +83,14 @@ func (s *Proxy) Exists(ctx context.Context, request *_map.ExistsRequest) (*_map.
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request ExistsRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	partitionKey := request.Input.Key
 	partition := s.PartitionBy([]byte(partitionKey))
 	outputBytes, err := partition.DoQuery(ctx, existsOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request ExistsRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &_map.ExistsResponse{}
@@ -97,7 +98,7 @@ func (s *Proxy) Exists(ctx context.Context, request *_map.ExistsRequest) (*_map.
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request ExistsRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending ExistsResponse %+v", response)
 	return response, nil
@@ -111,14 +112,14 @@ func (s *Proxy) Put(ctx context.Context, request *_map.PutRequest) (*_map.PutRes
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request PutRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	partitionKey := request.Input.Key
 	partition := s.PartitionBy([]byte(partitionKey))
 	outputBytes, err := partition.DoCommand(ctx, putOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request PutRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &_map.PutResponse{}
@@ -126,7 +127,7 @@ func (s *Proxy) Put(ctx context.Context, request *_map.PutRequest) (*_map.PutRes
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request PutRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending PutResponse %+v", response)
 	return response, nil
@@ -140,14 +141,14 @@ func (s *Proxy) Get(ctx context.Context, request *_map.GetRequest) (*_map.GetRes
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	partitionKey := request.Input.Key
 	partition := s.PartitionBy([]byte(partitionKey))
 	outputBytes, err := partition.DoQuery(ctx, getOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &_map.GetResponse{}
@@ -155,7 +156,7 @@ func (s *Proxy) Get(ctx context.Context, request *_map.GetRequest) (*_map.GetRes
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending GetResponse %+v", response)
 	return response, nil
@@ -169,14 +170,14 @@ func (s *Proxy) Remove(ctx context.Context, request *_map.RemoveRequest) (*_map.
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request RemoveRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	partitionKey := request.Input.Key
 	partition := s.PartitionBy([]byte(partitionKey))
 	outputBytes, err := partition.DoCommand(ctx, removeOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request RemoveRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &_map.RemoveResponse{}
@@ -184,7 +185,7 @@ func (s *Proxy) Remove(ctx context.Context, request *_map.RemoveRequest) (*_map.
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request RemoveRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending RemoveResponse %+v", response)
 	return response, nil
@@ -202,7 +203,7 @@ func (s *Proxy) Clear(ctx context.Context, request *_map.ClearRequest) (*_map.Cl
 	})
 	if err != nil {
 		s.log.Errorf("Request ClearRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &_map.ClearResponse{}
@@ -218,7 +219,7 @@ func (s *Proxy) Events(request *_map.EventsRequest, srv _map.MapService_EventsSe
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request EventsRequest failed: %v", err)
-		return err
+		return errors.Proto(err)
 	}
 
 	stream := streams.NewBufferedStream()
@@ -228,7 +229,7 @@ func (s *Proxy) Events(request *_map.EventsRequest, srv _map.MapService_EventsSe
 	})
 	if err != nil {
 		s.log.Errorf("Request EventsRequest failed: %v", err)
-		return err
+		return errors.Proto(err)
 	}
 
 	for {
@@ -239,7 +240,7 @@ func (s *Proxy) Events(request *_map.EventsRequest, srv _map.MapService_EventsSe
 
 		if result.Failed() {
 			s.log.Errorf("Request EventsRequest failed: %v", result.Error)
-			return result.Error
+			return errors.Proto(result.Error)
 		}
 
 		sessionOutput := result.Value.(rsm.SessionOutput)
@@ -251,13 +252,13 @@ func (s *Proxy) Events(request *_map.EventsRequest, srv _map.MapService_EventsSe
 		err = proto.Unmarshal(outputBytes, output)
 		if err != nil {
 			s.log.Errorf("Request EventsRequest failed: %v", err)
-			return err
+			return errors.Proto(err)
 		}
 
 		s.log.Debugf("Sending EventsResponse %+v", response)
 		if err = srv.Send(response); err != nil {
 			s.log.Errorf("Response EventsResponse failed: %v", err)
-			return err
+			return errors.Proto(err)
 		}
 	}
 	s.log.Debugf("Finished EventsRequest %+v", request)
@@ -272,7 +273,7 @@ func (s *Proxy) Entries(request *_map.EntriesRequest, srv _map.MapService_Entrie
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request EntriesRequest failed: %v", err)
-		return err
+		return errors.Proto(err)
 	}
 
 	stream := streams.NewBufferedStream()
@@ -282,7 +283,7 @@ func (s *Proxy) Entries(request *_map.EntriesRequest, srv _map.MapService_Entrie
 	})
 	if err != nil {
 		s.log.Errorf("Request EntriesRequest failed: %v", err)
-		return err
+		return errors.Proto(err)
 	}
 
 	for {
@@ -293,7 +294,7 @@ func (s *Proxy) Entries(request *_map.EntriesRequest, srv _map.MapService_Entrie
 
 		if result.Failed() {
 			s.log.Errorf("Request EntriesRequest failed: %v", result.Error)
-			return result.Error
+			return errors.Proto(result.Error)
 		}
 
 		sessionOutput := result.Value.(rsm.SessionOutput)
@@ -305,13 +306,13 @@ func (s *Proxy) Entries(request *_map.EntriesRequest, srv _map.MapService_Entrie
 		err = proto.Unmarshal(outputBytes, output)
 		if err != nil {
 			s.log.Errorf("Request EntriesRequest failed: %v", err)
-			return err
+			return errors.Proto(err)
 		}
 
 		s.log.Debugf("Sending EntriesResponse %+v", response)
 		if err = srv.Send(response); err != nil {
 			s.log.Errorf("Response EntriesResponse failed: %v", err)
-			return err
+			return errors.Proto(err)
 		}
 	}
 	s.log.Debugf("Finished EntriesRequest %+v", request)
@@ -331,7 +332,7 @@ func (s *Proxy) Snapshot(request *_map.SnapshotRequest, srv _map.MapService_Snap
 	})
 	if err != nil {
 		s.log.Errorf("Request SnapshotRequest failed: %v", err)
-		return err
+		return errors.Proto(err)
 	}
 
 	for {
@@ -342,7 +343,7 @@ func (s *Proxy) Snapshot(request *_map.SnapshotRequest, srv _map.MapService_Snap
 
 		if result.Failed() {
 			s.log.Errorf("Request SnapshotRequest failed: %v", result.Error)
-			return result.Error
+			return errors.Proto(result.Error)
 		}
 
 		sessionOutput := result.Value.(rsm.SessionOutput)
@@ -354,13 +355,13 @@ func (s *Proxy) Snapshot(request *_map.SnapshotRequest, srv _map.MapService_Snap
 		err = proto.Unmarshal(outputBytes, output)
 		if err != nil {
 			s.log.Errorf("Request SnapshotRequest failed: %v", err)
-			return err
+			return errors.Proto(err)
 		}
 
 		s.log.Debugf("Sending SnapshotResponse %+v", response)
 		if err = srv.Send(response); err != nil {
 			s.log.Errorf("Response SnapshotResponse failed: %v", err)
-			return err
+			return errors.Proto(err)
 		}
 	}
 	s.log.Debugf("Finished SnapshotRequest %+v", request)
@@ -376,7 +377,7 @@ func (s *Proxy) Restore(srv _map.MapService_RestoreServer) error {
 			return srv.SendAndClose(response)
 		} else if err != nil {
 			s.log.Errorf("Request RestoreRequest failed: %v", err)
-			return err
+			return errors.Proto(err)
 		}
 
 		s.log.Debugf("Received RestoreRequest %+v", request)
@@ -384,16 +385,16 @@ func (s *Proxy) Restore(srv _map.MapService_RestoreServer) error {
 		inputBytes, err := proto.Marshal(input)
 		if err != nil {
 			s.log.Errorf("Request RestoreRequest failed: %v", err)
-			return err
+			return errors.Proto(err)
 		}
 		partitions := s.Partitions()
 		err = async.IterAsync(len(partitions), func(i int) error {
 			_, err := partitions[i].DoCommand(srv.Context(), restoreOp, inputBytes, request.Header)
-			return err
+			return errors.Proto(err)
 		})
 		if err != nil {
 			s.log.Errorf("Request RestoreRequest failed: %v", err)
-			return err
+			return errors.Proto(err)
 		}
 	}
 }

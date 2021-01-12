@@ -25,7 +25,8 @@ import (
 	{{- $added = true }}
 	{{- end }}
 	{{- end }}
-	"github.com/atomix/go-framework/pkg/atomix/util/logging"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 	{{- $package := .Package }}
@@ -135,7 +136,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-	    return nil, err
+	    return nil, errors.Proto(err)
 	}
 	{{- else }}
 	var inputBytes []byte
@@ -163,7 +164,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	{{- end }}
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-	    return nil, err
+	    return nil, errors.Proto(err)
 	}
 
 	response := &{{ template "type" .Response.Type }}{}
@@ -172,7 +173,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-	    return nil, err
+	    return nil, errors.Proto(err)
 	}
 	{{- end }}
 	{{- else if .Scope.IsGlobal }}
@@ -196,7 +197,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	{{- end }}
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-	    return nil, err
+	    return nil, errors.Proto(err)
 	}
 
     {{- if $outputs }}
@@ -206,7 +207,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
         err = proto.Unmarshal(outputBytes.([]byte), {{ template "ref" $method.Response.Output }}output)
         if err != nil {
             s.log.Errorf("Request {{ $method.Request.Type.Name }} failed: %v", err)
-            return nil, err
+            return nil, errors.Proto(err)
         }
         outputs = append(outputs, output)
 	}
@@ -242,7 +243,7 @@ func (s *{{ $proxy }}) {{ .Name }}(srv {{ template "type" $primitive.Type }}_{{ 
             return srv.SendAndClose(response)
         } else if err != nil {
             s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-            return err
+            return errors.Proto(err)
         }
 
         s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
@@ -251,7 +252,7 @@ func (s *{{ $proxy }}) {{ .Name }}(srv {{ template "type" $primitive.Type }}_{{ 
         inputBytes, err := proto.Marshal(input)
         if err != nil {
             s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-            return err
+            return errors.Proto(err)
         }
         {{- else }}
         var inputBytes []byte
@@ -279,7 +280,7 @@ func (s *{{ $proxy }}) {{ .Name }}(srv {{ template "type" $primitive.Type }}_{{ 
         {{- end }}
         if err != nil {
             s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-            return err
+            return errors.Proto(err)
         }
 
         {{- if .Response.Output }}
@@ -287,7 +288,7 @@ func (s *{{ $proxy }}) {{ .Name }}(srv {{ template "type" $primitive.Type }}_{{ 
         err = proto.Unmarshal(outputBytes, output)
         if err != nil {
             s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-            return err
+            return errors.Proto(err)
         }
         {{- end }}
         {{- else if .Scope.IsGlobal }}
@@ -306,12 +307,12 @@ func (s *{{ $proxy }}) {{ .Name }}(srv {{ template "type" $primitive.Type }}_{{ 
         {{- else }}
         err = async.IterAsync(len(partitions), func(i int) error {
             _, err := partitions[i].Do{{ template "optype" . }}(srv.Context(), {{ $name }}, inputBytes, {{ template "val" .Request.Header }}request{{ template "field" .Request.Header }})
-            return err
+            return errors.Proto(err)
         })
         {{- end }}
         if err != nil {
             s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-            return err
+            return errors.Proto(err)
         }
 
         {{- if $outputs }}
@@ -321,7 +322,7 @@ func (s *{{ $proxy }}) {{ .Name }}(srv {{ template "type" $primitive.Type }}_{{ 
             err = proto.Unmarshal(outputBytes.([]byte), {{ template "ref" $method.Response.Output }}output)
             if err != nil {
                 s.log.Errorf("Request {{ $method.Request.Type.Name }} failed: %v", err)
-                return err
+                return errors.Proto(err)
             }
             outputs = append(outputs, output)
         }
@@ -355,7 +356,7 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-        return err
+        return errors.Proto(err)
 	}
 	{{- else }}
 	var inputBytes []byte
@@ -386,7 +387,7 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	{{- end }}
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-	    return err
+	    return errors.Proto(err)
 	}
 
 	for {
@@ -397,7 +398,7 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 
 		if result.Failed() {
 			s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", result.Error)
-			return result.Error
+			return errors.Proto(result.Error)
 		}
 
 		sessionOutput := result.Value.(rsm.SessionOutput)
@@ -409,13 +410,13 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
         err = proto.Unmarshal(outputBytes, output)
         if err != nil {
             s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-            return err
+            return errors.Proto(err)
         }
 
 		s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
 		if err = srv.Send(response); err != nil {
             s.log.Errorf("Response {{ .Response.Type.Name }} failed: %v", err)
-			return err
+			return errors.Proto(err)
 		}
 	}
 	s.log.Debugf("Finished {{ .Request.Type.Name }} %+v", request)

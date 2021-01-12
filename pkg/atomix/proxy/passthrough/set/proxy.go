@@ -3,9 +3,9 @@ package set
 import (
 	"context"
 	set "github.com/atomix/api/go/atomix/primitive/set"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/passthrough"
 	"github.com/atomix/go-framework/pkg/atomix/util/async"
-	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
 	"io"
 	"sync"

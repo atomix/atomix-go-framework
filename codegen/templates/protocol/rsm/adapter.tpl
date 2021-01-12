@@ -50,7 +50,7 @@ package {{ .Package.Name }}
 
 import (
 	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/util/logging"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/golang/protobuf/proto"
 	{{- $added := false }}
 	{{- range .Primitive.Methods }}

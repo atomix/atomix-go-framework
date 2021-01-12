@@ -3,9 +3,9 @@ package _map
 import (
 	"context"
 	_map "github.com/atomix/api/go/atomix/primitive/map"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/passthrough"
 	"github.com/atomix/go-framework/pkg/atomix/util/async"
-	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
 	"io"
 	"sync"

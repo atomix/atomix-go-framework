@@ -4,7 +4,7 @@ package {{ .Package.Name }}
 import (
 	"context"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/passthrough"
-	"github.com/atomix/go-framework/pkg/atomix/util/logging"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"google.golang.org/grpc"
 	{{- $added := false }}
 	{{- range .Primitive.Methods }}

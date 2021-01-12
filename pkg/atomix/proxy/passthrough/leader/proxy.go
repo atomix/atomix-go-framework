@@ -3,8 +3,8 @@ package leader
 import (
 	"context"
 	leader "github.com/atomix/api/go/atomix/primitive/leader"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/passthrough"
-	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
 	"io"
 )

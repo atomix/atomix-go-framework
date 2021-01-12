@@ -163,11 +163,6 @@ func (s *Session) DoQuery(ctx context.Context, name string, input []byte, header
 func (s *Session) DoQueryStream(ctx context.Context, name string, input []byte, header primitiveapi.RequestHeader, stream streams.WriteStream) error {
 	service := getService(header.PrimitiveID)
 	requestContext := s.getQueryContext(header.PrimitiveID)
-	err := s.Partition.doQueryStream(ctx, name, input, service, requestContext, stream)
-	if err != nil {
-		return err
-	}
-
 	stream = streams.NewDecodingStream(stream, func(value interface{}, err error) (interface{}, error) {
 		if err != nil {
 			return nil, err
@@ -176,7 +171,7 @@ func (s *Session) DoQueryStream(ctx context.Context, name string, input []byte, 
 		s.recordQueryResponse(requestContext, response.Context)
 		return SessionOutput{
 			Result: streams.Result{
-				Value: value,
+				Value: response.Value,
 				Error: err,
 			},
 			Header: primitiveapi.ResponseHeader{
@@ -184,7 +179,7 @@ func (s *Session) DoQueryStream(ctx context.Context, name string, input []byte, 
 			},
 		}, err
 	})
-	return nil
+	return s.Partition.doQueryStream(ctx, name, input, service, requestContext, stream)
 }
 
 // DoCreateService creates the service

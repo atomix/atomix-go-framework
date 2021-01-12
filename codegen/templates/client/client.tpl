@@ -54,7 +54,7 @@ package {{ .Package.Name }}
 
 import (
     "context"
-	"github.com/atomix/go-framework/pkg/atomix/util/logging"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/client"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"

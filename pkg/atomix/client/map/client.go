@@ -6,7 +6,7 @@ import (
 	_map "github.com/atomix/api/go/atomix/primitive/map"
 	"github.com/atomix/go-framework/pkg/atomix/client"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/util/logging"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"google.golang.org/grpc"
 	"io"
 )

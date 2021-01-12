@@ -3,8 +3,8 @@ package log
 import (
 	"context"
 	log "github.com/atomix/api/go/atomix/primitive/log"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/passthrough"
-	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
 	"io"
 )

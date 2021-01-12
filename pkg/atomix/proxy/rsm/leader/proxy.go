@@ -3,9 +3,10 @@ package leader
 import (
 	"context"
 	leader "github.com/atomix/api/go/atomix/primitive/leader"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
-	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 )
@@ -43,14 +44,14 @@ func (s *Proxy) Latch(ctx context.Context, request *leader.LatchRequest) (*leade
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request LatchRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	header := request.Header
 	partition := s.PartitionFor(header.PrimitiveID)
 	outputBytes, err := partition.DoCommand(ctx, latchOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request LatchRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &leader.LatchResponse{}
@@ -58,7 +59,7 @@ func (s *Proxy) Latch(ctx context.Context, request *leader.LatchRequest) (*leade
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request LatchRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending LatchResponse %+v", response)
 	return response, nil
@@ -72,14 +73,14 @@ func (s *Proxy) Get(ctx context.Context, request *leader.GetRequest) (*leader.Ge
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	header := request.Header
 	partition := s.PartitionFor(header.PrimitiveID)
 	outputBytes, err := partition.DoQuery(ctx, getOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &leader.GetResponse{}
@@ -87,7 +88,7 @@ func (s *Proxy) Get(ctx context.Context, request *leader.GetRequest) (*leader.Ge
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending GetResponse %+v", response)
 	return response, nil
@@ -101,7 +102,7 @@ func (s *Proxy) Events(request *leader.EventsRequest, srv leader.LeaderLatchServ
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request EventsRequest failed: %v", err)
-		return err
+		return errors.Proto(err)
 	}
 
 	stream := streams.NewBufferedStream()
@@ -111,7 +112,7 @@ func (s *Proxy) Events(request *leader.EventsRequest, srv leader.LeaderLatchServ
 	err = partition.DoCommandStream(srv.Context(), eventsOp, inputBytes, request.Header, stream)
 	if err != nil {
 		s.log.Errorf("Request EventsRequest failed: %v", err)
-		return err
+		return errors.Proto(err)
 	}
 
 	for {
@@ -122,7 +123,7 @@ func (s *Proxy) Events(request *leader.EventsRequest, srv leader.LeaderLatchServ
 
 		if result.Failed() {
 			s.log.Errorf("Request EventsRequest failed: %v", result.Error)
-			return result.Error
+			return errors.Proto(result.Error)
 		}
 
 		sessionOutput := result.Value.(rsm.SessionOutput)
@@ -134,13 +135,13 @@ func (s *Proxy) Events(request *leader.EventsRequest, srv leader.LeaderLatchServ
 		err = proto.Unmarshal(outputBytes, output)
 		if err != nil {
 			s.log.Errorf("Request EventsRequest failed: %v", err)
-			return err
+			return errors.Proto(err)
 		}
 
 		s.log.Debugf("Sending EventsResponse %+v", response)
 		if err = srv.Send(response); err != nil {
 			s.log.Errorf("Response EventsResponse failed: %v", err)
-			return err
+			return errors.Proto(err)
 		}
 	}
 	s.log.Debugf("Finished EventsRequest %+v", request)
@@ -157,7 +158,7 @@ func (s *Proxy) Snapshot(ctx context.Context, request *leader.SnapshotRequest) (
 	outputBytes, err := partition.DoCommand(ctx, snapshotOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request SnapshotRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &leader.SnapshotResponse{}
@@ -165,7 +166,7 @@ func (s *Proxy) Snapshot(ctx context.Context, request *leader.SnapshotRequest) (
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
 		s.log.Errorf("Request SnapshotRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending SnapshotResponse %+v", response)
 	return response, nil
@@ -179,14 +180,14 @@ func (s *Proxy) Restore(ctx context.Context, request *leader.RestoreRequest) (*l
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
 		s.log.Errorf("Request RestoreRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	header := request.Header
 	partition := s.PartitionFor(header.PrimitiveID)
 	_, err = partition.DoCommand(ctx, restoreOp, inputBytes, request.Header)
 	if err != nil {
 		s.log.Errorf("Request RestoreRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	response := &leader.RestoreResponse{}

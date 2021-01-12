@@ -3,8 +3,8 @@ package indexedmap
 import (
 	"context"
 	indexedmap "github.com/atomix/api/go/atomix/primitive/indexedmap"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/passthrough"
-	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
 	"io"
 )

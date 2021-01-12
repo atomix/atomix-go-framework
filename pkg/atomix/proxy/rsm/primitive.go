@@ -17,8 +17,8 @@ package rsm
 import (
 	"context"
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/util/async"
-	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
 )
 
