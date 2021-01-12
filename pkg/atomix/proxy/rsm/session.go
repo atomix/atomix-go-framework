@@ -113,7 +113,7 @@ func (s *Session) DoCommandStream(ctx context.Context, name string, input []byte
 			case rsm.SessionResponseType_OPEN_STREAM:
 				if streamState.serialize(response.Context) {
 					outStream.Value(SessionOutput{
-						Result: result,
+						Result: response.Result,
 						Header: primitiveapi.ResponseHeader{
 							ResponseType: primitiveapi.ResponseType_RESPONSE_STREAM,
 						},
@@ -132,7 +132,7 @@ func (s *Session) DoCommandStream(ctx context.Context, name string, input []byte
 				// Attempt to serialize the response to the stream and skip the response if serialization failed.
 				if streamState.serialize(response.Context) {
 					outStream.Value(SessionOutput{
-						Result: result,
+						Result: response.Result,
 						Header: primitiveapi.ResponseHeader{
 							ResponseType: primitiveapi.ResponseType_RESPONSE,
 						},

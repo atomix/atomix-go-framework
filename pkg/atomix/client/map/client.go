@@ -143,18 +143,20 @@ func (c *mapClient) Events(ctx context.Context, input *_map.EventsInput, ch chan
 	handshakeCh := make(chan struct{})
 	go func() {
 		defer close(ch)
-		response, err := stream.Recv()
-		if err == io.EOF {
-			return
-		}
-		if err != nil {
-			c.log.Error(err)
-		} else {
-			switch response.Header.ResponseType {
-			case primitiveapi.ResponseType_RESPONSE:
-				ch <- response.Output
-			case primitiveapi.ResponseType_RESPONSE_STREAM:
-				close(handshakeCh)
+		for {
+			response, err := stream.Recv()
+			if err == io.EOF {
+				return
+			}
+			if err != nil {
+				c.log.Error(err)
+			} else {
+				switch response.Header.ResponseType {
+				case primitiveapi.ResponseType_RESPONSE:
+					ch <- response.Output
+				case primitiveapi.ResponseType_RESPONSE_STREAM:
+					close(handshakeCh)
+				}
 			}
 		}
 	}()
@@ -181,18 +183,20 @@ func (c *mapClient) Entries(ctx context.Context, input *_map.EntriesInput, ch ch
 	handshakeCh := make(chan struct{})
 	go func() {
 		defer close(ch)
-		response, err := stream.Recv()
-		if err == io.EOF {
-			return
-		}
-		if err != nil {
-			c.log.Error(err)
-		} else {
-			switch response.Header.ResponseType {
-			case primitiveapi.ResponseType_RESPONSE:
-				ch <- response.Output
-			case primitiveapi.ResponseType_RESPONSE_STREAM:
-				close(handshakeCh)
+		for {
+			response, err := stream.Recv()
+			if err == io.EOF {
+				return
+			}
+			if err != nil {
+				c.log.Error(err)
+			} else {
+				switch response.Header.ResponseType {
+				case primitiveapi.ResponseType_RESPONSE:
+					ch <- response.Output
+				case primitiveapi.ResponseType_RESPONSE_STREAM:
+					close(handshakeCh)
+				}
 			}
 		}
 	}()
@@ -218,18 +222,20 @@ func (c *mapClient) Snapshot(ctx context.Context, ch chan<- _map.SnapshotEntry) 
 	handshakeCh := make(chan struct{})
 	go func() {
 		defer close(ch)
-		response, err := stream.Recv()
-		if err == io.EOF {
-			return
-		}
-		if err != nil {
-			c.log.Error(err)
-		} else {
-			switch response.Header.ResponseType {
-			case primitiveapi.ResponseType_RESPONSE:
-				ch <- response.Entry
-			case primitiveapi.ResponseType_RESPONSE_STREAM:
-				close(handshakeCh)
+		for {
+			response, err := stream.Recv()
+			if err == io.EOF {
+				return
+			}
+			if err != nil {
+				c.log.Error(err)
+			} else {
+				switch response.Header.ResponseType {
+				case primitiveapi.ResponseType_RESPONSE:
+					ch <- response.Entry
+				case primitiveapi.ResponseType_RESPONSE_STREAM:
+					close(handshakeCh)
+				}
 			}
 		}
 	}()

@@ -144,18 +144,20 @@ func (c *electionClient) Events(ctx context.Context, input *election.EventsInput
 	handshakeCh := make(chan struct{})
 	go func() {
 		defer close(ch)
-		response, err := stream.Recv()
-		if err == io.EOF {
-			return
-		}
-		if err != nil {
-			c.log.Error(err)
-		} else {
-			switch response.Header.ResponseType {
-			case primitiveapi.ResponseType_RESPONSE:
-				ch <- response.Output
-			case primitiveapi.ResponseType_RESPONSE_STREAM:
-				close(handshakeCh)
+		for {
+			response, err := stream.Recv()
+			if err == io.EOF {
+				return
+			}
+			if err != nil {
+				c.log.Error(err)
+			} else {
+				switch response.Header.ResponseType {
+				case primitiveapi.ResponseType_RESPONSE:
+					ch <- response.Output
+				case primitiveapi.ResponseType_RESPONSE_STREAM:
+					close(handshakeCh)
+				}
 			}
 		}
 	}()

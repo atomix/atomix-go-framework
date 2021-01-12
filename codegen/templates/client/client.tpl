@@ -195,19 +195,21 @@ func (c *{{ $clientImpl }}) {{ .Name }}(ctx context.Context, input *{{ include "
 	handshakeCh := make(chan struct{})
 	go func() {
 		defer close(ch)
-		response, err := stream.Recv()
-		if err == io.EOF {
-			return
-		}
-		if err != nil {
-			c.log.Error(err)
-		} else {
-			switch response.Header.ResponseType {
-			case primitiveapi.ResponseType_RESPONSE:
-                ch <- {{ template "val" .Response.Output }}response{{ template "field" .Response.Output }}
-			case primitiveapi.ResponseType_RESPONSE_STREAM:
-				close(handshakeCh)
-			}
+		for {
+            response, err := stream.Recv()
+            if err == io.EOF {
+                return
+            }
+            if err != nil {
+                c.log.Error(err)
+            } else {
+                switch response.Header.ResponseType {
+                case primitiveapi.ResponseType_RESPONSE:
+                    ch <- {{ template "val" .Response.Output }}response{{ template "field" .Response.Output }}
+                case primitiveapi.ResponseType_RESPONSE_STREAM:
+                    close(handshakeCh)
+                }
+            }
 		}
 	}()
 
@@ -233,18 +235,20 @@ func (c *{{ $clientImpl }}) {{ .Name }}(ctx context.Context, input *{{ include "
     handshakeCh := make(chan struct{})
     go func() {
         defer close(ch)
-        response, err := stream.Recv()
-        if err == io.EOF {
-            return
-        }
-        if err != nil {
-            c.log.Error(err)
-        } else {
-            switch response.Header.ResponseType {
-            case primitiveapi.ResponseType_RESPONSE:
-                ch <- struct{}{}
-            case primitiveapi.ResponseType_RESPONSE_STREAM:
-                close(handshakeCh)
+        for {
+            response, err := stream.Recv()
+            if err == io.EOF {
+                return
+            }
+            if err != nil {
+                c.log.Error(err)
+            } else {
+                switch response.Header.ResponseType {
+                case primitiveapi.ResponseType_RESPONSE:
+                    ch <- struct{}{}
+                case primitiveapi.ResponseType_RESPONSE_STREAM:
+                    close(handshakeCh)
+                }
             }
         }
     }()
@@ -270,19 +274,21 @@ func (c *{{ $clientImpl }}) {{ .Name }}(ctx context.Context, ch chan<- {{ templa
 	handshakeCh := make(chan struct{})
 	go func() {
 		defer close(ch)
-		response, err := stream.Recv()
-		if err == io.EOF {
-			return
-		}
-		if err != nil {
-			c.log.Error(err)
-		} else {
-			switch response.Header.ResponseType {
-			case primitiveapi.ResponseType_RESPONSE:
-                ch <- {{ template "val" .Response.Output }}response{{ template "field" .Response.Output }}
-			case primitiveapi.ResponseType_RESPONSE_STREAM:
-				close(handshakeCh)
-			}
+		for {
+            response, err := stream.Recv()
+            if err == io.EOF {
+                return
+            }
+            if err != nil {
+                c.log.Error(err)
+            } else {
+                switch response.Header.ResponseType {
+                case primitiveapi.ResponseType_RESPONSE:
+                    ch <- {{ template "val" .Response.Output }}response{{ template "field" .Response.Output }}
+                case primitiveapi.ResponseType_RESPONSE_STREAM:
+                    close(handshakeCh)
+                }
+            }
 		}
 	}()
 
@@ -307,18 +313,20 @@ func (c *{{ $clientImpl }}) {{ .Name }}(ctx context.Context, ch chan<- struct{})
     handshakeCh := make(chan struct{})
     go func() {
         defer close(ch)
-        response, err := stream.Recv()
-        if err == io.EOF {
-            return
-        }
-        if err != nil {
-            c.log.Error(err)
-        } else {
-            switch response.Header.ResponseType {
-            case primitiveapi.ResponseType_RESPONSE:
-                ch <- struct{}{}
-            case primitiveapi.ResponseType_RESPONSE_STREAM:
-                close(handshakeCh)
+        for {
+            response, err := stream.Recv()
+            if err == io.EOF {
+                return
+            }
+            if err != nil {
+                c.log.Error(err)
+            } else {
+                switch response.Header.ResponseType {
+                case primitiveapi.ResponseType_RESPONSE:
+                    ch <- struct{}{}
+                case primitiveapi.ResponseType_RESPONSE_STREAM:
+                    close(handshakeCh)
+                }
             }
         }
     }()

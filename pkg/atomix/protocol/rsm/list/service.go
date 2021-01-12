@@ -66,7 +66,16 @@ func (l *listService) Contains(input *list.ContainsInput) (*list.ContainsOutput,
 }
 
 func (l *listService) Append(input *list.AppendInput) (*list.AppendOutput, error) {
+	index := len(l.values)
 	l.values = append(l.values, input.Value)
+	err := l.notify(&list.EventsOutput{
+		Type:  list.EventsOutput_ADD,
+		Index: uint32(index),
+		Value: input.Value,
+	})
+	if err != nil {
+		return nil, err
+	}
 	return &list.AppendOutput{}, nil
 }
 
@@ -76,8 +85,10 @@ func (l *listService) Insert(input *list.InsertInput) (*list.InsertOutput, error
 		return nil, errors.NewInvalid("index %d out of bounds", index)
 	}
 
-	values := l.values
-	l.values = append(append(values[:index], input.Value), values[index:]...)
+	values := append(l.values, "")
+	copy(values[index+1:], values[index:])
+	values[index] = input.Value
+	l.values = values
 
 	err := l.notify(&list.EventsOutput{
 		Type:  list.EventsOutput_ADD,
@@ -146,7 +157,9 @@ func (l *listService) Remove(input *list.RemoveInput) (*list.RemoveOutput, error
 	if err != nil {
 		return nil, err
 	}
-	return &list.RemoveOutput{}, nil
+	return &list.RemoveOutput{
+		Value: value,
+	}, nil
 }
 
 func (l *listService) Clear() error {
@@ -160,6 +173,7 @@ func (l *listService) Events(input *list.EventsInput, stream ServiceEventsStream
 }
 
 func (l *listService) Elements(input *list.ElementsInput, stream ServiceElementsStream) error {
+	defer stream.Close()
 	for _, value := range l.values {
 		err := stream.Notify(&list.ElementsOutput{
 			Value: value,
@@ -172,6 +186,7 @@ func (l *listService) Elements(input *list.ElementsInput, stream ServiceElements
 }
 
 func (l *listService) Snapshot(writer ServiceSnapshotWriter) error {
+	defer writer.Close()
 	for _, value := range l.values {
 		err := writer.Write(&list.SnapshotEntry{
 			Value: value,
