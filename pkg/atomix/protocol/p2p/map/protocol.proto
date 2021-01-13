@@ -1,0 +1,74 @@
+/*
+Copyright 2021-present Open Networking Foundation.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+syntax = "proto3";
+
+package atomix.protocol.p2p.counter;
+
+import "atomix/primitive/meta/timestamp.proto";
+import "gogoproto/gogo.proto";
+
+message RequestHeader {
+    uint32 partition_id = 1 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "github.com/atomix/go-framework/pkg/atomix/protocol/p2p.PartitionID"];
+    string service = 2;
+}
+
+message BootstrapRequest {
+    RequestHeader header = 1 [(gogoproto.nullable) = false];
+}
+
+message BootstrapResponse {
+    Update update = 1 [(gogoproto.nullable) = false];
+}
+
+message AdvertiseRequest {
+    RequestHeader header = 1 [(gogoproto.nullable) = false];
+    map<string, Digest> digests = 2 [(gogoproto.nullable) = false];
+}
+
+message AdvertiseResponse {
+    map<string, Digest> requests = 1 [(gogoproto.nullable) = false];
+}
+
+message UpdateRequest {
+    RequestHeader header = 1 [(gogoproto.nullable) = false];
+    repeated Update updates = 3 [(gogoproto.nullable) = false];
+}
+
+message UpdateResponse {
+    repeated Update updates = 1 [(gogoproto.nullable) = false];
+}
+
+message Update {
+    Entry entry = 1 [(gogoproto.nullable) = false];
+}
+
+message Entry {
+    string key = 1;
+    bytes value = 2;
+    Digest digest = 3 [(gogoproto.nullable) = false];
+}
+
+message Digest {
+    atomix.primitive.meta.Timestamp timestamp = 1 [(gogoproto.nullable) = false];
+    bool tombstone = 2;
+}
+
+service MapProtocol {
+    rpc Bootstrap(BootstrapRequest) returns (stream BootstrapResponse);
+    rpc Advertise(AdvertiseRequest) returns (AdvertiseResponse);
+    rpc Update(UpdateRequest) returns (UpdateResponse);
+}

@@ -42,7 +42,9 @@ license_check: # @HELP examine and ensure license headers exist
 	./build/bin/license-check
 
 protos:
-	docker run -it -v `pwd`:/go/src/github.com/atomix/go-framework \
+	docker run -it \
+		-v $(PARENT_DIR)/atomix-api:/go/src/github.com/atomix/api \
+	 	-v `pwd`:/go/src/github.com/atomix/go-framework \
 		-w /go/src/github.com/atomix/go-framework \
 		--entrypoint build/bin/compile_protos.sh \
 		onosproject/protoc-go:stable

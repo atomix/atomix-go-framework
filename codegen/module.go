@@ -146,11 +146,11 @@ func (m *Module) executeService(service pgs.Service) {
 		}
 		addImport(requestMeta.Type)
 
-		headerField, err := m.ctx.GetHeaderFieldMeta(method.Input())
+		inputHeader, err := m.ctx.GetHeaderFieldMeta(method.Input())
 		if err != nil {
 			panic(err)
-		} else if headerField != nil {
-			requestMeta.Header = *headerField
+		} else if inputHeader != nil {
+			requestMeta.Header = *inputHeader
 		} else {
 			panic(fmt.Errorf("no 'atomix.primitive.header' field found on message type '%s'", method.Input().Name().String()))
 		}
@@ -252,6 +252,15 @@ func (m *Module) executeService(service pgs.Service) {
 			IsStream:   method.ServerStreaming(),
 		}
 		addImport(responseMeta.Type)
+
+		outputHeader, err := m.ctx.GetHeaderFieldMeta(method.Output())
+		if err != nil {
+			panic(err)
+		} else if inputHeader != nil {
+			responseMeta.Header = *outputHeader
+		} else {
+			panic(fmt.Errorf("no 'atomix.primitive.header' field found on message type '%s'", method.Output().Name().String()))
+		}
 
 		outputField, err := m.ctx.GetOutputFieldMeta(method.Output())
 		if err != nil {

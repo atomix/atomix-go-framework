@@ -29,6 +29,15 @@ func main() {
 			"interface.go": "/etc/atomix/templates/protocol/rsm/interface.tpl",
 			"adapter.go":   "/etc/atomix/templates/protocol/rsm/adapter.tpl",
 		})).
+		RegisterModule(codegen.NewModule("proxy", "p2p", map[string]string{
+			"proxy.go": "/etc/atomix/templates/proxy/p2p/proxy.tpl",
+		})).
+		RegisterModule(codegen.NewModule("protocol", "p2p", map[string]string{
+			"manager.go":   "/etc/atomix/templates/protocol/p2p/manager.tpl",
+			"partition.go": "/etc/atomix/templates/protocol/p2p/partition.tpl",
+			"service.go":   "/etc/atomix/templates/protocol/p2p/service.tpl",
+			"server.go":    "/etc/atomix/templates/protocol/p2p/server.tpl",
+		})).
 		RegisterModule(codegen.NewModule("proxy", "passthrough", map[string]string{
 			"proxy.go": "/etc/atomix/templates/proxy/passthrough/proxy.tpl",
 		})).
