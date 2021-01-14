@@ -38,9 +38,6 @@ func main() {
 			"service.go":   "/etc/atomix/templates/protocol/p2p/service.tpl",
 			"server.go":    "/etc/atomix/templates/protocol/p2p/server.tpl",
 		})).
-		RegisterModule(codegen.NewModule("proxy", "passthrough", map[string]string{
-			"proxy.go": "/etc/atomix/templates/proxy/passthrough/proxy.tpl",
-		})).
 		RegisterModule(codegen.NewModule("client", "", map[string]string{
 			"client.go": "/etc/atomix/templates/client/client.tpl",
 		})).
