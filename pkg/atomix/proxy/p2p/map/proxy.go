@@ -13,19 +13,6 @@ import (
 
 const Type = "Map"
 
-const (
-	sizeOp     = "Size"
-	existsOp   = "Exists"
-	putOp      = "Put"
-	getOp      = "Get"
-	removeOp   = "Remove"
-	clearOp    = "Clear"
-	eventsOp   = "Events"
-	entriesOp  = "Entries"
-	snapshotOp = "Snapshot"
-	restoreOp  = "Restore"
-)
-
 // RegisterProxy registers the primitive on the given node
 func RegisterProxy(node *p2p.Node) {
 	node.RegisterProxy(func(server *grpc.Server, client *p2p.Client) {

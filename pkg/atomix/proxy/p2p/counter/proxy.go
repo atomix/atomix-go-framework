@@ -10,16 +10,6 @@ import (
 
 const Type = "Counter"
 
-const (
-	setOp         = "Set"
-	getOp         = "Get"
-	incrementOp   = "Increment"
-	decrementOp   = "Decrement"
-	checkAndSetOp = "CheckAndSet"
-	snapshotOp    = "Snapshot"
-	restoreOp     = "Restore"
-)
-
 // RegisterProxy registers the primitive on the given node
 func RegisterProxy(node *p2p.Node) {
 	node.RegisterProxy(func(server *grpc.Server, client *p2p.Client) {

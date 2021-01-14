@@ -35,11 +35,6 @@ import (
 
 const {{ printf "%sType" .Generator.Prefix }} = {{ .Primitive.Name | quote }}
 {{ $root := . }}
-const (
-    {{- range .Primitive.Methods }}
-    {{ (printf "%s%sOp" $root.Generator.Prefix .Name) | toLowerCamel }} = {{ .Name | quote }}
-    {{- end }}
-)
 
 // Register{{ $proxy }} registers the primitive on the given node
 func Register{{ $proxy }}(node *p2p.Node) {
