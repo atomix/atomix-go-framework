@@ -296,8 +296,7 @@ func (p *Partition) doMetadata(ctx context.Context, serviceType string, namespac
 				Query: rsm.ServiceQueryRequest{
 					Request: &rsm.ServiceQueryRequest_Metadata{
 						Metadata: &rsm.ServiceMetadataRequest{
-							Type:      serviceType,
-							Namespace: namespace,
+							Type: serviceType,
 						},
 					},
 				},

@@ -89,9 +89,11 @@ func (e *electionService) updateTerm(newCandidates []string) (*election.Term, er
 		}
 	}
 
-	newTerm.Meta.Timestamp = &meta.ObjectMeta_PhysicalTimestamp{
-		PhysicalTimestamp: &meta.PhysicalTimestamp{
-			Time: e.Timestamp(),
+	newTerm.Meta.Timestamp = &meta.Timestamp{
+		Timestamp: &meta.Timestamp_PhysicalTimestamp{
+			PhysicalTimestamp: &meta.PhysicalTimestamp{
+				Time: e.Timestamp(),
+			},
 		},
 	}
 	e.term = newTerm

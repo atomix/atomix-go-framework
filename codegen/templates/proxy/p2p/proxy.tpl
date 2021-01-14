@@ -2,12 +2,10 @@
 package {{ .Package.Name }}
 
 import (
-    "fmt"
 	"context"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/p2p"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 	{{- $added := false }}
 	{{- range .Primitive.Methods }}
 	{{- if and (not $added) .Scope.IsGlobal }}
@@ -45,7 +43,7 @@ const (
 
 // Register{{ $proxy }} registers the primitive on the given node
 func Register{{ $proxy }}(node *p2p.Node) {
-	node.RegisterProxy({{ .Primitive.Name | quote }}, func(server *grpc.Server, client *p2p.Client) {
+	node.RegisterProxy(func(server *grpc.Server, client *p2p.Client) {
 		{{ .Primitive.Type.Package.Alias }}.Register{{ .Primitive.Type.Name }}Server(server, &{{ $proxy }}{
 			Proxy: p2p.NewProxy(client),
 			log: logging.GetLogger("atomix", {{ .Primitive.Name | lower | quote }}),

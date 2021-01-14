@@ -2,12 +2,10 @@ package counter
 
 import (
 	"context"
-	"fmt"
 	counter "github.com/atomix/api/go/atomix/primitive/counter"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/p2p"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 )
 
 const Type = "Counter"
@@ -24,7 +22,7 @@ const (
 
 // RegisterProxy registers the primitive on the given node
 func RegisterProxy(node *p2p.Node) {
-	node.RegisterProxy("Counter", func(server *grpc.Server, client *p2p.Client) {
+	node.RegisterProxy(func(server *grpc.Server, client *p2p.Client) {
 		counter.RegisterCounterServiceServer(server, &Proxy{
 			Proxy: p2p.NewProxy(client),
 			log:   logging.GetLogger("atomix", "counter"),

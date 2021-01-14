@@ -87,9 +87,11 @@ func (l *leaderService) updateLatch(newParticipants []string) (leader.Latch, err
 		}
 	}
 
-	newLatch.Meta.Timestamp = &meta.ObjectMeta_PhysicalTimestamp{
-		PhysicalTimestamp: &meta.PhysicalTimestamp{
-			Time: l.Timestamp(),
+	newLatch.Meta.Timestamp = &meta.Timestamp{
+		Timestamp: &meta.Timestamp_PhysicalTimestamp{
+			PhysicalTimestamp: &meta.PhysicalTimestamp{
+				Time: l.Timestamp(),
+			},
 		},
 	}
 	l.latch = newLatch

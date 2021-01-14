@@ -2,13 +2,11 @@ package _map
 
 import (
 	"context"
-	"fmt"
 	_map "github.com/atomix/api/go/atomix/primitive/map"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/p2p"
 	"github.com/atomix/go-framework/pkg/atomix/util/async"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 	"io"
 	"sync"
 )
@@ -30,7 +28,7 @@ const (
 
 // RegisterProxy registers the primitive on the given node
 func RegisterProxy(node *p2p.Node) {
-	node.RegisterProxy("Map", func(server *grpc.Server, client *p2p.Client) {
+	node.RegisterProxy(func(server *grpc.Server, client *p2p.Client) {
 		_map.RegisterMapServiceServer(server, &Proxy{
 			Proxy: p2p.NewProxy(client),
 			log:   logging.GetLogger("atomix", "map"),

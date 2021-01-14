@@ -71,7 +71,8 @@ func (p *Partition) Connect() (*grpc.ClientConn, error) {
 	var replica *cluster.Replica
 	replicas := make([]*cluster.Replica, 0, len(p.Replicas()))
 	for _, r := range p.Replicas() {
-		if r.NodeID == p.cluster.Member().NodeID {
+		member, ok := p.cluster.Member()
+		if ok && r.NodeID == member.NodeID {
 			replica = r
 			break
 		}

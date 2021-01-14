@@ -296,7 +296,7 @@ func (s *mapService) Put(ctx context.Context, input *mapapi.PutInput) (*mapapi.P
 		Key:   input.Key,
 		Value: input.Value,
 		Digest: Digest{
-			Timestamp: input.Meta.Timestamp,
+			Timestamp: *input.Meta.Timestamp,
 		},
 	}
 	return &mapapi.PutOutput{
@@ -320,7 +320,7 @@ func (s *mapService) Get(ctx context.Context, input *mapapi.GetInput) (*mapapi.G
 	return &mapapi.GetOutput{
 		Entry: &mapapi.Entry{
 			Meta: metaapi.ObjectMeta{
-				Timestamp: entry.Digest.Timestamp,
+				Timestamp: &entry.Digest.Timestamp,
 			},
 			Key:   entry.Key,
 			Value: entry.Value,
@@ -339,7 +339,7 @@ func (s *mapService) Remove(ctx context.Context, input *mapapi.RemoveInput) (*ma
 	return &mapapi.RemoveOutput{
 		Entry: &mapapi.Entry{
 			Meta: metaapi.ObjectMeta{
-				Timestamp: entry.Digest.Timestamp,
+				Timestamp: &entry.Digest.Timestamp,
 			},
 			Key:   entry.Key,
 			Value: entry.Value,
@@ -371,7 +371,7 @@ func (s *mapService) Entries(ctx context.Context, input *mapapi.EntriesInput, st
 		err := stream.Notify(&mapapi.EntriesOutput{
 			Entry: mapapi.Entry{
 				Meta: metaapi.ObjectMeta{
-					Timestamp: entry.Digest.Timestamp,
+					Timestamp: &entry.Digest.Timestamp,
 				},
 				Key:   entry.Key,
 				Value: entry.Value,
