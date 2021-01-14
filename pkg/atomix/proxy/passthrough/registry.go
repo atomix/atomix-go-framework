@@ -23,23 +23,20 @@ type RegisterProxyFunc func(server *grpc.Server, client *Client)
 
 // Registry is a primitive registry
 type Registry interface {
-	// Register registers a primitive
-	Register(primitiveType string, f RegisterProxyFunc)
+	// RegisterProxy registers a primitive proxy
+	RegisterProxy(f RegisterProxyFunc)
 
 	// GetProxies gets a list of primitives
 	GetProxies() []RegisterProxyFunc
-
-	// GetProxy gets a primitive proxy by type
-	GetProxy(primitiveType string) RegisterProxyFunc
 }
 
 // primitiveRegistry is the default primitive registry
 type primitiveRegistry struct {
-	proxies map[string]RegisterProxyFunc
+	proxies []RegisterProxyFunc
 }
 
-func (r *primitiveRegistry) Register(primitiveType string, primitive RegisterProxyFunc) {
-	r.proxies[primitiveType] = primitive
+func (r *primitiveRegistry) RegisterProxy(primitive RegisterProxyFunc) {
+	r.proxies = append(r.proxies, primitive)
 }
 
 func (r *primitiveRegistry) GetProxies() []RegisterProxyFunc {
@@ -50,13 +47,7 @@ func (r *primitiveRegistry) GetProxies() []RegisterProxyFunc {
 	return proxies
 }
 
-func (r *primitiveRegistry) GetProxy(primitiveType string) RegisterProxyFunc {
-	return r.proxies[primitiveType]
-}
-
 // NewRegistry creates a new primitive registry
 func NewRegistry() Registry {
-	return &primitiveRegistry{
-		proxies: make(map[string]RegisterProxyFunc),
-	}
+	return &primitiveRegistry{}
 }

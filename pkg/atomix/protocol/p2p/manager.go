@@ -106,8 +106,7 @@ func (m *Manager) PartitionFor(primitiveID primitive.PrimitiveId) (*Partition, e
 }
 
 func (m *Manager) getPartitionIfMember(partition *Partition) (*Partition, error) {
-	member := partition.Replica(m.Cluster.Member().ID)
-	if member == nil {
+	if _, ok := partition.Member(); !ok {
 		return nil, errors.NewUnavailable("replica is not a member of partition %d", partition.ID)
 	}
 	return partition, nil

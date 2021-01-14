@@ -27,7 +27,7 @@ func NewClient(cluster *cluster.Cluster) *Client {
 	proxyPartitions := make([]*Partition, 0, len(partitions))
 	proxyPartitionsByID := make(map[PartitionID]*Partition)
 	for _, partition := range partitions {
-		proxyPartition := NewPartition(partition)
+		proxyPartition := NewPartition(cluster, partition)
 		proxyPartitions = append(proxyPartitions, proxyPartition)
 		proxyPartitionsByID[proxyPartition.ID] = proxyPartition
 	}

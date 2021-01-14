@@ -77,33 +77,51 @@ type Cluster struct {
 }
 
 // Member returns the local group member
-func (c *Cluster) Member() *Member {
-	return c.member
+func (c *Cluster) Member() (*Member, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.member == nil {
+		return nil, false
+	}
+	return c.member, true
 }
 
 // Replica returns a replica by ID
-func (c *Cluster) Replica(id ReplicaID) *Replica {
-	return c.replicas[id]
+func (c *Cluster) Replica(id ReplicaID) (*Replica, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	replica, ok := c.replicas[id]
+	return replica, ok
 }
 
 // Replicas returns the current replicas
 func (c *Cluster) Replicas() ReplicaSet {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	if c.replicas != nil {
-		return c.replicas
+	copy := make(ReplicaSet)
+	for id, replica := range c.replicas {
+		copy[id] = replica
 	}
-	return ReplicaSet{}
+	return copy
+}
+
+// Partition returns the given partition
+func (c *Cluster) Partition(id PartitionID) (*Partition, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	partition, ok := c.partitions[id]
+	return partition, ok
 }
 
 // Partitions returns the current partitions
 func (c *Cluster) Partitions() PartitionSet {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	if c.partitions != nil {
-		return c.partitions
+	copy := make(PartitionSet)
+	for id, partition := range c.partitions {
+		copy[id] = partition
 	}
-	return PartitionSet{}
+	return copy
 }
 
 // Update updates the cluster configuration

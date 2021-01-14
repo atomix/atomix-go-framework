@@ -53,11 +53,13 @@ func newSessionManager(cluster *cluster.Cluster, ctx PartitionContext, clientID 
 		defaultTimeout := 30 * time.Second
 		timeout = &defaultTimeout
 	}
+	member, _ := cluster.Member()
 	log := log.WithFields(
-		logging.String("NodeID", string(cluster.Member().NodeID)),
+		logging.String("NodeID", string(member.NodeID)),
 		logging.Uint64("SessionID", uint64(ctx.Index())))
 	session := &sessionManager{
 		cluster:          cluster,
+		member:           member,
 		log:              log,
 		id:               SessionID(ctx.Index()),
 		clientID:         clientID,
@@ -76,6 +78,7 @@ func newSessionManager(cluster *cluster.Cluster, ctx PartitionContext, clientID 
 // sessionManager manages the ordering of request and response streams for a single client
 type sessionManager struct {
 	cluster          *cluster.Cluster
+	member           *cluster.Member
 	log              logging.Logger
 	id               SessionID
 	clientID         ClientID
@@ -254,6 +257,7 @@ func (s *serviceSession) StreamsOf(op OperationID) []Stream {
 func (s *serviceSession) addStream(id StreamID, op OperationID, outStream streams.WriteStream) Stream {
 	stream := &sessionStream{
 		cluster: s.cluster,
+		member:  s.member,
 		id:      id,
 		op:      op,
 		session: s,

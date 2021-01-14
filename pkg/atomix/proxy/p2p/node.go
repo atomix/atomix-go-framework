@@ -17,6 +17,7 @@ package p2p
 import (
 	proxyapi "github.com/atomix/api/go/atomix/proxy"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy"
 	"github.com/atomix/go-framework/pkg/atomix/util"
@@ -65,7 +66,11 @@ func (n *Node) Start() error {
 		proxyapi.RegisterProxyConfigServiceServer(s, proxy.NewServer(n.Cluster))
 	})
 
-	err := n.Cluster.Member().Serve(cluster.WithServices(services...))
+	member, ok := n.Cluster.Member()
+	if !ok {
+		return errors.NewUnavailable("not a member of the cluster")
+	}
+	err := member.Serve(cluster.WithServices(services...))
 	if err != nil {
 		return err
 	}

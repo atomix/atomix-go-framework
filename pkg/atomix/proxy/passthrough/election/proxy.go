@@ -25,7 +25,7 @@ const (
 
 // RegisterProxy registers the primitive on the given node
 func RegisterProxy(node *passthrough.Node) {
-	node.RegisterProxy("Election", func(server *grpc.Server, client *passthrough.Client) {
+	node.RegisterProxy(func(server *grpc.Server, client *passthrough.Client) {
 		election.RegisterLeaderElectionServiceServer(server, &Proxy{
 			Proxy: passthrough.NewProxy(client),
 			log:   logging.GetLogger("atomix", "election"),

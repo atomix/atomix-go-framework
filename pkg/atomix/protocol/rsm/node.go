@@ -17,6 +17,7 @@ package rsm
 import (
 	protocolapi "github.com/atomix/api/go/atomix/protocol"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/protocol"
 	"github.com/atomix/go-framework/pkg/atomix/util"
@@ -50,7 +51,11 @@ func (n *Node) RegisterService(t string, f NewServiceFunc) {
 func (n *Node) Start() error {
 	log.Info("Starting protocol")
 
-	err := n.Cluster.Member().Serve(
+	member, ok := n.Cluster.Member()
+	if !ok {
+		return errors.NewUnavailable("not a member of the cluster")
+	}
+	err := member.Serve(
 		cluster.WithService(func(server *grpc.Server) {
 			RegisterStorageServiceServer(server, &Server{Protocol: n.protocol})
 		}),

@@ -23,9 +23,10 @@ import (
 )
 
 // NewPartition creates a new proxy partition
-func NewPartition(p *cluster.Partition) *Partition {
+func NewPartition(c *cluster.Cluster, p *cluster.Partition) *Partition {
 	return &Partition{
 		Partition: p,
+		cluster:   c,
 	}
 }
 
@@ -35,10 +36,10 @@ type PartitionID int
 // Partition is a proxy partition
 type Partition struct {
 	*cluster.Partition
-	ID     PartitionID
-	conn   *grpc.ClientConn
-	leader *cluster.Replica
-	mu     sync.RWMutex
+	cluster *cluster.Cluster
+	ID      PartitionID
+	conn    *grpc.ClientConn
+	mu      sync.RWMutex
 }
 
 // Connect gets the connection to the partition
@@ -58,42 +59,27 @@ func (p *Partition) Connect() (*grpc.ClientConn, error) {
 		return conn, nil
 	}
 
-	if p.leader == nil {
-		replicas := make([]*cluster.Replica, 0)
-		for _, replica := range p.Replicas() {
-			replicas = append(replicas, replica)
+	var replica *cluster.Replica
+	replicas := make([]*cluster.Replica, 0, len(p.Replicas()))
+	for _, r := range p.Replicas() {
+		member, ok := p.cluster.Member()
+		if ok && r.NodeID == member.NodeID {
+			replica = r
+			break
 		}
-		p.leader = replicas[rand.Intn(len(replicas))]
+		replicas = append(replicas, r)
 	}
 
-	conn, err := p.leader.Connect(context.Background(), cluster.WithDialOption(grpc.WithInsecure()))
+	if replica == nil {
+		replica = replicas[rand.Intn(len(replicas))]
+	}
+
+	conn, err := replica.Connect(context.Background(), cluster.WithDialOption(grpc.WithInsecure()))
 	if err != nil {
 		return nil, err
 	}
 	p.conn = conn
 	return conn, nil
-}
-
-// Reconnect reconnects the client to the given leader if necessary
-func (p *Partition) Reconnect(leader *cluster.Replica) {
-	if leader == nil {
-		return
-	}
-
-	p.mu.RLock()
-	connLeader := p.leader
-	p.mu.RUnlock()
-	if connLeader.ID == leader.ID {
-		return
-	}
-
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.leader = leader
-	if p.conn != nil {
-		p.conn.Close()
-		p.conn = nil
-	}
 }
 
 // close closes the connections

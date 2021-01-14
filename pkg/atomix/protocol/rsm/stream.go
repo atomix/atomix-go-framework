@@ -62,6 +62,7 @@ func (s *queryStream) Session() Session {
 // sessionStream manages a single stream for a session
 type sessionStream struct {
 	cluster    *cluster.Cluster
+	member     *cluster.Member
 	id         StreamID
 	op         OperationID
 	session    Session
@@ -127,7 +128,7 @@ func (s *sessionStream) open() {
 	s.results.PushBack(out)
 
 	log.WithFields(
-		logging.String("NodeID", string(s.cluster.Member().NodeID)),
+		logging.String("NodeID", string(s.member.NodeID)),
 		logging.Uint64("SessionID", uint64(s.session.ID())),
 		logging.Uint64("StreamID", uint64(s.ID()))).
 		Debugf("Sending stream open %d %v", s.responseID, out.result)
@@ -140,7 +141,7 @@ func (s *sessionStream) updateClock() {
 	s.responseID++
 	if s.completeID > s.responseID {
 		log.WithFields(
-			logging.String("NodeID", string(s.cluster.Member().NodeID)),
+			logging.String("NodeID", string(s.member.NodeID)),
 			logging.Uint64("SessionID", uint64(s.session.ID())),
 			logging.Uint64("StreamID", uint64(s.ID()))).
 			Debugf("Skipped completed result %d", s.responseID)
@@ -190,14 +191,14 @@ func (s *sessionStream) Send(result streams.Result) {
 	}
 	s.results.PushBack(out)
 	log.WithFields(
-		logging.String("NodeID", string(s.cluster.Member().NodeID)),
+		logging.String("NodeID", string(s.member.NodeID)),
 		logging.Uint64("SessionID", uint64(s.session.ID())),
 		logging.Uint64("StreamID", uint64(s.ID()))).
 		Debugf("Cached response %d", s.responseID)
 
 	// If the out channel is set, send the result
 	log.WithFields(
-		logging.String("NodeID", string(s.cluster.Member().NodeID)),
+		logging.String("NodeID", string(s.member.NodeID)),
 		logging.Uint64("SessionID", uint64(s.session.ID())),
 		logging.Uint64("StreamID", uint64(s.ID()))).
 		Debugf("Sending response %d %v", s.responseID, out.result)
@@ -221,7 +222,7 @@ func (s *sessionStream) Error(err error) {
 
 func (s *sessionStream) Close() {
 	log.WithFields(
-		logging.String("NodeID", string(s.cluster.Member().NodeID)),
+		logging.String("NodeID", string(s.member.NodeID)),
 		logging.Uint64("SessionID", uint64(s.session.ID())),
 		logging.Uint64("StreamID", uint64(s.ID()))).
 		Debug("Stream closed")
@@ -256,7 +257,7 @@ func (s *sessionStream) Close() {
 	s.results.PushBack(out)
 
 	log.WithFields(
-		logging.String("NodeID", string(s.cluster.Member().NodeID)),
+		logging.String("NodeID", string(s.member.NodeID)),
 		logging.Uint64("SessionID", uint64(s.session.ID())),
 		logging.Uint64("StreamID", uint64(s.ID()))).
 		Debugf("Sending stream close %d %v", s.responseID, out.result)
@@ -275,7 +276,7 @@ func (s *sessionStream) ack(id uint64) {
 			event = next
 		}
 		log.WithFields(
-			logging.String("NodeID", string(s.cluster.Member().NodeID)),
+			logging.String("NodeID", string(s.member.NodeID)),
 			logging.Uint64("SessionID", uint64(s.session.ID())),
 			logging.Uint64("StreamID", uint64(s.ID()))).
 			Debugf("Discarded cached responses up to %d", id)
@@ -288,7 +289,7 @@ func (s *sessionStream) replay(stream streams.WriteStream) {
 	for result != nil {
 		response := result.Value.(sessionStreamResult)
 		log.WithFields(
-			logging.String("NodeID", string(s.cluster.Member().NodeID)),
+			logging.String("NodeID", string(s.member.NodeID)),
 			logging.Uint64("SessionID", uint64(s.session.ID())),
 			logging.Uint64("StreamID", uint64(s.ID()))).
 			Debugf("Sending response %d %v", response.id, response.result)

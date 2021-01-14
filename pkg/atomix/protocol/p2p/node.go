@@ -16,6 +16,7 @@ package p2p
 
 import (
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"google.golang.org/grpc"
@@ -60,7 +61,11 @@ func (n *Node) Start() error {
 		}
 	}
 
-	err := n.Cluster.Member().Serve(cluster.WithServices(services...))
+	member, ok := n.Cluster.Member()
+	if !ok {
+		return errors.NewUnavailable("not a member of the cluster")
+	}
+	err := member.Serve(cluster.WithServices(services...))
 	if err != nil {
 		return err
 	}

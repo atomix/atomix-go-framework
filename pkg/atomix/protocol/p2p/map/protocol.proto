@@ -21,35 +21,14 @@ package atomix.protocol.p2p.counter;
 import "atomix/primitive/meta/timestamp.proto";
 import "gogoproto/gogo.proto";
 
-message RequestHeader {
+message Bootstrap {
     uint32 partition_id = 1 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "github.com/atomix/go-framework/pkg/atomix/protocol/p2p.PartitionID"];
     string service = 2;
 }
 
-message BootstrapRequest {
-    RequestHeader header = 1 [(gogoproto.nullable) = false];
-}
-
-message BootstrapResponse {
-    Update update = 1 [(gogoproto.nullable) = false];
-}
-
-message AdvertiseRequest {
-    RequestHeader header = 1 [(gogoproto.nullable) = false];
-    map<string, Digest> digests = 2 [(gogoproto.nullable) = false];
-}
-
-message AdvertiseResponse {
-    map<string, Digest> requests = 1 [(gogoproto.nullable) = false];
-}
-
-message UpdateRequest {
-    RequestHeader header = 1 [(gogoproto.nullable) = false];
-    repeated Update updates = 3 [(gogoproto.nullable) = false];
-}
-
-message UpdateResponse {
-    repeated Update updates = 1 [(gogoproto.nullable) = false];
+message Advertisement {
+    string key = 1;
+    Digest digest = 2 [(gogoproto.nullable) = false];
 }
 
 message Update {
@@ -67,8 +46,14 @@ message Digest {
     bool tombstone = 2;
 }
 
+message GossipMessage {
+    oneof message {
+        Bootstrap bootstrap = 1;
+        Advertisement advertisement = 2;
+        Update update = 3;
+    }
+}
+
 service MapProtocol {
-    rpc Bootstrap(BootstrapRequest) returns (stream BootstrapResponse);
-    rpc Advertise(AdvertiseRequest) returns (AdvertiseResponse);
-    rpc Update(UpdateRequest) returns (UpdateResponse);
+    rpc Gossip (stream GossipMessage) returns (stream GossipMessage);
 }

@@ -17,6 +17,7 @@ package cluster
 import (
 	"context"
 	protocolapi "github.com/atomix/api/go/atomix/protocol"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"sync"
 )
 
@@ -41,19 +42,34 @@ type Partition struct {
 	mu       sync.RWMutex
 }
 
+// Member returns the local partition member
+func (p *Partition) Member() (*Member, bool) {
+	member, ok := p.cluster.Member()
+	if !ok {
+		return nil, false
+	}
+	_, ok = p.Replica(member.ID)
+	if !ok {
+		return nil, false
+	}
+	return member, true
+}
+
 // Replica returns a replica by ID
-func (p *Partition) Replica(id ReplicaID) *Replica {
-	return p.replicas[id]
+func (p *Partition) Replica(id ReplicaID) (*Replica, bool) {
+	replica, ok := p.replicas[id]
+	return replica, ok
 }
 
 // Replicas returns the current replicas
 func (p *Partition) Replicas() ReplicaSet {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	if p.replicas != nil {
-		return p.replicas
+	copy := make(ReplicaSet)
+	for id, replica := range p.replicas {
+		copy[id] = replica
 	}
-	return ReplicaSet{}
+	return copy
 }
 
 // Update updates the partition configuration
@@ -63,7 +79,11 @@ func (p *Partition) Update(config protocolapi.ProtocolPartition) error {
 	replicas := make(map[ReplicaID]*Replica)
 	for _, id := range config.Replicas {
 		replicaID := ReplicaID(id)
-		replicas[ReplicaID(replicaID)] = p.cluster.Replica(replicaID)
+		replica, ok := p.cluster.Replica(replicaID)
+		if !ok {
+			return errors.NewNotFound("replica '%s' not a member of the cluster", replicaID)
+		}
+		replicas[ReplicaID(replicaID)] = replica
 	}
 
 	for id := range p.replicas {

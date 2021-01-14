@@ -43,7 +43,7 @@ const (
 
 // Register{{ $proxy }} registers the primitive on the given node
 func Register{{ $proxy }}(node *passthrough.Node) {
-	node.RegisterProxy({{ .Primitive.Name | quote }}, func(server *grpc.Server, client *passthrough.Client) {
+	node.RegisterProxy(func(server *grpc.Server, client *passthrough.Client) {
 		{{ .Primitive.Type.Package.Alias }}.Register{{ .Primitive.Type.Name }}Server(server, &{{ $proxy }}{
 			Proxy: passthrough.NewProxy(client),
 			log: logging.GetLogger("atomix", {{ .Primitive.Name | lower | quote }}),

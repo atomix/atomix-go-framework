@@ -54,7 +54,7 @@ func (p *Partition) CreateService(t ServiceType, n string) error {
 		if err != nil {
 			return err
 		}
-		services[n] = f(p.Partition)
+		services[n] = f(n, p.Partition)
 	}
 	return nil
 }
