@@ -209,17 +209,13 @@ func (s *{{ $serviceImpl }}) Restore(reader io.Reader) error {
 {{- range .Primitive.Methods }}
 {{ if .Response.IsDiscrete }}
 {{- if .Type.IsAsync }}
-{{- $newStream := printf "new%s%sStream" $serviceInt .Name }}
-{{- $newInformer := printf "new%s%sInformer" $serviceInt .Name }}
-func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(in []byte, stream rsm.Stream) {
+func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(in []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
 {{- if and .Request.Input .Response.Output }}
     input := &{{ template "type" .Request.Input.Field.Type }}{}
     err := proto.Unmarshal(in, input)
     if err != nil {
         s.log.Error(err)
-        stream.Error(err)
-        stream.Close()
-        return
+        return nil, err
     }
     future, err := s.rsm.{{ .Name }}(input)
 {{- else if .Request.Input }}
@@ -227,9 +223,7 @@ func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(in []byte, stream rsm.St
     err := proto.Unmarshal(in, input)
     if err != nil {
         s.log.Error(err)
-        stream.Error(err)
-        stream.Close()
-        return
+        return nil, err
     }
     future, err := s.rsm.{{ .Name }}(input)
 {{- else }}
@@ -237,11 +231,10 @@ func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(in []byte, stream rsm.St
 {{- end }}
     if err != nil {
         s.log.Error(err)
-        stream.Error(err)
-        stream.Close()
-        return
+        return nil, err
     }
     future.setStream(stream)
+    return nil, nil
 }
 {{- else }}
 func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(in []byte) ([]byte, error) {
@@ -304,45 +297,47 @@ func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(in []byte) ([]byte, erro
 {{ else }}
 {{- $newStream := printf "new%s%sStream" $serviceInt .Name }}
 {{- $newInformer := printf "new%s%sInformer" $serviceInt .Name }}
-func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(in []byte, stream rsm.Stream) {
+func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(in []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
 {{- if .Type.IsSnapshot }}
     {{- $newWriter := printf "new%s%sStreamWriter" $serviceInt .Name }}
     err := s.rsm.{{ .Name }}({{ $newWriter }}(stream))
-{{- else if and .Request.Input .Response.Output }}
+    if err != nil {
+        s.log.Error(err)
+        return nil, err
+    }
+    return nil, nil
+{{- else }}
+{{- if and .Request.Input .Response.Output }}
     input := &{{ template "type" .Request.Input.Field.Type }}{}
     err := proto.Unmarshal(in, input)
     if err != nil {
         s.log.Error(err)
-        stream.Error(err)
-        stream.Close()
-        return
+        return nil, err
     }
     output := {{ $newStream }}(stream)
-    err = s.rsm.{{ .Name }}(input, output)
+    closer, err := s.rsm.{{ .Name }}(input, output)
 {{- else if .Request.Input }}
     input := &{{ template "type" .Request.Input.Field.Type }}{}
     err := proto.Unmarshal(in, input)
     if err != nil {
         s.log.Error(err)
-        stream.Error(err)
-        stream.Close()
-        return
+        return nil, err
     }
     output := {{ $newInformer }}(stream)
-    err = s.rsm.{{ .Name }}(input, output)
+    closer, err := s.rsm.{{ .Name }}(input, output)
 {{- else if .Response.Output }}
     output := {{ $newStream }}(stream)
-    err := s.rsm.{{ .Name }}(output)
+    closer, err := s.rsm.{{ .Name }}(output)
 {{- else }}
     output := {{ $newInformer }}(stream)
-    err := s.rsm.{{ .Name }}(output)
+    closer, err := s.rsm.{{ .Name }}(output)
 {{- end }}
     if err != nil {
         s.log.Error(err)
-        stream.Error(err)
-        stream.Close()
-        return
+        return nil, err
     }
+    return closer, nil
+{{- end }}
 }
 {{ end }}
 {{- end }}

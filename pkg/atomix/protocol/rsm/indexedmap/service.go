@@ -29,6 +29,7 @@ func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
 		entries: make(map[string]*LinkedMapEntryValue),
 		indexes: make(map[uint64]*LinkedMapEntryValue),
 		timers:  make(map[string]rsm.Timer),
+		streams: make(map[rsm.StreamID]ServiceEventsStream),
 	}
 }
 
@@ -41,6 +42,7 @@ type indexedMapService struct {
 	firstEntry *LinkedMapEntryValue
 	lastEntry  *LinkedMapEntryValue
 	timers     map[string]rsm.Timer
+	streams    map[rsm.StreamID]ServiceEventsStream
 }
 
 func (m *indexedMapService) Size() (*indexedmap.SizeOutput, error) {
@@ -79,11 +81,14 @@ func (m *indexedMapService) Clear() error {
 	panic("implement me")
 }
 
-func (m *indexedMapService) Events(*indexedmap.EventsInput, ServiceEventsStream) error {
-	panic("implement me")
+func (m *indexedMapService) Events(input *indexedmap.EventsInput, stream ServiceEventsStream) (rsm.StreamCloser, error) {
+	m.streams[stream.ID()] = stream
+	return func() {
+		delete(m.streams, stream.ID())
+	}, nil
 }
 
-func (m *indexedMapService) Entries(*indexedmap.EntriesInput, ServiceEntriesStream) error {
+func (m *indexedMapService) Entries(*indexedmap.EntriesInput, ServiceEntriesStream) (rsm.StreamCloser, error) {
 	panic("implement me")
 }
 

@@ -66,7 +66,7 @@ type Service interface {
 	// Get gets the current leader
 	Get(*leader.GetInput) (*leader.GetOutput, error)
 	// Events listens for leader change events
-	Events(*leader.EventsInput, ServiceEventsStream) error
+	Events(*leader.EventsInput, ServiceEventsStream) (rsm.StreamCloser, error)
 	// Snapshot exports a snapshot of the primitive state
 	Snapshot() (*leader.Snapshot, error)
 	// Restore imports a snapshot of the primitive state

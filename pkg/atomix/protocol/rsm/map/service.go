@@ -28,6 +28,7 @@ func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
 		Service: rsm.NewService(scheduler, context),
 		entries: make(map[string]*_map.Entry),
 		timers:  make(map[string]rsm.Timer),
+		streams: make(map[rsm.StreamID]ServiceEventsStream),
 	}
 }
 
@@ -36,7 +37,7 @@ type mapService struct {
 	rsm.Service
 	entries map[string]*_map.Entry
 	timers  map[string]rsm.Timer
-	streams []ServiceEventsStream
+	streams map[rsm.StreamID]ServiceEventsStream
 }
 
 func (m *mapService) notify(event *_map.EventsOutput) error {
@@ -70,11 +71,14 @@ func (m *mapService) Clear() error {
 	panic("implement me")
 }
 
-func (m *mapService) Events(input *_map.EventsInput, stream ServiceEventsStream) error {
-	panic("implement me")
+func (m *mapService) Events(input *_map.EventsInput, stream ServiceEventsStream) (rsm.StreamCloser, error) {
+	m.streams[stream.ID()] = stream
+	return func() {
+		delete(m.streams, stream.ID())
+	}, nil
 }
 
-func (m *mapService) Entries(input *_map.EntriesInput, stream ServiceEntriesStream) error {
+func (m *mapService) Entries(input *_map.EntriesInput, stream ServiceEntriesStream) (rsm.StreamCloser, error) {
 	panic("implement me")
 }
 

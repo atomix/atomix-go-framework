@@ -101,43 +101,53 @@ func (s *Session) DoCommandStream(ctx context.Context, name string, input []byte
 	streamState, requestContext := s.nextStream(header.PrimitiveID)
 	ch := make(chan streams.Result)
 	inStream := streams.NewChannelStream(ch)
-	err := s.Partition.doCommandStream(ctx, name, input, service, requestContext, inStream)
+	err := s.Partition.doCommandStream(context.Background(), name, input, service, requestContext, inStream)
 	if err != nil {
 		return err
 	}
 
 	go func() {
-		for result := range ch {
-			response := result.Value.(PartitionOutput)
-			switch response.Type {
-			case rsm.SessionResponseType_OPEN_STREAM:
-				if streamState.serialize(response.Context) {
-					outStream.Value(SessionOutput{
-						Result: response.Result,
-						Header: primitiveapi.ResponseHeader{
-							ResponseType: primitiveapi.ResponseType_RESPONSE_STREAM,
-						},
-					})
-				}
-			case rsm.SessionResponseType_CLOSE_STREAM:
-				if streamState.serialize(response.Context) {
-					outStream.Close()
-					streamState.Close()
+		for {
+			select {
+			case result, ok := <-ch:
+				if !ok {
+					s.deleteStream(streamState.ID)
 					return
 				}
-			case rsm.SessionResponseType_RESPONSE:
-				// Record the response
-				s.recordCommandResponse(requestContext, response.Context)
 
-				// Attempt to serialize the response to the stream and skip the response if serialization failed.
-				if streamState.serialize(response.Context) {
-					outStream.Value(SessionOutput{
-						Result: response.Result,
-						Header: primitiveapi.ResponseHeader{
-							ResponseType: primitiveapi.ResponseType_RESPONSE,
-						},
-					})
+				response := result.Value.(PartitionOutput)
+				switch response.Type {
+				case rsm.SessionResponseType_OPEN_STREAM:
+					if streamState.serialize(response.Context) {
+						outStream.Value(SessionOutput{
+							Result: response.Result,
+							Header: primitiveapi.ResponseHeader{
+								ResponseType: primitiveapi.ResponseType_RESPONSE_STREAM,
+							},
+						})
+					}
+				case rsm.SessionResponseType_CLOSE_STREAM:
+					if streamState.serialize(response.Context) {
+						outStream.Close()
+						streamState.Close()
+						return
+					}
+				case rsm.SessionResponseType_RESPONSE:
+					// Record the response
+					s.recordCommandResponse(requestContext, response.Context)
+
+					// Attempt to serialize the response to the stream and skip the response if serialization failed.
+					if streamState.serialize(response.Context) {
+						outStream.Value(SessionOutput{
+							Result: response.Result,
+							Header: primitiveapi.ResponseHeader{
+								ResponseType: primitiveapi.ResponseType_RESPONSE,
+							},
+						})
+					}
 				}
+			case <-ctx.Done():
+				s.deleteStream(streamState.ID)
 			}
 		}
 	}()

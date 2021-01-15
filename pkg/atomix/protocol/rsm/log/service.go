@@ -27,6 +27,7 @@ func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
 	return &logService{
 		Service: rsm.NewService(scheduler, context),
 		indexes: make(map[uint64]*LinkedEntry),
+		streams: make(map[rsm.StreamID]ServiceEventsStream),
 	}
 }
 
@@ -37,7 +38,7 @@ type logService struct {
 	indexes    map[uint64]*LinkedEntry
 	firstEntry *LinkedEntry
 	lastEntry  *LinkedEntry
-	streams    []ServiceEventsStream
+	streams map[rsm.StreamID]ServiceEventsStream
 }
 
 func (l *logService) notify(event *log.EventsOutput) error {
@@ -87,11 +88,14 @@ func (l *logService) Clear() error {
 	panic("implement me")
 }
 
-func (l *logService) Events(*log.EventsInput, ServiceEventsStream) error {
-	panic("implement me")
+func (l *logService) Events(input *log.EventsInput, stream ServiceEventsStream) (rsm.StreamCloser, error) {
+	l.streams[stream.ID()] = stream
+	return func() {
+		delete(l.streams, stream.ID())
+	}, nil
 }
 
-func (l *logService) Entries(*log.EntriesInput, ServiceEntriesStream) error {
+func (l *logService) Entries(*log.EntriesInput, ServiceEntriesStream) (rsm.StreamCloser, error) {
 	panic("implement me")
 }
 

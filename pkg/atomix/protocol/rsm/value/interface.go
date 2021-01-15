@@ -66,7 +66,7 @@ type Service interface {
 	// Get gets the value
 	Get(*value.GetInput) (*value.GetOutput, error)
 	// Events listens for value change events
-	Events(*value.EventsInput, ServiceEventsStream) error
+	Events(*value.EventsInput, ServiceEventsStream) (rsm.StreamCloser, error)
 	// Snapshot exports a snapshot of the primitive state
 	Snapshot() (*value.Snapshot, error)
 	// Restore imports a snapshot of the primitive state

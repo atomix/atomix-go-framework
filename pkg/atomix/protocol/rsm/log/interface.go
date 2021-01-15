@@ -193,9 +193,9 @@ type Service interface {
 	// Clear removes all entries from the log
 	Clear() error
 	// Events listens for change events
-	Events(*log.EventsInput, ServiceEventsStream) error
+	Events(*log.EventsInput, ServiceEventsStream) (rsm.StreamCloser, error)
 	// Entries lists all entries in the log
-	Entries(*log.EntriesInput, ServiceEntriesStream) error
+	Entries(*log.EntriesInput, ServiceEntriesStream) (rsm.StreamCloser, error)
 	// Snapshot exports a snapshot of the primitive state
 	Snapshot(ServiceSnapshotWriter) error
 	// Restore imports a snapshot of the primitive state

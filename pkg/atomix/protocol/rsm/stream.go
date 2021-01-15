@@ -39,33 +39,76 @@ type Stream interface {
 	Session() Session
 }
 
-// queryStream wraps a stream for a query
-type queryStream struct {
-	streams.WriteStream
+// StreamCloser is a function to be called when a stream is closed
+type StreamCloser func()
+
+type opStream struct {
 	id      StreamID
 	op      OperationID
+	stream  streams.WriteStream
 	session Session
+	closer  StreamCloser
+	closed  bool
 }
 
-func (s *queryStream) ID() StreamID {
+func (s *opStream) ID() StreamID {
 	return s.id
 }
 
-func (s *queryStream) OperationID() OperationID {
+func (s *opStream) OperationID() OperationID {
 	return s.op
 }
 
-func (s *queryStream) Session() Session {
+func (s *opStream) Session() Session {
 	return s.session
+}
+
+func (s *opStream) Send(out streams.Result) {
+	s.stream.Send(out)
+}
+
+func (s *opStream) Result(value interface{}, err error) {
+	s.stream.Result(value, err)
+}
+
+func (s *opStream) Value(value interface{}) {
+	s.stream.Value(value)
+}
+
+func (s *opStream) Error(err error) {
+	s.stream.Error(err)
+}
+
+func (s *opStream) setCloser(closer StreamCloser) {
+	if s.closed {
+		if closer != nil {
+			closer()
+		}
+	} else {
+		s.closer = closer
+	}
+}
+
+func (s *opStream) Close() {
+	if !s.closed {
+		s.closed = true
+		if s.closer != nil {
+			s.closer()
+		}
+	}
+	s.stream.Close()
+}
+
+// queryStream wraps a stream for a query
+type queryStream struct {
+	*opStream
 }
 
 // sessionStream manages a single stream for a session
 type sessionStream struct {
+	*opStream
 	cluster    *cluster.Cluster
 	member     *cluster.Member
-	id         StreamID
-	op         OperationID
-	session    Session
 	responseID uint64
 	completeID uint64
 	lastIndex  Index
@@ -79,20 +122,6 @@ type sessionStreamResult struct {
 	id     uint64
 	index  Index
 	result streams.Result
-}
-
-// ID returns the stream identifier
-func (s *sessionStream) ID() StreamID {
-	return s.id
-}
-
-// OperationID returns the stream operation identifier
-func (s *sessionStream) OperationID() OperationID {
-	return s.op
-}
-
-func (s *sessionStream) Session() Session {
-	return s.session
 }
 
 // open opens the stream
@@ -220,7 +249,24 @@ func (s *sessionStream) Error(err error) {
 	s.Result(nil, err)
 }
 
+func (s *sessionStream) setCloser(closer StreamCloser) {
+	if s.closed {
+		if closer != nil {
+			closer()
+		}
+	} else {
+		s.closer = closer
+	}
+}
+
 func (s *sessionStream) Close() {
+	if !s.closed {
+		s.closed = true
+		if s.closer != nil {
+			s.closer()
+		}
+	}
+
 	log.WithFields(
 		logging.String("NodeID", string(s.member.NodeID)),
 		logging.Uint64("SessionID", uint64(s.session.ID())),

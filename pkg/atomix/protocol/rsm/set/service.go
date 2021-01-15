@@ -29,6 +29,7 @@ func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
 	return &setService{
 		Service: rsm.NewService(scheduler, context),
 		values:  make(map[string]meta.ObjectMeta),
+		streams: make(map[rsm.StreamID]ServiceEventsStream),
 	}
 }
 
@@ -36,7 +37,7 @@ func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
 type setService struct {
 	rsm.Service
 	values  map[string]meta.ObjectMeta
-	streams []ServiceEventsStream
+	streams map[rsm.StreamID]ServiceEventsStream
 }
 
 func (s *setService) notify(event setapi.Event) error {
@@ -115,7 +116,7 @@ func (s *setService) Clear() error {
 	return nil
 }
 
-func (s *setService) Events(input *setapi.EventsInput, stream ServiceEventsStream) error {
+func (s *setService) Events(input *setapi.EventsInput, stream ServiceEventsStream) (rsm.StreamCloser, error) {
 	if input.Replay {
 		for value, metadata := range s.values {
 			err := stream.Notify(&setapi.EventsOutput{
@@ -128,15 +129,17 @@ func (s *setService) Events(input *setapi.EventsInput, stream ServiceEventsStrea
 				},
 			})
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
-	s.streams = append(s.streams, stream)
-	return nil
+	s.streams[stream.ID()] = stream
+	return func() {
+		delete(s.streams, stream.ID())
+	}, nil
 }
 
-func (s *setService) Elements(input *setapi.ElementsInput, stream ServiceElementsStream) error {
+func (s *setService) Elements(input *setapi.ElementsInput, stream ServiceElementsStream) (rsm.StreamCloser, error) {
 	for value, object := range s.values {
 		err := stream.Notify(&setapi.ElementsOutput{
 			Element: setapi.Element{
@@ -145,10 +148,10 @@ func (s *setService) Elements(input *setapi.ElementsInput, stream ServiceElement
 			},
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 func (s *setService) Snapshot(writer ServiceSnapshotWriter) error {

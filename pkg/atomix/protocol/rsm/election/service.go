@@ -28,6 +28,7 @@ func init() {
 func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
 	return &electionService{
 		Service: rsm.NewService(scheduler, context),
+		streams: make(map[rsm.StreamID]ServiceEventsStream),
 	}
 }
 
@@ -35,7 +36,7 @@ func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
 type electionService struct {
 	rsm.Service
 	term    electionapi.Term
-	streams []ServiceEventsStream
+	streams map[rsm.StreamID]ServiceEventsStream
 }
 
 // SessionExpired is called when a session is expired by the server
@@ -233,9 +234,11 @@ func (e *electionService) GetTerm(input *electionapi.GetTermInput) (*electionapi
 	}, nil
 }
 
-func (e *electionService) Events(input *electionapi.EventsInput, stream ServiceEventsStream) error {
-	e.streams = append(e.streams, stream)
-	return nil
+func (e *electionService) Events(input *electionapi.EventsInput, stream ServiceEventsStream) (rsm.StreamCloser, error) {
+	e.streams[stream.ID()] = stream
+	return func() {
+		delete(e.streams, stream.ID())
+	}, nil
 }
 
 func (e *electionService) Snapshot() (*electionapi.Snapshot, error) {

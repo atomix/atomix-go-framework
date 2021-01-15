@@ -185,9 +185,9 @@ type Service interface {
 	// Clear removes all entries from the map
 	Clear() error
 	// Events listens for change events
-	Events(*_map.EventsInput, ServiceEventsStream) error
+	Events(*_map.EventsInput, ServiceEventsStream) (rsm.StreamCloser, error)
 	// Entries lists all entries in the map
-	Entries(*_map.EntriesInput, ServiceEntriesStream) error
+	Entries(*_map.EntriesInput, ServiceEntriesStream) (rsm.StreamCloser, error)
 	// Snapshot exports a snapshot of the primitive state
 	Snapshot(ServiceSnapshotWriter) error
 	// Restore imports a snapshot of the primitive state

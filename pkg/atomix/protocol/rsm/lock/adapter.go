@@ -105,23 +105,20 @@ func (s *ServiceAdaptor) Restore(reader io.Reader) error {
 	return nil
 }
 
-func (s *ServiceAdaptor) lock(in []byte, stream rsm.Stream) {
+func (s *ServiceAdaptor) lock(in []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
 	input := &lock.LockInput{}
 	err := proto.Unmarshal(in, input)
 	if err != nil {
 		s.log.Error(err)
-		stream.Error(err)
-		stream.Close()
-		return
+		return nil, err
 	}
 	future, err := s.rsm.Lock(input)
 	if err != nil {
 		s.log.Error(err)
-		stream.Error(err)
-		stream.Close()
-		return
+		return nil, err
 	}
 	future.setStream(stream)
+	return nil, nil
 }
 
 func (s *ServiceAdaptor) unlock(in []byte) ([]byte, error) {

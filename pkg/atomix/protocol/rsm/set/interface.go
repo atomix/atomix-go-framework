@@ -185,9 +185,9 @@ type Service interface {
 	// Clear removes all values from the set
 	Clear() error
 	// Events listens for set change events
-	Events(*set.EventsInput, ServiceEventsStream) error
+	Events(*set.EventsInput, ServiceEventsStream) (rsm.StreamCloser, error)
 	// Elements lists all elements in the set
-	Elements(*set.ElementsInput, ServiceElementsStream) error
+	Elements(*set.ElementsInput, ServiceElementsStream) (rsm.StreamCloser, error)
 	// Snapshot exports a snapshot of the primitive state
 	Snapshot(ServiceSnapshotWriter) error
 	// Restore imports a snapshot of the primitive state

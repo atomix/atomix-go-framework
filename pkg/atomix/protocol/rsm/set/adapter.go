@@ -203,52 +203,45 @@ func (s *ServiceAdaptor) clear(in []byte) ([]byte, error) {
 	return nil, nil
 }
 
-func (s *ServiceAdaptor) events(in []byte, stream rsm.Stream) {
+func (s *ServiceAdaptor) events(in []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
 	input := &set.EventsInput{}
 	err := proto.Unmarshal(in, input)
 	if err != nil {
 		s.log.Error(err)
-		stream.Error(err)
-		stream.Close()
-		return
+		return nil, err
 	}
 	output := newServiceEventsStream(stream)
-	err = s.rsm.Events(input, output)
+	closer, err := s.rsm.Events(input, output)
 	if err != nil {
 		s.log.Error(err)
-		stream.Error(err)
-		stream.Close()
-		return
+		return nil, err
 	}
+	return closer, nil
 }
 
-func (s *ServiceAdaptor) elements(in []byte, stream rsm.Stream) {
+func (s *ServiceAdaptor) elements(in []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
 	input := &set.ElementsInput{}
 	err := proto.Unmarshal(in, input)
 	if err != nil {
 		s.log.Error(err)
-		stream.Error(err)
-		stream.Close()
-		return
+		return nil, err
 	}
 	output := newServiceElementsStream(stream)
-	err = s.rsm.Elements(input, output)
+	closer, err := s.rsm.Elements(input, output)
 	if err != nil {
 		s.log.Error(err)
-		stream.Error(err)
-		stream.Close()
-		return
+		return nil, err
 	}
+	return closer, nil
 }
 
-func (s *ServiceAdaptor) snapshot(in []byte, stream rsm.Stream) {
+func (s *ServiceAdaptor) snapshot(in []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
 	err := s.rsm.Snapshot(newServiceSnapshotStreamWriter(stream))
 	if err != nil {
 		s.log.Error(err)
-		stream.Error(err)
-		stream.Close()
-		return
+		return nil, err
 	}
+	return nil, nil
 }
 
 func (s *ServiceAdaptor) restore(in []byte) ([]byte, error) {

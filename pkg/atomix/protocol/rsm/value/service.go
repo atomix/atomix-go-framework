@@ -29,6 +29,7 @@ func init() {
 func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
 	return &valueService{
 		Service: rsm.NewService(scheduler, context),
+		streams: make(map[rsm.StreamID]ServiceEventsStream),
 	}
 }
 
@@ -36,7 +37,7 @@ func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
 type valueService struct {
 	rsm.Service
 	value   valueapi.Value
-	streams []ServiceEventsStream
+	streams map[rsm.StreamID]ServiceEventsStream
 }
 
 func (v *valueService) notify(event valueapi.Event) error {
@@ -98,9 +99,11 @@ func (v *valueService) Get(input *valueapi.GetInput) (*valueapi.GetOutput, error
 	}, nil
 }
 
-func (v *valueService) Events(input *valueapi.EventsInput, stream ServiceEventsStream) error {
-	v.streams = append(v.streams, stream)
-	return nil
+func (v *valueService) Events(input *valueapi.EventsInput, stream ServiceEventsStream) (rsm.StreamCloser, error) {
+	v.streams[stream.ID()] = stream
+	return func() {
+		delete(v.streams, stream.ID())
+	}, nil
 }
 
 func (v *valueService) Snapshot() (*valueapi.Snapshot, error) {

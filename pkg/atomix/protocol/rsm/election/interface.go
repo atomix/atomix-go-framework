@@ -74,7 +74,7 @@ type Service interface {
 	// GetTerm gets the current leadership term
 	GetTerm(*election.GetTermInput) (*election.GetTermOutput, error)
 	// Events listens for leadership events
-	Events(*election.EventsInput, ServiceEventsStream) error
+	Events(*election.EventsInput, ServiceEventsStream) (rsm.StreamCloser, error)
 	// Snapshot exports a snapshot of the primitive state
 	Snapshot() (*election.Snapshot, error)
 	// Restore imports a snapshot of the primitive state

@@ -168,15 +168,17 @@ func (m *Manager) installSessions(reader io.Reader) error {
 
 			for _, stream := range service.Streams {
 				session.streams[StreamID(stream.StreamId)] = &sessionStream{
+					opStream: &opStream{
+						id:      StreamID(stream.StreamId),
+						op:      OperationID(stream.Type),
+						session: session,
+						stream:  streams.NewNilStream(),
+					},
 					cluster:    m.cluster,
 					member:     m.member,
-					id:         StreamID(stream.StreamId),
-					op:         OperationID(stream.Type),
-					session:    session,
 					responseID: stream.SequenceNumber,
 					completeID: stream.LastCompleted,
 					ctx:        m.context,
-					stream:     streams.NewNilStream(),
 					results:    list.New(),
 				}
 			}
@@ -366,8 +368,14 @@ func (m *Manager) applyServiceCommandOperation(request ServiceCommandRequest, co
 		stream.Send(result)
 		stream.Close()
 	} else if streamOp, ok := operation.(StreamingOperation); ok {
-		streamCtx := session.addStream(StreamID(context.SequenceNumber), operationID, stream)
-		streamOp.Execute(request.GetOperation().Value, streamCtx)
+		sessionStream := session.addStream(StreamID(context.SequenceNumber), operationID, stream)
+		closer, err := streamOp.Execute(request.GetOperation().Value, sessionStream)
+		if err != nil {
+			stream.Error(err)
+			stream.Close()
+		} else {
+			sessionStream.setCloser(closer)
+		}
 	} else {
 		stream.Close()
 	}
@@ -802,13 +810,21 @@ func (m *Manager) applyServiceQueryOperation(request ServiceQueryRequest, contex
 		})
 
 		queryStream := &queryStream{
-			WriteStream: responseStream,
-			id:          StreamID(m.context.Index()),
-			op:          operationID,
-			session:     session,
+			opStream: &opStream{
+				stream:  responseStream,
+				id:      StreamID(m.context.Index()),
+				op:      operationID,
+				session: session,
+			},
 		}
 
-		streamOp.Execute(request.GetOperation().Value, queryStream)
+		closer, err := streamOp.Execute(request.GetOperation().Value, queryStream)
+		if err != nil {
+			stream.Error(err)
+			stream.Close()
+		} else {
+			queryStream.setCloser(closer)
+		}
 	} else {
 		stream.Close()
 	}

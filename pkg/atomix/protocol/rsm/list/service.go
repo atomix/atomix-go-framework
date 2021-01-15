@@ -28,6 +28,7 @@ func init() {
 func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
 	return &listService{
 		Service: rsm.NewService(scheduler, context),
+		streams: make(map[rsm.StreamID]ServiceEventsStream),
 	}
 }
 
@@ -35,7 +36,7 @@ func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
 type listService struct {
 	rsm.Service
 	items   []listapi.Value
-	streams []ServiceEventsStream
+	streams map[rsm.StreamID]ServiceEventsStream
 }
 
 func (l *listService) notify(event listapi.Event) error {
@@ -205,12 +206,14 @@ func (l *listService) Clear() error {
 	return nil
 }
 
-func (l *listService) Events(input *listapi.EventsInput, stream ServiceEventsStream) error {
-	l.streams = append(l.streams, stream)
-	return nil
+func (l *listService) Events(input *listapi.EventsInput, stream ServiceEventsStream) (rsm.StreamCloser, error) {
+	l.streams[stream.ID()] = stream
+	return func() {
+		delete(l.streams, stream.ID())
+	}, nil
 }
 
-func (l *listService) Elements(input *listapi.ElementsInput, stream ServiceElementsStream) error {
+func (l *listService) Elements(input *listapi.ElementsInput, stream ServiceElementsStream) (rsm.StreamCloser, error) {
 	defer stream.Close()
 	for index, value := range l.items {
 		err := stream.Notify(&listapi.ElementsOutput{
@@ -220,10 +223,10 @@ func (l *listService) Elements(input *listapi.ElementsInput, stream ServiceEleme
 			},
 		})
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 func (l *listService) Snapshot(writer ServiceSnapshotWriter) error {

@@ -359,13 +359,13 @@ type {{ $serviceInt }} interface {
     {{- if .Type.IsSnapshot }}
     {{ .Name }}({{ $writerInt }}) error
     {{- else if and .Request.Input .Response.Output }}
-    {{ .Name }}(*{{ template "type" .Request.Input.Field.Type }}, {{ $streamInt }}) error
+    {{ .Name }}(*{{ template "type" .Request.Input.Field.Type }}, {{ $streamInt }}) (rsm.StreamCloser, error)
     {{- else if .Request.Input }}
-    {{ .Name }}(*{{ template "type" .Request.Input.Field.Type }}, {{ $informerInt }}) error
+    {{ .Name }}(*{{ template "type" .Request.Input.Field.Type }}, {{ $informerInt }}) (rsm.StreamCloser, error)
     {{- else if .Response.Output }}
-    {{ .Name }}({{ $streamInt }}) error
+    {{ .Name }}({{ $streamInt }}) (rsm.StreamCloser, error)
     {{- else }}
-    {{ .Name }}({{ $informerInt }}) error
+    {{ .Name }}({{ $informerInt }}) (rsm.StreamCloser, error)
     {{- end }}
     {{- end }}
     {{- end }}

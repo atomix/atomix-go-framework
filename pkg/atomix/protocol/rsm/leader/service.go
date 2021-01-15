@@ -27,6 +27,7 @@ func init() {
 func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
 	return &leaderService{
 		Service: rsm.NewService(scheduler, context),
+		streams: make(map[rsm.StreamID]ServiceEventsStream),
 	}
 }
 
@@ -34,7 +35,7 @@ func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
 type leaderService struct {
 	rsm.Service
 	latch   leaderapi.Latch
-	streams []ServiceEventsStream
+	streams map[rsm.StreamID]ServiceEventsStream
 }
 
 // SessionExpired is called when a session is expired by the server
@@ -131,9 +132,11 @@ func (l *leaderService) Get(input *leaderapi.GetInput) (*leaderapi.GetOutput, er
 	}, nil
 }
 
-func (l *leaderService) Events(input *leaderapi.EventsInput, stream ServiceEventsStream) error {
-	l.streams = append(l.streams, stream)
-	return nil
+func (l *leaderService) Events(input *leaderapi.EventsInput, stream ServiceEventsStream) (rsm.StreamCloser, error) {
+	l.streams[stream.ID()] = stream
+	return func() {
+		delete(l.streams, stream.ID())
+	}, nil
 }
 
 func (l *leaderService) Snapshot() (*leaderapi.Snapshot, error) {

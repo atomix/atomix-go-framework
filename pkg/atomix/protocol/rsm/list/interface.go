@@ -189,9 +189,9 @@ type Service interface {
 	// Clear removes all elements from the list
 	Clear() error
 	// Events listens for change events
-	Events(*list.EventsInput, ServiceEventsStream) error
+	Events(*list.EventsInput, ServiceEventsStream) (rsm.StreamCloser, error)
 	// Elements streams all elements in the list
-	Elements(*list.ElementsInput, ServiceElementsStream) error
+	Elements(*list.ElementsInput, ServiceElementsStream) (rsm.StreamCloser, error)
 	// Snapshot exports a snapshot of the primitive state
 	Snapshot(ServiceSnapshotWriter) error
 	// Restore imports a snapshot of the primitive state

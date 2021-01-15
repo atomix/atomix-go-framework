@@ -254,15 +254,17 @@ func (s *serviceSession) StreamsOf(op OperationID) []Stream {
 }
 
 // addStream adds a stream at the given sequence number
-func (s *serviceSession) addStream(id StreamID, op OperationID, outStream streams.WriteStream) Stream {
+func (s *serviceSession) addStream(id StreamID, op OperationID, outStream streams.WriteStream) *sessionStream {
 	stream := &sessionStream{
+		opStream: &opStream{
+			id:      id,
+			op:      op,
+			session: s,
+			stream:  outStream,
+		},
 		cluster: s.cluster,
 		member:  s.member,
-		id:      id,
-		op:      op,
-		session: s,
 		ctx:     s.ctx,
-		stream:  outStream,
 		results: list.New(),
 	}
 	s.streams[id] = stream
