@@ -34,9 +34,11 @@ protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomi
 
 protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/api/go/atomix/primitive/counter,output_path=atomix/proxy/p2p/counter,plugin=proxy,protocol=p2p:pkg /go/src/github.com/atomix/api/proto/atomix/primitive/counter/*.proto
 protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/api/go/atomix/primitive/map,output_path=atomix/proxy/p2p/map,plugin=proxy,protocol=p2p:pkg         /go/src/github.com/atomix/api/proto/atomix/primitive/map/*.proto
+protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/api/go/atomix/primitive/value,output_path=atomix/proxy/p2p/value,plugin=proxy,protocol=p2p:pkg     /go/src/github.com/atomix/api/proto/atomix/primitive/value/*.proto
 
 protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/api/go/atomix/primitive/counter,output_path=atomix/protocol/p2p/counter,plugin=protocol,protocol=p2p:pkg /go/src/github.com/atomix/api/proto/atomix/primitive/counter/*.proto
 protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/api/go/atomix/primitive/map,output_path=atomix/protocol/p2p/map,plugin=protocol,protocol=p2p:pkg         /go/src/github.com/atomix/api/proto/atomix/primitive/map/*.proto
+protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/api/go/atomix/primitive/value,output_path=atomix/protocol/p2p/value,plugin=protocol,protocol=p2p:pkg     /go/src/github.com/atomix/api/proto/atomix/primitive/value/*.proto
 
 protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/api/go/atomix/primitive/counter,output_path=atomix/client/counter,plugin=client:pkg       /go/src/github.com/atomix/api/proto/atomix/primitive/counter/*.proto
 protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/api/go/atomix/primitive/election,output_path=atomix/client/election,plugin=client:pkg     /go/src/github.com/atomix/api/proto/atomix/primitive/election/*.proto
