@@ -55,10 +55,6 @@ func (l *logService) Size() (*log.SizeOutput, error) {
 	}, nil
 }
 
-func (l *logService) Exists(*log.ExistsInput) (*log.ExistsOutput, error) {
-	panic("implement me")
-}
-
 func (l *logService) Append(*log.AppendInput) (*log.AppendOutput, error) {
 	panic("implement me")
 }

@@ -18,6 +18,10 @@ import (
 	metaapi "github.com/atomix/api/go/atomix/primitive/meta"
 )
 
+func Equal(m1, m2 metaapi.ObjectMeta) bool {
+	return New(m1).Equal(New(m2))
+}
+
 // New creates new object metadata from the given proto metadata
 func New(meta metaapi.ObjectMeta) ObjectMeta {
 	var revision Revision
@@ -103,6 +107,16 @@ func (m ObjectMeta) Proto() metaapi.ObjectMeta {
 		}
 	}
 	return meta
+}
+
+func (m ObjectMeta) Equal(meta ObjectMeta) bool {
+	if m.Revision != meta.Revision {
+		return false
+	}
+	if m.Timestamp != nil && meta.Timestamp != nil && !m.Timestamp.Equal(meta.Timestamp) {
+		return false
+	}
+	return true
 }
 
 // Revision is a revision number

@@ -14,7 +14,7 @@ const Type = "Lock"
 const (
 	lockOp     = "Lock"
 	unlockOp   = "Unlock"
-	isLockedOp = "IsLocked"
+	getLockOp  = "GetLock"
 	snapshotOp = "Snapshot"
 	restoreOp  = "Restore"
 )
@@ -49,7 +49,7 @@ type ServiceAdaptor struct {
 func (s *ServiceAdaptor) init() {
 	s.RegisterStreamOperation(lockOp, s.lock)
 	s.RegisterUnaryOperation(unlockOp, s.unlock)
-	s.RegisterUnaryOperation(isLockedOp, s.isLocked)
+	s.RegisterUnaryOperation(getLockOp, s.getLock)
 	s.RegisterUnaryOperation(snapshotOp, s.snapshot)
 	s.RegisterUnaryOperation(restoreOp, s.restore)
 }
@@ -146,15 +146,15 @@ func (s *ServiceAdaptor) unlock(in []byte) ([]byte, error) {
 	return out, nil
 }
 
-func (s *ServiceAdaptor) isLocked(in []byte) ([]byte, error) {
-	input := &lock.IsLockedInput{}
+func (s *ServiceAdaptor) getLock(in []byte) ([]byte, error) {
+	input := &lock.GetLockInput{}
 	err := proto.Unmarshal(in, input)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
 
-	output, err := s.rsm.IsLocked(input)
+	output, err := s.rsm.GetLock(input)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err

@@ -13,7 +13,6 @@ const Type = "IndexedMap"
 
 const (
 	sizeOp       = "Size"
-	existsOp     = "Exists"
 	putOp        = "Put"
 	getOp        = "Get"
 	firstEntryOp = "FirstEntry"
@@ -57,7 +56,6 @@ type ServiceAdaptor struct {
 
 func (s *ServiceAdaptor) init() {
 	s.RegisterUnaryOperation(sizeOp, s.size)
-	s.RegisterUnaryOperation(existsOp, s.exists)
 	s.RegisterUnaryOperation(putOp, s.put)
 	s.RegisterUnaryOperation(getOp, s.get)
 	s.RegisterUnaryOperation(firstEntryOp, s.firstEntry)
@@ -125,28 +123,6 @@ func (s *ServiceAdaptor) Restore(reader io.Reader) error {
 
 func (s *ServiceAdaptor) size(in []byte) ([]byte, error) {
 	output, err := s.rsm.Size()
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-
-	out, err := proto.Marshal(output)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-	return out, nil
-}
-
-func (s *ServiceAdaptor) exists(in []byte) ([]byte, error) {
-	input := &indexedmap.ExistsInput{}
-	err := proto.Unmarshal(in, input)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-
-	output, err := s.rsm.Exists(input)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err

@@ -57,8 +57,8 @@ type Service interface {
 	Lock(*lock.LockInput) (*LockOutputFuture, error)
 	// Unlock releases the lock
 	Unlock(*lock.UnlockInput) (*lock.UnlockOutput, error)
-	// IsLocked checks whether the lock is held
-	IsLocked(*lock.IsLockedInput) (*lock.IsLockedOutput, error)
+	// GetLock gets the lock state
+	GetLock(*lock.GetLockInput) (*lock.GetLockOutput, error)
 	// Snapshot exports a snapshot of the primitive state
 	Snapshot() (*lock.Snapshot, error)
 	// Restore imports a snapshot of the primitive state

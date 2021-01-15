@@ -176,8 +176,6 @@ var _ ServiceSnapshotWriter = &ServiceAdaptorSnapshotStreamWriter{}
 type Service interface {
 	// Size returns the size of the log
 	Size() (*log.SizeOutput, error)
-	// Exists checks whether an index exists in the log
-	Exists(*log.ExistsInput) (*log.ExistsOutput, error)
 	// Appends appends an entry into the log
 	Append(*log.AppendInput) (*log.AppendOutput, error)
 	// Get gets the entry for an index

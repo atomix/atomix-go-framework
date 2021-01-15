@@ -84,7 +84,7 @@ func (s *Proxy) Contains(ctx context.Context, request *set.ContainsRequest) (*se
 		s.log.Errorf("Request ContainsRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	partitionKey := request.Input.Value
+	partitionKey := request.Input.Element.Value
 	partition := s.PartitionBy([]byte(partitionKey))
 	outputBytes, err := partition.DoQuery(ctx, containsOp, inputBytes, request.Header)
 	if err != nil {
@@ -113,7 +113,7 @@ func (s *Proxy) Add(ctx context.Context, request *set.AddRequest) (*set.AddRespo
 		s.log.Errorf("Request AddRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	partitionKey := request.Input.Value
+	partitionKey := request.Input.Element.Value
 	partition := s.PartitionBy([]byte(partitionKey))
 	outputBytes, err := partition.DoCommand(ctx, addOp, inputBytes, request.Header)
 	if err != nil {
@@ -142,7 +142,7 @@ func (s *Proxy) Remove(ctx context.Context, request *set.RemoveRequest) (*set.Re
 		s.log.Errorf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	partitionKey := request.Input.Value
+	partitionKey := request.Input.Element.Value
 	partition := s.PartitionBy([]byte(partitionKey))
 	outputBytes, err := partition.DoCommand(ctx, removeOp, inputBytes, request.Header)
 	if err != nil {

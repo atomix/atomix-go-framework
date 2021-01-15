@@ -280,32 +280,23 @@ func (s *mapService) Size(ctx context.Context) (*mapapi.SizeOutput, error) {
 	}, nil
 }
 
-func (s *mapService) Exists(ctx context.Context, input *mapapi.ExistsInput) (*mapapi.ExistsOutput, error) {
-	s.entriesMu.RLock()
-	defer s.entriesMu.RUnlock()
-	_, exists := s.entries[input.Key]
-	return &mapapi.ExistsOutput{
-		ContainsKey: exists,
-	}, nil
-}
-
 func (s *mapService) Put(ctx context.Context, input *mapapi.PutInput) (*mapapi.PutOutput, error) {
 	s.entriesMu.Lock()
 	defer s.entriesMu.Unlock()
-	s.entries[input.Key] = Entry{
-		Key:   input.Key,
-		Value: input.Value,
+	s.entries[input.Entry.Key] = Entry{
+		Key:   input.Entry.Key,
+		Value: input.Entry.Value,
 		Digest: Digest{
-			Timestamp: *input.Meta.Timestamp,
+			Timestamp: *input.Entry.Timestamp,
 		},
 	}
 	return &mapapi.PutOutput{
-		Entry: &mapapi.Entry{
-			Meta: metaapi.ObjectMeta{
-				Timestamp: input.Meta.Timestamp,
+		Entry: mapapi.Entry{
+			ObjectMeta: metaapi.ObjectMeta{
+				Timestamp: input.Entry.Timestamp,
 			},
-			Key:   input.Key,
-			Value: input.Value,
+			Key:   input.Entry.Key,
+			Value: input.Entry.Value,
 		},
 	}, nil
 }
@@ -318,8 +309,8 @@ func (s *mapService) Get(ctx context.Context, input *mapapi.GetInput) (*mapapi.G
 		return nil, errors.NewNotFound("key '%s' not found", input.Key)
 	}
 	return &mapapi.GetOutput{
-		Entry: &mapapi.Entry{
-			Meta: metaapi.ObjectMeta{
+		Entry: mapapi.Entry{
+			ObjectMeta: metaapi.ObjectMeta{
 				Timestamp: &entry.Digest.Timestamp,
 			},
 			Key:   entry.Key,
@@ -337,8 +328,8 @@ func (s *mapService) Remove(ctx context.Context, input *mapapi.RemoveInput) (*ma
 	}
 	delete(s.entries, input.Key)
 	return &mapapi.RemoveOutput{
-		Entry: &mapapi.Entry{
-			Meta: metaapi.ObjectMeta{
+		Entry: mapapi.Entry{
+			ObjectMeta: metaapi.ObjectMeta{
 				Timestamp: &entry.Digest.Timestamp,
 			},
 			Key:   entry.Key,
@@ -370,7 +361,7 @@ func (s *mapService) Entries(ctx context.Context, input *mapapi.EntriesInput, st
 	for _, entry := range s.entries {
 		err := stream.Notify(&mapapi.EntriesOutput{
 			Entry: mapapi.Entry{
-				Meta: metaapi.ObjectMeta{
+				ObjectMeta: metaapi.ObjectMeta{
 					Timestamp: &entry.Digest.Timestamp,
 				},
 				Key:   entry.Key,

@@ -54,10 +54,6 @@ func (m *mapService) Size() (*_map.SizeOutput, error) {
 	}, nil
 }
 
-func (m *mapService) Exists(input *_map.ExistsInput) (*_map.ExistsOutput, error) {
-	panic("implement me")
-}
-
 func (m *mapService) Put(input *_map.PutInput) (*_map.PutOutput, error) {
 	panic("implement me")
 }

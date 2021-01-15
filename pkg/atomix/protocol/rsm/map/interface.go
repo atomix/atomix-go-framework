@@ -176,8 +176,6 @@ var _ ServiceSnapshotWriter = &ServiceAdaptorSnapshotStreamWriter{}
 type Service interface {
 	// Size returns the size of the map
 	Size() (*_map.SizeOutput, error)
-	// Exists checks whether a key exists in the map
-	Exists(*_map.ExistsInput) (*_map.ExistsOutput, error)
 	// Put puts an entry into the map
 	Put(*_map.PutInput) (*_map.PutOutput, error)
 	// Get gets the entry for a key

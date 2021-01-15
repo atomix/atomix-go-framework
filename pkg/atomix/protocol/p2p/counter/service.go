@@ -25,8 +25,6 @@ type Service interface {
 	Increment(context.Context, *counter.IncrementInput) (*counter.IncrementOutput, error)
 	// Decrement decrements the counter value
 	Decrement(context.Context, *counter.DecrementInput) (*counter.DecrementOutput, error)
-	// CheckAndSet performs a check-and-set operation on the counter value
-	CheckAndSet(context.Context, *counter.CheckAndSetInput) (*counter.CheckAndSetOutput, error)
 	// Snapshot exports a snapshot of the primitive state
 	Snapshot(context.Context) (*counter.Snapshot, error)
 	// Restore imports a snapshot of the primitive state

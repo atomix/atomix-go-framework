@@ -17,7 +17,6 @@ const Type = "Map"
 
 const (
 	sizeOp     = "Size"
-	existsOp   = "Exists"
 	putOp      = "Put"
 	getOp      = "Get"
 	removeOp   = "Remove"
@@ -75,35 +74,6 @@ func (s *Proxy) Size(ctx context.Context, request *_map.SizeRequest) (*_map.Size
 	return response, nil
 }
 
-func (s *Proxy) Exists(ctx context.Context, request *_map.ExistsRequest) (*_map.ExistsResponse, error) {
-	s.log.Debugf("Received ExistsRequest %+v", request)
-
-	var err error
-	input := &request.Input
-	inputBytes, err := proto.Marshal(input)
-	if err != nil {
-		s.log.Errorf("Request ExistsRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	partitionKey := request.Input.Key
-	partition := s.PartitionBy([]byte(partitionKey))
-	outputBytes, err := partition.DoQuery(ctx, existsOp, inputBytes, request.Header)
-	if err != nil {
-		s.log.Errorf("Request ExistsRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-
-	response := &_map.ExistsResponse{}
-	output := &response.Output
-	err = proto.Unmarshal(outputBytes, output)
-	if err != nil {
-		s.log.Errorf("Request ExistsRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	s.log.Debugf("Sending ExistsResponse %+v", response)
-	return response, nil
-}
-
 func (s *Proxy) Put(ctx context.Context, request *_map.PutRequest) (*_map.PutResponse, error) {
 	s.log.Debugf("Received PutRequest %+v", request)
 
@@ -114,7 +84,7 @@ func (s *Proxy) Put(ctx context.Context, request *_map.PutRequest) (*_map.PutRes
 		s.log.Errorf("Request PutRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	partitionKey := request.Input.Key
+	partitionKey := request.Input.Entry.Key
 	partition := s.PartitionBy([]byte(partitionKey))
 	outputBytes, err := partition.DoCommand(ctx, putOp, inputBytes, request.Header)
 	if err != nil {

@@ -25,8 +25,6 @@ type Client interface {
 	client.PrimitiveClient
 	// Size returns the size of the map
 	Size(context.Context) (*indexedmap.SizeOutput, error)
-	// Exists checks whether a key exists in the map
-	Exists(context.Context, *indexedmap.ExistsInput) (*indexedmap.ExistsOutput, error)
 	// Put puts an entry into the map
 	Put(context.Context, *indexedmap.PutInput) (*indexedmap.PutOutput, error)
 	// Get gets the entry for a key
@@ -72,18 +70,6 @@ func (c *indexedMapClient) Size(ctx context.Context) (*indexedmap.SizeOutput, er
 		Header: c.getRequestHeader(),
 	}
 	response, err := c.client.Size(ctx, request)
-	if err != nil {
-		return nil, errors.From(err)
-	}
-	return &response.Output, nil
-}
-
-func (c *indexedMapClient) Exists(ctx context.Context, input *indexedmap.ExistsInput) (*indexedmap.ExistsOutput, error) {
-	request := &indexedmap.ExistsRequest{
-		Header: c.getRequestHeader(),
-	}
-	request.Input = *input
-	response, err := c.client.Exists(ctx, request)
 	if err != nil {
 		return nil, errors.From(err)
 	}

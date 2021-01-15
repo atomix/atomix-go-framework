@@ -176,8 +176,6 @@ var _ ServiceSnapshotWriter = &ServiceAdaptorSnapshotStreamWriter{}
 type Service interface {
 	// Size gets the number of elements in the list
 	Size() (*list.SizeOutput, error)
-	// Contains returns whether the list contains a value
-	Contains(*list.ContainsInput) (*list.ContainsOutput, error)
 	// Append appends a value to the list
 	Append(*list.AppendInput) (*list.AppendOutput, error)
 	// Insert inserts a value at a specific index in the list

@@ -25,8 +25,6 @@ type Client interface {
 	client.PrimitiveClient
 	// Size returns the size of the map
 	Size(context.Context) (*_map.SizeOutput, error)
-	// Exists checks whether a key exists in the map
-	Exists(context.Context, *_map.ExistsInput) (*_map.ExistsOutput, error)
 	// Put puts an entry into the map
 	Put(context.Context, *_map.PutInput) (*_map.PutOutput, error)
 	// Get gets the entry for a key
@@ -64,18 +62,6 @@ func (c *mapClient) Size(ctx context.Context) (*_map.SizeOutput, error) {
 		Header: c.getRequestHeader(),
 	}
 	response, err := c.client.Size(ctx, request)
-	if err != nil {
-		return nil, errors.From(err)
-	}
-	return &response.Output, nil
-}
-
-func (c *mapClient) Exists(ctx context.Context, input *_map.ExistsInput) (*_map.ExistsOutput, error) {
-	request := &_map.ExistsRequest{
-		Header: c.getRequestHeader(),
-	}
-	request.Input = *input
-	response, err := c.client.Exists(ctx, request)
 	if err != nil {
 		return nil, errors.From(err)
 	}

@@ -16,7 +16,6 @@ const Type = "List"
 
 const (
 	sizeOp     = "Size"
-	containsOp = "Contains"
 	appendOp   = "Append"
 	insertOp   = "Insert"
 	getOp      = "Get"
@@ -65,35 +64,6 @@ func (s *Proxy) Size(ctx context.Context, request *list.SizeRequest) (*list.Size
 		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending SizeResponse %+v", response)
-	return response, nil
-}
-
-func (s *Proxy) Contains(ctx context.Context, request *list.ContainsRequest) (*list.ContainsResponse, error) {
-	s.log.Debugf("Received ContainsRequest %+v", request)
-
-	var err error
-	input := &request.Input
-	inputBytes, err := proto.Marshal(input)
-	if err != nil {
-		s.log.Errorf("Request ContainsRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	header := request.Header
-	partition := s.PartitionFor(header.PrimitiveID)
-	outputBytes, err := partition.DoQuery(ctx, containsOp, inputBytes, request.Header)
-	if err != nil {
-		s.log.Errorf("Request ContainsRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-
-	response := &list.ContainsResponse{}
-	output := &response.Output
-	err = proto.Unmarshal(outputBytes, output)
-	if err != nil {
-		s.log.Errorf("Request ContainsRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	s.log.Debugf("Sending ContainsResponse %+v", response)
 	return response, nil
 }
 

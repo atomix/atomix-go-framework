@@ -258,16 +258,14 @@ func (s *counterService) Increment(ctx context.Context, input *counter.Increment
 		return nil, errors.NewUnavailable("not a member of the partition")
 	}
 	s.stateMu.Lock()
-	prevValue := s.getValue()
 	increment := s.state.Increments[string(member.ID)]
 	s.state.Increments[string(member.ID)] = increment + 1
 	s.timestamp.Increment()
-	nextValue := s.getValue()
+	value := s.getValue()
 	s.stateMu.Unlock()
 	s.enqueueState()
 	return &counter.IncrementOutput{
-		PreviousValue: prevValue,
-		NextValue:     nextValue,
+		Value: value,
 	}, nil
 }
 
@@ -277,21 +275,15 @@ func (s *counterService) Decrement(ctx context.Context, input *counter.Decrement
 		return nil, errors.NewUnavailable("not a member of the partition")
 	}
 	s.stateMu.Lock()
-	prevValue := s.getValue()
 	decrement := s.state.Decrements[string(member.ID)]
 	s.state.Decrements[string(member.ID)] = decrement + 1
 	s.timestamp.Increment()
-	nextValue := s.getValue()
+	value := s.getValue()
 	s.stateMu.Unlock()
 	s.enqueueState()
 	return &counter.DecrementOutput{
-		PreviousValue: prevValue,
-		NextValue:     nextValue,
+		Value: value,
 	}, nil
-}
-
-func (s *counterService) CheckAndSet(ctx context.Context, input *counter.CheckAndSetInput) (*counter.CheckAndSetOutput, error) {
-	return nil, errors.NewNotSupported("CheckAndSet is not supported for CRDT counters")
 }
 
 func (s *counterService) Snapshot(ctx context.Context) (*counter.Snapshot, error) {

@@ -16,7 +16,6 @@ const Type = "Log"
 
 const (
 	sizeOp       = "Size"
-	existsOp     = "Exists"
 	appendOp     = "Append"
 	getOp        = "Get"
 	firstEntryOp = "FirstEntry"
@@ -67,35 +66,6 @@ func (s *Proxy) Size(ctx context.Context, request *log.SizeRequest) (*log.SizeRe
 		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending SizeResponse %+v", response)
-	return response, nil
-}
-
-func (s *Proxy) Exists(ctx context.Context, request *log.ExistsRequest) (*log.ExistsResponse, error) {
-	s.log.Debugf("Received ExistsRequest %+v", request)
-
-	var err error
-	input := &request.Input
-	inputBytes, err := proto.Marshal(input)
-	if err != nil {
-		s.log.Errorf("Request ExistsRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	header := request.Header
-	partition := s.PartitionFor(header.PrimitiveID)
-	outputBytes, err := partition.DoQuery(ctx, existsOp, inputBytes, request.Header)
-	if err != nil {
-		s.log.Errorf("Request ExistsRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-
-	response := &log.ExistsResponse{}
-	output := &response.Output
-	err = proto.Unmarshal(outputBytes, output)
-	if err != nil {
-		s.log.Errorf("Request ExistsRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	s.log.Debugf("Sending ExistsResponse %+v", response)
 	return response, nil
 }
 

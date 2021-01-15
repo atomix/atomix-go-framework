@@ -25,8 +25,6 @@ type Client interface {
 	client.PrimitiveClient
 	// Size returns the size of the log
 	Size(context.Context) (*log.SizeOutput, error)
-	// Exists checks whether an index exists in the log
-	Exists(context.Context, *log.ExistsInput) (*log.ExistsOutput, error)
 	// Appends appends an entry into the log
 	Append(context.Context, *log.AppendInput) (*log.AppendOutput, error)
 	// Get gets the entry for an index
@@ -72,18 +70,6 @@ func (c *logClient) Size(ctx context.Context) (*log.SizeOutput, error) {
 		Header: c.getRequestHeader(),
 	}
 	response, err := c.client.Size(ctx, request)
-	if err != nil {
-		return nil, errors.From(err)
-	}
-	return &response.Output, nil
-}
-
-func (c *logClient) Exists(ctx context.Context, input *log.ExistsInput) (*log.ExistsOutput, error) {
-	request := &log.ExistsRequest{
-		Header: c.getRequestHeader(),
-	}
-	request.Input = *input
-	response, err := c.client.Exists(ctx, request)
 	if err != nil {
 		return nil, errors.From(err)
 	}

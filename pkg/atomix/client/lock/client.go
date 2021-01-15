@@ -26,8 +26,8 @@ type Client interface {
 	Lock(context.Context, *lock.LockInput) (*lock.LockOutput, error)
 	// Unlock releases the lock
 	Unlock(context.Context, *lock.UnlockInput) (*lock.UnlockOutput, error)
-	// IsLocked checks whether the lock is held
-	IsLocked(context.Context, *lock.IsLockedInput) (*lock.IsLockedOutput, error)
+	// GetLock gets the lock state
+	GetLock(context.Context, *lock.GetLockInput) (*lock.GetLockOutput, error)
 	// Snapshot exports a snapshot of the primitive state
 	Snapshot(context.Context) (*lock.Snapshot, error)
 	// Restore imports a snapshot of the primitive state
@@ -73,12 +73,12 @@ func (c *lockClient) Unlock(ctx context.Context, input *lock.UnlockInput) (*lock
 	return &response.Output, nil
 }
 
-func (c *lockClient) IsLocked(ctx context.Context, input *lock.IsLockedInput) (*lock.IsLockedOutput, error) {
-	request := &lock.IsLockedRequest{
+func (c *lockClient) GetLock(ctx context.Context, input *lock.GetLockInput) (*lock.GetLockOutput, error) {
+	request := &lock.GetLockRequest{
 		Header: c.getRequestHeader(),
 	}
 	request.Input = *input
-	response, err := c.client.IsLocked(ctx, request)
+	response, err := c.client.GetLock(ctx, request)
 	if err != nil {
 		return nil, errors.From(err)
 	}

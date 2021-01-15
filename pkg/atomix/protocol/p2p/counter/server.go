@@ -135,32 +135,6 @@ func (s *Server) Decrement(ctx context.Context, request *counter.DecrementReques
 	return response, nil
 }
 
-func (s *Server) CheckAndSet(ctx context.Context, request *counter.CheckAndSetRequest) (*counter.CheckAndSetResponse, error) {
-	s.log.Debugf("Received CheckAndSetRequest %+v", request)
-	partition, err := s.manager.PartitionFrom(ctx)
-	if err != nil {
-		s.log.Errorf("Request CheckAndSetRequest %+v failed: %v", request, err)
-		return nil, err
-	}
-
-	service, err := partition.GetService(request.Header.PrimitiveID.Name)
-	if err != nil {
-		s.log.Errorf("Request CheckAndSetRequest %+v failed: %v", request, err)
-		return nil, errors.Proto(err)
-	}
-	input := &request.Input
-	output, err := service.CheckAndSet(ctx, input)
-	if err != nil {
-		s.log.Errorf("Request CheckAndSetRequest %+v failed: %v", request, err)
-		return nil, errors.Proto(err)
-	}
-
-	response := &counter.CheckAndSetResponse{}
-	response.Output = *output
-	s.log.Debugf("Sending CheckAndSetResponse %+v", response)
-	return response, nil
-}
-
 func (s *Server) Snapshot(ctx context.Context, request *counter.SnapshotRequest) (*counter.SnapshotResponse, error) {
 	s.log.Debugf("Received SnapshotRequest %+v", request)
 	partition, err := s.manager.PartitionFrom(ctx)

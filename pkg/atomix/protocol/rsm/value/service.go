@@ -15,9 +15,10 @@
 package value
 
 import (
-	"github.com/atomix/api/go/atomix/primitive/meta"
-	"github.com/atomix/api/go/atomix/primitive/value"
+	metaapi "github.com/atomix/api/go/atomix/primitive/meta"
+	valueapi "github.com/atomix/api/go/atomix/primitive/value"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/meta"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
 )
 
@@ -34,74 +35,81 @@ func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
 // valueService is a state machine for a list primitive
 type valueService struct {
 	rsm.Service
-	value   value.Value
+	value   valueapi.Value
 	streams []ServiceEventsStream
 }
 
-func (v *valueService) notify(event *value.EventsOutput) error {
+func (v *valueService) notify(event valueapi.Event) error {
+	output := &valueapi.EventsOutput{
+		Event: event,
+	}
 	for _, stream := range v.streams {
-		if err := stream.Notify(event); err != nil {
+		if err := stream.Notify(output); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (v *valueService) Set(input *value.SetInput) (*value.SetOutput, error) {
-	if input.Value.Meta.Revision != nil && input.Value.Meta.Revision.Num != v.value.Meta.Revision.Num {
-		return nil, errors.NewConflict("expected version %d does not match actual version %d", input.Value.Meta.Revision.Num, v.value.Meta.Revision.Num)
+func (v *valueService) Set(input *valueapi.SetInput) (*valueapi.SetOutput, error) {
+	for _, precondition := range input.Preconditions {
+		switch p := precondition.Precondition.(type) {
+		case *valueapi.Precondition_Metadata:
+			if !meta.Equal(v.value.ObjectMeta, *p.Metadata) {
+				return nil, errors.NewConflict("metadata precondition failed")
+			}
+		}
 	}
 
-	v.value = value.Value{
-		Meta: meta.ObjectMeta{
-			Revision: &meta.Revision{
-				Num: v.value.Meta.Revision.Num + 1,
-			},
-		},
-		Value: input.Value.Value,
+	meta := input.Value.ObjectMeta
+	if meta.Revision == nil {
+		if v.value.Revision != nil {
+			meta.Revision = &metaapi.Revision{
+				Num: v.value.Revision.Num + 1,
+			}
+		} else {
+			meta.Revision = &metaapi.Revision{
+				Num: 1,
+			}
+		}
 	}
 
-	err := v.notify(&value.EventsOutput{
-		Type:  value.EventsOutput_UPDATE,
+	value := valueapi.Value{
+		ObjectMeta: meta,
+		Value:      input.Value.Value,
+	}
+	v.value = value
+
+	err := v.notify(valueapi.Event{
+		Type:  valueapi.Event_UPDATE,
 		Value: v.value,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &value.SetOutput{
-		Meta: v.value.Meta,
+	return &valueapi.SetOutput{
+		Value: value,
 	}, nil
 }
 
-func (v *valueService) Get(input *value.GetInput) (*value.GetOutput, error) {
-	return &value.GetOutput{
-		Value: &v.value,
+func (v *valueService) Get(input *valueapi.GetInput) (*valueapi.GetOutput, error) {
+	return &valueapi.GetOutput{
+		Value: v.value,
 	}, nil
 }
 
-func (v *valueService) Events(input *value.EventsInput, stream ServiceEventsStream) error {
+func (v *valueService) Events(input *valueapi.EventsInput, stream ServiceEventsStream) error {
 	v.streams = append(v.streams, stream)
 	return nil
 }
 
-func (v *valueService) Snapshot() (*value.Snapshot, error) {
-	panic("implement me")
+func (v *valueService) Snapshot() (*valueapi.Snapshot, error) {
+	return &valueapi.Snapshot{
+		Value: &v.value,
+	}, nil
 }
 
-func (v *valueService) Restore(snapshot *value.Snapshot) error {
-	panic("implement me")
-}
-
-func slicesEqual(a, b []byte) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for _, i := range a {
-		for _, j := range b {
-			if i != j {
-				return false
-			}
-		}
-	}
-	return true
+func (v *valueService) Restore(snapshot *valueapi.Snapshot) error {
+	v.value = *snapshot.Value
+	return nil
 }

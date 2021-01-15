@@ -63,32 +63,6 @@ func (s *Server) Size(ctx context.Context, request *_map.SizeRequest) (*_map.Siz
 	return response, nil
 }
 
-func (s *Server) Exists(ctx context.Context, request *_map.ExistsRequest) (*_map.ExistsResponse, error) {
-	s.log.Debugf("Received ExistsRequest %+v", request)
-	partition, err := s.manager.PartitionFrom(ctx)
-	if err != nil {
-		s.log.Errorf("Request ExistsRequest %+v failed: %v", request, err)
-		return nil, err
-	}
-
-	service, err := partition.GetService(request.Header.PrimitiveID.Name)
-	if err != nil {
-		s.log.Errorf("Request ExistsRequest %+v failed: %v", request, err)
-		return nil, errors.Proto(err)
-	}
-	input := &request.Input
-	output, err := service.Exists(ctx, input)
-	if err != nil {
-		s.log.Errorf("Request ExistsRequest %+v failed: %v", request, err)
-		return nil, errors.Proto(err)
-	}
-
-	response := &_map.ExistsResponse{}
-	response.Output = *output
-	s.log.Debugf("Sending ExistsResponse %+v", response)
-	return response, nil
-}
-
 func (s *Server) Put(ctx context.Context, request *_map.PutRequest) (*_map.PutResponse, error) {
 	s.log.Debugf("Received PutRequest %+v", request)
 	partition, err := s.manager.PartitionFrom(ctx)

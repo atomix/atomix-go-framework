@@ -15,7 +15,7 @@
 package leader
 
 import (
-	"github.com/atomix/api/go/atomix/primitive/leader"
+	leaderapi "github.com/atomix/api/go/atomix/primitive/leader"
 	"github.com/atomix/api/go/atomix/primitive/meta"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
 )
@@ -33,7 +33,7 @@ func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
 // leaderService is a state machine for an election primitive
 type leaderService struct {
 	rsm.Service
-	latch   leader.Latch
+	latch   leaderapi.Latch
 	streams []ServiceEventsStream
 }
 
@@ -58,36 +58,39 @@ func (l *leaderService) close(session rsm.Session) {
 	l.updateLatch(participants)
 }
 
-func (l *leaderService) notify(event *leader.EventsOutput) error {
+func (l *leaderService) notify(event leaderapi.Event) error {
+	output := &leaderapi.EventsOutput{
+		Event: event,
+	}
 	for _, stream := range l.streams {
-		if err := stream.Notify(event); err != nil {
+		if err := stream.Notify(output); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (l *leaderService) updateLatch(newParticipants []string) (leader.Latch, error) {
+func (l *leaderService) updateLatch(newParticipants []string) (leaderapi.Latch, error) {
 	oldLatch := l.latch
 	if slicesMatch(oldLatch.Participants, newParticipants) {
 		return l.latch, nil
 	}
 
-	var newLatch leader.Latch
+	var newLatch leaderapi.Latch
 	if len(newParticipants) == 0 {
-		newLatch.Meta.Revision = oldLatch.Meta.Revision
+		newLatch.ObjectMeta.Revision = oldLatch.ObjectMeta.Revision
 	} else {
 		newLatch.Leader = newParticipants[0]
 		if oldLatch.Leader != newLatch.Leader {
-			newLatch.Meta.Revision = &meta.Revision{
-				Num: oldLatch.Meta.Revision.Num + 1,
+			newLatch.ObjectMeta.Revision = &meta.Revision{
+				Num: oldLatch.ObjectMeta.Revision.Num + 1,
 			}
 		} else {
-			newLatch.Meta.Revision = oldLatch.Meta.Revision
+			newLatch.ObjectMeta.Revision = oldLatch.ObjectMeta.Revision
 		}
 	}
 
-	newLatch.Meta.Timestamp = &meta.Timestamp{
+	newLatch.ObjectMeta.Timestamp = &meta.Timestamp{
 		Timestamp: &meta.Timestamp_PhysicalTimestamp{
 			PhysicalTimestamp: &meta.PhysicalTimestamp{
 				Time: l.Timestamp(),
@@ -95,16 +98,17 @@ func (l *leaderService) updateLatch(newParticipants []string) (leader.Latch, err
 		},
 	}
 	l.latch = newLatch
-	err := l.notify(&leader.EventsOutput{
-		Latch: &newLatch,
+	err := l.notify(leaderapi.Event{
+		Type:  leaderapi.Event_CHANGE,
+		Latch: newLatch,
 	})
 	if err != nil {
-		return leader.Latch{}, err
+		return leaderapi.Latch{}, err
 	}
 	return newLatch, nil
 }
 
-func (l *leaderService) Latch(input *leader.LatchInput) (*leader.LatchOutput, error) {
+func (l *leaderService) Latch(input *leaderapi.LatchInput) (*leaderapi.LatchOutput, error) {
 	clientID := string(l.CurrentSession().ClientID())
 	participants := l.latch.Participants[:]
 	if !sliceContains(participants, clientID) {
@@ -116,30 +120,30 @@ func (l *leaderService) Latch(input *leader.LatchInput) (*leader.LatchOutput, er
 		return nil, err
 	}
 
-	return &leader.LatchOutput{
-		Latch: &latch,
+	return &leaderapi.LatchOutput{
+		Latch: latch,
 	}, nil
 }
 
-func (l *leaderService) Get(input *leader.GetInput) (*leader.GetOutput, error) {
-	return &leader.GetOutput{
-		Latch: &l.latch,
+func (l *leaderService) Get(input *leaderapi.GetInput) (*leaderapi.GetOutput, error) {
+	return &leaderapi.GetOutput{
+		Latch: l.latch,
 	}, nil
 }
 
-func (l *leaderService) Events(input *leader.EventsInput, stream ServiceEventsStream) error {
+func (l *leaderService) Events(input *leaderapi.EventsInput, stream ServiceEventsStream) error {
 	l.streams = append(l.streams, stream)
 	return nil
 }
 
-func (l *leaderService) Snapshot() (*leader.Snapshot, error) {
-	return &leader.Snapshot{
+func (l *leaderService) Snapshot() (*leaderapi.Snapshot, error) {
+	return &leaderapi.Snapshot{
 		Latch: &l.latch,
 	}, nil
 }
 
-func (l *leaderService) Restore(snapshot *leader.Snapshot) error {
-	l.latch = leader.Latch{}
+func (l *leaderService) Restore(snapshot *leaderapi.Snapshot) error {
+	l.latch = leaderapi.Latch{}
 	if snapshot.Latch != nil {
 		l.latch = *snapshot.Latch
 	}

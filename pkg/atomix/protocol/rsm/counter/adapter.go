@@ -12,13 +12,12 @@ import (
 const Type = "Counter"
 
 const (
-	setOp         = "Set"
-	getOp         = "Get"
-	incrementOp   = "Increment"
-	decrementOp   = "Decrement"
-	checkAndSetOp = "CheckAndSet"
-	snapshotOp    = "Snapshot"
-	restoreOp     = "Restore"
+	setOp       = "Set"
+	getOp       = "Get"
+	incrementOp = "Increment"
+	decrementOp = "Decrement"
+	snapshotOp  = "Snapshot"
+	restoreOp   = "Restore"
 )
 
 var newServiceFunc rsm.NewServiceFunc
@@ -53,7 +52,6 @@ func (s *ServiceAdaptor) init() {
 	s.RegisterUnaryOperation(getOp, s.get)
 	s.RegisterUnaryOperation(incrementOp, s.increment)
 	s.RegisterUnaryOperation(decrementOp, s.decrement)
-	s.RegisterUnaryOperation(checkAndSetOp, s.checkAndSet)
 	s.RegisterUnaryOperation(snapshotOp, s.snapshot)
 	s.RegisterUnaryOperation(restoreOp, s.restore)
 }
@@ -184,28 +182,6 @@ func (s *ServiceAdaptor) decrement(in []byte) ([]byte, error) {
 	}
 
 	output, err := s.rsm.Decrement(input)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-
-	out, err := proto.Marshal(output)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-	return out, nil
-}
-
-func (s *ServiceAdaptor) checkAndSet(in []byte) ([]byte, error) {
-	input := &counter.CheckAndSetInput{}
-	err := proto.Unmarshal(in, input)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-
-	output, err := s.rsm.CheckAndSet(input)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err

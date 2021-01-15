@@ -15,7 +15,7 @@
 package election
 
 import (
-	"github.com/atomix/api/go/atomix/primitive/election"
+	electionapi "github.com/atomix/api/go/atomix/primitive/election"
 	"github.com/atomix/api/go/atomix/primitive/meta"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
@@ -28,14 +28,13 @@ func init() {
 func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
 	return &electionService{
 		Service: rsm.NewService(scheduler, context),
-		term:    &election.Term{},
 	}
 }
 
 // electionService is a state machine for an election primitive
 type electionService struct {
 	rsm.Service
-	term    *election.Term
+	term    electionapi.Term
 	streams []ServiceEventsStream
 }
 
@@ -60,36 +59,39 @@ func (e *electionService) close(session rsm.Session) {
 	e.updateTerm(newCandidates)
 }
 
-func (e *electionService) notify(event *election.EventsOutput) error {
+func (e *electionService) notify(event electionapi.Event) error {
+	output := &electionapi.EventsOutput{
+		Event: event,
+	}
 	for _, stream := range e.streams {
-		if err := stream.Notify(event); err != nil {
+		if err := stream.Notify(output); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (e *electionService) updateTerm(newCandidates []string) (*election.Term, error) {
+func (e *electionService) updateTerm(newCandidates []string) (electionapi.Term, error) {
 	oldTerm := e.term
 	if slicesMatch(oldTerm.Candidates, newCandidates) {
 		return e.term, nil
 	}
 
-	newTerm := &election.Term{}
+	newTerm := electionapi.Term{}
 	if len(newCandidates) == 0 {
-		newTerm.Meta.Revision = oldTerm.Meta.Revision
+		newTerm.ObjectMeta.Revision = oldTerm.ObjectMeta.Revision
 	} else {
 		newTerm.Leader = newCandidates[0]
 		if oldTerm.Leader != newTerm.Leader {
-			newTerm.Meta.Revision = &meta.Revision{
-				Num: oldTerm.Meta.Revision.Num + 1,
+			newTerm.ObjectMeta.Revision = &meta.Revision{
+				Num: oldTerm.ObjectMeta.Revision.Num + 1,
 			}
 		} else {
-			newTerm.Meta.Revision = oldTerm.Meta.Revision
+			newTerm.ObjectMeta.Revision = oldTerm.ObjectMeta.Revision
 		}
 	}
 
-	newTerm.Meta.Timestamp = &meta.Timestamp{
+	newTerm.ObjectMeta.Timestamp = &meta.Timestamp{
 		Timestamp: &meta.Timestamp_PhysicalTimestamp{
 			PhysicalTimestamp: &meta.PhysicalTimestamp{
 				Time: e.Timestamp(),
@@ -97,16 +99,17 @@ func (e *electionService) updateTerm(newCandidates []string) (*election.Term, er
 		},
 	}
 	e.term = newTerm
-	err := e.notify(&election.EventsOutput{
+	err := e.notify(electionapi.Event{
+		Type: electionapi.Event_CHANGED,
 		Term: newTerm,
 	})
 	if err != nil {
-		return nil, err
+		return electionapi.Term{}, err
 	}
 	return newTerm, nil
 }
 
-func (e *electionService) Enter(input *election.EnterInput) (*election.EnterOutput, error) {
+func (e *electionService) Enter(input *electionapi.EnterInput) (*electionapi.EnterOutput, error) {
 	clientID := string(e.CurrentSession().ClientID())
 	candidates := e.term.Candidates[:]
 	if !sliceContains(candidates, clientID) {
@@ -118,12 +121,12 @@ func (e *electionService) Enter(input *election.EnterInput) (*election.EnterOutp
 		return nil, err
 	}
 
-	return &election.EnterOutput{
+	return &electionapi.EnterOutput{
 		Term: term,
 	}, nil
 }
 
-func (e *electionService) Withdraw(input *election.WithdrawInput) (*election.WithdrawOutput, error) {
+func (e *electionService) Withdraw(input *electionapi.WithdrawInput) (*electionapi.WithdrawOutput, error) {
 	clientID := string(e.CurrentSession().ClientID())
 	candidates := make([]string, 0, len(e.term.Candidates))
 	for _, candidate := range e.term.Candidates {
@@ -137,12 +140,12 @@ func (e *electionService) Withdraw(input *election.WithdrawInput) (*election.Wit
 		return nil, err
 	}
 
-	return &election.WithdrawOutput{
+	return &electionapi.WithdrawOutput{
 		Term: term,
 	}, nil
 }
 
-func (e *electionService) Anoint(input *election.AnointInput) (*election.AnointOutput, error) {
+func (e *electionService) Anoint(input *electionapi.AnointInput) (*electionapi.AnointOutput, error) {
 	clientID := string(e.CurrentSession().ClientID())
 	if !sliceContains(e.term.Candidates, clientID) {
 		return nil, errors.NewInvalid("not a candidate")
@@ -160,12 +163,12 @@ func (e *electionService) Anoint(input *election.AnointInput) (*election.AnointO
 	if err != nil {
 		return nil, err
 	}
-	return &election.AnointOutput{
+	return &electionapi.AnointOutput{
 		Term: term,
 	}, nil
 }
 
-func (e *electionService) Promote(input *election.PromoteInput) (*election.PromoteOutput, error) {
+func (e *electionService) Promote(input *electionapi.PromoteInput) (*electionapi.PromoteOutput, error) {
 	clientID := string(e.CurrentSession().ClientID())
 	if !sliceContains(e.term.Candidates, clientID) {
 		return nil, errors.NewInvalid("not a candidate")
@@ -197,12 +200,12 @@ func (e *electionService) Promote(input *election.PromoteInput) (*election.Promo
 	if err != nil {
 		return nil, err
 	}
-	return &election.PromoteOutput{
+	return &electionapi.PromoteOutput{
 		Term: term,
 	}, nil
 }
 
-func (e *electionService) Evict(input *election.EvictInput) (*election.EvictOutput, error) {
+func (e *electionService) Evict(input *electionapi.EvictInput) (*electionapi.EvictOutput, error) {
 	clientID := input.CandidateID
 	if !sliceContains(e.term.Candidates, clientID) {
 		return nil, errors.NewInvalid("not a candidate")
@@ -219,29 +222,29 @@ func (e *electionService) Evict(input *election.EvictInput) (*election.EvictOutp
 	if err != nil {
 		return nil, err
 	}
-	return &election.EvictOutput{
+	return &electionapi.EvictOutput{
 		Term: term,
 	}, nil
 }
 
-func (e *electionService) GetTerm(input *election.GetTermInput) (*election.GetTermOutput, error) {
-	return &election.GetTermOutput{
+func (e *electionService) GetTerm(input *electionapi.GetTermInput) (*electionapi.GetTermOutput, error) {
+	return &electionapi.GetTermOutput{
 		Term: e.term,
 	}, nil
 }
 
-func (e *electionService) Events(input *election.EventsInput, stream ServiceEventsStream) error {
+func (e *electionService) Events(input *electionapi.EventsInput, stream ServiceEventsStream) error {
 	e.streams = append(e.streams, stream)
 	return nil
 }
 
-func (e *electionService) Snapshot() (*election.Snapshot, error) {
-	return &election.Snapshot{
+func (e *electionService) Snapshot() (*electionapi.Snapshot, error) {
+	return &electionapi.Snapshot{
 		Term: e.term,
 	}, nil
 }
 
-func (e *electionService) Restore(snapshot *election.Snapshot) error {
+func (e *electionService) Restore(snapshot *electionapi.Snapshot) error {
 	e.term = snapshot.Term
 	return nil
 }

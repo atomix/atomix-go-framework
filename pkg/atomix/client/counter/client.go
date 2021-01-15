@@ -30,8 +30,6 @@ type Client interface {
 	Increment(context.Context, *counter.IncrementInput) (*counter.IncrementOutput, error)
 	// Decrement decrements the counter value
 	Decrement(context.Context, *counter.DecrementInput) (*counter.DecrementOutput, error)
-	// CheckAndSet performs a check-and-set operation on the counter value
-	CheckAndSet(context.Context, *counter.CheckAndSetInput) (*counter.CheckAndSetOutput, error)
 	// Snapshot exports a snapshot of the primitive state
 	Snapshot(context.Context) (*counter.Snapshot, error)
 	// Restore imports a snapshot of the primitive state
@@ -95,18 +93,6 @@ func (c *counterClient) Decrement(ctx context.Context, input *counter.DecrementI
 	}
 	request.Input = *input
 	response, err := c.client.Decrement(ctx, request)
-	if err != nil {
-		return nil, errors.From(err)
-	}
-	return &response.Output, nil
-}
-
-func (c *counterClient) CheckAndSet(ctx context.Context, input *counter.CheckAndSetInput) (*counter.CheckAndSetOutput, error) {
-	request := &counter.CheckAndSetRequest{
-		Header: c.getRequestHeader(),
-	}
-	request.Input = *input
-	response, err := c.client.CheckAndSet(ctx, request)
 	if err != nil {
 		return nil, errors.From(err)
 	}

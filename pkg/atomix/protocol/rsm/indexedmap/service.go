@@ -47,10 +47,6 @@ func (m *indexedMapService) Size() (*indexedmap.SizeOutput, error) {
 	panic("implement me")
 }
 
-func (m *indexedMapService) Exists(*indexedmap.ExistsInput) (*indexedmap.ExistsOutput, error) {
-	panic("implement me")
-}
-
 func (m *indexedMapService) Put(*indexedmap.PutInput) (*indexedmap.PutOutput, error) {
 	panic("implement me")
 }

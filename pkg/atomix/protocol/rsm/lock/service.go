@@ -48,7 +48,7 @@ func (l *lockService) Unlock(input *lock.UnlockInput) (*lock.UnlockOutput, error
 	panic("implement me")
 }
 
-func (l *lockService) IsLocked(input *lock.IsLockedInput) (*lock.IsLockedOutput, error) {
+func (l *lockService) GetLock(input *lock.GetLockInput) (*lock.GetLockOutput, error) {
 	panic("implement me")
 }
 

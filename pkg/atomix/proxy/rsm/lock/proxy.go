@@ -15,7 +15,7 @@ const Type = "Lock"
 const (
 	lockOp     = "Lock"
 	unlockOp   = "Unlock"
-	isLockedOp = "IsLocked"
+	getLockOp  = "GetLock"
 	snapshotOp = "Snapshot"
 	restoreOp  = "Restore"
 )
@@ -93,32 +93,32 @@ func (s *Proxy) Unlock(ctx context.Context, request *lock.UnlockRequest) (*lock.
 	return response, nil
 }
 
-func (s *Proxy) IsLocked(ctx context.Context, request *lock.IsLockedRequest) (*lock.IsLockedResponse, error) {
-	s.log.Debugf("Received IsLockedRequest %+v", request)
+func (s *Proxy) GetLock(ctx context.Context, request *lock.GetLockRequest) (*lock.GetLockResponse, error) {
+	s.log.Debugf("Received GetLockRequest %+v", request)
 
 	var err error
 	input := &request.Input
 	inputBytes, err := proto.Marshal(input)
 	if err != nil {
-		s.log.Errorf("Request IsLockedRequest failed: %v", err)
+		s.log.Errorf("Request GetLockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	header := request.Header
 	partition := s.PartitionFor(header.PrimitiveID)
-	outputBytes, err := partition.DoQuery(ctx, isLockedOp, inputBytes, request.Header)
+	outputBytes, err := partition.DoQuery(ctx, getLockOp, inputBytes, request.Header)
 	if err != nil {
-		s.log.Errorf("Request IsLockedRequest failed: %v", err)
+		s.log.Errorf("Request GetLockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
-	response := &lock.IsLockedResponse{}
+	response := &lock.GetLockResponse{}
 	output := &response.Output
 	err = proto.Unmarshal(outputBytes, output)
 	if err != nil {
-		s.log.Errorf("Request IsLockedRequest failed: %v", err)
+		s.log.Errorf("Request GetLockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	s.log.Debugf("Sending IsLockedResponse %+v", response)
+	s.log.Debugf("Sending GetLockResponse %+v", response)
 	return response, nil
 }
 

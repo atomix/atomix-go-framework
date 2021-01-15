@@ -25,8 +25,6 @@ type Client interface {
 	client.PrimitiveClient
 	// Size gets the number of elements in the list
 	Size(context.Context) (*list.SizeOutput, error)
-	// Contains returns whether the list contains a value
-	Contains(context.Context, *list.ContainsInput) (*list.ContainsOutput, error)
 	// Append appends a value to the list
 	Append(context.Context, *list.AppendInput) (*list.AppendOutput, error)
 	// Insert inserts a value at a specific index in the list
@@ -68,18 +66,6 @@ func (c *listClient) Size(ctx context.Context) (*list.SizeOutput, error) {
 		Header: c.getRequestHeader(),
 	}
 	response, err := c.client.Size(ctx, request)
-	if err != nil {
-		return nil, errors.From(err)
-	}
-	return &response.Output, nil
-}
-
-func (c *listClient) Contains(ctx context.Context, input *list.ContainsInput) (*list.ContainsOutput, error) {
-	request := &list.ContainsRequest{
-		Header: c.getRequestHeader(),
-	}
-	request.Input = *input
-	response, err := c.client.Contains(ctx, request)
 	if err != nil {
 		return nil, errors.From(err)
 	}

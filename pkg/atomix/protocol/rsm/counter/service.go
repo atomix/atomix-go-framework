@@ -37,10 +37,12 @@ type counterService struct {
 }
 
 func (c *counterService) Set(input *counter.SetInput) (*counter.SetOutput, error) {
-	prevValue := c.value
+	if err := checkPreconditions(c.value, input.Preconditions); err != nil {
+		return nil, err
+	}
 	c.value = input.Value
 	return &counter.SetOutput{
-		PreviousValue: prevValue,
+		Value: c.value,
 	}, nil
 }
 
@@ -51,29 +53,17 @@ func (c *counterService) Get(input *counter.GetInput) (*counter.GetOutput, error
 }
 
 func (c *counterService) Increment(input *counter.IncrementInput) (*counter.IncrementOutput, error) {
-	prevValue := c.value
 	c.value += input.Delta
 	return &counter.IncrementOutput{
-		PreviousValue: prevValue,
-		NextValue:     c.value,
+		Value: c.value,
 	}, nil
 }
 
 func (c *counterService) Decrement(input *counter.DecrementInput) (*counter.DecrementOutput, error) {
-	prevValue := c.value
 	c.value -= input.Delta
 	return &counter.DecrementOutput{
-		PreviousValue: prevValue,
-		NextValue:     c.value,
+		Value: c.value,
 	}, nil
-}
-
-func (c *counterService) CheckAndSet(input *counter.CheckAndSetInput) (*counter.CheckAndSetOutput, error) {
-	if c.value != input.Expect {
-		return nil, errors.NewConflict("optimistic lock failure")
-	}
-	c.value = input.Update
-	return &counter.CheckAndSetOutput{}, nil
 }
 
 func (c *counterService) Snapshot() (*counter.Snapshot, error) {
@@ -84,5 +74,17 @@ func (c *counterService) Snapshot() (*counter.Snapshot, error) {
 
 func (c *counterService) Restore(snapshot *counter.Snapshot) error {
 	c.value = snapshot.Value
+	return nil
+}
+
+func checkPreconditions(value int64, preconditions []counter.Precondition) error {
+	for _, precondition := range preconditions {
+		switch p := precondition.Precondition.(type) {
+		case *counter.Precondition_Value:
+			if value != p.Value {
+				return errors.NewConflict("value precondition failed")
+			}
+		}
+	}
 	return nil
 }

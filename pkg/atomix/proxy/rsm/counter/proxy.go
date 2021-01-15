@@ -13,13 +13,12 @@ import (
 const Type = "Counter"
 
 const (
-	setOp         = "Set"
-	getOp         = "Get"
-	incrementOp   = "Increment"
-	decrementOp   = "Decrement"
-	checkAndSetOp = "CheckAndSet"
-	snapshotOp    = "Snapshot"
-	restoreOp     = "Restore"
+	setOp       = "Set"
+	getOp       = "Get"
+	incrementOp = "Increment"
+	decrementOp = "Decrement"
+	snapshotOp  = "Snapshot"
+	restoreOp   = "Restore"
 )
 
 // RegisterProxy registers the primitive on the given node
@@ -150,35 +149,6 @@ func (s *Proxy) Decrement(ctx context.Context, request *counter.DecrementRequest
 		return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending DecrementResponse %+v", response)
-	return response, nil
-}
-
-func (s *Proxy) CheckAndSet(ctx context.Context, request *counter.CheckAndSetRequest) (*counter.CheckAndSetResponse, error) {
-	s.log.Debugf("Received CheckAndSetRequest %+v", request)
-
-	var err error
-	input := &request.Input
-	inputBytes, err := proto.Marshal(input)
-	if err != nil {
-		s.log.Errorf("Request CheckAndSetRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	header := request.Header
-	partition := s.PartitionFor(header.PrimitiveID)
-	outputBytes, err := partition.DoCommand(ctx, checkAndSetOp, inputBytes, request.Header)
-	if err != nil {
-		s.log.Errorf("Request CheckAndSetRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-
-	response := &counter.CheckAndSetResponse{}
-	output := &response.Output
-	err = proto.Unmarshal(outputBytes, output)
-	if err != nil {
-		s.log.Errorf("Request CheckAndSetRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	s.log.Debugf("Sending CheckAndSetResponse %+v", response)
 	return response, nil
 }
 

@@ -55,30 +55,9 @@ func (s *Proxy) Size(ctx context.Context, request *_map.SizeRequest) (*_map.Size
 	return response, nil
 }
 
-func (s *Proxy) Exists(ctx context.Context, request *_map.ExistsRequest) (*_map.ExistsResponse, error) {
-	s.log.Debugf("Received ExistsRequest %+v", request)
-	partitionKey := request.Input.Key
-	partition := s.PartitionBy([]byte(partitionKey))
-
-	conn, err := partition.Connect()
-	if err != nil {
-		return nil, err
-	}
-
-	client := _map.NewMapServiceClient(conn)
-	ctx = partition.AddHeader(ctx)
-	response, err := client.Exists(ctx, request)
-	if err != nil {
-		s.log.Errorf("Request ExistsRequest failed: %v", err)
-		return nil, err
-	}
-	s.log.Debugf("Sending ExistsResponse %+v", response)
-	return response, nil
-}
-
 func (s *Proxy) Put(ctx context.Context, request *_map.PutRequest) (*_map.PutResponse, error) {
 	s.log.Debugf("Received PutRequest %+v", request)
-	partitionKey := request.Input.Key
+	partitionKey := request.Input.Entry.Key
 	partition := s.PartitionBy([]byte(partitionKey))
 
 	conn, err := partition.Connect()

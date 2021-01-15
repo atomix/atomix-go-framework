@@ -109,27 +109,6 @@ func (s *Proxy) Decrement(ctx context.Context, request *counter.DecrementRequest
 	return response, nil
 }
 
-func (s *Proxy) CheckAndSet(ctx context.Context, request *counter.CheckAndSetRequest) (*counter.CheckAndSetResponse, error) {
-	s.log.Debugf("Received CheckAndSetRequest %+v", request)
-	header := request.Header
-	partition := s.PartitionFor(header.PrimitiveID)
-
-	conn, err := partition.Connect()
-	if err != nil {
-		return nil, err
-	}
-
-	client := counter.NewCounterServiceClient(conn)
-	ctx = partition.AddHeader(ctx)
-	response, err := client.CheckAndSet(ctx, request)
-	if err != nil {
-		s.log.Errorf("Request CheckAndSetRequest failed: %v", err)
-		return nil, err
-	}
-	s.log.Debugf("Sending CheckAndSetResponse %+v", response)
-	return response, nil
-}
-
 func (s *Proxy) Snapshot(ctx context.Context, request *counter.SnapshotRequest) (*counter.SnapshotResponse, error) {
 	s.log.Debugf("Received SnapshotRequest %+v", request)
 	header := request.Header

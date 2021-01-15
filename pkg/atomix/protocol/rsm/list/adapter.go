@@ -13,7 +13,6 @@ const Type = "List"
 
 const (
 	sizeOp     = "Size"
-	containsOp = "Contains"
 	appendOp   = "Append"
 	insertOp   = "Insert"
 	getOp      = "Get"
@@ -55,7 +54,6 @@ type ServiceAdaptor struct {
 
 func (s *ServiceAdaptor) init() {
 	s.RegisterUnaryOperation(sizeOp, s.size)
-	s.RegisterUnaryOperation(containsOp, s.contains)
 	s.RegisterUnaryOperation(appendOp, s.append)
 	s.RegisterUnaryOperation(insertOp, s.insert)
 	s.RegisterUnaryOperation(getOp, s.get)
@@ -121,28 +119,6 @@ func (s *ServiceAdaptor) Restore(reader io.Reader) error {
 
 func (s *ServiceAdaptor) size(in []byte) ([]byte, error) {
 	output, err := s.rsm.Size()
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-
-	out, err := proto.Marshal(output)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-	return out, nil
-}
-
-func (s *ServiceAdaptor) contains(in []byte) ([]byte, error) {
-	input := &list.ContainsInput{}
-	err := proto.Unmarshal(in, input)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-
-	output, err := s.rsm.Contains(input)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
