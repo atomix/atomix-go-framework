@@ -104,6 +104,32 @@ func (s *ProtocolServer) Gossip(stream MapProtocol_GossipServer) error {
 		}
 
 		log.Debugf("Received GossipMessage %+v", msg)
+		switch m := msg.Message.(type) {
+		case *GossipMessage_Advertisement:
+			request, err := service.Advertise(stream.Context(), m.Advertisement.Key, m.Advertisement.Digest)
+			if err != nil {
+				return err
+			}
+
+			if request {
+
+			}
+		case *GossipMessage_Update:
+			update, err := service.Update(stream.Context(), *m.Update)
+			if err != nil {
+				return err
+			}
+			if update != nil {
+				err := stream.Send(&GossipMessage{
+					Message: &GossipMessage_Update{
+						Update: update,
+					},
+				})
+				if err != nil {
+					return err
+				}
+			}
+		}
 	}
 }
 

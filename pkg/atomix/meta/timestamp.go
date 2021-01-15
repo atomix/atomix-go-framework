@@ -44,6 +44,7 @@ type Timestamp interface {
 	Before(Timestamp) bool
 	After(Timestamp) bool
 	Equal(Timestamp) bool
+	Proto() metaapi.Timestamp
 }
 
 type LogicalTime uint64
@@ -86,6 +87,16 @@ func (t LogicalTimestamp) Equal(u Timestamp) bool {
 		panic("not a logical timestamp")
 	}
 	return t.Time == v.Time
+}
+
+func (t LogicalTimestamp) Proto() metaapi.Timestamp {
+	return metaapi.Timestamp{
+		Timestamp: &metaapi.Timestamp_LogicalTimestamp{
+			LogicalTimestamp: &metaapi.LogicalTimestamp{
+				Time: metaapi.LogicalTime(t.Time),
+			},
+		},
+	}
 }
 
 func NewVectorTimestamp(times []LogicalTime, i int) Timestamp {
@@ -139,6 +150,20 @@ func (t VectorTimestamp) Equal(u Timestamp) bool {
 	return true
 }
 
+func (t VectorTimestamp) Proto() metaapi.Timestamp {
+	times := make([]metaapi.LogicalTime, len(t.Times))
+	for i, time := range t.Times {
+		times[i] = metaapi.LogicalTime(time)
+	}
+	return metaapi.Timestamp{
+		Timestamp: &metaapi.Timestamp_VectorTimestamp{
+			VectorTimestamp: &metaapi.VectorTimestamp{
+				Time: times,
+			},
+		},
+	}
+}
+
 type PhysicalTime time.Time
 
 func NewPhysicalTimestamp(time PhysicalTime) Timestamp {
@@ -173,6 +198,16 @@ func (t PhysicalTimestamp) Equal(u Timestamp) bool {
 		panic("not a wall clock timestamp")
 	}
 	return time.Time(t.Time).Equal(time.Time(v.Time))
+}
+
+func (t PhysicalTimestamp) Proto() metaapi.Timestamp {
+	return metaapi.Timestamp{
+		Timestamp: &metaapi.Timestamp_PhysicalTimestamp{
+			PhysicalTimestamp: &metaapi.PhysicalTimestamp{
+				Time: metaapi.PhysicalTime(t.Time),
+			},
+		},
+	}
 }
 
 type Epoch uint64
@@ -211,4 +246,19 @@ func (t EpochTimestamp) Equal(u Timestamp) bool {
 		panic("not an epoch timestamp")
 	}
 	return t.Epoch == v.Epoch && t.Time == v.Time
+}
+
+func (t EpochTimestamp) Proto() metaapi.Timestamp {
+	return metaapi.Timestamp{
+		Timestamp: &metaapi.Timestamp_EpochTimestamp{
+			EpochTimestamp: &metaapi.EpochTimestamp{
+				Epoch: metaapi.Epoch{
+					Num: metaapi.EpochNum(t.Epoch),
+				},
+				Sequence: metaapi.Sequence{
+					Num: metaapi.SequenceNum(t.Time),
+				},
+			},
+		},
+	}
 }

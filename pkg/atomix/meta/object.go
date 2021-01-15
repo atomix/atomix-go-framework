@@ -62,49 +62,8 @@ func (m ObjectMeta) Proto() metaapi.ObjectMeta {
 		}
 	}
 	if m.Timestamp != nil {
-		switch t := m.Timestamp.(type) {
-		case PhysicalTimestamp:
-			meta.Timestamp = &metaapi.Timestamp{
-				Timestamp: &metaapi.Timestamp_PhysicalTimestamp{
-					PhysicalTimestamp: &metaapi.PhysicalTimestamp{
-						Time: metaapi.PhysicalTime(t.Time),
-					},
-				},
-			}
-		case LogicalTimestamp:
-			meta.Timestamp = &metaapi.Timestamp{
-				Timestamp: &metaapi.Timestamp_LogicalTimestamp{
-					LogicalTimestamp: &metaapi.LogicalTimestamp{
-						Time: metaapi.LogicalTime(t.Time),
-					},
-				},
-			}
-		case VectorTimestamp:
-			times := make([]metaapi.LogicalTime, len(t.Times))
-			for i, time := range t.Times {
-				times[i] = metaapi.LogicalTime(time)
-			}
-			meta.Timestamp = &metaapi.Timestamp{
-				Timestamp: &metaapi.Timestamp_VectorTimestamp{
-					VectorTimestamp: &metaapi.VectorTimestamp{
-						Time: times,
-					},
-				},
-			}
-		case EpochTimestamp:
-			meta.Timestamp = &metaapi.Timestamp{
-				Timestamp: &metaapi.Timestamp_EpochTimestamp{
-					EpochTimestamp: &metaapi.EpochTimestamp{
-						Epoch: metaapi.Epoch{
-							Num: metaapi.EpochNum(t.Epoch),
-						},
-						Sequence: metaapi.Sequence{
-							Num: metaapi.SequenceNum(t.Time),
-						},
-					},
-				},
-			}
-		}
+		timestamp := m.Timestamp.Proto()
+		meta.Timestamp = &timestamp
 	}
 	return meta
 }
