@@ -5,7 +5,7 @@ import (
 	"context"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/atomix/go-framework/pkg/atomix/protocol/p2p"
+	"github.com/atomix/go-framework/pkg/atomix/protocol/crdt"
 	"google.golang.org/grpc"
 	{{- $added := false }}
 	{{- range .Primitive.Methods }}
@@ -36,19 +36,19 @@ import (
 )
 
 // Register{{ $server }} registers the primitive on the given node
-func Register{{ $server }}(node *p2p.Node) {
-	node.RegisterServer(func(server *grpc.Server, manager *p2p.Manager) {
+func Register{{ $server }}(node *crdt.Node) {
+	node.RegisterServer(func(server *grpc.Server, manager *crdt.Manager) {
 		{{ .Primitive.Type.Package.Alias }}.Register{{ .Primitive.Type.Name }}Server(server, new{{ $server }}(newManager(manager)))
 	})
 	node.RegisterServer(registerServerFunc)
 }
 
-var registerServerFunc p2p.RegisterServerFunc
+var registerServerFunc crdt.RegisterServerFunc
 
 func new{{ $server }}(manager *Manager) {{ .Primitive.Type.Package.Alias }}.{{ .Primitive.Type.Name }}Server {
 	return &{{ $server }}{
 		manager: manager,
-		log: logging.GetLogger("atomix", "protocol", "p2p", {{ .Primitive.Name | lower | quote }}),
+		log: logging.GetLogger("atomix", "protocol", "crdt", {{ .Primitive.Name | lower | quote }}),
 	}
 }
 

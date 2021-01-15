@@ -1,10 +1,10 @@
 package counter
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/protocol/p2p"
+	"github.com/atomix/go-framework/pkg/atomix/protocol/crdt"
 )
 
-func newPartition(parent *p2p.Partition) *Partition {
+func newPartition(parent *crdt.Partition) *Partition {
 	return &Partition{
 		ID:     parent.ID,
 		parent: parent,
@@ -13,8 +13,8 @@ func newPartition(parent *p2p.Partition) *Partition {
 
 // Partition is a partition
 type Partition struct {
-	ID     p2p.PartitionID
-	parent *p2p.Partition
+	ID     crdt.PartitionID
+	parent *crdt.Partition
 }
 
 // GetService gets the service

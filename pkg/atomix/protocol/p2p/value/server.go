@@ -92,13 +92,13 @@ func (s *Server) Events(request *value.EventsRequest, srv value.ValueService_Eve
 	partition, err := s.manager.PartitionFrom(srv.Context())
 	if err != nil {
 		s.log.Errorf("Request EventsRequest %+v failed: %v", request, err)
-		return nil, errors.Proto(err)
+		return errors.Proto(err)
 	}
 
 	service, err := partition.GetService(request.Header.PrimitiveID.Name)
 	if err != nil {
 		s.log.Errorf("Request EventsRequest %+v failed: %v", request, err)
-		return nil, errors.Proto(err)
+		return errors.Proto(err)
 	}
 	input := &request.Input
 	err = service.Events(srv.Context(), input, newServiceEventsStream(stream))

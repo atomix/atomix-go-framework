@@ -21,22 +21,22 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/meta"
-	"github.com/atomix/go-framework/pkg/atomix/protocol/p2p"
+	"github.com/atomix/go-framework/pkg/atomix/protocol/crdt"
 	"github.com/atomix/go-framework/pkg/atomix/util/async"
 	"google.golang.org/grpc"
 	"sync"
 	"time"
 )
 
-var log = logging.GetLogger("atomix", "protocol", "p2p", "counter")
+var log = logging.GetLogger("atomix", "protocol", "crdt", "counter")
 
 const gossipInterval = 100 * time.Millisecond
 
 func init() {
-	registerServerFunc = func(server *grpc.Server, manager *p2p.Manager) {
+	registerServerFunc = func(server *grpc.Server, manager *crdt.Manager) {
 		RegisterCounterProtocolServer(server, newProtocolServer(newManager(manager)))
 	}
-	newServiceFunc = func(name string, partition *cluster.Partition) p2p.Service {
+	newServiceFunc = func(name string, partition *cluster.Partition) crdt.Service {
 		return newService(name, partition)
 	}
 }

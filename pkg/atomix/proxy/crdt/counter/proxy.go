@@ -4,24 +4,24 @@ import (
 	"context"
 	counter "github.com/atomix/api/go/atomix/primitive/counter"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/atomix/go-framework/pkg/atomix/proxy/p2p"
+	"github.com/atomix/go-framework/pkg/atomix/proxy/crdt"
 	"google.golang.org/grpc"
 )
 
 const Type = "Counter"
 
 // RegisterProxy registers the primitive on the given node
-func RegisterProxy(node *p2p.Node) {
-	node.RegisterProxy(func(server *grpc.Server, client *p2p.Client) {
+func RegisterProxy(node *crdt.Node) {
+	node.RegisterProxy(func(server *grpc.Server, client *crdt.Client) {
 		counter.RegisterCounterServiceServer(server, &Proxy{
-			Proxy: p2p.NewProxy(client),
+			Proxy: crdt.NewProxy(client),
 			log:   logging.GetLogger("atomix", "counter"),
 		})
 	})
 }
 
 type Proxy struct {
-	*p2p.Proxy
+	*crdt.Proxy
 	log logging.Logger
 }
 

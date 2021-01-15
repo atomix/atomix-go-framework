@@ -3,20 +3,20 @@ package counter
 import (
 	"context"
 	counter "github.com/atomix/api/go/atomix/primitive/counter"
-	"github.com/atomix/go-framework/pkg/atomix/protocol/p2p"
+	"github.com/atomix/go-framework/pkg/atomix/protocol/crdt"
 )
 
-const ServiceType p2p.ServiceType = "Counter"
+const ServiceType crdt.ServiceType = "Counter"
 
 // RegisterService registers the service on the given node
-func RegisterService(node *p2p.Node) {
+func RegisterService(node *crdt.Node) {
 	node.RegisterService(ServiceType, newServiceFunc)
 }
 
-var newServiceFunc p2p.NewServiceFunc
+var newServiceFunc crdt.NewServiceFunc
 
 type Service interface {
-	p2p.Service
+	crdt.Service
 	// Set sets the counter value
 	Set(context.Context, *counter.SetInput) (*counter.SetOutput, error)
 	// Get gets the current counter value

@@ -5,24 +5,24 @@ import (
 	counter "github.com/atomix/api/go/atomix/primitive/counter"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/atomix/go-framework/pkg/atomix/protocol/p2p"
+	"github.com/atomix/go-framework/pkg/atomix/protocol/crdt"
 	"google.golang.org/grpc"
 )
 
 // RegisterServer registers the primitive on the given node
-func RegisterServer(node *p2p.Node) {
-	node.RegisterServer(func(server *grpc.Server, manager *p2p.Manager) {
+func RegisterServer(node *crdt.Node) {
+	node.RegisterServer(func(server *grpc.Server, manager *crdt.Manager) {
 		counter.RegisterCounterServiceServer(server, newServer(newManager(manager)))
 	})
 	node.RegisterServer(registerServerFunc)
 }
 
-var registerServerFunc p2p.RegisterServerFunc
+var registerServerFunc crdt.RegisterServerFunc
 
 func newServer(manager *Manager) counter.CounterServiceServer {
 	return &Server{
 		manager: manager,
-		log:     logging.GetLogger("atomix", "protocol", "p2p", "counter"),
+		log:     logging.GetLogger("atomix", "protocol", "crdt", "counter"),
 	}
 }
 

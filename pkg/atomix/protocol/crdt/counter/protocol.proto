@@ -16,12 +16,12 @@ limitations under the License.
 
 syntax = "proto3";
 
-package atomix.protocol.p2p.counter;
+package atomix.protocol.crdt.counter;
 
 import "gogoproto/gogo.proto";
 
 message RequestHeader {
-    uint32 partition_id = 1 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "github.com/atomix/go-framework/pkg/atomix/protocol/p2p.PartitionID"];
+    uint32 partition_id = 1 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "github.com/atomix/go-framework/pkg/atomix/protocol/crdt.PartitionID"];
     string service = 2;
 }
 

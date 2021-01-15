@@ -1,13 +1,13 @@
-package counter
+package {{ .Package.Name }}
 
 import (
-	"context"
+    "context"
 	"github.com/atomix/api/go/atomix/primitive"
-	"github.com/atomix/go-framework/pkg/atomix/protocol/p2p"
+	"github.com/atomix/go-framework/pkg/atomix/protocol/crdt"
 )
 
 // newManager creates a new manager
-func newManager(parent *p2p.Manager) *Manager {
+func newManager(parent *crdt.Manager) *Manager {
 	return &Manager{
 		parent: parent,
 	}
@@ -15,7 +15,7 @@ func newManager(parent *p2p.Manager) *Manager {
 
 // Manager is a primitive partition manager
 type Manager struct {
-	parent *p2p.Manager
+	parent *crdt.Manager
 }
 
 func (m *Manager) PartitionFrom(ctx context.Context) (*Partition, error) {
@@ -38,7 +38,7 @@ func (m *Manager) PartitionsFrom(ctx context.Context) ([]*Partition, error) {
 	return partitions, nil
 }
 
-func (m *Manager) Partition(partitionID p2p.PartitionID) (*Partition, error) {
+func (m *Manager) Partition(partitionID crdt.PartitionID) (*Partition, error) {
 	parent, err := m.parent.Partition(partitionID)
 	if err != nil {
 		return nil, err

@@ -38,6 +38,15 @@ func main() {
 			"service.go":   "/etc/atomix/templates/protocol/p2p/service.tpl",
 			"server.go":    "/etc/atomix/templates/protocol/p2p/server.tpl",
 		})).
+		RegisterModule(codegen.NewModule("proxy", "crdt", map[string]string{
+			"proxy.go": "/etc/atomix/templates/proxy/crdt/proxy.tpl",
+		})).
+		RegisterModule(codegen.NewModule("protocol", "crdt", map[string]string{
+			"manager.go":   "/etc/atomix/templates/protocol/crdt/manager.tpl",
+			"partition.go": "/etc/atomix/templates/protocol/crdt/partition.tpl",
+			"service.go":   "/etc/atomix/templates/protocol/crdt/service.tpl",
+			"server.go":    "/etc/atomix/templates/protocol/crdt/server.tpl",
+		})).
 		RegisterModule(codegen.NewModule("client", "", map[string]string{
 			"client.go": "/etc/atomix/templates/client/client.tpl",
 		})).
