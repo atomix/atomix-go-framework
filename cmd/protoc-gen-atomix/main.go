@@ -36,15 +36,6 @@ func main() {
 			"server.go":   "/etc/atomix/templates/protocol/gossip/server.tpl",
 			"protocol.go":  "/etc/atomix/templates/protocol/gossip/protocol.tpl",
 		})).
-		RegisterModule(codegen.NewModule("proxy", "crdt", map[string]string{
-			"proxy.go": "/etc/atomix/templates/proxy/crdt/proxy.tpl",
-		})).
-		RegisterModule(codegen.NewModule("protocol", "crdt", map[string]string{
-			"manager.go":   "/etc/atomix/templates/protocol/crdt/manager.tpl",
-			"partition.go": "/etc/atomix/templates/protocol/crdt/partition.tpl",
-			"service.go":   "/etc/atomix/templates/protocol/crdt/service.tpl",
-			"server.go":    "/etc/atomix/templates/protocol/crdt/server.tpl",
-		})).
 		RegisterPostProcessor(pgsgo.GoFmt()).
 		Render()
 }

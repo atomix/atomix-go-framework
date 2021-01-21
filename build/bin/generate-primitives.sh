@@ -32,10 +32,6 @@ protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomi
 protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/api/go/atomix/primitive/set,output_path=atomix/protocol/rsm/set,plugin=protocol,protocol=rsm:pkg               /go/src/github.com/atomix/api/proto/atomix/primitive/set/*.proto
 protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/api/go/atomix/primitive/value,output_path=atomix/protocol/rsm/value,plugin=protocol,protocol=rsm:pkg           /go/src/github.com/atomix/api/proto/atomix/primitive/value/*.proto
 
-protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/api/go/atomix/primitive/counter,output_path=atomix/proxy/crdt/counter,plugin=proxy,protocol=crdt:pkg /go/src/github.com/atomix/api/proto/atomix/primitive/counter/*.proto
-
-protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/api/go/atomix/primitive/counter,output_path=atomix/protocol/crdt/counter,plugin=protocol,protocol=crdt:pkg /go/src/github.com/atomix/api/proto/atomix/primitive/counter/*.proto
-
 protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/api/go/atomix/primitive/map,output_path=atomix/proxy/gossip/map,plugin=proxy,protocol=gossip:pkg         /go/src/github.com/atomix/api/proto/atomix/primitive/map/*.proto
 protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/api/go/atomix/primitive/value,output_path=atomix/proxy/gossip/value,plugin=proxy,protocol=gossip:pkg     /go/src/github.com/atomix/api/proto/atomix/primitive/value/*.proto
 
