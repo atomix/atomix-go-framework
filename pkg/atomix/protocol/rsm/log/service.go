@@ -99,14 +99,6 @@ func (l *logService) Entries(*log.EntriesRequest, ServiceEntriesStream) (rsm.Str
 	panic("implement me")
 }
 
-func (l *logService) Snapshot(writer ServiceSnapshotWriter) error {
-	panic("implement me")
-}
-
-func (l *logService) Restore(request *log.RestoreRequest) error {
-	panic("implement me")
-}
-
 // LinkedEntry is a doubly linked Entry
 type LinkedEntry struct {
 	*log.Entry

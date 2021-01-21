@@ -229,29 +229,6 @@ func (l *listService) Elements(input *listapi.ElementsRequest, stream ServiceEle
 	return nil, nil
 }
 
-func (l *listService) Snapshot(writer ServiceSnapshotWriter) error {
-	defer writer.Close()
-	for index, value := range l.items {
-		err := writer.Write(&listapi.SnapshotResponse{
-			Entry: listapi.SnapshotEntry{
-				Item: listapi.Item{
-					Index: uint32(index),
-					Value: value,
-				},
-			},
-		})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (l *listService) Restore(request *listapi.RestoreRequest) error {
-	l.items = append(l.items, request.Entry.Item.Value)
-	return nil
-}
-
 func checkPreconditions(value listapi.Value, preconditions []listapi.Precondition) error {
 	for _, precondition := range preconditions {
 		switch p := precondition.Precondition.(type) {

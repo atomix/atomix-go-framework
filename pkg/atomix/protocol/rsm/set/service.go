@@ -153,25 +153,3 @@ func (s *setService) Elements(request *setapi.ElementsRequest, stream ServiceEle
 	}
 	return nil, nil
 }
-
-func (s *setService) Snapshot(writer ServiceSnapshotWriter) error {
-	for value, object := range s.values {
-		err := writer.Write(&setapi.SnapshotResponse{
-			Entry: setapi.SnapshotEntry{
-				Element: setapi.Element{
-					ObjectMeta: object.Proto(),
-					Value:      value,
-				},
-			},
-		})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *setService) Restore(request *setapi.RestoreRequest) error {
-	s.values[request.Entry.Element.Value] = meta.New(request.Entry.Element.ObjectMeta)
-	return nil
-}

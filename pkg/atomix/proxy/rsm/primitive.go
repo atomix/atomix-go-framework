@@ -42,7 +42,7 @@ func (s *PrimitiveServer) Create(ctx context.Context, request *primitiveapi.Crea
 	s.log.Debugf("Received OpenRequest %+v", request)
 	partitions := s.Partitions()
 	err := async.IterAsync(len(partitions), func(i int) error {
-		return partitions[i].DoCreateService(ctx, request.Header)
+		return partitions[i].DoCreateService(ctx)
 	})
 	if err != nil {
 		s.log.Errorf("Request OpenRequest failed: %v", err)
@@ -57,7 +57,7 @@ func (s *PrimitiveServer) Close(ctx context.Context, request *primitiveapi.Close
 	s.log.Debugf("Received CloseRequest %+v", request)
 	partitions := s.Partitions()
 	err := async.IterAsync(len(partitions), func(i int) error {
-		return partitions[i].DoCloseService(ctx, request.Header)
+		return partitions[i].DoCloseService(ctx)
 	})
 	if err != nil {
 		s.log.Errorf("Request CloseRequest failed: %v", err)
@@ -72,7 +72,7 @@ func (s *PrimitiveServer) Delete(ctx context.Context, request *primitiveapi.Dele
 	s.log.Debugf("Received DeleteRequest %+v", request)
 	partitions := s.Partitions()
 	err := async.IterAsync(len(partitions), func(i int) error {
-		return partitions[i].DoDeleteService(ctx, request.Header)
+		return partitions[i].DoDeleteService(ctx)
 	})
 	if err != nil {
 		s.log.Errorf("Request DeleteRequest failed: %v", err)

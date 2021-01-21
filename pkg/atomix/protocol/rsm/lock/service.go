@@ -51,11 +51,3 @@ func (l *lockService) Unlock(input *lock.UnlockRequest) (*lock.UnlockResponse, e
 func (l *lockService) GetLock(input *lock.GetLockRequest) (*lock.GetLockResponse, error) {
 	panic("implement me")
 }
-
-func (l *lockService) Snapshot() (*lock.SnapshotResponse, error) {
-	panic("implement me")
-}
-
-func (l *lockService) Restore(request *lock.RestoreRequest) error {
-	panic("implement me")
-}

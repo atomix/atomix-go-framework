@@ -105,16 +105,3 @@ func (v *valueService) Events(input *valueapi.EventsRequest, stream ServiceEvent
 		delete(v.streams, stream.ID())
 	}, nil
 }
-
-func (v *valueService) Snapshot() (*valueapi.SnapshotResponse, error) {
-	return &valueapi.SnapshotResponse{
-		Snapshot: valueapi.Snapshot{
-			Value: v.value,
-		},
-	}, nil
-}
-
-func (v *valueService) Restore(snapshot *valueapi.RestoreRequest) error {
-	v.value = snapshot.Snapshot.Value
-	return nil
-}

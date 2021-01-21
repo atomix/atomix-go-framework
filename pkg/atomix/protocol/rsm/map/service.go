@@ -81,11 +81,3 @@ func (m *mapService) Events(input *_map.EventsRequest, stream ServiceEventsStrea
 func (m *mapService) Entries(input *_map.EntriesRequest, stream ServiceEntriesStream) (rsm.StreamCloser, error) {
 	panic("implement me")
 }
-
-func (m *mapService) Snapshot(writer ServiceSnapshotWriter) error {
-	panic("implement me")
-}
-
-func (m *mapService) Restore(request *_map.RestoreRequest) error {
-	panic("implement me")
-}
