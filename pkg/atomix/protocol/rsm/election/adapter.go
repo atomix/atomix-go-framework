@@ -4,9 +4,7 @@ import (
 	election "github.com/atomix/api/go/atomix/primitive/election"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
-	"io"
 )
 
 const Type = "Election"
@@ -19,8 +17,6 @@ const (
 	evictOp    = "Evict"
 	getTermOp  = "GetTerm"
 	eventsOp   = "Events"
-	snapshotOp = "Snapshot"
-	restoreOp  = "Restore"
 )
 
 var newServiceFunc rsm.NewServiceFunc
@@ -58,8 +54,6 @@ func (s *ServiceAdaptor) init() {
 	s.RegisterUnaryOperation(evictOp, s.evict)
 	s.RegisterUnaryOperation(getTermOp, s.getTerm)
 	s.RegisterStreamOperation(eventsOp, s.events)
-	s.RegisterUnaryOperation(snapshotOp, s.snapshot)
-	s.RegisterUnaryOperation(restoreOp, s.restore)
 }
 
 func (s *ServiceAdaptor) SessionOpen(session rsm.Session) {
@@ -80,215 +74,152 @@ func (s *ServiceAdaptor) SessionClosed(session rsm.Session) {
 	}
 }
 
-func (s *ServiceAdaptor) Backup(writer io.Writer) error {
-	snapshot, err := s.rsm.Snapshot()
+func (s *ServiceAdaptor) enter(input []byte) ([]byte, error) {
+	request := &election.EnterRequest{}
+	err := proto.Unmarshal(input, request)
 	if err != nil {
 		s.log.Error(err)
-		return err
+		return nil, err
 	}
-	bytes, err := proto.Marshal(snapshot)
+
+	response, err := s.rsm.Enter(request)
 	if err != nil {
 		s.log.Error(err)
-		return err
+		return nil, err
 	}
-	return util.WriteBytes(writer, bytes)
+
+	output, err := proto.Marshal(response)
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
+	}
+	return output, nil
 }
 
-func (s *ServiceAdaptor) Restore(reader io.Reader) error {
-	bytes, err := util.ReadBytes(reader)
+func (s *ServiceAdaptor) withdraw(input []byte) ([]byte, error) {
+	request := &election.WithdrawRequest{}
+	err := proto.Unmarshal(input, request)
 	if err != nil {
 		s.log.Error(err)
-		return err
+		return nil, err
 	}
-	snapshot := &election.Snapshot{}
-	err = proto.Unmarshal(bytes, snapshot)
-	if err != nil {
-		return err
-	}
-	err = s.rsm.Restore(snapshot)
+
+	response, err := s.rsm.Withdraw(request)
 	if err != nil {
 		s.log.Error(err)
-		return err
+		return nil, err
 	}
-	return nil
+
+	output, err := proto.Marshal(response)
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
+	}
+	return output, nil
 }
 
-func (s *ServiceAdaptor) enter(in []byte) ([]byte, error) {
-	input := &election.EnterInput{}
-	err := proto.Unmarshal(in, input)
+func (s *ServiceAdaptor) anoint(input []byte) ([]byte, error) {
+	request := &election.AnointRequest{}
+	err := proto.Unmarshal(input, request)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
 
-	output, err := s.rsm.Enter(input)
+	response, err := s.rsm.Anoint(request)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
 
-	out, err := proto.Marshal(output)
+	output, err := proto.Marshal(response)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
-	return out, nil
+	return output, nil
 }
 
-func (s *ServiceAdaptor) withdraw(in []byte) ([]byte, error) {
-	input := &election.WithdrawInput{}
-	err := proto.Unmarshal(in, input)
+func (s *ServiceAdaptor) promote(input []byte) ([]byte, error) {
+	request := &election.PromoteRequest{}
+	err := proto.Unmarshal(input, request)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
 
-	output, err := s.rsm.Withdraw(input)
+	response, err := s.rsm.Promote(request)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
 
-	out, err := proto.Marshal(output)
+	output, err := proto.Marshal(response)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
-	return out, nil
+	return output, nil
 }
 
-func (s *ServiceAdaptor) anoint(in []byte) ([]byte, error) {
-	input := &election.AnointInput{}
-	err := proto.Unmarshal(in, input)
+func (s *ServiceAdaptor) evict(input []byte) ([]byte, error) {
+	request := &election.EvictRequest{}
+	err := proto.Unmarshal(input, request)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
 
-	output, err := s.rsm.Anoint(input)
+	response, err := s.rsm.Evict(request)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
 
-	out, err := proto.Marshal(output)
+	output, err := proto.Marshal(response)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
-	return out, nil
+	return output, nil
 }
 
-func (s *ServiceAdaptor) promote(in []byte) ([]byte, error) {
-	input := &election.PromoteInput{}
-	err := proto.Unmarshal(in, input)
+func (s *ServiceAdaptor) getTerm(input []byte) ([]byte, error) {
+	request := &election.GetTermRequest{}
+	err := proto.Unmarshal(input, request)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
 
-	output, err := s.rsm.Promote(input)
+	response, err := s.rsm.GetTerm(request)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
 
-	out, err := proto.Marshal(output)
+	output, err := proto.Marshal(response)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
-	return out, nil
+	return output, nil
 }
 
-func (s *ServiceAdaptor) evict(in []byte) ([]byte, error) {
-	input := &election.EvictInput{}
-	err := proto.Unmarshal(in, input)
+func (s *ServiceAdaptor) events(input []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
+	request := &election.EventsRequest{}
+	err := proto.Unmarshal(input, request)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
-
-	output, err := s.rsm.Evict(input)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-
-	out, err := proto.Marshal(output)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-	return out, nil
-}
-
-func (s *ServiceAdaptor) getTerm(in []byte) ([]byte, error) {
-	input := &election.GetTermInput{}
-	err := proto.Unmarshal(in, input)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-
-	output, err := s.rsm.GetTerm(input)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-
-	out, err := proto.Marshal(output)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-	return out, nil
-}
-
-func (s *ServiceAdaptor) events(in []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
-	input := &election.EventsInput{}
-	err := proto.Unmarshal(in, input)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-	output := newServiceEventsStream(stream)
-	closer, err := s.rsm.Events(input, output)
+	response := newServiceEventsStream(stream)
+	closer, err := s.rsm.Events(request, response)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
 	return closer, nil
-}
-
-func (s *ServiceAdaptor) snapshot(in []byte) ([]byte, error) {
-	output, err := s.rsm.Snapshot()
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-
-	out, err := proto.Marshal(output)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-	return out, nil
-}
-
-func (s *ServiceAdaptor) restore(in []byte) ([]byte, error) {
-	input := &election.Snapshot{}
-	err := proto.Unmarshal(in, input)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-	err = s.rsm.Restore(input)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-	return nil, nil
 }
 
 var _ rsm.Service = &ServiceAdaptor{}

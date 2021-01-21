@@ -15,10 +15,17 @@
 package rsm
 
 import (
-	primitiveapi "github.com/atomix/api/go/atomix/primitive"
+	"context"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/atomix/go-framework/pkg/atomix/util/async"
+	"google.golang.org/grpc/metadata"
+)
+
+const (
+	primitiveTypeKey = "Primitive-Type"
+	primitiveNameKey = "Primitive-Name"
 )
 
 // NewClient creates a new proxy client
@@ -44,6 +51,26 @@ type Client struct {
 	partitionsByID map[PartitionID]*Partition
 }
 
+func (p *Client) getPrimitiveName(ctx context.Context) (string, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return "", errors.NewInvalid("no metadata found")
+	}
+	names := md.Get(primitiveNameKey)
+	if len(names) != 1 {
+		return "", errors.NewInvalid("no primitive name found")
+	}
+	return names[0], nil
+}
+
+func (p *Client) PartitionFrom(ctx context.Context) (*Partition, error) {
+	name, err := p.getPrimitiveName(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return p.PartitionBy([]byte(name)), nil
+}
+
 func (p *Client) Partition(partitionID PartitionID) *Partition {
 	return p.partitionsByID[partitionID]
 }
@@ -54,10 +81,6 @@ func (p *Client) PartitionBy(partitionKey []byte) *Partition {
 		panic(err)
 	}
 	return p.partitions[i]
-}
-
-func (p *Client) PartitionFor(primitiveID primitiveapi.PrimitiveId) *Partition {
-	return p.PartitionBy([]byte(primitiveID.String()))
 }
 
 func (p *Client) Partitions() []*Partition {

@@ -60,7 +60,7 @@ func (l *leaderService) close(session rsm.Session) {
 }
 
 func (l *leaderService) notify(event leaderapi.Event) error {
-	output := &leaderapi.EventsOutput{
+	output := &leaderapi.EventsResponse{
 		Event: event,
 	}
 	for _, stream := range l.streams {
@@ -109,7 +109,7 @@ func (l *leaderService) updateLatch(newParticipants []string) (leaderapi.Latch, 
 	return newLatch, nil
 }
 
-func (l *leaderService) Latch(input *leaderapi.LatchInput) (*leaderapi.LatchOutput, error) {
+func (l *leaderService) Latch(input *leaderapi.LatchRequest) (*leaderapi.LatchResponse, error) {
 	clientID := string(l.CurrentSession().ClientID())
 	participants := l.latch.Participants[:]
 	if !sliceContains(participants, clientID) {
@@ -121,36 +121,22 @@ func (l *leaderService) Latch(input *leaderapi.LatchInput) (*leaderapi.LatchOutp
 		return nil, err
 	}
 
-	return &leaderapi.LatchOutput{
+	return &leaderapi.LatchResponse{
 		Latch: latch,
 	}, nil
 }
 
-func (l *leaderService) Get(input *leaderapi.GetInput) (*leaderapi.GetOutput, error) {
-	return &leaderapi.GetOutput{
+func (l *leaderService) Get(input *leaderapi.GetRequest) (*leaderapi.GetResponse, error) {
+	return &leaderapi.GetResponse{
 		Latch: l.latch,
 	}, nil
 }
 
-func (l *leaderService) Events(input *leaderapi.EventsInput, stream ServiceEventsStream) (rsm.StreamCloser, error) {
+func (l *leaderService) Events(input *leaderapi.EventsRequest, stream ServiceEventsStream) (rsm.StreamCloser, error) {
 	l.streams[stream.ID()] = stream
 	return func() {
 		delete(l.streams, stream.ID())
 	}, nil
-}
-
-func (l *leaderService) Snapshot() (*leaderapi.Snapshot, error) {
-	return &leaderapi.Snapshot{
-		Latch: &l.latch,
-	}, nil
-}
-
-func (l *leaderService) Restore(snapshot *leaderapi.Snapshot) error {
-	l.latch = leaderapi.Latch{}
-	if snapshot.Latch != nil {
-		l.latch = *snapshot.Latch
-	}
-	return nil
 }
 
 func slicesMatch(s1, s2 []string) bool {

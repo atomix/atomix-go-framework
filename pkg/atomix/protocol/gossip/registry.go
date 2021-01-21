@@ -15,7 +15,6 @@
 package gossip
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"google.golang.org/grpc"
 )
@@ -24,7 +23,7 @@ import (
 type RegisterServerFunc func(server *grpc.Server, manager *Manager)
 
 // NewServiceFunc is a function for creating a service
-type NewServiceFunc func(name string, partition *cluster.Partition) Service
+type NewServiceFunc func(serviceID ServiceID, partition *Partition) (Service, error)
 
 // Registry is a primitive registry
 type Registry interface {

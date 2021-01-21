@@ -4,6 +4,7 @@ package {{ .Package.Name }}
 import (
 	"context"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/crdt"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"google.golang.org/grpc"
 	{{- $added := false }}
@@ -121,31 +122,26 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	{{- else if .Request.PartitionRange }}
 	partitionRange := {{ template "val" .Request.PartitionRange }}request{{ template "field" .Request.PartitionRange }}
 	{{- else }}
-	header := {{ template "val" .Request.Header }}request{{ template "field" .Request.Header }}
-	partition := s.PartitionFor(header.PrimitiveID)
+    partition, err := s.PartitionFrom(ctx)
+    if err != nil {
+        return nil, errors.Proto(err)
+    }
 	{{- end }}
 
 	conn, err := partition.Connect()
 	if err != nil {
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-	ctx = partition.AddHeader(ctx)
+	ctx = partition.AddHeaders(ctx)
 	response, err := client.{{ .Name }}(ctx, request)
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-	    return nil, err
+	    return nil, errors.Proto(err)
 	}
 	{{- else if .Scope.IsGlobal }}
 	partitions := s.Partitions()
-	{{- $outputs := false }}
-	{{- if .Response.Output }}
-    {{- range .Response.Output.Aggregates }}
-    {{- $outputs = true }}
-    {{- end }}
-    {{- end }}
-    {{- if $outputs }}
 	responses, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
         partition := partitions[i]
         conn, err := partition.Connect()
@@ -154,197 +150,31 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
             return nil, err
         }
         client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-        ctx = partition.AddHeader(ctx)
+        ctx = partition.AddHeaders(ctx)
 		return client.{{ .Name }}(ctx, request)
 	})
-	{{- else }}
-	err := async.IterAsync(len(partitions), func(i int) error {
-        partition := partitions[i]
-        conn, err := partition.Connect()
-        if err != nil {
-            s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-            return err
-        }
-        client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-        ctx = partition.AddHeader(ctx)
-		_, err = client.{{ .Name }}(ctx, request)
-		return err
-	})
-	{{- end }}
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-	    return nil, err
+	    return nil, errors.Proto(err)
 	}
 
-	response := &{{ template "type" .Response.Type }}{}
-    {{- if .Response.Output }}
-    {{- range .Response.Output.Aggregates }}
+	response := responses[0].(*{{ template "type" .Response.Type }})
+    {{- range .Response.Aggregates }}
     {{- if .IsChooseFirst }}
-    response{{ template "field" $method.Response.Output }}{{ template "field" . }} = responses[0].(*{{ template "type" $method.Response.Type }}){{ template "field" $method.Response.Output }}{{ template "field" . }}
+    response{{ template "field" . }} = responses[0].(*{{ template "type" $method.Response.Type }}){{ template "field" . }}
     {{- else if .IsAppend }}
     for _, r := range responses {
-        response{{ template "field" $method.Response.Output }}{{ template "field" . }} = append(response{{ template "field" $method.Response.Output }}{{ template "field" . }}, r.(*{{ template "type" $method.Response.Type }}){{ template "field" $method.Response.Output }}{{ template "field" . }}...)
+        response{{ template "field" . }} = append(response{{ template "field" . }}, r.(*{{ template "type" $method.Response.Type }}){{ template "field" . }}...)
     }
     {{- else if .IsSum }}
     for _, r := range responses {
-        response{{ template "field" $method.Response.Output }}{{ template "field" . }} += r.(*{{ template "type" $method.Response.Type }}){{ template "field" $method.Response.Output }}{{ template "field" . }}
+        response{{ template "field" . }} += r.(*{{ template "type" $method.Response.Type }}){{ template "field" . }}
     }
-    {{- end }}
     {{- end }}
     {{- end }}
 	{{- end }}
 	s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
 	return response, nil
-}
-{{ else if .Request.IsStream }}
-func (s *{{ $proxy }}) {{ .Name }}(srv {{ template "type" $primitive.Type }}_{{ .Name }}Server) error {
-    {{- if and .Scope.IsPartition (not .Request.PartitionKey) (not .Request.PartitionRange) }}
-    var stream {{ template "type" $primitive.Type }}_{{ .Name }}Client
-    {{- else if .Scope.IsGlobal }}
-    var streams map[crdt.PartitionID]{{ template "type" $primitive.Type }}_{{ .Name }}Client
-    {{- end }}
-    for {
-        request, err := srv.Recv()
-        if err == io.EOF {
-            {{- if and .Scope.IsPartition (not .Request.PartitionKey) (not .Request.PartitionRange) }}
-            if stream == nil {
-                return nil
-            }
-
-            response, err := stream.CloseAndRecv()
-            if err != nil {
-                s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-                return err
-            }
-            {{- else }}
-            if streams == nil {
-                return nil
-            }
-
-            responses := make([]*{{ template "type" $method.Response.Type }}, 0, len(streams))
-            for _, stream := range streams {
-                response, err := stream.CloseAndRecv()
-                if err != nil {
-                    s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-                    return err
-                }
-                responses = append(responses, response)
-            }
-            {{- $outputs := false }}
-            {{- if .Response.Output }}
-            {{- range .Response.Output.Aggregates }}
-            {{- $outputs = true }}
-            {{- end }}
-            {{- end }}
-            clients := make([]{{ template "type" $primitive.Type }}_{{ .Name }}Client, 0, len(streams))
-            for _, stream := range streams {
-                clients = append(clients, stream)
-            }
-            {{- if $outputs }}
-            responses, err := async.ExecuteAsync(len(clients), func(i int) (interface{}, error) {
-                return clients[i].CloseAndRecv()
-            })
-            {{- else }}
-            err := async.IterAsync(len(clients), func(i int) error {
-                _, err = clients[i].CloseAndRecv()
-                return err
-            })
-            {{- end }}
-            if err != nil {
-                s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-                return err
-            }
-
-            response := &{{ template "type" .Response.Type }}{}
-            {{- if .Response.Output }}
-            {{- range .Response.Output.Aggregates }}
-            {{- if .IsChooseFirst }}
-            response{{ template "field" $method.Response.Output }}{{ template "field" . }} = responses[0].(*{{ template "type" $method.Response.Type }}){{ template "field" $method.Response.Output }}{{ template "field" . }}
-            {{- else if .IsAppend }}
-            for _, r := range responses {
-                response{{ template "field" $method.Response.Output }}{{ template "field" . }} = append(response{{ template "field" $method.Response.Output }}{{ template "field" . }}, r.(*{{ template "type" $method.Response.Type }}){{ template "field" $method.Response.Output }}{{ template "field" . }}...)
-            }
-            {{- else if .IsSum }}
-            for _, r := range responses {
-                response{{ template "field" $method.Response.Output }}{{ template "field" . }} += r.(*{{ template "type" $method.Response.Type }}){{ template "field" $method.Response.Output }}{{ template "field" . }}
-            }
-            {{- end }}
-            {{- end }}
-            {{- end }}
-            {{- end }}
-            s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
-            return srv.SendAndClose(response)
-        } else if err != nil {
-            s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-            return err
-        }
-
-        s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
-        {{- if and .Scope.IsPartition (not .Request.PartitionKey) (not .Request.PartitionRange) }}
-        if stream == nil {
-            header := {{ template "val" .Request.Header }}request{{ template "field" .Request.Header }}
-            partition := s.PartitionFor(header.PrimitiveID)
-            conn, err := partition.Connect()
-            if err != nil {
-                return err
-            }
-            client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-            ctx := partition.AddHeader(srv.Context())
-            stream, err = client.{{ .Name }}(ctx)
-            if err != nil {
-                return err
-            }
-        }
-        {{- else }}
-        if streams == nil {
-            partitions := s.Partitions()
-            streams = make(map[crdt.PartitionID]{{ template "type" $primitive.Type }}_{{ .Name }}Client)
-            for _, partition := range partitions {
-                conn, err := partition.Connect()
-                if err != nil {
-                    return err
-                }
-                client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-                ctx := partition.AddHeader(srv.Context())
-                stream, err := client.{{ .Name }}(ctx)
-                if err != nil {
-                    return err
-                }
-                streams[partition.ID] = stream
-            }
-        }
-        {{- end }}
-
-        {{- if .Scope.IsPartition }}
-        {{- if .Request.PartitionKey }}
-        partitionKey := {{ template "val" .Request.PartitionKey }}request{{ template "field" .Request.PartitionKey }}
-        {{- if and .Request.PartitionKey.Field.Type.IsBytes (not .Request.PartitionKey.Field.Type.IsCast) }}
-        partition := streams[s.PartitionBy(partitionKey).ID]
-        {{- else }}
-        partition := streams[s.PartitionBy([]byte(partitionKey)).ID]
-        {{- end }}
-        {{- else if .Request.PartitionRange }}
-        partitionRange := {{ template "val" .Request.PartitionRange }}request{{ template "field" .Request.PartitionRange }}
-        partition := streams[s.PartitionByRange(partitionRange).ID]
-        {{- else }}
-        partition := stream
-        {{- end }}
-
-        err = partition.Send(request)
-        if err != nil {
-            s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-            return err
-        }
-        {{- else if .Scope.IsGlobal }}
-        for _, stream := range streams {
-            err := stream.Send(request)
-            if err != nil {
-                s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-                return err
-            }
-        }
-        {{- end }}
-    }
 }
 {{ else if .Response.IsStream }}
 func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }}, srv {{ template "type" $primitive.Type }}_{{ .Name }}Server) error {
@@ -360,22 +190,24 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	{{- else if .Request.PartitionRange }}
 	partitionRange := {{ template "val" .Request.PartitionRange }}request{{ template "field" .Request.PartitionRange }}
 	{{- else }}
-	header := {{ template "val" .Request.Header }}request{{ template "field" .Request.Header }}
-	partition := s.PartitionFor(header.PrimitiveID)
+    partition, err := s.PartitionFrom(srv.Context())
+    if err != nil {
+        return errors.Proto(err)
+    }
 	{{- end }}
 
 	conn, err := partition.Connect()
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-		return err
+		return errors.Proto(err)
 	}
 
 	client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-	ctx := partition.AddHeader(srv.Context())
+	ctx := partition.AddHeaders(srv.Context())
 	stream, err := client.{{ .Name }}(ctx, request)
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-		return err
+		return errors.Proto(err)
 	}
 
 	for {
@@ -385,7 +217,7 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 			return nil
 		} else if err != nil {
             s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-			return err
+			return errors.Proto(err)
 		}
 		s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
 		if err := srv.Send(response); err != nil {
@@ -406,7 +238,7 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
             return err
         }
         client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-        ctx := partition.AddHeader(srv.Context())
+        ctx := partition.AddHeaders(srv.Context())
         stream, err := client.{{ .Name }}(ctx, request)
         if err != nil {
             s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
@@ -430,7 +262,7 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
     })
     if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-        return err
+        return errors.Proto(err)
     }
 
     go func() {

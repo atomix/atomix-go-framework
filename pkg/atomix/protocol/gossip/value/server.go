@@ -2,26 +2,26 @@ package value
 
 import (
 	"context"
-	primitiveapi "github.com/atomix/api/go/atomix/primitive"
 	value "github.com/atomix/api/go/atomix/primitive/value"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
-	streams "github.com/atomix/go-framework/pkg/atomix/stream"
+	"github.com/atomix/go-framework/pkg/atomix/util/async"
 	"google.golang.org/grpc"
+	"sync"
 )
 
 // RegisterServer registers the primitive on the given node
 func RegisterServer(node *gossip.Node) {
 	node.RegisterServer(func(server *grpc.Server, manager *gossip.Manager) {
-		value.RegisterValueServiceServer(server, newServer(newManager(manager)))
+		value.RegisterValueServiceServer(server, newServer(manager))
 	})
 	node.RegisterServer(registerServerFunc)
 }
 
 var registerServerFunc gossip.RegisterServerFunc
 
-func newServer(manager *Manager) value.ValueServiceServer {
+func newServer(manager *gossip.Manager) value.ValueServiceServer {
 	return &Server{
 		manager: manager,
 		log:     logging.GetLogger("atomix", "protocol", "gossip", "value"),
@@ -29,7 +29,7 @@ func newServer(manager *Manager) value.ValueServiceServer {
 }
 
 type Server struct {
-	manager *Manager
+	manager *gossip.Manager
 	log     logging.Logger
 }
 
@@ -41,20 +41,17 @@ func (s *Server) Set(ctx context.Context, request *value.SetRequest) (*value.Set
 		return nil, err
 	}
 
-	service, err := partition.GetService(request.Header.PrimitiveID.Name)
-	if err != nil {
-		s.log.Errorf("Request SetRequest %+v failed: %v", request, err)
-		return nil, errors.Proto(err)
-	}
-	input := &request.Input
-	output, err := service.Set(ctx, input)
+	service, err := partition.ServiceFrom(ctx)
 	if err != nil {
 		s.log.Errorf("Request SetRequest %+v failed: %v", request, err)
 		return nil, errors.Proto(err)
 	}
 
-	response := &value.SetResponse{}
-	response.Output = *output
+	response, err := service.(Service).Set(ctx, request)
+	if err != nil {
+		s.log.Errorf("Request SetRequest %+v failed: %v", request, err)
+		return nil, errors.Proto(err)
+	}
 	s.log.Debugf("Sending SetResponse %+v", response)
 	return response, nil
 }
@@ -67,20 +64,17 @@ func (s *Server) Get(ctx context.Context, request *value.GetRequest) (*value.Get
 		return nil, err
 	}
 
-	service, err := partition.GetService(request.Header.PrimitiveID.Name)
-	if err != nil {
-		s.log.Errorf("Request GetRequest %+v failed: %v", request, err)
-		return nil, errors.Proto(err)
-	}
-	input := &request.Input
-	output, err := service.Get(ctx, input)
+	service, err := partition.ServiceFrom(ctx)
 	if err != nil {
 		s.log.Errorf("Request GetRequest %+v failed: %v", request, err)
 		return nil, errors.Proto(err)
 	}
 
-	response := &value.GetResponse{}
-	response.Output = *output
+	response, err := service.(Service).Get(ctx, request)
+	if err != nil {
+		s.log.Errorf("Request GetRequest %+v failed: %v", request, err)
+		return nil, errors.Proto(err)
+	}
 	s.log.Debugf("Sending GetResponse %+v", response)
 	return response, nil
 }
@@ -88,106 +82,72 @@ func (s *Server) Get(ctx context.Context, request *value.GetRequest) (*value.Get
 func (s *Server) Events(request *value.EventsRequest, srv value.ValueService_EventsServer) error {
 	s.log.Debugf("Received EventsRequest %+v", request)
 
-	stream := streams.NewBufferedStream()
-	partition, err := s.manager.PartitionFrom(srv.Context())
+	partitions, err := s.manager.PartitionsFrom(srv.Context())
 	if err != nil {
 		s.log.Errorf("Request EventsRequest %+v failed: %v", request, err)
 		return errors.Proto(err)
 	}
 
-	service, err := partition.GetService(request.Header.PrimitiveID.Name)
-	if err != nil {
-		s.log.Errorf("Request EventsRequest %+v failed: %v", request, err)
-		return errors.Proto(err)
-	}
-	input := &request.Input
-	err = service.Events(srv.Context(), input, newServiceEventsStream(stream))
+	responseCh := make(chan value.EventsResponse)
+	wg := &sync.WaitGroup{}
+	wg.Add(len(partitions))
+	err = async.IterAsync(len(partitions), func(i int) error {
+		partition := partitions[i]
+		service, err := partition.ServiceFrom(srv.Context())
+		if err != nil {
+			return err
+		}
+
+		partitionCh := make(chan value.EventsResponse)
+		errCh := make(chan error)
+		go func() {
+			err := service.(Service).Events(srv.Context(), request, partitionCh)
+			if err != nil {
+				errCh <- err
+			}
+		}()
+
+		defer wg.Done()
+		for {
+			select {
+			case response, ok := <-partitionCh:
+				if ok {
+					responseCh <- response
+				} else {
+					return nil
+				}
+			case err := <-errCh:
+				return err
+			}
+		}
+	})
 	if err != nil {
 		s.log.Errorf("Request EventsRequest %+v failed: %v", request, err)
 		return errors.Proto(err)
 	}
 
-	response := &value.EventsResponse{}
-	response.Header = primitiveapi.ResponseHeader{
-		ResponseType: primitiveapi.ResponseType_RESPONSE_STREAM,
-	}
-	err = srv.Send(response)
-	if err != nil {
-		s.log.Errorf("Request EventsRequest %+v failed: %v", request, err)
-		return errors.Proto(err)
-	}
+	go func() {
+		wg.Wait()
+		close(responseCh)
+	}()
 
 	for {
-		result, ok := stream.Receive()
-		if !ok {
-			break
+		select {
+		case response, ok := <-responseCh:
+			if ok {
+				s.log.Debugf("Sending EventsResponse %v", response)
+				err = srv.Send(&response)
+				if err != nil {
+					s.log.Errorf("Request EventsRequest %+v failed: %v", request, err)
+					return errors.Proto(err)
+				}
+			} else {
+				s.log.Debugf("Finished EventsRequest %+v", request)
+				return nil
+			}
+		case <-srv.Context().Done():
+			s.log.Debugf("Finished EventsRequest %+v", request)
+			return nil
 		}
-
-		if result.Failed() {
-			s.log.Errorf("Request EventsRequest %+v failed: %v", request, result.Error)
-			return errors.Proto(result.Error)
-		}
-
-		response := &value.EventsResponse{}
-		response.Output = *result.Value.(*value.EventsOutput)
-
-		err = srv.Send(response)
-		if err != nil {
-			s.log.Errorf("Request EventsRequest %+v failed: %v", request, err)
-			return errors.Proto(err)
-		}
 	}
-
-	s.log.Debugf("Finished EventsRequest %+v", request)
-	return nil
-}
-
-func (s *Server) Snapshot(ctx context.Context, request *value.SnapshotRequest) (*value.SnapshotResponse, error) {
-	s.log.Debugf("Received SnapshotRequest %+v", request)
-	partition, err := s.manager.PartitionFrom(ctx)
-	if err != nil {
-		s.log.Errorf("Request SnapshotRequest %+v failed: %v", request, err)
-		return nil, err
-	}
-
-	service, err := partition.GetService(request.Header.PrimitiveID.Name)
-	if err != nil {
-		s.log.Errorf("Request SnapshotRequest %+v failed: %v", request, err)
-		return nil, errors.Proto(err)
-	}
-	output, err := service.Snapshot(ctx)
-	if err != nil {
-		s.log.Errorf("Request SnapshotRequest %+v failed: %v", request, err)
-		return nil, errors.Proto(err)
-	}
-
-	response := &value.SnapshotResponse{}
-	response.Snapshot = *output
-	s.log.Debugf("Sending SnapshotResponse %+v", response)
-	return response, nil
-}
-
-func (s *Server) Restore(ctx context.Context, request *value.RestoreRequest) (*value.RestoreResponse, error) {
-	s.log.Debugf("Received RestoreRequest %+v", request)
-	partition, err := s.manager.PartitionFrom(ctx)
-	if err != nil {
-		s.log.Errorf("Request RestoreRequest %+v failed: %v", request, err)
-		return nil, err
-	}
-
-	service, err := partition.GetService(request.Header.PrimitiveID.Name)
-	if err != nil {
-		s.log.Errorf("Request RestoreRequest %+v failed: %v", request, err)
-		return nil, errors.Proto(err)
-	}
-	input := &request.Snapshot
-	err = service.Restore(ctx, input)
-	if err != nil {
-		s.log.Errorf("Request RestoreRequest %+v failed: %v", request, err)
-		return nil, errors.Proto(err)
-	}
-
-	response := &value.RestoreResponse{}
-	s.log.Debugf("Sending RestoreResponse %+v", response)
-	return response, nil
 }

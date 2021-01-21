@@ -61,7 +61,7 @@ func (e *electionService) close(session rsm.Session) {
 }
 
 func (e *electionService) notify(event electionapi.Event) error {
-	output := &electionapi.EventsOutput{
+	output := &electionapi.EventsResponse{
 		Event: event,
 	}
 	for _, stream := range e.streams {
@@ -110,7 +110,7 @@ func (e *electionService) updateTerm(newCandidates []string) (electionapi.Term, 
 	return newTerm, nil
 }
 
-func (e *electionService) Enter(input *electionapi.EnterInput) (*electionapi.EnterOutput, error) {
+func (e *electionService) Enter(input *electionapi.EnterRequest) (*electionapi.EnterResponse, error) {
 	clientID := string(e.CurrentSession().ClientID())
 	candidates := e.term.Candidates[:]
 	if !sliceContains(candidates, clientID) {
@@ -122,12 +122,12 @@ func (e *electionService) Enter(input *electionapi.EnterInput) (*electionapi.Ent
 		return nil, err
 	}
 
-	return &electionapi.EnterOutput{
+	return &electionapi.EnterResponse{
 		Term: term,
 	}, nil
 }
 
-func (e *electionService) Withdraw(input *electionapi.WithdrawInput) (*electionapi.WithdrawOutput, error) {
+func (e *electionService) Withdraw(input *electionapi.WithdrawRequest) (*electionapi.WithdrawResponse, error) {
 	clientID := string(e.CurrentSession().ClientID())
 	candidates := make([]string, 0, len(e.term.Candidates))
 	for _, candidate := range e.term.Candidates {
@@ -141,12 +141,12 @@ func (e *electionService) Withdraw(input *electionapi.WithdrawInput) (*electiona
 		return nil, err
 	}
 
-	return &electionapi.WithdrawOutput{
+	return &electionapi.WithdrawResponse{
 		Term: term,
 	}, nil
 }
 
-func (e *electionService) Anoint(input *electionapi.AnointInput) (*electionapi.AnointOutput, error) {
+func (e *electionService) Anoint(input *electionapi.AnointRequest) (*electionapi.AnointResponse, error) {
 	clientID := string(e.CurrentSession().ClientID())
 	if !sliceContains(e.term.Candidates, clientID) {
 		return nil, errors.NewInvalid("not a candidate")
@@ -164,12 +164,12 @@ func (e *electionService) Anoint(input *electionapi.AnointInput) (*electionapi.A
 	if err != nil {
 		return nil, err
 	}
-	return &electionapi.AnointOutput{
+	return &electionapi.AnointResponse{
 		Term: term,
 	}, nil
 }
 
-func (e *electionService) Promote(input *electionapi.PromoteInput) (*electionapi.PromoteOutput, error) {
+func (e *electionService) Promote(input *electionapi.PromoteRequest) (*electionapi.PromoteResponse, error) {
 	clientID := string(e.CurrentSession().ClientID())
 	if !sliceContains(e.term.Candidates, clientID) {
 		return nil, errors.NewInvalid("not a candidate")
@@ -201,12 +201,12 @@ func (e *electionService) Promote(input *electionapi.PromoteInput) (*electionapi
 	if err != nil {
 		return nil, err
 	}
-	return &electionapi.PromoteOutput{
+	return &electionapi.PromoteResponse{
 		Term: term,
 	}, nil
 }
 
-func (e *electionService) Evict(input *electionapi.EvictInput) (*electionapi.EvictOutput, error) {
+func (e *electionService) Evict(input *electionapi.EvictRequest) (*electionapi.EvictResponse, error) {
 	clientID := input.CandidateID
 	if !sliceContains(e.term.Candidates, clientID) {
 		return nil, errors.NewInvalid("not a candidate")
@@ -223,33 +223,22 @@ func (e *electionService) Evict(input *electionapi.EvictInput) (*electionapi.Evi
 	if err != nil {
 		return nil, err
 	}
-	return &electionapi.EvictOutput{
+	return &electionapi.EvictResponse{
 		Term: term,
 	}, nil
 }
 
-func (e *electionService) GetTerm(input *electionapi.GetTermInput) (*electionapi.GetTermOutput, error) {
-	return &electionapi.GetTermOutput{
+func (e *electionService) GetTerm(input *electionapi.GetTermRequest) (*electionapi.GetTermResponse, error) {
+	return &electionapi.GetTermResponse{
 		Term: e.term,
 	}, nil
 }
 
-func (e *electionService) Events(input *electionapi.EventsInput, stream ServiceEventsStream) (rsm.StreamCloser, error) {
+func (e *electionService) Events(input *electionapi.EventsRequest, stream ServiceEventsStream) (rsm.StreamCloser, error) {
 	e.streams[stream.ID()] = stream
 	return func() {
 		delete(e.streams, stream.ID())
 	}, nil
-}
-
-func (e *electionService) Snapshot() (*electionapi.Snapshot, error) {
-	return &electionapi.Snapshot{
-		Term: e.term,
-	}, nil
-}
-
-func (e *electionService) Restore(snapshot *electionapi.Snapshot) error {
-	e.term = snapshot.Term
-	return nil
 }
 
 func slicesMatch(s1, s2 []string) bool {

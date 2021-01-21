@@ -21,8 +21,6 @@ const (
 	evictOp    = "Evict"
 	getTermOp  = "GetTerm"
 	eventsOp   = "Events"
-	snapshotOp = "Snapshot"
-	restoreOp  = "Restore"
 )
 
 // RegisterProxy registers the primitive on the given node
@@ -42,25 +40,24 @@ type Proxy struct {
 
 func (s *Proxy) Enter(ctx context.Context, request *election.EnterRequest) (*election.EnterResponse, error) {
 	s.log.Debugf("Received EnterRequest %+v", request)
-
-	var err error
-	input := &request.Input
-	inputBytes, err := proto.Marshal(input)
+	input, err := proto.Marshal(request)
 	if err != nil {
 		s.log.Errorf("Request EnterRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	header := request.Header
-	partition := s.PartitionFor(header.PrimitiveID)
-	outputBytes, err := partition.DoCommand(ctx, enterOp, inputBytes, request.Header)
+	partition, err := s.PartitionFrom(ctx)
+	if err != nil {
+		return nil, errors.Proto(err)
+	}
+
+	output, err := partition.DoCommand(ctx, enterOp, input)
 	if err != nil {
 		s.log.Errorf("Request EnterRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &election.EnterResponse{}
-	output := &response.Output
-	err = proto.Unmarshal(outputBytes, output)
+	err = proto.Unmarshal(output, response)
 	if err != nil {
 		s.log.Errorf("Request EnterRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -71,25 +68,24 @@ func (s *Proxy) Enter(ctx context.Context, request *election.EnterRequest) (*ele
 
 func (s *Proxy) Withdraw(ctx context.Context, request *election.WithdrawRequest) (*election.WithdrawResponse, error) {
 	s.log.Debugf("Received WithdrawRequest %+v", request)
-
-	var err error
-	input := &request.Input
-	inputBytes, err := proto.Marshal(input)
+	input, err := proto.Marshal(request)
 	if err != nil {
 		s.log.Errorf("Request WithdrawRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	header := request.Header
-	partition := s.PartitionFor(header.PrimitiveID)
-	outputBytes, err := partition.DoCommand(ctx, withdrawOp, inputBytes, request.Header)
+	partition, err := s.PartitionFrom(ctx)
+	if err != nil {
+		return nil, errors.Proto(err)
+	}
+
+	output, err := partition.DoCommand(ctx, withdrawOp, input)
 	if err != nil {
 		s.log.Errorf("Request WithdrawRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &election.WithdrawResponse{}
-	output := &response.Output
-	err = proto.Unmarshal(outputBytes, output)
+	err = proto.Unmarshal(output, response)
 	if err != nil {
 		s.log.Errorf("Request WithdrawRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -100,25 +96,24 @@ func (s *Proxy) Withdraw(ctx context.Context, request *election.WithdrawRequest)
 
 func (s *Proxy) Anoint(ctx context.Context, request *election.AnointRequest) (*election.AnointResponse, error) {
 	s.log.Debugf("Received AnointRequest %+v", request)
-
-	var err error
-	input := &request.Input
-	inputBytes, err := proto.Marshal(input)
+	input, err := proto.Marshal(request)
 	if err != nil {
 		s.log.Errorf("Request AnointRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	header := request.Header
-	partition := s.PartitionFor(header.PrimitiveID)
-	outputBytes, err := partition.DoCommand(ctx, anointOp, inputBytes, request.Header)
+	partition, err := s.PartitionFrom(ctx)
+	if err != nil {
+		return nil, errors.Proto(err)
+	}
+
+	output, err := partition.DoCommand(ctx, anointOp, input)
 	if err != nil {
 		s.log.Errorf("Request AnointRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &election.AnointResponse{}
-	output := &response.Output
-	err = proto.Unmarshal(outputBytes, output)
+	err = proto.Unmarshal(output, response)
 	if err != nil {
 		s.log.Errorf("Request AnointRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -129,25 +124,24 @@ func (s *Proxy) Anoint(ctx context.Context, request *election.AnointRequest) (*e
 
 func (s *Proxy) Promote(ctx context.Context, request *election.PromoteRequest) (*election.PromoteResponse, error) {
 	s.log.Debugf("Received PromoteRequest %+v", request)
-
-	var err error
-	input := &request.Input
-	inputBytes, err := proto.Marshal(input)
+	input, err := proto.Marshal(request)
 	if err != nil {
 		s.log.Errorf("Request PromoteRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	header := request.Header
-	partition := s.PartitionFor(header.PrimitiveID)
-	outputBytes, err := partition.DoCommand(ctx, promoteOp, inputBytes, request.Header)
+	partition, err := s.PartitionFrom(ctx)
+	if err != nil {
+		return nil, errors.Proto(err)
+	}
+
+	output, err := partition.DoCommand(ctx, promoteOp, input)
 	if err != nil {
 		s.log.Errorf("Request PromoteRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &election.PromoteResponse{}
-	output := &response.Output
-	err = proto.Unmarshal(outputBytes, output)
+	err = proto.Unmarshal(output, response)
 	if err != nil {
 		s.log.Errorf("Request PromoteRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -158,25 +152,24 @@ func (s *Proxy) Promote(ctx context.Context, request *election.PromoteRequest) (
 
 func (s *Proxy) Evict(ctx context.Context, request *election.EvictRequest) (*election.EvictResponse, error) {
 	s.log.Debugf("Received EvictRequest %+v", request)
-
-	var err error
-	input := &request.Input
-	inputBytes, err := proto.Marshal(input)
+	input, err := proto.Marshal(request)
 	if err != nil {
 		s.log.Errorf("Request EvictRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	header := request.Header
-	partition := s.PartitionFor(header.PrimitiveID)
-	outputBytes, err := partition.DoCommand(ctx, evictOp, inputBytes, request.Header)
+	partition, err := s.PartitionFrom(ctx)
+	if err != nil {
+		return nil, errors.Proto(err)
+	}
+
+	output, err := partition.DoCommand(ctx, evictOp, input)
 	if err != nil {
 		s.log.Errorf("Request EvictRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &election.EvictResponse{}
-	output := &response.Output
-	err = proto.Unmarshal(outputBytes, output)
+	err = proto.Unmarshal(output, response)
 	if err != nil {
 		s.log.Errorf("Request EvictRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -187,25 +180,24 @@ func (s *Proxy) Evict(ctx context.Context, request *election.EvictRequest) (*ele
 
 func (s *Proxy) GetTerm(ctx context.Context, request *election.GetTermRequest) (*election.GetTermResponse, error) {
 	s.log.Debugf("Received GetTermRequest %+v", request)
-
-	var err error
-	input := &request.Input
-	inputBytes, err := proto.Marshal(input)
+	input, err := proto.Marshal(request)
 	if err != nil {
 		s.log.Errorf("Request GetTermRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	header := request.Header
-	partition := s.PartitionFor(header.PrimitiveID)
-	outputBytes, err := partition.DoQuery(ctx, getTermOp, inputBytes, request.Header)
+	partition, err := s.PartitionFrom(ctx)
+	if err != nil {
+		return nil, errors.Proto(err)
+	}
+
+	output, err := partition.DoQuery(ctx, getTermOp, input)
 	if err != nil {
 		s.log.Errorf("Request GetTermRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &election.GetTermResponse{}
-	output := &response.Output
-	err = proto.Unmarshal(outputBytes, output)
+	err = proto.Unmarshal(output, response)
 	if err != nil {
 		s.log.Errorf("Request GetTermRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -216,20 +208,19 @@ func (s *Proxy) GetTerm(ctx context.Context, request *election.GetTermRequest) (
 
 func (s *Proxy) Events(request *election.EventsRequest, srv election.LeaderElectionService_EventsServer) error {
 	s.log.Debugf("Received EventsRequest %+v", request)
-
-	var err error
-	input := &request.Input
-	inputBytes, err := proto.Marshal(input)
+	input, err := proto.Marshal(request)
 	if err != nil {
 		s.log.Errorf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
 	stream := streams.NewBufferedStream()
-	header := request.Header
-	partition := s.PartitionFor(header.PrimitiveID)
+	partition, err := s.PartitionFrom(srv.Context())
+	if err != nil {
+		return errors.Proto(err)
+	}
 
-	err = partition.DoCommandStream(srv.Context(), eventsOp, inputBytes, request.Header, stream)
+	err = partition.DoCommandStream(srv.Context(), eventsOp, input, stream)
 	if err != nil {
 		s.log.Errorf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
@@ -246,13 +237,8 @@ func (s *Proxy) Events(request *election.EventsRequest, srv election.LeaderElect
 			return errors.Proto(result.Error)
 		}
 
-		sessionOutput := result.Value.(rsm.SessionOutput)
-		response := &election.EventsResponse{
-			Header: sessionOutput.Header,
-		}
-		outputBytes := sessionOutput.Value.([]byte)
-		output := &response.Output
-		err = proto.Unmarshal(outputBytes, output)
+		response := &election.EventsResponse{}
+		err = proto.Unmarshal(result.Value.([]byte), response)
 		if err != nil {
 			s.log.Errorf("Request EventsRequest failed: %v", err)
 			return errors.Proto(err)
@@ -266,51 +252,4 @@ func (s *Proxy) Events(request *election.EventsRequest, srv election.LeaderElect
 	}
 	s.log.Debugf("Finished EventsRequest %+v", request)
 	return nil
-}
-
-func (s *Proxy) Snapshot(ctx context.Context, request *election.SnapshotRequest) (*election.SnapshotResponse, error) {
-	s.log.Debugf("Received SnapshotRequest %+v", request)
-
-	var err error
-	var inputBytes []byte
-	header := request.Header
-	partition := s.PartitionFor(header.PrimitiveID)
-	outputBytes, err := partition.DoCommand(ctx, snapshotOp, inputBytes, request.Header)
-	if err != nil {
-		s.log.Errorf("Request SnapshotRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-
-	response := &election.SnapshotResponse{}
-	output := &response.Snapshot
-	err = proto.Unmarshal(outputBytes, output)
-	if err != nil {
-		s.log.Errorf("Request SnapshotRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	s.log.Debugf("Sending SnapshotResponse %+v", response)
-	return response, nil
-}
-
-func (s *Proxy) Restore(ctx context.Context, request *election.RestoreRequest) (*election.RestoreResponse, error) {
-	s.log.Debugf("Received RestoreRequest %+v", request)
-
-	var err error
-	input := &request.Snapshot
-	inputBytes, err := proto.Marshal(input)
-	if err != nil {
-		s.log.Errorf("Request RestoreRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	header := request.Header
-	partition := s.PartitionFor(header.PrimitiveID)
-	_, err = partition.DoCommand(ctx, restoreOp, inputBytes, request.Header)
-	if err != nil {
-		s.log.Errorf("Request RestoreRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-
-	response := &election.RestoreResponse{}
-	s.log.Debugf("Sending RestoreResponse %+v", response)
-	return response, nil
 }

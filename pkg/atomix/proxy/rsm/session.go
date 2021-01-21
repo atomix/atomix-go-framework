@@ -16,10 +16,11 @@ package rsm
 
 import (
 	"context"
-	primitiveapi "github.com/atomix/api/go/atomix/primitive"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/google/uuid"
+	"google.golang.org/grpc/metadata"
 	"sync"
 	"time"
 )
@@ -81,9 +82,12 @@ type Session struct {
 }
 
 // DoCommand submits a command to the service
-func (s *Session) DoCommand(ctx context.Context, name string, input []byte, header primitiveapi.RequestHeader) ([]byte, error) {
-	service := getService(header.PrimitiveID)
-	requestContext := s.nextCommandContext(header.PrimitiveID)
+func (s *Session) DoCommand(ctx context.Context, name string, input []byte) ([]byte, error) {
+	service, err := getService(ctx)
+	if err != nil {
+		return nil, err
+	}
+	requestContext := s.nextCommandContext()
 	response, responseStatus, responseContext, err := s.Partition.doCommand(ctx, name, input, service, requestContext)
 	if err != nil {
 		return nil, err
@@ -96,12 +100,15 @@ func (s *Session) DoCommand(ctx context.Context, name string, input []byte, head
 }
 
 // DoCommandStream submits a streaming command to the service
-func (s *Session) DoCommandStream(ctx context.Context, name string, input []byte, header primitiveapi.RequestHeader, outStream streams.WriteStream) error {
-	service := getService(header.PrimitiveID)
-	streamState, requestContext := s.nextStream(header.PrimitiveID)
+func (s *Session) DoCommandStream(ctx context.Context, name string, input []byte, outStream streams.WriteStream) error {
+	service, err := getService(ctx)
+	if err != nil {
+		return err
+	}
+	streamState, requestContext := s.nextStream()
 	ch := make(chan streams.Result)
 	inStream := streams.NewChannelStream(ch)
-	err := s.Partition.doCommandStream(context.Background(), name, input, service, requestContext, inStream)
+	err = s.Partition.doCommandStream(context.Background(), name, input, service, requestContext, inStream)
 	if err != nil {
 		return err
 	}
@@ -121,9 +128,6 @@ func (s *Session) DoCommandStream(ctx context.Context, name string, input []byte
 					if streamState.serialize(response.Context) {
 						outStream.Value(SessionOutput{
 							Result: response.Result,
-							Header: primitiveapi.ResponseHeader{
-								ResponseType: primitiveapi.ResponseType_RESPONSE_STREAM,
-							},
 						})
 					}
 				case rsm.SessionResponseType_CLOSE_STREAM:
@@ -140,9 +144,6 @@ func (s *Session) DoCommandStream(ctx context.Context, name string, input []byte
 					if streamState.serialize(response.Context) {
 						outStream.Value(SessionOutput{
 							Result: response.Result,
-							Header: primitiveapi.ResponseHeader{
-								ResponseType: primitiveapi.ResponseType_RESPONSE,
-							},
 						})
 					}
 				}
@@ -155,9 +156,12 @@ func (s *Session) DoCommandStream(ctx context.Context, name string, input []byte
 }
 
 // DoQuery submits a query to the service
-func (s *Session) DoQuery(ctx context.Context, name string, input []byte, header primitiveapi.RequestHeader) ([]byte, error) {
-	service := getService(header.PrimitiveID)
-	requestContext := s.getQueryContext(header.PrimitiveID)
+func (s *Session) DoQuery(ctx context.Context, name string, input []byte) ([]byte, error) {
+	service, err := getService(ctx)
+	if err != nil {
+		return nil, err
+	}
+	requestContext := s.getQueryContext()
 	response, responseStatus, responseContext, err := s.Partition.doQuery(ctx, name, input, service, requestContext)
 	if err != nil {
 		return nil, err
@@ -170,9 +174,12 @@ func (s *Session) DoQuery(ctx context.Context, name string, input []byte, header
 }
 
 // DoQueryStream submits a streaming query to the service
-func (s *Session) DoQueryStream(ctx context.Context, name string, input []byte, header primitiveapi.RequestHeader, stream streams.WriteStream) error {
-	service := getService(header.PrimitiveID)
-	requestContext := s.getQueryContext(header.PrimitiveID)
+func (s *Session) DoQueryStream(ctx context.Context, name string, input []byte, stream streams.WriteStream) error {
+	service, err := getService(ctx)
+	if err != nil {
+		return err
+	}
+	requestContext := s.getQueryContext()
 	stream = streams.NewDecodingStream(stream, func(value interface{}, err error) (interface{}, error) {
 		if err != nil {
 			return nil, err
@@ -184,18 +191,18 @@ func (s *Session) DoQueryStream(ctx context.Context, name string, input []byte, 
 				Value: response.Value,
 				Error: err,
 			},
-			Header: primitiveapi.ResponseHeader{
-				ResponseType: getResponseType(response.Type),
-			},
 		}, err
 	})
 	return s.Partition.doQueryStream(ctx, name, input, service, requestContext, stream)
 }
 
 // DoCreateService creates the service
-func (s *Session) DoCreateService(ctx context.Context, header primitiveapi.RequestHeader) error {
-	service := getService(header.PrimitiveID)
-	requestContext := s.nextCommandContext(header.PrimitiveID)
+func (s *Session) DoCreateService(ctx context.Context) error {
+	service, err := getService(ctx)
+	if err != nil {
+		return err
+	}
+	requestContext := s.nextCommandContext()
 	responseStatus, responseContext, err := s.Partition.doCreateService(ctx, service, requestContext)
 	if err != nil {
 		return err
@@ -208,9 +215,12 @@ func (s *Session) DoCreateService(ctx context.Context, header primitiveapi.Reque
 }
 
 // DoCloseService closes the service
-func (s *Session) DoCloseService(ctx context.Context, header primitiveapi.RequestHeader) error {
-	service := getService(header.PrimitiveID)
-	requestContext := s.nextCommandContext(header.PrimitiveID)
+func (s *Session) DoCloseService(ctx context.Context) error {
+	service, err := getService(ctx)
+	if err != nil {
+		return err
+	}
+	requestContext := s.nextCommandContext()
 	responseStatus, responseContext, err := s.Partition.doCloseService(ctx, service, requestContext)
 	if err != nil {
 		return err
@@ -223,9 +233,12 @@ func (s *Session) DoCloseService(ctx context.Context, header primitiveapi.Reques
 }
 
 // DoDeleteService deletes the service
-func (s *Session) DoDeleteService(ctx context.Context, header primitiveapi.RequestHeader) error {
-	service := getService(header.PrimitiveID)
-	requestContext := s.nextCommandContext(header.PrimitiveID)
+func (s *Session) DoDeleteService(ctx context.Context) error {
+	service, err := getService(ctx)
+	if err != nil {
+		return err
+	}
+	requestContext := s.nextCommandContext()
 	responseStatus, responseContext, err := s.Partition.doDeleteService(ctx, service, requestContext)
 	if err != nil {
 		return err
@@ -239,7 +252,7 @@ func (s *Session) DoDeleteService(ctx context.Context, header primitiveapi.Reque
 
 // open creates the session and begins keep-alives
 func (s *Session) open(ctx context.Context) error {
-	requestContext, _ := s.getStateContexts(primitiveapi.PrimitiveId{})
+	requestContext, _ := s.getStateContexts()
 	responseStatus, responseContext, err := s.Partition.doOpenSession(ctx, requestContext, &s.Timeout)
 	if err != nil {
 		return err
@@ -264,7 +277,7 @@ func (s *Session) open(ctx context.Context) error {
 
 // keepAlive keeps the session alive
 func (s *Session) keepAlive(ctx context.Context) error {
-	requestContext, streamContexts := s.getStateContexts(primitiveapi.PrimitiveId{})
+	requestContext, streamContexts := s.getStateContexts()
 	responseStatus, responseContext, err := s.Partition.doKeepAliveSession(ctx, requestContext, streamContexts)
 	if err != nil {
 		return err
@@ -287,7 +300,7 @@ func (s *Session) Close() error {
 
 // close closes the session
 func (s *Session) close(ctx context.Context) error {
-	requestContext, _ := s.getStateContexts(primitiveapi.PrimitiveId{})
+	requestContext, _ := s.getStateContexts()
 	responseStatus, responseContext, err := s.Partition.doCloseSession(ctx, requestContext)
 	if err != nil {
 		return err
@@ -302,7 +315,7 @@ func (s *Session) close(ctx context.Context) error {
 }
 
 // getStateContexts gets the header for the current state of the session
-func (s *Session) getStateContexts(primitive primitiveapi.PrimitiveId) (rsm.SessionCommandContext, []rsm.SessionStreamContext) {
+func (s *Session) getStateContexts() (rsm.SessionCommandContext, []rsm.SessionStreamContext) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return rsm.SessionCommandContext{
@@ -312,7 +325,7 @@ func (s *Session) getStateContexts(primitive primitiveapi.PrimitiveId) (rsm.Sess
 }
 
 // getQueryContext gets the current read header
-func (s *Session) getQueryContext(primitive primitiveapi.PrimitiveId) rsm.SessionQueryContext {
+func (s *Session) getQueryContext() rsm.SessionQueryContext {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return rsm.SessionQueryContext{
@@ -323,7 +336,7 @@ func (s *Session) getQueryContext(primitive primitiveapi.PrimitiveId) rsm.Sessio
 }
 
 // nextCommandContext returns the next write context
-func (s *Session) nextCommandContext(primitive primitiveapi.PrimitiveId) rsm.SessionCommandContext {
+func (s *Session) nextCommandContext() rsm.SessionCommandContext {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.requestID = s.requestID + 1
@@ -334,7 +347,7 @@ func (s *Session) nextCommandContext(primitive primitiveapi.PrimitiveId) rsm.Ses
 }
 
 // nextStreamHeader returns the next write stream and header
-func (s *Session) nextStream(primitive primitiveapi.PrimitiveId) (*StreamState, rsm.SessionCommandContext) {
+func (s *Session) nextStream() (*StreamState, rsm.SessionCommandContext) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.requestID = s.requestID + 1
@@ -446,23 +459,21 @@ func (s *StreamState) Close() {
 // SessionOutput is a result for session-supporting servers containing session header information
 type SessionOutput struct {
 	streams.Result
-	Header primitiveapi.ResponseHeader
 }
 
 // getService returns the service ID for the given primitive
-func getService(primitive primitiveapi.PrimitiveId) rsm.ServiceId {
+func getService(ctx context.Context) (rsm.ServiceId, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return rsm.ServiceId{}, errors.NewInvalid("service metadata not found")
+	}
+	types := md.Get(primitiveTypeKey)
+	names := md.Get(primitiveNameKey)
+	if len(types) == 0 || len(names) == 0 {
+		return rsm.ServiceId{}, errors.NewInvalid("service metadata not found")
+	}
 	return rsm.ServiceId{
-		Type: primitive.Type,
-		Name: primitive.Name,
-	}
-}
-
-func getResponseType(t rsm.SessionResponseType) primitiveapi.ResponseType {
-	switch t {
-	case rsm.SessionResponseType_RESPONSE:
-		return primitiveapi.ResponseType_RESPONSE
-	case rsm.SessionResponseType_OPEN_STREAM:
-		return primitiveapi.ResponseType_RESPONSE_STREAM
-	}
-	return primitiveapi.ResponseType_RESPONSE
+		Type: types[0],
+		Name: names[0],
+	}, nil
 }

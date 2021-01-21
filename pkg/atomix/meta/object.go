@@ -35,6 +35,7 @@ func New(meta metaapi.ObjectMeta) ObjectMeta {
 	return ObjectMeta{
 		Revision:  revision,
 		Timestamp: timestamp,
+		Tombstone: meta.Type == metaapi.ObjectMeta_TOMBSTONE,
 	}
 }
 
@@ -48,6 +49,7 @@ type Object interface {
 type ObjectMeta struct {
 	Revision  Revision
 	Timestamp Timestamp
+	Tombstone bool
 }
 
 func (m ObjectMeta) Meta() ObjectMeta {
@@ -73,6 +75,26 @@ func (m ObjectMeta) Equal(meta ObjectMeta) bool {
 		return false
 	}
 	if m.Timestamp != nil && meta.Timestamp != nil && !m.Timestamp.Equal(meta.Timestamp) {
+		return false
+	}
+	return true
+}
+
+func (m ObjectMeta) Before(meta ObjectMeta) bool {
+	if m.Revision >= meta.Revision {
+		return false
+	}
+	if m.Timestamp != nil && meta.Timestamp != nil && !m.Timestamp.Before(meta.Timestamp) {
+		return false
+	}
+	return true
+}
+
+func (m ObjectMeta) After(meta ObjectMeta) bool {
+	if m.Revision <= meta.Revision {
+		return false
+	}
+	if m.Timestamp != nil && meta.Timestamp != nil && !m.Timestamp.After(meta.Timestamp) {
 		return false
 	}
 	return true

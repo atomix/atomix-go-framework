@@ -6,15 +6,11 @@ import (
 
 type Service interface {
 	// Set sets the counter value
-	Set(*counter.SetInput) (*counter.SetOutput, error)
+	Set(*counter.SetRequest) (*counter.SetResponse, error)
 	// Get gets the current counter value
-	Get(*counter.GetInput) (*counter.GetOutput, error)
+	Get(*counter.GetRequest) (*counter.GetResponse, error)
 	// Increment increments the counter value
-	Increment(*counter.IncrementInput) (*counter.IncrementOutput, error)
+	Increment(*counter.IncrementRequest) (*counter.IncrementResponse, error)
 	// Decrement decrements the counter value
-	Decrement(*counter.DecrementInput) (*counter.DecrementOutput, error)
-	// Snapshot exports a snapshot of the primitive state
-	Snapshot() (*counter.Snapshot, error)
-	// Restore imports a snapshot of the primitive state
-	Restore(*counter.Snapshot) error
+	Decrement(*counter.DecrementRequest) (*counter.DecrementResponse, error)
 }

@@ -17,7 +17,7 @@ type ServiceEventsStream interface {
 	Session() rsm.Session
 
 	// Notify sends a value on the stream
-	Notify(value *election.EventsOutput) error
+	Notify(value *election.EventsResponse) error
 
 	// Close closes the stream
 	Close()
@@ -45,7 +45,7 @@ func (s *ServiceAdaptorEventsStream) Session() rsm.Session {
 	return s.stream.Session()
 }
 
-func (s *ServiceAdaptorEventsStream) Notify(value *election.EventsOutput) error {
+func (s *ServiceAdaptorEventsStream) Notify(value *election.EventsResponse) error {
 	bytes, err := proto.Marshal(value)
 	if err != nil {
 		return err
@@ -62,21 +62,17 @@ var _ ServiceEventsStream = &ServiceAdaptorEventsStream{}
 
 type Service interface {
 	// Enter enters the leader election
-	Enter(*election.EnterInput) (*election.EnterOutput, error)
+	Enter(*election.EnterRequest) (*election.EnterResponse, error)
 	// Withdraw withdraws a candidate from the leader election
-	Withdraw(*election.WithdrawInput) (*election.WithdrawOutput, error)
+	Withdraw(*election.WithdrawRequest) (*election.WithdrawResponse, error)
 	// Anoint anoints a candidate leader
-	Anoint(*election.AnointInput) (*election.AnointOutput, error)
+	Anoint(*election.AnointRequest) (*election.AnointResponse, error)
 	// Promote promotes a candidate
-	Promote(*election.PromoteInput) (*election.PromoteOutput, error)
+	Promote(*election.PromoteRequest) (*election.PromoteResponse, error)
 	// Evict evicts a candidate from the election
-	Evict(*election.EvictInput) (*election.EvictOutput, error)
+	Evict(*election.EvictRequest) (*election.EvictResponse, error)
 	// GetTerm gets the current leadership term
-	GetTerm(*election.GetTermInput) (*election.GetTermOutput, error)
+	GetTerm(*election.GetTermRequest) (*election.GetTermResponse, error)
 	// Events listens for leadership events
-	Events(*election.EventsInput, ServiceEventsStream) (rsm.StreamCloser, error)
-	// Snapshot exports a snapshot of the primitive state
-	Snapshot() (*election.Snapshot, error)
-	// Restore imports a snapshot of the primitive state
-	Restore(*election.Snapshot) error
+	Events(*election.EventsRequest, ServiceEventsStream) (rsm.StreamCloser, error)
 }

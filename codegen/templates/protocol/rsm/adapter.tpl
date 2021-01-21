@@ -3,63 +3,12 @@
 
 {{- define "type" }}{{ printf "%s.%s" .Package.Alias .Name }}{{ end }}
 
-{{- define "field" }}
-{{- $path := .Field.Path }}
-{{- range $index, $element := $path -}}
-{{- if eq $index 0 -}}
-{{- if isLast $path $index -}}
-{{- if $element.Type.IsPointer -}}
-.Get{{ $element.Name }}()
-{{- else -}}
-.{{ $element.Name }}
-{{- end -}}
-{{- else -}}
-{{- if $element.Type.IsPointer -}}
-.Get{{ $element.Name }}().
-{{- else -}}
-.{{ $element.Name }}.
-{{- end -}}
-{{- end -}}
-{{- else -}}
-{{- if isLast $path $index -}}
-{{- if $element.Type.IsPointer -}}
-    Get{{ $element.Name }}()
-{{- else -}}
-    {{ $element.Name -}}
-{{- end -}}
-{{- else -}}
-{{- if $element.Type.IsPointer -}}
-    Get{{ $element.Name }}().
-{{- else -}}
-    {{ $element.Name }}.
-{{- end -}}
-{{- end -}}
-{{- end -}}
-{{- end -}}
-{{- end }}
-
-{{- define "ref" -}}
-{{- if not .Field.Type.IsPointer }}&{{ end }}
-{{- end }}
-
-{{- define "val" -}}
-{{- if .Field.Type.IsPointer }}*{{ end }}
-{{- end }}
-
 package {{ .Package.Name }}
 
 import (
 	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/golang/protobuf/proto"
-	{{- $added := false }}
-	{{- range .Primitive.Methods }}
-	{{- if and (not $added) (or .Type.IsSnapshot .Type.IsRestore) }}
-	"github.com/atomix/go-framework/pkg/atomix/util"
-	"io"
-	{{- $added = true }}
-	{{- end }}
-	{{- end }}
 	{{- $package := .Package }}
 	{{- range .Imports }}
 	{{ .Alias }} {{ .Path | quote }}
@@ -131,104 +80,17 @@ func (s *{{ $serviceImpl }}) SessionClosed(session rsm.Session) {
     }
 }
 
-{{ range .Primitive.Methods }}
-{{- if .Type.IsSnapshot }}
-func (s *{{ $serviceImpl }}) Backup(writer io.Writer) error {
-    {{- if .Response.IsDiscrete }}
-    snapshot, err := s.rsm.{{ .Name }}()
-    if err != nil {
-	    s.log.Error(err)
-        return err
-    }
-    bytes, err := proto.Marshal(snapshot)
-    if err != nil {
-	    s.log.Error(err)
-        return err
-    }
-    return util.WriteBytes(writer, bytes)
-    {{- else if .Response.IsStream }}
-    {{- $newWriter := printf "new%s%sWriter" $serviceInt .Name }}
-    err := s.rsm.{{ .Name }}({{ $newWriter }}(writer))
-    if err != nil {
-	    s.log.Error(err)
-	    return err
-    }
-    return nil
-    {{- end }}
-}
-{{- end }}
-{{ end }}
-
-{{- range .Primitive.Methods }}
-{{- if .Type.IsRestore }}
-func (s *{{ $serviceImpl }}) Restore(reader io.Reader) error {
-    {{- if .Request.IsDiscrete }}
-    bytes, err := util.ReadBytes(reader)
-    if err != nil {
-	    s.log.Error(err)
-        return err
-    }
-    snapshot := &{{ template "type" .Request.Input.Field.Type }}{}
-    err = proto.Unmarshal(bytes, snapshot)
-    if err != nil {
-        return err
-    }
-    err = s.rsm.{{ .Name }}(snapshot)
-    if err != nil {
-	    s.log.Error(err)
-	    return err
-    }
-    return nil
-    {{- else if .Request.IsStream }}
-    for {
-        bytes, err := util.ReadBytes(reader)
-        if err == io.EOF {
-            return nil
-        } else if err != nil {
-            s.log.Error(err)
-            return err
-        }
-
-        entry := &{{ template "type" .Request.Input.Field.Type }}{}
-        err = proto.Unmarshal(bytes, entry)
-        if err != nil {
-            s.log.Error(err)
-            return err
-        }
-        err = s.rsm.{{ .Name }}(entry)
-        if err != nil {
-            s.log.Error(err)
-            return err
-        }
-    }
-    {{- end }}
-}
-{{- end }}
-{{- end }}
-
 {{- range .Primitive.Methods }}
 {{ if .Response.IsDiscrete }}
 {{- if .Type.IsAsync }}
-func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(in []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
-{{- if and .Request.Input .Response.Output }}
-    input := &{{ template "type" .Request.Input.Field.Type }}{}
-    err := proto.Unmarshal(in, input)
+func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
+    request := &{{ template "type" .Request.Type }}{}
+    err := proto.Unmarshal(input, request)
     if err != nil {
         s.log.Error(err)
         return nil, err
     }
-    future, err := s.rsm.{{ .Name }}(input)
-{{- else if .Request.Input }}
-    input := &{{ template "type" .Request.Input.Field.Type }}{}
-    err := proto.Unmarshal(in, input)
-    if err != nil {
-        s.log.Error(err)
-        return nil, err
-    }
-    future, err := s.rsm.{{ .Name }}(input)
-{{- else }}
-    future, err := s.rsm.{{ .Name }}()
-{{- end }}
+    future, err := s.rsm.{{ .Name }}(request)
     if err != nil {
         s.log.Error(err)
         return nil, err
@@ -237,107 +99,45 @@ func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(in []byte, stream rsm.St
     return nil, nil
 }
 {{- else }}
-func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(in []byte) ([]byte, error) {
-{{- if and .Request.Input .Response.Output }}
-    input := &{{ template "type" .Request.Input.Field.Type }}{}
-	err := proto.Unmarshal(in, input)
+func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte) ([]byte, error) {
+    request := &{{ template "type" .Request.Type }}{}
+	err := proto.Unmarshal(input, request)
 	if err != nil {
 	    s.log.Error(err)
 		return nil, err
 	}
 
-	output, err := s.rsm.{{ .Name }}(input)
+	response, err := s.rsm.{{ .Name }}(request)
 	if err !=  nil {
 	    s.log.Error(err)
     	return nil, err
 	}
 
-	out, err := proto.Marshal(output)
+	output, err := proto.Marshal(response)
 	if err != nil {
 	    s.log.Error(err)
 		return nil, err
 	}
-	return out, nil
-{{- else if .Request.Input }}
-    input := &{{ template "type" .Request.Input.Field.Type }}{}
-	err := proto.Unmarshal(in, input)
-	if err != nil {
-	    s.log.Error(err)
-		return nil, err
-	}
-	err = s.rsm.{{ .Name }}(input)
-	if err != nil {
-	    s.log.Error(err)
-	    return nil, err
-	}
-	return nil, nil
-{{- else if .Response.Output }}
-	output, err := s.rsm.{{ .Name }}()
-	if err !=  nil {
-	    s.log.Error(err)
-    	return nil, err
-	}
-
-	out, err := proto.Marshal(output)
-	if err != nil {
-	    s.log.Error(err)
-		return nil, err
-	}
-	return out, nil
-{{- else }}
-	err := s.rsm.{{ .Name }}()
-	if err != nil {
-	    s.log.Error(err)
-	    return nil, err
-	}
-	return nil, nil
-{{- end }}
+	return output, nil
 }
 {{- end }}
 {{ else }}
 {{- $newStream := printf "new%s%sStream" $serviceInt .Name }}
 {{- $newInformer := printf "new%s%sInformer" $serviceInt .Name }}
-func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(in []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
-{{- if .Type.IsSnapshot }}
-    {{- $newWriter := printf "new%s%sStreamWriter" $serviceInt .Name }}
-    err := s.rsm.{{ .Name }}({{ $newWriter }}(stream))
+func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
+    request := &{{ template "type" .Request.Type }}{}
+    err := proto.Unmarshal(input, request)
     if err != nil {
         s.log.Error(err)
         return nil, err
     }
-    return nil, nil
-{{- else }}
-{{- if and .Request.Input .Response.Output }}
-    input := &{{ template "type" .Request.Input.Field.Type }}{}
-    err := proto.Unmarshal(in, input)
-    if err != nil {
-        s.log.Error(err)
-        return nil, err
-    }
-    output := {{ $newStream }}(stream)
-    closer, err := s.rsm.{{ .Name }}(input, output)
-{{- else if .Request.Input }}
-    input := &{{ template "type" .Request.Input.Field.Type }}{}
-    err := proto.Unmarshal(in, input)
-    if err != nil {
-        s.log.Error(err)
-        return nil, err
-    }
-    output := {{ $newInformer }}(stream)
-    closer, err := s.rsm.{{ .Name }}(input, output)
-{{- else if .Response.Output }}
-    output := {{ $newStream }}(stream)
-    closer, err := s.rsm.{{ .Name }}(output)
-{{- else }}
-    output := {{ $newInformer }}(stream)
-    closer, err := s.rsm.{{ .Name }}(output)
-{{- end }}
+    response := {{ $newStream }}(stream)
+    closer, err := s.rsm.{{ .Name }}(request, response)
     if err != nil {
         s.log.Error(err)
         return nil, err
     }
     return closer, nil
-{{- end }}
 }
 {{ end }}
 {{- end }}

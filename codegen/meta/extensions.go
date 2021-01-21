@@ -16,7 +16,10 @@ package meta
 
 import (
 	"errors"
-	"github.com/atomix/api/go/atomix/primitive"
+	operations "github.com/atomix/api/go/atomix/primitive/extensions/operation"
+	partitions "github.com/atomix/api/go/atomix/primitive/extensions/partition"
+	services "github.com/atomix/api/go/atomix/primitive/extensions/service"
+	states "github.com/atomix/api/go/atomix/primitive/extensions/state"
 	"github.com/gogo/protobuf/gogoproto"
 	gogoprotobuf "github.com/gogo/protobuf/proto"
 	"github.com/golang/protobuf/proto" //nolint:staticcheck
@@ -27,7 +30,7 @@ import (
 // GetPrimitiveType gets the name extension from the given service
 func GetPrimitiveType(service pgs.Service) (string, error) {
 	var primitiveType string
-	ok, err := service.Extension(primitive.E_Type, &primitiveType)
+	ok, err := service.Extension(services.E_Type, &primitiveType)
 	if err != nil {
 		return "", err
 	} else if !ok {
@@ -36,10 +39,10 @@ func GetPrimitiveType(service pgs.Service) (string, error) {
 	return primitiveType, nil
 }
 
-// GetPartition gets the partition extension from the given service
-func GetPartition(service pgs.Service) (bool, error) {
+// GetPartitioned gets the partitioned extension from the given service
+func GetPartitioned(service pgs.Service) (bool, error) {
 	var partition bool
-	ok, err := service.Extension(primitive.E_Partition, &partition)
+	ok, err := service.Extension(services.E_Partitioned, &partition)
 	if err != nil {
 		return false, err
 	} else if !ok {
@@ -51,7 +54,7 @@ func GetPartition(service pgs.Service) (bool, error) {
 // GetAsync gets the partition extension from the given service
 func GetAsync(method pgs.Method) (bool, error) {
 	var async bool
-	ok, err := method.Extension(primitive.E_Async, &async)
+	ok, err := method.Extension(operations.E_Async, &async)
 	if err != nil {
 		return false, err
 	} else if !ok {
@@ -63,7 +66,7 @@ func GetAsync(method pgs.Method) (bool, error) {
 // GetOperationName gets the name extension from the given method
 func GetOperationName(method pgs.Method) (string, error) {
 	var opName string
-	ok, err := method.Extension(primitive.E_Opname, &opName)
+	ok, err := method.Extension(operations.E_Name, &opName)
 	if err != nil {
 		return "", err
 	} else if !ok {
@@ -73,9 +76,9 @@ func GetOperationName(method pgs.Method) (string, error) {
 }
 
 // GetOperationType gets the optype extension from the given method
-func GetOperationType(method pgs.Method) (primitive.OperationType, error) {
-	var operationType primitive.OperationType
-	ok, err := method.Extension(primitive.E_Optype, &operationType)
+func GetOperationType(method pgs.Method) (operations.OperationType, error) {
+	var operationType operations.OperationType
+	ok, err := method.Extension(operations.E_Type, &operationType)
 	if err != nil {
 		return 0, err
 	} else if !ok {
@@ -85,15 +88,63 @@ func GetOperationType(method pgs.Method) (primitive.OperationType, error) {
 }
 
 // GetPartitionStrategy gets the partition strategy extension from the given method
-func GetPartitionStrategy(method pgs.Method) (*primitive.PartitionStrategy, error) {
-	var strategy primitive.PartitionStrategy
-	ok, err := method.Extension(primitive.E_Partitionby, &strategy)
+func GetPartitionStrategy(method pgs.Method) (*partitions.PartitionStrategy, error) {
+	var strategy partitions.PartitionStrategy
+	ok, err := method.Extension(partitions.E_Strategy, &strategy)
 	if err != nil {
 		return nil, err
 	} else if !ok {
 		return nil, nil
 	}
 	return &strategy, nil
+}
+
+// GetStateKey gets the state key extension from the given field
+func GetStateKey(field pgs.Field) (bool, error) {
+	var key bool
+	ok, err := field.Extension(states.E_Key, &key)
+	if err != nil {
+		return false, err
+	} else if !ok {
+		return false, nil
+	}
+	return key, nil
+}
+
+// GetStateValueType gets the state valuetype extension from the given service
+func GetStateValueType(service pgs.Service) (*string, error) {
+	var valueType string
+	ok, err := service.Extension(states.E_Valuetype, &valueType)
+	if err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, nil
+	}
+	return &valueType, nil
+}
+
+// GetStateEntryType gets the state entrytype extension from the given service
+func GetStateEntryType(service pgs.Service) (*string, error) {
+	var entryType string
+	ok, err := service.Extension(states.E_Entrytype, &entryType)
+	if err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, nil
+	}
+	return &entryType, nil
+}
+
+// GetStateDigest gets the state digest extension from the given field
+func GetStateDigest(field pgs.Field) (bool, error) {
+	var digest bool
+	ok, err := field.Extension(states.E_Digest, &digest)
+	if err != nil {
+		return false, err
+	} else if !ok {
+		return false, nil
+	}
+	return digest, nil
 }
 
 func getExtensionDesc(extension *gogoprotobuf.ExtensionDesc) *proto.ExtensionDesc {

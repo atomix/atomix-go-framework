@@ -3,9 +3,7 @@ package log
 import (
 	log "github.com/atomix/api/go/atomix/primitive/log"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
-	"io"
 )
 
 type ServiceEventsStream interface {
@@ -19,7 +17,7 @@ type ServiceEventsStream interface {
 	Session() rsm.Session
 
 	// Notify sends a value on the stream
-	Notify(value *log.EventsOutput) error
+	Notify(value *log.EventsResponse) error
 
 	// Close closes the stream
 	Close()
@@ -47,7 +45,7 @@ func (s *ServiceAdaptorEventsStream) Session() rsm.Session {
 	return s.stream.Session()
 }
 
-func (s *ServiceAdaptorEventsStream) Notify(value *log.EventsOutput) error {
+func (s *ServiceAdaptorEventsStream) Notify(value *log.EventsResponse) error {
 	bytes, err := proto.Marshal(value)
 	if err != nil {
 		return err
@@ -73,7 +71,7 @@ type ServiceEntriesStream interface {
 	Session() rsm.Session
 
 	// Notify sends a value on the stream
-	Notify(value *log.EntriesOutput) error
+	Notify(value *log.EntriesResponse) error
 
 	// Close closes the stream
 	Close()
@@ -101,7 +99,7 @@ func (s *ServiceAdaptorEntriesStream) Session() rsm.Session {
 	return s.stream.Session()
 }
 
-func (s *ServiceAdaptorEntriesStream) Notify(value *log.EntriesOutput) error {
+func (s *ServiceAdaptorEntriesStream) Notify(value *log.EntriesResponse) error {
 	bytes, err := proto.Marshal(value)
 	if err != nil {
 		return err
@@ -116,88 +114,27 @@ func (s *ServiceAdaptorEntriesStream) Close() {
 
 var _ ServiceEntriesStream = &ServiceAdaptorEntriesStream{}
 
-type ServiceSnapshotWriter interface {
-	// Write writes a value to the stream
-	Write(value *log.SnapshotEntry) error
-
-	// Close closes the stream
-	Close()
-}
-
-func newServiceSnapshotWriter(writer io.Writer) ServiceSnapshotWriter {
-	return &ServiceAdaptorSnapshotWriter{
-		writer: writer,
-	}
-}
-
-type ServiceAdaptorSnapshotWriter struct {
-	writer io.Writer
-}
-
-func (s *ServiceAdaptorSnapshotWriter) Write(value *log.SnapshotEntry) error {
-	bytes, err := proto.Marshal(value)
-	if err != nil {
-		return err
-	}
-	return util.WriteBytes(s.writer, bytes)
-}
-
-func (s *ServiceAdaptorSnapshotWriter) Close() {
-
-}
-
-var _ ServiceSnapshotWriter = &ServiceAdaptorSnapshotWriter{}
-
-func newServiceSnapshotStreamWriter(stream rsm.Stream) ServiceSnapshotWriter {
-	return &ServiceAdaptorSnapshotStreamWriter{
-		stream: stream,
-	}
-}
-
-type ServiceAdaptorSnapshotStreamWriter struct {
-	stream rsm.Stream
-}
-
-func (s *ServiceAdaptorSnapshotStreamWriter) Write(value *log.SnapshotEntry) error {
-	bytes, err := proto.Marshal(value)
-	if err != nil {
-		return err
-	}
-	s.stream.Value(bytes)
-	return nil
-}
-
-func (s *ServiceAdaptorSnapshotStreamWriter) Close() {
-	s.stream.Close()
-}
-
-var _ ServiceSnapshotWriter = &ServiceAdaptorSnapshotStreamWriter{}
-
 type Service interface {
 	// Size returns the size of the log
-	Size() (*log.SizeOutput, error)
+	Size(*log.SizeRequest) (*log.SizeResponse, error)
 	// Appends appends an entry into the log
-	Append(*log.AppendInput) (*log.AppendOutput, error)
+	Append(*log.AppendRequest) (*log.AppendResponse, error)
 	// Get gets the entry for an index
-	Get(*log.GetInput) (*log.GetOutput, error)
+	Get(*log.GetRequest) (*log.GetResponse, error)
 	// FirstEntry gets the first entry in the log
-	FirstEntry() (*log.FirstEntryOutput, error)
+	FirstEntry(*log.FirstEntryRequest) (*log.FirstEntryResponse, error)
 	// LastEntry gets the last entry in the log
-	LastEntry() (*log.LastEntryOutput, error)
+	LastEntry(*log.LastEntryRequest) (*log.LastEntryResponse, error)
 	// PrevEntry gets the previous entry in the log
-	PrevEntry(*log.PrevEntryInput) (*log.PrevEntryOutput, error)
+	PrevEntry(*log.PrevEntryRequest) (*log.PrevEntryResponse, error)
 	// NextEntry gets the next entry in the log
-	NextEntry(*log.NextEntryInput) (*log.NextEntryOutput, error)
+	NextEntry(*log.NextEntryRequest) (*log.NextEntryResponse, error)
 	// Remove removes an entry from the log
-	Remove(*log.RemoveInput) (*log.RemoveOutput, error)
+	Remove(*log.RemoveRequest) (*log.RemoveResponse, error)
 	// Clear removes all entries from the log
-	Clear() error
+	Clear(*log.ClearRequest) (*log.ClearResponse, error)
 	// Events listens for change events
-	Events(*log.EventsInput, ServiceEventsStream) (rsm.StreamCloser, error)
+	Events(*log.EventsRequest, ServiceEventsStream) (rsm.StreamCloser, error)
 	// Entries lists all entries in the log
-	Entries(*log.EntriesInput, ServiceEntriesStream) (rsm.StreamCloser, error)
-	// Snapshot exports a snapshot of the primitive state
-	Snapshot(ServiceSnapshotWriter) error
-	// Restore imports a snapshot of the primitive state
-	Restore(*log.SnapshotEntry) error
+	Entries(*log.EntriesRequest, ServiceEntriesStream) (rsm.StreamCloser, error)
 }

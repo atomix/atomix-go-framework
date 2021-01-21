@@ -14,11 +14,9 @@ import (
 const Type = "Value"
 
 const (
-	setOp      = "Set"
-	getOp      = "Get"
-	eventsOp   = "Events"
-	snapshotOp = "Snapshot"
-	restoreOp  = "Restore"
+	setOp    = "Set"
+	getOp    = "Get"
+	eventsOp = "Events"
 )
 
 // RegisterProxy registers the primitive on the given node
@@ -38,25 +36,24 @@ type Proxy struct {
 
 func (s *Proxy) Set(ctx context.Context, request *value.SetRequest) (*value.SetResponse, error) {
 	s.log.Debugf("Received SetRequest %+v", request)
-
-	var err error
-	input := &request.Input
-	inputBytes, err := proto.Marshal(input)
+	input, err := proto.Marshal(request)
 	if err != nil {
 		s.log.Errorf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	header := request.Header
-	partition := s.PartitionFor(header.PrimitiveID)
-	outputBytes, err := partition.DoCommand(ctx, setOp, inputBytes, request.Header)
+	partition, err := s.PartitionFrom(ctx)
+	if err != nil {
+		return nil, errors.Proto(err)
+	}
+
+	output, err := partition.DoCommand(ctx, setOp, input)
 	if err != nil {
 		s.log.Errorf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &value.SetResponse{}
-	output := &response.Output
-	err = proto.Unmarshal(outputBytes, output)
+	err = proto.Unmarshal(output, response)
 	if err != nil {
 		s.log.Errorf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -67,25 +64,24 @@ func (s *Proxy) Set(ctx context.Context, request *value.SetRequest) (*value.SetR
 
 func (s *Proxy) Get(ctx context.Context, request *value.GetRequest) (*value.GetResponse, error) {
 	s.log.Debugf("Received GetRequest %+v", request)
-
-	var err error
-	input := &request.Input
-	inputBytes, err := proto.Marshal(input)
+	input, err := proto.Marshal(request)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	header := request.Header
-	partition := s.PartitionFor(header.PrimitiveID)
-	outputBytes, err := partition.DoQuery(ctx, getOp, inputBytes, request.Header)
+	partition, err := s.PartitionFrom(ctx)
+	if err != nil {
+		return nil, errors.Proto(err)
+	}
+
+	output, err := partition.DoQuery(ctx, getOp, input)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &value.GetResponse{}
-	output := &response.Output
-	err = proto.Unmarshal(outputBytes, output)
+	err = proto.Unmarshal(output, response)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -96,20 +92,19 @@ func (s *Proxy) Get(ctx context.Context, request *value.GetRequest) (*value.GetR
 
 func (s *Proxy) Events(request *value.EventsRequest, srv value.ValueService_EventsServer) error {
 	s.log.Debugf("Received EventsRequest %+v", request)
-
-	var err error
-	input := &request.Input
-	inputBytes, err := proto.Marshal(input)
+	input, err := proto.Marshal(request)
 	if err != nil {
 		s.log.Errorf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
 	stream := streams.NewBufferedStream()
-	header := request.Header
-	partition := s.PartitionFor(header.PrimitiveID)
+	partition, err := s.PartitionFrom(srv.Context())
+	if err != nil {
+		return errors.Proto(err)
+	}
 
-	err = partition.DoCommandStream(srv.Context(), eventsOp, inputBytes, request.Header, stream)
+	err = partition.DoCommandStream(srv.Context(), eventsOp, input, stream)
 	if err != nil {
 		s.log.Errorf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
@@ -126,13 +121,8 @@ func (s *Proxy) Events(request *value.EventsRequest, srv value.ValueService_Even
 			return errors.Proto(result.Error)
 		}
 
-		sessionOutput := result.Value.(rsm.SessionOutput)
-		response := &value.EventsResponse{
-			Header: sessionOutput.Header,
-		}
-		outputBytes := sessionOutput.Value.([]byte)
-		output := &response.Output
-		err = proto.Unmarshal(outputBytes, output)
+		response := &value.EventsResponse{}
+		err = proto.Unmarshal(result.Value.([]byte), response)
 		if err != nil {
 			s.log.Errorf("Request EventsRequest failed: %v", err)
 			return errors.Proto(err)
@@ -146,51 +136,4 @@ func (s *Proxy) Events(request *value.EventsRequest, srv value.ValueService_Even
 	}
 	s.log.Debugf("Finished EventsRequest %+v", request)
 	return nil
-}
-
-func (s *Proxy) Snapshot(ctx context.Context, request *value.SnapshotRequest) (*value.SnapshotResponse, error) {
-	s.log.Debugf("Received SnapshotRequest %+v", request)
-
-	var err error
-	var inputBytes []byte
-	header := request.Header
-	partition := s.PartitionFor(header.PrimitiveID)
-	outputBytes, err := partition.DoCommand(ctx, snapshotOp, inputBytes, request.Header)
-	if err != nil {
-		s.log.Errorf("Request SnapshotRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-
-	response := &value.SnapshotResponse{}
-	output := &response.Snapshot
-	err = proto.Unmarshal(outputBytes, output)
-	if err != nil {
-		s.log.Errorf("Request SnapshotRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	s.log.Debugf("Sending SnapshotResponse %+v", response)
-	return response, nil
-}
-
-func (s *Proxy) Restore(ctx context.Context, request *value.RestoreRequest) (*value.RestoreResponse, error) {
-	s.log.Debugf("Received RestoreRequest %+v", request)
-
-	var err error
-	input := &request.Snapshot
-	inputBytes, err := proto.Marshal(input)
-	if err != nil {
-		s.log.Errorf("Request RestoreRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	header := request.Header
-	partition := s.PartitionFor(header.PrimitiveID)
-	_, err = partition.DoCommand(ctx, restoreOp, inputBytes, request.Header)
-	if err != nil {
-		s.log.Errorf("Request RestoreRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-
-	response := &value.RestoreResponse{}
-	s.log.Debugf("Sending RestoreResponse %+v", response)
-	return response, nil
 }

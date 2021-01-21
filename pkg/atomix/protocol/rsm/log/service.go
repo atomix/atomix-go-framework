@@ -38,10 +38,10 @@ type logService struct {
 	indexes    map[uint64]*LinkedEntry
 	firstEntry *LinkedEntry
 	lastEntry  *LinkedEntry
-	streams map[rsm.StreamID]ServiceEventsStream
+	streams    map[rsm.StreamID]ServiceEventsStream
 }
 
-func (l *logService) notify(event *log.EventsOutput) error {
+func (l *logService) notify(event *log.EventsResponse) error {
 	for _, stream := range l.streams {
 		if err := stream.Notify(event); err != nil {
 			return err
@@ -50,60 +50,60 @@ func (l *logService) notify(event *log.EventsOutput) error {
 	return nil
 }
 
-func (l *logService) Size() (*log.SizeOutput, error) {
-	return &log.SizeOutput{
+func (l *logService) Size(*log.SizeRequest) (*log.SizeResponse, error) {
+	return &log.SizeResponse{
 		Size_: int32(len(l.indexes)),
 	}, nil
 }
 
-func (l *logService) Append(*log.AppendInput) (*log.AppendOutput, error) {
+func (l *logService) Append(*log.AppendRequest) (*log.AppendResponse, error) {
 	panic("implement me")
 }
 
-func (l *logService) Get(*log.GetInput) (*log.GetOutput, error) {
+func (l *logService) Get(*log.GetRequest) (*log.GetResponse, error) {
 	panic("implement me")
 }
 
-func (l *logService) FirstEntry() (*log.FirstEntryOutput, error) {
+func (l *logService) FirstEntry(*log.FirstEntryRequest) (*log.FirstEntryResponse, error) {
 	panic("implement me")
 }
 
-func (l *logService) LastEntry() (*log.LastEntryOutput, error) {
+func (l *logService) LastEntry(*log.LastEntryRequest) (*log.LastEntryResponse, error) {
 	panic("implement me")
 }
 
-func (l *logService) PrevEntry(*log.PrevEntryInput) (*log.PrevEntryOutput, error) {
+func (l *logService) PrevEntry(*log.PrevEntryRequest) (*log.PrevEntryResponse, error) {
 	panic("implement me")
 }
 
-func (l *logService) NextEntry(*log.NextEntryInput) (*log.NextEntryOutput, error) {
+func (l *logService) NextEntry(*log.NextEntryRequest) (*log.NextEntryResponse, error) {
 	panic("implement me")
 }
 
-func (l *logService) Remove(*log.RemoveInput) (*log.RemoveOutput, error) {
+func (l *logService) Remove(*log.RemoveRequest) (*log.RemoveResponse, error) {
 	panic("implement me")
 }
 
-func (l *logService) Clear() error {
+func (l *logService) Clear(*log.ClearRequest) (*log.ClearResponse, error) {
 	panic("implement me")
 }
 
-func (l *logService) Events(input *log.EventsInput, stream ServiceEventsStream) (rsm.StreamCloser, error) {
+func (l *logService) Events(input *log.EventsRequest, stream ServiceEventsStream) (rsm.StreamCloser, error) {
 	l.streams[stream.ID()] = stream
 	return func() {
 		delete(l.streams, stream.ID())
 	}, nil
 }
 
-func (l *logService) Entries(*log.EntriesInput, ServiceEntriesStream) (rsm.StreamCloser, error) {
+func (l *logService) Entries(*log.EntriesRequest, ServiceEntriesStream) (rsm.StreamCloser, error) {
 	panic("implement me")
 }
 
-func (l *logService) Snapshot(ServiceSnapshotWriter) error {
+func (l *logService) Snapshot(writer ServiceSnapshotWriter) error {
 	panic("implement me")
 }
 
-func (l *logService) Restore(*log.SnapshotEntry) error {
+func (l *logService) Restore(request *log.RestoreRequest) error {
 	panic("implement me")
 }
 

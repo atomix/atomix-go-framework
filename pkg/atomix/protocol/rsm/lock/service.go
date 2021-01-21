@@ -40,22 +40,22 @@ type lockService struct {
 	timers map[rsm.Index]rsm.Timer
 }
 
-func (l *lockService) Lock(input *lock.LockInput) (*LockOutputFuture, error) {
+func (l *lockService) Lock(input *lock.LockRequest) (*LockResponseFuture, error) {
 	panic("implement me")
 }
 
-func (l *lockService) Unlock(input *lock.UnlockInput) (*lock.UnlockOutput, error) {
+func (l *lockService) Unlock(input *lock.UnlockRequest) (*lock.UnlockResponse, error) {
 	panic("implement me")
 }
 
-func (l *lockService) GetLock(input *lock.GetLockInput) (*lock.GetLockOutput, error) {
+func (l *lockService) GetLock(input *lock.GetLockRequest) (*lock.GetLockResponse, error) {
 	panic("implement me")
 }
 
-func (l *lockService) Snapshot() (*lock.Snapshot, error) {
+func (l *lockService) Snapshot() (*lock.SnapshotResponse, error) {
 	panic("implement me")
 }
 
-func (l *lockService) Restore(snapshot *lock.Snapshot) error {
+func (l *lockService) Restore(request *lock.RestoreRequest) error {
 	panic("implement me")
 }

@@ -129,18 +129,11 @@ Query
 {{ if and .Request.IsDiscrete .Response.IsDiscrete }}
 func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "type" .Request.Type }}) (*{{ template "type" .Response.Type }}, error) {
 	s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
-
-    var err error
-    {{- if .Request.Input }}
-    input := {{ template "ref" .Request.Input }}request{{ template "field" .Request.Input }}
-	inputBytes, err := proto.Marshal(input)
+	input, err := proto.Marshal(request)
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
-	{{- else }}
-	var inputBytes []byte
-	{{- end }}
 
 	{{- if .Scope.IsPartition }}
 	{{- if .Request.PartitionKey }}
@@ -153,214 +146,76 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	{{- else if .Request.PartitionRange }}
 	partitionRange := {{ template "val" .Request.PartitionRange }}request{{ template "field" .Request.PartitionRange }}
 	{{- else }}
-	header := {{ template "val" .Request.Header }}request{{ template "field" .Request.Header }}
-	partition := s.PartitionFor(header.PrimitiveID)
+    partition, err := s.PartitionFrom(ctx)
+    if err != nil {
+        return nil, errors.Proto(err)
+    }
 	{{- end }}
 
-    {{- if .Response.Output }}
-	outputBytes, err := partition.Do{{ template "optype" . }}(ctx, {{ $name }}, inputBytes, {{ template "val" .Request.Header }}request{{ template "field" .Request.Header }})
-	{{- else }}
-	_, err = partition.Do{{ template "optype" . }}(ctx, {{ $name }}, inputBytes, {{ template "val" .Request.Header }}request{{ template "field" .Request.Header }})
-	{{- end }}
+	output, err := partition.Do{{ template "optype" . }}(ctx, {{ $name }}, input)
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
 
 	response := &{{ template "type" .Response.Type }}{}
-	{{- if .Response.Output }}
-    output := {{ template "ref" .Response.Output }}response{{ template "field" .Response.Output }}
-	err = proto.Unmarshal(outputBytes, output)
+	err = proto.Unmarshal(output, response)
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
-	{{- end }}
 	{{- else if .Scope.IsGlobal }}
 	partitions := s.Partitions()
-	{{- $outputs := false }}
-	{{- if .Response.Output }}
-    {{- range .Response.Output.Aggregates }}
-    {{- $outputs = true }}
-    {{- end }}
+	{{- $aggregates := false }}
+    {{- range .Response.Aggregates }}
+    {{- $aggregates = true }}
     {{- end }}
 
-    {{- if $outputs }}
-	outputsBytes, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
-		return partitions[i].Do{{ template "optype" . }}(ctx, {{ $name }}, inputBytes, {{ template "val" .Request.Header }}request{{ template "field" .Request.Header }})
+	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
+		return partitions[i].Do{{ template "optype" . }}(ctx, {{ $name }}, input)
 	})
-	{{- else }}
-	err = async.IterAsync(len(partitions), func(i int) error {
-		_, err := partitions[i].Do{{ template "optype" . }}(ctx, {{ $name }}, inputBytes, {{ template "val" .Request.Header }}request{{ template "field" .Request.Header }})
-		return err
-	})
-	{{- end }}
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
 
-    {{- if $outputs }}
-	outputs := make([]{{ template "type" $method.Response.Output.Field.Type }}, 0, len(outputsBytes))
-	for _, outputBytes := range outputsBytes {
-	    output := {{ template "type" $method.Response.Output.Field.Type }}{}
-        err = proto.Unmarshal(outputBytes.([]byte), {{ template "ref" $method.Response.Output }}output)
+	responses := make([]{{ template "type" $method.Response.Type }}, 0, len(outputs))
+	for _, output := range outputs {
+	    var response {{ template "type" $method.Response.Type }}
+        err := proto.Unmarshal(output.([]byte), &response)
         if err != nil {
             s.log.Errorf("Request {{ $method.Request.Type.Name }} failed: %v", err)
             return nil, errors.Proto(err)
         }
-        outputs = append(outputs, output)
+        responses = append(responses, response)
 	}
-    {{- end }}
 
-	response := &{{ template "type" .Response.Type }}{}
-	{{- if .Response.Output }}
-    {{- range .Response.Output.Aggregates }}
+	response := &responses[0]
+    {{- range .Response.Aggregates }}
     {{- if .IsChooseFirst }}
-    response{{ template "field" $method.Response.Output }}{{ template "field" . }} = outputs[0]{{ template "field" . }}
+    response{{ template "field" . }} = responses[0]{{ template "field" . }}
     {{- else if .IsAppend }}
-    for _, o := range outputs {
-        response{{ template "field" $method.Response.Output }}{{ template "field" . }} = append(response{{ template "field" $method.Response.Output }}{{ template "field" . }}, o{{ template "field" . }}...)
+    for _, r := range responses {
+        response{{ template "field" . }} = append(response{{ template "field" . }}, r{{ template "field" . }}...)
     }
     {{- else if .IsSum }}
-    for _, o := range outputs {
-        response{{ template "field" $method.Response.Output }}{{ template "field" . }} += o{{ template "field" . }}
+    for _, r := range responses {
+        response{{ template "field" . }} += r{{ template "field" . }}
     }
-    {{- end }}
     {{- end }}
 	{{- end }}
 	{{- end }}
 	s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
 	return response, nil
 }
-{{ else if .Request.IsStream }}
-func (s *{{ $proxy }}) {{ .Name }}(srv {{ template "type" $primitive.Type }}_{{ .Name }}Server) error {
-	response := &{{ template "type" .Response.Type }}{}
-    for {
-        request, err := srv.Recv()
-        if err == io.EOF {
-            s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
-            return srv.SendAndClose(response)
-        } else if err != nil {
-            s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-            return errors.Proto(err)
-        }
-
-        s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
-        {{- if .Request.Input }}
-        input := {{ template "ref" .Request.Input }}request{{ template "field" .Request.Input }}
-        inputBytes, err := proto.Marshal(input)
-        if err != nil {
-            s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-            return errors.Proto(err)
-        }
-        {{- else }}
-        var inputBytes []byte
-        {{- end }}
-
-        {{- if .Scope.IsPartition }}
-        {{- if .Request.PartitionKey }}
-        partitionKey := {{ template "val" .Request.PartitionKey }}request{{ template "field" .Request.PartitionKey }}
-        {{- if and .Request.PartitionKey.Field.Type.IsBytes (not .Request.PartitionKey.Field.Type.IsCast) }}
-        partition := s.PartitionBy(partitionKey)
-        {{- else }}
-        partition := s.PartitionBy([]byte(partitionKey))
-        {{- end }}
-        {{- else if .Request.PartitionRange }}
-        partitionRange := {{ template "val" .Request.PartitionRange }}request{{ template "field" .Request.PartitionRange }}
-        {{- else }}
-        header := {{ template "val" .Request.Header }}request{{ template "field" .Request.Header }}
-        partition := s.PartitionFor(header.PrimitiveID)
-        {{- end }}
-
-        {{- if .Response.Output }}
-        outputBytes, err := partition.Do{{ template "optype" . }}(srv.Context(), {{ $name }}, inputBytes, {{ template "val" .Request.Header }}request{{ template "field" .Request.Header }})
-        {{- else }}
-        _, err = partition.Do{{ template "optype" . }}(srv.Context(), {{ $name }}, inputBytes, {{ template "val" .Request.Header }}request{{ template "field" .Request.Header }})
-        {{- end }}
-        if err != nil {
-            s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-            return errors.Proto(err)
-        }
-
-        {{- if .Response.Output }}
-        output := {{ template "ref" .Response.Output }}response{{ template "field" .Response.Output }}
-        err = proto.Unmarshal(outputBytes, output)
-        if err != nil {
-            s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-            return errors.Proto(err)
-        }
-        {{- end }}
-        {{- else if .Scope.IsGlobal }}
-        partitions := s.Partitions()
-        {{- $outputs := false }}
-        {{- if .Response.Output }}
-        {{- range .Response.Output.Aggregates }}
-        {{- $outputs = true }}
-        {{- end }}
-        {{- end }}
-
-        {{- if $outputs }}
-        outputsBytes, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
-            return partitions[i].Do{{ template "optype" . }}(srv.Context(), {{ $name }}, inputBytes, {{ template "val" .Request.Header }}request{{ template "field" .Request.Header }})
-        })
-        {{- else }}
-        err = async.IterAsync(len(partitions), func(i int) error {
-            _, err := partitions[i].Do{{ template "optype" . }}(srv.Context(), {{ $name }}, inputBytes, {{ template "val" .Request.Header }}request{{ template "field" .Request.Header }})
-            return errors.Proto(err)
-        })
-        {{- end }}
-        if err != nil {
-            s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-            return errors.Proto(err)
-        }
-
-        {{- if $outputs }}
-        outputs := make([]{{ template "type" $method.Response.Output.Field.Type }}, 0, len(outputsBytes))
-        for _, outputBytes := range outputsBytes {
-            output := {{ template "type" $method.Response.Output.Field.Type }}{}
-            err = proto.Unmarshal(outputBytes.([]byte), {{ template "ref" $method.Response.Output }}output)
-            if err != nil {
-                s.log.Errorf("Request {{ $method.Request.Type.Name }} failed: %v", err)
-                return errors.Proto(err)
-            }
-            outputs = append(outputs, output)
-        }
-        {{- end }}
-
-        {{- if .Response.Output }}
-        {{- range .Response.Output.Aggregates }}
-        {{- if .IsChooseFirst }}
-        response{{ template "field" $method.Response.Output }}{{ template "field" . }} = outputs[0]{{ template "field" . }}
-        {{- else if .IsAppend }}
-        for _, o := range outputs {
-            response{{ template "field" $method.Response.Output }}{{ template "field" . }} = append(response{{ template "field" $method.Response.Output }}{{ template "field" . }}, o{{ template "field" . }}...)
-        }
-        {{- else if .IsSum }}
-        for _, o := range outputs {
-            response{{ template "field" $method.Response.Output }}{{ template "field" . }} += o{{ template "field" . }}
-        }
-        {{- end }}
-        {{- end }}
-        {{- end }}
-        {{- end }}
-    }
-}
 {{ else if .Response.IsStream }}
 func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }}, srv {{ template "type" $primitive.Type }}_{{ .Name }}Server) error {
     s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
-
-    var err error
-    {{- if .Request.Input }}
-    input := {{ template "ref" .Request.Input }}request{{ template "field" .Request.Input }}
-	inputBytes, err := proto.Marshal(input)
+	input, err := proto.Marshal(request)
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
         return errors.Proto(err)
 	}
-	{{- else }}
-	var inputBytes []byte
-	{{- end }}
 
 	stream := streams.NewBufferedStream()
 	{{- if .Scope.IsPartition }}
@@ -374,15 +229,17 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	{{- else if .Request.PartitionRange }}
 	partitionRange := {{ template "val" .Request.PartitionRange }}request{{ template "field" .Request.PartitionRange }}
 	{{- else }}
-	header := {{ template "val" .Request.Header }}request{{ template "field" .Request.Header }}
-	partition := s.PartitionFor(header.PrimitiveID)
+    partition, err := s.PartitionFrom(srv.Context())
+    if err != nil {
+        return errors.Proto(err)
+    }
 	{{- end }}
 
-	err = partition.Do{{ template "optype" . }}Stream(srv.Context(), {{ $name }}, inputBytes, {{ template "val" .Request.Header }}request{{ template "field" .Request.Header }}, stream)
+	err = partition.Do{{ template "optype" . }}Stream(srv.Context(), {{ $name }}, input, stream)
 	{{- else if .Scope.IsGlobal }}
 	partitions := s.Partitions()
 	err = async.IterAsync(len(partitions), func(i int) error {
-		return partitions[i].Do{{ template "optype" . }}Stream(srv.Context(), {{ $name }}, inputBytes, {{ template "val" .Request.Header }}request{{ template "field" .Request.Header }}, stream)
+		return partitions[i].Do{{ template "optype" . }}Stream(srv.Context(), {{ $name }}, input, stream)
 	})
 	{{- end }}
 	if err != nil {
@@ -401,13 +258,8 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 			return errors.Proto(result.Error)
 		}
 
-		sessionOutput := result.Value.(rsm.SessionOutput)
-		response := &{{ template "type" .Response.Type }}{
-		    Header: sessionOutput.Header,
-		}
-		outputBytes := sessionOutput.Value.([]byte)
-        output := {{ template "ref" .Response.Output }}response{{ template "field" .Response.Output }}
-        err = proto.Unmarshal(outputBytes, output)
+		response := &{{ template "type" .Response.Type }}{}
+        err = proto.Unmarshal(result.Value.([]byte), response)
         if err != nil {
             s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
             return errors.Proto(err)

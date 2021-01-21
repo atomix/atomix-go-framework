@@ -47,7 +47,7 @@ type Partition struct {
 }
 
 // AddHeader adds the header for the partition to the given context
-func (p *Partition) AddHeader(ctx context.Context) context.Context {
+func (p *Partition) AddHeaders(ctx context.Context) context.Context {
 	return metadata.AppendToOutgoingContext(ctx, partitionsKey, fmt.Sprint(p.ID))
 }
 

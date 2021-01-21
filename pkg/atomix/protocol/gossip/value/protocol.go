@@ -1,507 +1,151 @@
-// Copyright 2019-present Open Networking Foundation.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package value
 
 import (
 	"context"
-	metaapi "github.com/atomix/api/go/atomix/primitive/meta"
-	valueapi "github.com/atomix/api/go/atomix/primitive/value"
-	"github.com/atomix/go-framework/pkg/atomix/cluster"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
+	value "github.com/atomix/api/go/atomix/primitive/value"
 	"github.com/atomix/go-framework/pkg/atomix/meta"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
-	"github.com/atomix/go-framework/pkg/atomix/util/async"
-	"google.golang.org/grpc"
-	"io"
-	"sync"
-	"time"
+	"github.com/golang/protobuf/proto"
 )
 
-var log = logging.GetLogger("atomix", "protocol", "gossip", "value")
+const ServiceType gossip.ServiceType = "Value"
 
-const antiEntropyPeriod = time.Second
-
-func init() {
-	registerServerFunc = func(server *grpc.Server, manager *gossip.Manager) {
-		RegisterValueProtocolServer(server, newProtocolServer(newManager(manager)))
-	}
-	newServiceFunc = func(name string, partition *cluster.Partition) gossip.Service {
-		return newService(name, partition)
-	}
-}
-
-func newProtocolServer(manager *Manager) ValueProtocolServer {
-	return &ProtocolServer{
-		manager: manager,
-	}
-}
-
-type ProtocolServer struct {
-	manager *Manager
-}
-
-func (s *ProtocolServer) Gossip(stream ValueProtocol_GossipServer) error {
-	msg, err := stream.Recv()
-	if err == io.EOF {
-		return nil
-	} else if err != nil {
-		log.Errorf("Receiving GossipMessage %+v failed: %v", msg, err)
-		return err
-	}
-
-	log.Debugf("Received GossipMessage %+v", msg)
-	bootstrap := msg.GetBootstrap()
-	if bootstrap == nil {
-		return errors.Proto(errors.NewInvalid("gossip stream not initialized with expected bootstrap request"))
-	}
-
-	service, err := s.getService(bootstrap.PartitionID, bootstrap.Service)
-	if err != nil {
-		return errors.Proto(err)
-	}
-
-	value, err := service.Bootstrap(stream.Context())
-	if err != nil {
-		return errors.Proto(err)
-	}
-
-	msg = &GossipMessage{
-		Message: &GossipMessage_Update{
-			Update: &Update{
-				Value: value,
-			},
-		},
-	}
-	log.Debugf("Sending GossipMessage %+v", msg)
-	err = stream.Send(msg)
-	if err != nil {
-		log.Errorf("Sending GossipMessage %+v failed: %v", msg, err)
-		return err
-	}
-
-	for {
-		msg, err := stream.Recv()
-		if err == io.EOF {
-			return nil
-		} else if err != nil {
-			log.Errorf("Receiving GossipMessage %+v failed: %v", msg, err)
-			return err
-		}
-
-		log.Debugf("Received GossipMessage %+v", msg)
-	}
-}
-
-func (s *ProtocolServer) getService(partitionID gossip.PartitionID, name string) (GossipService, error) {
-	partition, err := s.manager.Partition(partitionID)
-	if err != nil {
-		return nil, err
-	}
-	service, err := partition.GetService(name)
-	if err != nil {
-		return nil, err
-	}
-	return service.(GossipService), nil
-}
-
-type GossipService interface {
-	Bootstrap(context.Context) (Value, error)
-	Advertise(context.Context, Digest) (request bool, err error)
-	Update(context.Context, Update) (update *Update, err error)
-}
-
-func newService(name string, partition *cluster.Partition) Service {
-	service := &valueService{
-		name:      name,
-		partition: partition,
-		peers:     make(map[cluster.ReplicaID]*valuePeer),
-	}
-	service.start()
-	return service
-}
-
-type valueService struct {
-	name      string
-	partition *cluster.Partition
-	value     valueapi.Value
-	valueMu   sync.RWMutex
-	streams   []ServiceEventsStream
-	peers     map[cluster.ReplicaID]*valuePeer
-	peersMu   sync.RWMutex
-	cancel    context.CancelFunc
-}
-
-func (s *valueService) start() error {
-	ctx, cancel := context.WithCancel(context.Background())
-	s.cancel = cancel
-	watchCh := make(chan cluster.ReplicaSet)
-	err := s.partition.Watch(ctx, watchCh)
-	if err != nil {
-		return err
-	}
-
-	replicaSet := s.partition.Replicas()
-	err = s.updateReplicas(replicaSet)
-	if err != nil {
-		return err
-	}
-
-	go s.watchReplicas(watchCh)
-	go s.sendAdvertisements()
-	return nil
-}
-
-func (s *valueService) watchReplicas(watchCh <-chan cluster.ReplicaSet) {
-	for replicaSet := range watchCh {
-		err := s.updateReplicas(replicaSet)
+// RegisterService registers the service on the given node
+func RegisterService(node *gossip.Node) {
+	node.RegisterService(ServiceType, func(serviceID gossip.ServiceID, partition *gossip.Partition) (gossip.Service, error) {
+		protocol, err := newProtocol(serviceID, partition)
 		if err != nil {
-			log.Errorf("Failed to handle replica set change: %v", err)
+			return nil, err
 		}
-	}
-}
-
-func (s *valueService) updateReplicas(replicaSet cluster.ReplicaSet) error {
-	replicas := make([]*cluster.Replica, 0, len(replicaSet))
-	for _, replica := range replicaSet {
-		if member, ok := s.partition.Member(); !ok || replica.ID != member.ID {
-			replicas = append(replicas, replica)
-		}
-	}
-
-	err := async.IterAsync(len(replicas), func(i int) error {
-		replica := replicas[i]
-		s.peersMu.RLock()
-		_, ok := s.peers[replica.ID]
-		s.peersMu.RUnlock()
-		if ok {
-			return nil
-		}
-
-		s.peersMu.Lock()
-		defer s.peersMu.Unlock()
-
-		peer, err := newPeer(s, replica)
-		if err != nil {
-			return err
-		}
-		s.peers[peer.replica.ID] = peer
-		return nil
+		service := newServiceFunc(protocol)
+		return &gossipService{service: service}, nil
 	})
+}
+
+var newServiceFunc func(protocol Protocol) Service
+
+func registerService(f func(protocol Protocol) Service) {
+	newServiceFunc = f
+}
+
+type Protocol interface {
+	Repair(ctx context.Context, value *value.Value) (*value.Value, error)
+	Broadcast(ctx context.Context, value *value.Value) error
+}
+
+func newProtocol(serviceID gossip.ServiceID, partition *gossip.Partition) (Protocol, error) {
+	group, err := gossip.NewPeerGroup(partition, ServiceType, serviceID)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	s.peersMu.RLock()
-	peers := make([]*valuePeer, 0, len(s.peers))
-	for _, peer := range s.peers {
-		peers = append(peers, peer)
+	protocol := &serviceProtocol{
+		group: group,
 	}
-	s.peersMu.RUnlock()
+	return protocol, nil
+}
 
-	err = async.IterAsync(len(peers), func(i int) error {
-		peer := peers[i]
-		if _, ok := replicaSet[peer.replica.ID]; ok {
-			return nil
-		}
+type serviceProtocol struct {
+	group *gossip.PeerGroup
+}
 
-		s.peersMu.Lock()
-		defer s.peersMu.Unlock()
-
-		peer.close()
-		delete(s.peers, peer.replica.ID)
-		return nil
-	})
+func (p *serviceProtocol) Repair(ctx context.Context, value *value.Value) (*value.Value, error) {
+	objects, err := p.group.Read(ctx, "")
 	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *valueService) sendAdvertisements() {
-	ticker := time.NewTicker(antiEntropyPeriod)
-	for range ticker.C {
-		s.enqueueAdvertisements()
-	}
-}
-
-func (s *valueService) enqueueAdvertisements() {
-	s.valueMu.RLock()
-	digest := Digest{}
-	if s.value.Timestamp != nil {
-		digest.Timestamp = *s.value.Timestamp
-	}
-	s.valueMu.RUnlock()
-
-	s.peersMu.RLock()
-	for _, replica := range s.peers {
-		go func(replica *valuePeer) {
-			replica.enqueueAdvertisement(Advertisement{
-				Digest: digest,
-			})
-		}(replica)
-	}
-	s.peersMu.RUnlock()
-}
-
-func (s *valueService) enqueueUpdate(update Update) {
-	s.peersMu.RLock()
-	for _, replica := range s.peers {
-		go func(replica *valuePeer) {
-			replica.enqueueUpdate(update)
-		}(replica)
-	}
-	s.peersMu.RUnlock()
-}
-
-func (s *valueService) Set(ctx context.Context, input *valueapi.SetInput) (*valueapi.SetOutput, error) {
-	value := input.Value
-	if err := checkPreconditions(value, input.Preconditions); err != nil {
 		return nil, err
 	}
 
-	s.valueMu.Lock()
-	s.value = value
-	s.valueMu.Unlock()
-	return &valueapi.SetOutput{
-		Value: value,
-	}, nil
-}
-
-func (s *valueService) Get(ctx context.Context, input *valueapi.GetInput) (*valueapi.GetOutput, error) {
-	s.valueMu.RLock()
-	value := s.value
-	s.valueMu.RUnlock()
-	return &valueapi.GetOutput{
-		Value: value,
-	}, nil
-}
-
-func (s *valueService) Events(ctx context.Context, input *valueapi.EventsInput, stream ServiceEventsStream) error {
-	s.valueMu.Lock()
-	defer s.valueMu.Unlock()
-	s.streams = append(s.streams, stream)
-	return nil
-}
-
-func (s *valueService) Snapshot(ctx context.Context) (*valueapi.Snapshot, error) {
-	return &valueapi.Snapshot{
-		Value: &s.value,
-	}, nil
-}
-
-func (s *valueService) Restore(ctx context.Context, snapshot *valueapi.Snapshot) error {
-	s.value = *snapshot.Value
-	return nil
-}
-
-func (s *valueService) Bootstrap(ctx context.Context) (Value, error) {
-	s.valueMu.RLock()
-	defer s.valueMu.RUnlock()
-	var timestamp metaapi.Timestamp
-	if s.value.Timestamp != nil {
-		timestamp = *s.value.Timestamp
-	}
-	value := Value{
-		Value: s.value.Value,
-		Digest: Digest{
-			Timestamp: timestamp,
-		},
+	for _, object := range objects {
+		if meta.New(object.ObjectMeta).After(meta.New(value.ObjectMeta)) {
+			err = proto.Unmarshal(object.Value, value)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 	return value, nil
 }
 
-func (s *valueService) Advertise(ctx context.Context, digest Digest) (bool, error) {
-	s.valueMu.RLock()
-	value := s.value
-	s.valueMu.RUnlock()
-	localTimestamp := meta.NewTimestamp(*value.Timestamp)
-	updateTimestamp := meta.NewTimestamp(digest.Timestamp)
-	if updateTimestamp.After(localTimestamp) {
-		return true, nil
+func (p *serviceProtocol) Broadcast(ctx context.Context, value *value.Value) error {
+	bytes, err := proto.Marshal(value)
+	if err != nil {
+		return err
 	}
-	return false, nil
+	object := &gossip.Object{
+		ObjectMeta: value.ObjectMeta,
+		Value:      bytes,
+	}
+	p.group.Update(ctx, object)
+	return nil
 }
 
-func (s *valueService) Update(ctx context.Context, update Update) (*Update, error) {
-	remoteValue := update.Value
-	s.valueMu.RLock()
-	localValue := s.value
-	s.valueMu.RUnlock()
-
-	localTimestamp := meta.NewTimestamp(*localValue.Timestamp)
-	remoteTimestamp := meta.NewTimestamp(remoteValue.Digest.Timestamp)
-	if remoteTimestamp.After(localTimestamp) {
-		s.valueMu.Lock()
-		defer s.valueMu.Unlock()
-		localValue := s.value
-		localTimestamp := meta.NewTimestamp(*localValue.Timestamp)
-		remoteTimestamp := meta.NewTimestamp(remoteValue.Digest.Timestamp)
-		if remoteTimestamp.After(localTimestamp) {
-			timestamp := remoteTimestamp.Proto()
-			s.value = valueapi.Value{
-				ObjectMeta: metaapi.ObjectMeta{
-					Timestamp: &timestamp,
-				},
-			}
-		} else if localTimestamp.Before(remoteTimestamp) {
-			return &Update{
-				Value: Value{
-					Value: localValue.Value,
-					Digest: Digest{
-						Timestamp: *localValue.Timestamp,
-					},
-				},
-			}, nil
-		}
-	} else if localTimestamp.Before(remoteTimestamp) {
-		return &Update{
-			Value: Value{
-				Value: localValue.Value,
-				Digest: Digest{
-					Timestamp: *localValue.Timestamp,
-				},
-			},
-		}, nil
-	}
-	return nil, nil
+type gossipService struct {
+	service Service
 }
 
-func (s *valueService) close() {
-	s.cancel()
-}
-
-func newPeer(service *valueService, replica *cluster.Replica) (*valuePeer, error) {
-	peer := &valuePeer{
-		service: service,
-		replica: replica,
+func (s *gossipService) Read(ctx context.Context, _ string) (*gossip.Object, error) {
+	value, err := s.service.Read(ctx)
+	if err != nil {
+		return nil, err
+	} else if value == nil {
+		return nil, nil
 	}
-	err := peer.connect()
+
+	bytes, err := proto.Marshal(value)
 	if err != nil {
 		return nil, err
 	}
-	return peer, nil
+	return &gossip.Object{
+		ObjectMeta: value.ObjectMeta,
+		Value:      bytes,
+	}, nil
 }
 
-type valuePeer struct {
-	service  *valueService
-	replica  *cluster.Replica
-	conn     *grpc.ClientConn
-	stream   ValueProtocol_GossipClient
-	advertCh chan Advertisement
-	updateCh chan Update
-}
-
-func (r *valuePeer) connect() error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-	conn, err := r.replica.Connect(ctx, cluster.WithDialOption(grpc.WithInsecure()))
+func (s *gossipService) Update(ctx context.Context, object *gossip.Object) error {
+	value := &value.Value{}
+	err := proto.Unmarshal(object.Value, value)
 	if err != nil {
 		return err
 	}
-	r.conn = conn
-	client := NewValueProtocolClient(conn)
-	stream, err := client.Gossip(context.Background())
-	if err != nil {
-		return err
-	}
-	r.stream = stream
-	err = r.bootstrap()
-	if err != nil {
-		return err
-	}
-	go r.gossip()
-	return nil
+	return s.service.Update(ctx, value)
 }
 
-func (r *valuePeer) bootstrap() error {
-	msg := &GossipMessage{
-		Message: &GossipMessage_Bootstrap{
-			Bootstrap: &Bootstrap{
-				PartitionID: gossip.PartitionID(r.service.partition.ID),
-				Service:     r.service.name,
-			},
-		},
-	}
-	log.Debugf("Sending GossipMessage %+v", msg)
-	err := r.stream.Send(msg)
-	if err != nil {
-		log.Errorf("Sending GossipMessage %+v failed: %v", msg, err)
-		return err
-	}
-	return nil
-}
-
-func (r *valuePeer) enqueueAdvertisement(advertisement Advertisement) {
-	r.advertCh <- advertisement
-}
-
-func (r *valuePeer) enqueueUpdate(update Update) {
-	r.updateCh <- update
-}
-
-func (r *valuePeer) gossip() {
-	for {
-		select {
-		case update := <-r.updateCh:
-			r.sendUpdate(update)
-		case advert := <-r.advertCh:
-			r.sendAdvertisement(advert)
+func (s *gossipService) Clone(ctx context.Context, ch chan<- gossip.Object) error {
+	errCh := make(chan error)
+	go func() {
+		defer close(errCh)
+		value, err := s.service.Read(ctx)
+		if err != nil {
+			errCh <- err
+			return
 		}
-	}
-}
-
-func (r *valuePeer) sendUpdate(update Update) {
-	msg := &GossipMessage{
-		Message: &GossipMessage_Update{
-			Update: &update,
-		},
-	}
-	log.Debugf("Sending GossipMessage %+v", msg)
-	err := r.stream.Send(msg)
-	if err != nil {
-		log.Errorf("Sending GossipMessage %+v failed: %v", msg, err)
-	}
-}
-
-func (r *valuePeer) sendAdvertisement(advert Advertisement) {
-	msg := &GossipMessage{
-		Message: &GossipMessage_Advertisement{
-			Advertisement: &advert,
-		},
-	}
-	log.Debugf("Sending GossipMessage %+v", msg)
-	err := r.stream.Send(msg)
-	if err != nil {
-		log.Errorf("Sending GossipMessage %+v failed: %v", msg, err)
-	}
-}
-
-func (r *valuePeer) close() {
-	close(r.advertCh)
-	close(r.updateCh)
-}
-
-func checkPreconditions(value valueapi.Value, preconditions []valueapi.Precondition) error {
-	for _, precondition := range preconditions {
-		switch p := precondition.Precondition.(type) {
-		case *valueapi.Precondition_Metadata:
-			if !meta.Equal(value.ObjectMeta, *p.Metadata) {
-				return errors.NewConflict("metadata precondition failed")
-			}
+		bytes, err := proto.Marshal(value)
+		if err != nil {
+			errCh <- err
+			return
 		}
-	}
-	return nil
+		object := gossip.Object{
+			ObjectMeta: value.ObjectMeta,
+			Value:      bytes,
+		}
+		ch <- object
+	}()
+	return <-errCh
+}
+
+var _ gossip.Service = &gossipService{}
+
+type Replica interface {
+	Protocol() Protocol
+	Read(ctx context.Context) (*value.Value, error)
+	Update(ctx context.Context, value *value.Value) error
+}
+
+type Service interface {
+	Replica
+	// Set sets the value
+	Set(context.Context, *value.SetRequest) (*value.SetResponse, error)
+	// Get gets the value
+	Get(context.Context, *value.GetRequest) (*value.GetResponse, error)
+	// Events listens for value change events
+	Events(context.Context, *value.EventsRequest, chan<- value.EventsResponse) error
 }

@@ -3,9 +3,7 @@ package list
 import (
 	list "github.com/atomix/api/go/atomix/primitive/list"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
-	"io"
 )
 
 type ServiceEventsStream interface {
@@ -19,7 +17,7 @@ type ServiceEventsStream interface {
 	Session() rsm.Session
 
 	// Notify sends a value on the stream
-	Notify(value *list.EventsOutput) error
+	Notify(value *list.EventsResponse) error
 
 	// Close closes the stream
 	Close()
@@ -47,7 +45,7 @@ func (s *ServiceAdaptorEventsStream) Session() rsm.Session {
 	return s.stream.Session()
 }
 
-func (s *ServiceAdaptorEventsStream) Notify(value *list.EventsOutput) error {
+func (s *ServiceAdaptorEventsStream) Notify(value *list.EventsResponse) error {
 	bytes, err := proto.Marshal(value)
 	if err != nil {
 		return err
@@ -73,7 +71,7 @@ type ServiceElementsStream interface {
 	Session() rsm.Session
 
 	// Notify sends a value on the stream
-	Notify(value *list.ElementsOutput) error
+	Notify(value *list.ElementsResponse) error
 
 	// Close closes the stream
 	Close()
@@ -101,7 +99,7 @@ func (s *ServiceAdaptorElementsStream) Session() rsm.Session {
 	return s.stream.Session()
 }
 
-func (s *ServiceAdaptorElementsStream) Notify(value *list.ElementsOutput) error {
+func (s *ServiceAdaptorElementsStream) Notify(value *list.ElementsResponse) error {
 	bytes, err := proto.Marshal(value)
 	if err != nil {
 		return err
@@ -116,84 +114,23 @@ func (s *ServiceAdaptorElementsStream) Close() {
 
 var _ ServiceElementsStream = &ServiceAdaptorElementsStream{}
 
-type ServiceSnapshotWriter interface {
-	// Write writes a value to the stream
-	Write(value *list.SnapshotEntry) error
-
-	// Close closes the stream
-	Close()
-}
-
-func newServiceSnapshotWriter(writer io.Writer) ServiceSnapshotWriter {
-	return &ServiceAdaptorSnapshotWriter{
-		writer: writer,
-	}
-}
-
-type ServiceAdaptorSnapshotWriter struct {
-	writer io.Writer
-}
-
-func (s *ServiceAdaptorSnapshotWriter) Write(value *list.SnapshotEntry) error {
-	bytes, err := proto.Marshal(value)
-	if err != nil {
-		return err
-	}
-	return util.WriteBytes(s.writer, bytes)
-}
-
-func (s *ServiceAdaptorSnapshotWriter) Close() {
-
-}
-
-var _ ServiceSnapshotWriter = &ServiceAdaptorSnapshotWriter{}
-
-func newServiceSnapshotStreamWriter(stream rsm.Stream) ServiceSnapshotWriter {
-	return &ServiceAdaptorSnapshotStreamWriter{
-		stream: stream,
-	}
-}
-
-type ServiceAdaptorSnapshotStreamWriter struct {
-	stream rsm.Stream
-}
-
-func (s *ServiceAdaptorSnapshotStreamWriter) Write(value *list.SnapshotEntry) error {
-	bytes, err := proto.Marshal(value)
-	if err != nil {
-		return err
-	}
-	s.stream.Value(bytes)
-	return nil
-}
-
-func (s *ServiceAdaptorSnapshotStreamWriter) Close() {
-	s.stream.Close()
-}
-
-var _ ServiceSnapshotWriter = &ServiceAdaptorSnapshotStreamWriter{}
-
 type Service interface {
 	// Size gets the number of elements in the list
-	Size() (*list.SizeOutput, error)
+	Size(*list.SizeRequest) (*list.SizeResponse, error)
 	// Append appends a value to the list
-	Append(*list.AppendInput) (*list.AppendOutput, error)
+	Append(*list.AppendRequest) (*list.AppendResponse, error)
 	// Insert inserts a value at a specific index in the list
-	Insert(*list.InsertInput) (*list.InsertOutput, error)
+	Insert(*list.InsertRequest) (*list.InsertResponse, error)
 	// Get gets the value at an index in the list
-	Get(*list.GetInput) (*list.GetOutput, error)
+	Get(*list.GetRequest) (*list.GetResponse, error)
 	// Set sets the value at an index in the list
-	Set(*list.SetInput) (*list.SetOutput, error)
+	Set(*list.SetRequest) (*list.SetResponse, error)
 	// Remove removes an element from the list
-	Remove(*list.RemoveInput) (*list.RemoveOutput, error)
+	Remove(*list.RemoveRequest) (*list.RemoveResponse, error)
 	// Clear removes all elements from the list
-	Clear() error
+	Clear(*list.ClearRequest) (*list.ClearResponse, error)
 	// Events listens for change events
-	Events(*list.EventsInput, ServiceEventsStream) (rsm.StreamCloser, error)
+	Events(*list.EventsRequest, ServiceEventsStream) (rsm.StreamCloser, error)
 	// Elements streams all elements in the list
-	Elements(*list.ElementsInput, ServiceElementsStream) (rsm.StreamCloser, error)
-	// Snapshot exports a snapshot of the primitive state
-	Snapshot(ServiceSnapshotWriter) error
-	// Restore imports a snapshot of the primitive state
-	Restore(*list.SnapshotEntry) error
+	Elements(*list.ElementsRequest, ServiceElementsStream) (rsm.StreamCloser, error)
 }

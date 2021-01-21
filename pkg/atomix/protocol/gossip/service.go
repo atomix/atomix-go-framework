@@ -14,8 +14,19 @@
 
 package gossip
 
-// ServiceType is a CRDT service type name
+import (
+	"context"
+)
+
+// ServiceType is a gossip service type name
 type ServiceType string
 
-// Service is a CRDT service interface
-type Service interface{}
+// ServiceID is a gossip service identifier
+type ServiceID string
+
+// Service is a gossip service interface
+type Service interface {
+	Read(ctx context.Context, key string) (*Object, error)
+	Update(ctx context.Context, object *Object) error
+	Clone(ctx context.Context, ch chan<- Object) error
+}

@@ -68,7 +68,8 @@ type TypeMeta struct {
 // PrimitiveMeta is the metadata for a primitive
 type PrimitiveMeta struct {
 	ServiceMeta
-	Name string
+	Name  string
+	State StateMeta
 }
 
 // ServiceMeta is the metadata for a service
@@ -78,14 +79,20 @@ type ServiceMeta struct {
 	Methods []MethodMeta
 }
 
+type StateMeta struct {
+	Value *StateTypeMeta
+	Entry *StateTypeMeta
+}
+
+type StateTypeMeta struct {
+	Type   TypeMeta
+	Key    *FieldRefMeta
+	Digest *FieldRefMeta
+}
+
 type ServiceTypeMeta struct {
 	Name    string
 	Package PackageMeta
-}
-
-// MessageTypeMeta is the metadata for a message type
-type MessageTypeMeta struct {
-	TypeMeta
 }
 
 // FieldRefMeta is metadata for a field reference
@@ -142,29 +149,17 @@ type RequestMeta struct {
 	Header         FieldRefMeta
 	PartitionKey   *FieldRefMeta
 	PartitionRange *FieldRefMeta
-	Input          *InputMeta
 	IsDiscrete     bool
 	IsStream       bool
-}
-
-// InputMeta is the type metadata for a message
-type InputMeta struct {
-	FieldRefMeta
 }
 
 // ResponseMeta is the type metadata for a message
 type ResponseMeta struct {
 	MessageMeta
 	Header     FieldRefMeta
-	Output     *OutputMeta
+	Aggregates []AggregatorMeta
 	IsDiscrete bool
 	IsStream   bool
-}
-
-// OutputMeta is the type metadata for a message
-type OutputMeta struct {
-	FieldRefMeta
-	Aggregates []AggregatorMeta
 }
 
 type AggregatorMeta struct {
@@ -176,9 +171,7 @@ type AggregatorMeta struct {
 
 // MethodTypeMeta is the metadata for a store method type
 type MethodTypeMeta struct {
-	IsCommand  bool
-	IsQuery    bool
-	IsSnapshot bool
-	IsRestore  bool
-	IsAsync    bool
+	IsCommand bool
+	IsQuery   bool
+	IsAsync   bool
 }

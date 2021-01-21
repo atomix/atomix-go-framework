@@ -3,9 +3,7 @@ package indexedmap
 import (
 	indexedmap "github.com/atomix/api/go/atomix/primitive/indexedmap"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
-	"io"
 )
 
 type ServiceEventsStream interface {
@@ -19,7 +17,7 @@ type ServiceEventsStream interface {
 	Session() rsm.Session
 
 	// Notify sends a value on the stream
-	Notify(value *indexedmap.EventsOutput) error
+	Notify(value *indexedmap.EventsResponse) error
 
 	// Close closes the stream
 	Close()
@@ -47,7 +45,7 @@ func (s *ServiceAdaptorEventsStream) Session() rsm.Session {
 	return s.stream.Session()
 }
 
-func (s *ServiceAdaptorEventsStream) Notify(value *indexedmap.EventsOutput) error {
+func (s *ServiceAdaptorEventsStream) Notify(value *indexedmap.EventsResponse) error {
 	bytes, err := proto.Marshal(value)
 	if err != nil {
 		return err
@@ -73,7 +71,7 @@ type ServiceEntriesStream interface {
 	Session() rsm.Session
 
 	// Notify sends a value on the stream
-	Notify(value *indexedmap.EntriesOutput) error
+	Notify(value *indexedmap.EntriesResponse) error
 
 	// Close closes the stream
 	Close()
@@ -101,7 +99,7 @@ func (s *ServiceAdaptorEntriesStream) Session() rsm.Session {
 	return s.stream.Session()
 }
 
-func (s *ServiceAdaptorEntriesStream) Notify(value *indexedmap.EntriesOutput) error {
+func (s *ServiceAdaptorEntriesStream) Notify(value *indexedmap.EntriesResponse) error {
 	bytes, err := proto.Marshal(value)
 	if err != nil {
 		return err
@@ -116,88 +114,27 @@ func (s *ServiceAdaptorEntriesStream) Close() {
 
 var _ ServiceEntriesStream = &ServiceAdaptorEntriesStream{}
 
-type ServiceSnapshotWriter interface {
-	// Write writes a value to the stream
-	Write(value *indexedmap.SnapshotEntry) error
-
-	// Close closes the stream
-	Close()
-}
-
-func newServiceSnapshotWriter(writer io.Writer) ServiceSnapshotWriter {
-	return &ServiceAdaptorSnapshotWriter{
-		writer: writer,
-	}
-}
-
-type ServiceAdaptorSnapshotWriter struct {
-	writer io.Writer
-}
-
-func (s *ServiceAdaptorSnapshotWriter) Write(value *indexedmap.SnapshotEntry) error {
-	bytes, err := proto.Marshal(value)
-	if err != nil {
-		return err
-	}
-	return util.WriteBytes(s.writer, bytes)
-}
-
-func (s *ServiceAdaptorSnapshotWriter) Close() {
-
-}
-
-var _ ServiceSnapshotWriter = &ServiceAdaptorSnapshotWriter{}
-
-func newServiceSnapshotStreamWriter(stream rsm.Stream) ServiceSnapshotWriter {
-	return &ServiceAdaptorSnapshotStreamWriter{
-		stream: stream,
-	}
-}
-
-type ServiceAdaptorSnapshotStreamWriter struct {
-	stream rsm.Stream
-}
-
-func (s *ServiceAdaptorSnapshotStreamWriter) Write(value *indexedmap.SnapshotEntry) error {
-	bytes, err := proto.Marshal(value)
-	if err != nil {
-		return err
-	}
-	s.stream.Value(bytes)
-	return nil
-}
-
-func (s *ServiceAdaptorSnapshotStreamWriter) Close() {
-	s.stream.Close()
-}
-
-var _ ServiceSnapshotWriter = &ServiceAdaptorSnapshotStreamWriter{}
-
 type Service interface {
 	// Size returns the size of the map
-	Size() (*indexedmap.SizeOutput, error)
+	Size(*indexedmap.SizeRequest) (*indexedmap.SizeResponse, error)
 	// Put puts an entry into the map
-	Put(*indexedmap.PutInput) (*indexedmap.PutOutput, error)
+	Put(*indexedmap.PutRequest) (*indexedmap.PutResponse, error)
 	// Get gets the entry for a key
-	Get(*indexedmap.GetInput) (*indexedmap.GetOutput, error)
+	Get(*indexedmap.GetRequest) (*indexedmap.GetResponse, error)
 	// FirstEntry gets the first entry in the map
-	FirstEntry() (*indexedmap.FirstEntryOutput, error)
+	FirstEntry(*indexedmap.FirstEntryRequest) (*indexedmap.FirstEntryResponse, error)
 	// LastEntry gets the last entry in the map
-	LastEntry() (*indexedmap.LastEntryOutput, error)
+	LastEntry(*indexedmap.LastEntryRequest) (*indexedmap.LastEntryResponse, error)
 	// PrevEntry gets the previous entry in the map
-	PrevEntry(*indexedmap.PrevEntryInput) (*indexedmap.PrevEntryOutput, error)
+	PrevEntry(*indexedmap.PrevEntryRequest) (*indexedmap.PrevEntryResponse, error)
 	// NextEntry gets the next entry in the map
-	NextEntry(*indexedmap.NextEntryInput) (*indexedmap.NextEntryOutput, error)
+	NextEntry(*indexedmap.NextEntryRequest) (*indexedmap.NextEntryResponse, error)
 	// Remove removes an entry from the map
-	Remove(*indexedmap.RemoveInput) (*indexedmap.RemoveOutput, error)
+	Remove(*indexedmap.RemoveRequest) (*indexedmap.RemoveResponse, error)
 	// Clear removes all entries from the map
-	Clear() error
+	Clear(*indexedmap.ClearRequest) (*indexedmap.ClearResponse, error)
 	// Events listens for change events
-	Events(*indexedmap.EventsInput, ServiceEventsStream) (rsm.StreamCloser, error)
+	Events(*indexedmap.EventsRequest, ServiceEventsStream) (rsm.StreamCloser, error)
 	// Entries lists all entries in the map
-	Entries(*indexedmap.EntriesInput, ServiceEntriesStream) (rsm.StreamCloser, error)
-	// Snapshot exports a snapshot of the primitive state
-	Snapshot(ServiceSnapshotWriter) error
-	// Restore imports a snapshot of the primitive state
-	Restore(*indexedmap.SnapshotEntry) error
+	Entries(*indexedmap.EntriesRequest, ServiceEntriesStream) (rsm.StreamCloser, error)
 }

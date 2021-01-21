@@ -41,7 +41,7 @@ type valueService struct {
 }
 
 func (v *valueService) notify(event valueapi.Event) error {
-	output := &valueapi.EventsOutput{
+	output := &valueapi.EventsResponse{
 		Event: event,
 	}
 	for _, stream := range v.streams {
@@ -52,7 +52,7 @@ func (v *valueService) notify(event valueapi.Event) error {
 	return nil
 }
 
-func (v *valueService) Set(input *valueapi.SetInput) (*valueapi.SetOutput, error) {
+func (v *valueService) Set(input *valueapi.SetRequest) (*valueapi.SetResponse, error) {
 	for _, precondition := range input.Preconditions {
 		switch p := precondition.Precondition.(type) {
 		case *valueapi.Precondition_Metadata:
@@ -88,31 +88,33 @@ func (v *valueService) Set(input *valueapi.SetInput) (*valueapi.SetOutput, error
 	if err != nil {
 		return nil, err
 	}
-	return &valueapi.SetOutput{
+	return &valueapi.SetResponse{
 		Value: value,
 	}, nil
 }
 
-func (v *valueService) Get(input *valueapi.GetInput) (*valueapi.GetOutput, error) {
-	return &valueapi.GetOutput{
+func (v *valueService) Get(input *valueapi.GetRequest) (*valueapi.GetResponse, error) {
+	return &valueapi.GetResponse{
 		Value: v.value,
 	}, nil
 }
 
-func (v *valueService) Events(input *valueapi.EventsInput, stream ServiceEventsStream) (rsm.StreamCloser, error) {
+func (v *valueService) Events(input *valueapi.EventsRequest, stream ServiceEventsStream) (rsm.StreamCloser, error) {
 	v.streams[stream.ID()] = stream
 	return func() {
 		delete(v.streams, stream.ID())
 	}, nil
 }
 
-func (v *valueService) Snapshot() (*valueapi.Snapshot, error) {
-	return &valueapi.Snapshot{
-		Value: &v.value,
+func (v *valueService) Snapshot() (*valueapi.SnapshotResponse, error) {
+	return &valueapi.SnapshotResponse{
+		Snapshot: valueapi.Snapshot{
+			Value: v.value,
+		},
 	}, nil
 }
 
-func (v *valueService) Restore(snapshot *valueapi.Snapshot) error {
-	v.value = *snapshot.Value
+func (v *valueService) Restore(snapshot *valueapi.RestoreRequest) error {
+	v.value = snapshot.Snapshot.Value
 	return nil
 }

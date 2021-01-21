@@ -17,7 +17,7 @@ type ServiceEventsStream interface {
 	Session() rsm.Session
 
 	// Notify sends a value on the stream
-	Notify(value *leader.EventsOutput) error
+	Notify(value *leader.EventsResponse) error
 
 	// Close closes the stream
 	Close()
@@ -45,7 +45,7 @@ func (s *ServiceAdaptorEventsStream) Session() rsm.Session {
 	return s.stream.Session()
 }
 
-func (s *ServiceAdaptorEventsStream) Notify(value *leader.EventsOutput) error {
+func (s *ServiceAdaptorEventsStream) Notify(value *leader.EventsResponse) error {
 	bytes, err := proto.Marshal(value)
 	if err != nil {
 		return err
@@ -62,13 +62,9 @@ var _ ServiceEventsStream = &ServiceAdaptorEventsStream{}
 
 type Service interface {
 	// Latch attempts to acquire the leader latch
-	Latch(*leader.LatchInput) (*leader.LatchOutput, error)
+	Latch(*leader.LatchRequest) (*leader.LatchResponse, error)
 	// Get gets the current leader
-	Get(*leader.GetInput) (*leader.GetOutput, error)
+	Get(*leader.GetRequest) (*leader.GetResponse, error)
 	// Events listens for leader change events
-	Events(*leader.EventsInput, ServiceEventsStream) (rsm.StreamCloser, error)
-	// Snapshot exports a snapshot of the primitive state
-	Snapshot() (*leader.Snapshot, error)
-	// Restore imports a snapshot of the primitive state
-	Restore(*leader.Snapshot) error
+	Events(*leader.EventsRequest, ServiceEventsStream) (rsm.StreamCloser, error)
 }

@@ -4,19 +4,15 @@ import (
 	lock "github.com/atomix/api/go/atomix/primitive/lock"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
-	"io"
 )
 
 const Type = "Lock"
 
 const (
-	lockOp     = "Lock"
-	unlockOp   = "Unlock"
-	getLockOp  = "GetLock"
-	snapshotOp = "Snapshot"
-	restoreOp  = "Restore"
+	lockOp    = "Lock"
+	unlockOp  = "Unlock"
+	getLockOp = "GetLock"
 )
 
 var newServiceFunc rsm.NewServiceFunc
@@ -50,8 +46,6 @@ func (s *ServiceAdaptor) init() {
 	s.RegisterStreamOperation(lockOp, s.lock)
 	s.RegisterUnaryOperation(unlockOp, s.unlock)
 	s.RegisterUnaryOperation(getLockOp, s.getLock)
-	s.RegisterUnaryOperation(snapshotOp, s.snapshot)
-	s.RegisterUnaryOperation(restoreOp, s.restore)
 }
 
 func (s *ServiceAdaptor) SessionOpen(session rsm.Session) {
@@ -72,47 +66,14 @@ func (s *ServiceAdaptor) SessionClosed(session rsm.Session) {
 	}
 }
 
-func (s *ServiceAdaptor) Backup(writer io.Writer) error {
-	snapshot, err := s.rsm.Snapshot()
-	if err != nil {
-		s.log.Error(err)
-		return err
-	}
-	bytes, err := proto.Marshal(snapshot)
-	if err != nil {
-		s.log.Error(err)
-		return err
-	}
-	return util.WriteBytes(writer, bytes)
-}
-
-func (s *ServiceAdaptor) Restore(reader io.Reader) error {
-	bytes, err := util.ReadBytes(reader)
-	if err != nil {
-		s.log.Error(err)
-		return err
-	}
-	snapshot := &lock.Snapshot{}
-	err = proto.Unmarshal(bytes, snapshot)
-	if err != nil {
-		return err
-	}
-	err = s.rsm.Restore(snapshot)
-	if err != nil {
-		s.log.Error(err)
-		return err
-	}
-	return nil
-}
-
-func (s *ServiceAdaptor) lock(in []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
-	input := &lock.LockInput{}
-	err := proto.Unmarshal(in, input)
+func (s *ServiceAdaptor) lock(input []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
+	request := &lock.LockRequest{}
+	err := proto.Unmarshal(input, request)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
-	future, err := s.rsm.Lock(input)
+	future, err := s.rsm.Lock(request)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
@@ -121,78 +82,48 @@ func (s *ServiceAdaptor) lock(in []byte, stream rsm.Stream) (rsm.StreamCloser, e
 	return nil, nil
 }
 
-func (s *ServiceAdaptor) unlock(in []byte) ([]byte, error) {
-	input := &lock.UnlockInput{}
-	err := proto.Unmarshal(in, input)
+func (s *ServiceAdaptor) unlock(input []byte) ([]byte, error) {
+	request := &lock.UnlockRequest{}
+	err := proto.Unmarshal(input, request)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
 
-	output, err := s.rsm.Unlock(input)
+	response, err := s.rsm.Unlock(request)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
 
-	out, err := proto.Marshal(output)
+	output, err := proto.Marshal(response)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
-	return out, nil
+	return output, nil
 }
 
-func (s *ServiceAdaptor) getLock(in []byte) ([]byte, error) {
-	input := &lock.GetLockInput{}
-	err := proto.Unmarshal(in, input)
+func (s *ServiceAdaptor) getLock(input []byte) ([]byte, error) {
+	request := &lock.GetLockRequest{}
+	err := proto.Unmarshal(input, request)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
 
-	output, err := s.rsm.GetLock(input)
+	response, err := s.rsm.GetLock(request)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
 
-	out, err := proto.Marshal(output)
+	output, err := proto.Marshal(response)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
-	return out, nil
-}
-
-func (s *ServiceAdaptor) snapshot(in []byte) ([]byte, error) {
-	output, err := s.rsm.Snapshot()
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-
-	out, err := proto.Marshal(output)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-	return out, nil
-}
-
-func (s *ServiceAdaptor) restore(in []byte) ([]byte, error) {
-	input := &lock.Snapshot{}
-	err := proto.Unmarshal(in, input)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-	err = s.rsm.Restore(input)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-	return nil, nil
+	return output, nil
 }
 
 var _ rsm.Service = &ServiceAdaptor{}

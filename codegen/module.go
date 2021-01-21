@@ -16,7 +16,8 @@ package codegen
 
 import (
 	"fmt"
-	"github.com/atomix/api/go/atomix/primitive"
+	operationext "github.com/atomix/api/go/atomix/primitive/extensions/operation"
+	partitionext "github.com/atomix/api/go/atomix/primitive/extensions/partition"
 	"github.com/atomix/go-framework/codegen/meta"
 	"github.com/lyft/protoc-gen-star"
 	"github.com/lyft/protoc-gen-star/lang/go"
@@ -87,13 +88,13 @@ func (m *Module) executeService(service pgs.Service) {
 		return
 	}
 
-	partition, err := meta.GetPartition(service)
+	partition, err := meta.GetPartitioned(service)
 	if err != nil {
 		panic(err)
 	}
 
 	importsSet := make(map[string]meta.PackageMeta)
-	var addImport = func(t meta.TypeMeta) {
+	var addImport = func(t *meta.TypeMeta) {
 		if t.Package.Alias != "" {
 			baseAlias := t.Package.Alias
 			i := 0
@@ -128,13 +129,9 @@ func (m *Module) executeService(service pgs.Service) {
 		}
 
 		methodTypeMeta := meta.MethodTypeMeta{
-			IsCommand: operationType == primitive.OperationType_COMMAND ||
-				operationType == primitive.OperationType_SNAPSHOT ||
-				operationType == primitive.OperationType_RESTORE,
-			IsQuery:    operationType == primitive.OperationType_QUERY,
-			IsSnapshot: operationType == primitive.OperationType_SNAPSHOT,
-			IsRestore:  operationType == primitive.OperationType_RESTORE,
-			IsAsync:    async,
+			IsCommand: operationType == operationext.OperationType_COMMAND,
+			IsQuery:   operationType == operationext.OperationType_QUERY,
+			IsAsync:   async,
 		}
 
 		requestMeta := meta.RequestMeta{
@@ -144,26 +141,7 @@ func (m *Module) executeService(service pgs.Service) {
 			IsDiscrete: !method.ClientStreaming(),
 			IsStream:   method.ClientStreaming(),
 		}
-		addImport(requestMeta.Type)
-
-		inputHeader, err := m.ctx.GetHeaderFieldMeta(method.Input())
-		if err != nil {
-			panic(err)
-		} else if inputHeader != nil {
-			requestMeta.Header = *inputHeader
-		} else {
-			panic(fmt.Errorf("no 'atomix.primitive.header' field found on message type '%s'", method.Input().Name().String()))
-		}
-
-		inputField, err := m.ctx.GetInputFieldMeta(method.Input())
-		if err != nil {
-			panic(err)
-		} else if inputField != nil {
-			requestMeta.Input = &meta.InputMeta{
-				FieldRefMeta: *inputField,
-			}
-			addImport(inputField.Field.Type)
-		}
+		addImport(&requestMeta.Type)
 
 		var methodScopeMeta meta.MethodScopeMeta
 		var methodPartitionerMeta meta.MethodPartitionerMeta
@@ -176,11 +154,11 @@ func (m *Module) executeService(service pgs.Service) {
 		if partition {
 			if partitionStrategy != nil {
 				switch *partitionStrategy {
-				case primitive.PartitionStrategy_NONE:
+				case partitionext.PartitionStrategy_NONE:
 					methodScopeMeta = meta.MethodScopeMeta{
 						IsGlobal: true,
 					}
-				case primitive.PartitionStrategy_HASH:
+				case partitionext.PartitionStrategy_HASH:
 					partitionKey, err := m.ctx.GetPartitionKeyFieldMeta(method.Input())
 					if err != nil {
 						panic(err)
@@ -195,7 +173,7 @@ func (m *Module) executeService(service pgs.Service) {
 					methodPartitionerMeta = meta.MethodPartitionerMeta{
 						IsHash: true,
 					}
-				case primitive.PartitionStrategy_RANGE:
+				case partitionext.PartitionStrategy_RANGE:
 					partitionRange, err := m.ctx.GetPartitionRangeFieldMeta(method.Input())
 					if err != nil {
 						panic(err)
@@ -210,14 +188,14 @@ func (m *Module) executeService(service pgs.Service) {
 					methodPartitionerMeta = meta.MethodPartitionerMeta{
 						IsRange: true,
 					}
-				case primitive.PartitionStrategy_RANDOM:
+				case partitionext.PartitionStrategy_RANDOM:
 					methodScopeMeta = meta.MethodScopeMeta{
 						IsPartition: true,
 					}
 					methodPartitionerMeta = meta.MethodPartitionerMeta{
 						IsRandom: true,
 					}
-				case primitive.PartitionStrategy_ROUND_ROBIN:
+				case partitionext.PartitionStrategy_ROUND_ROBIN:
 					methodScopeMeta = meta.MethodScopeMeta{
 						IsPartition: true,
 					}
@@ -251,46 +229,13 @@ func (m *Module) executeService(service pgs.Service) {
 			IsDiscrete: !method.ServerStreaming(),
 			IsStream:   method.ServerStreaming(),
 		}
-		addImport(responseMeta.Type)
+		addImport(&responseMeta.Type)
 
-		outputHeader, err := m.ctx.GetHeaderFieldMeta(method.Output())
+		aggregates, err := m.ctx.GetAggregateFields(method.Output())
 		if err != nil {
 			panic(err)
-		} else if inputHeader != nil {
-			responseMeta.Header = *outputHeader
-		} else {
-			panic(fmt.Errorf("no 'atomix.primitive.header' field found on message type '%s'", method.Output().Name().String()))
 		}
-
-		outputField, err := m.ctx.GetOutputFieldMeta(method.Output())
-		if err != nil {
-			panic(err)
-		} else if outputField != nil {
-			aggregators, err := m.ctx.GetAggregateFields(method.Output())
-			if err != nil {
-				panic(err)
-			}
-
-			aggregates := make([]meta.AggregatorMeta, len(aggregators))
-			for i, aggregate := range aggregators {
-				aggregates[i] = meta.AggregatorMeta{
-					FieldRefMeta: meta.FieldRefMeta{
-						Field: meta.FieldMeta{
-							Type: aggregate.Field.Type,
-							Path: aggregate.Field.Path[len(outputField.Field.Path):],
-						},
-					},
-					IsChooseFirst: aggregate.IsChooseFirst,
-					IsAppend:      aggregate.IsAppend,
-					IsSum:         aggregate.IsSum,
-				}
-			}
-			responseMeta.Output = &meta.OutputMeta{
-				FieldRefMeta: *outputField,
-				Aggregates:   aggregates,
-			}
-			addImport(outputField.Field.Type)
-		}
+		responseMeta.Aggregates = aggregates
 
 		methodMeta := meta.MethodMeta{
 			Name:        method.Name().UpperCamelCase().String(),
@@ -311,6 +256,25 @@ func (m *Module) executeService(service pgs.Service) {
 		imports = append(imports, importPkg)
 	}
 
+	valueType, err := m.ctx.GetStateValueTypeMeta(service)
+	if err != nil {
+		panic(err)
+	} else if valueType != nil {
+		addImport(&valueType.Type)
+	}
+
+	entryType, err := m.ctx.GetStateEntryTypeMeta(service)
+	if err != nil {
+		panic(err)
+	} else if entryType != nil {
+		addImport(&entryType.Type)
+	}
+
+	stateMeta := meta.StateMeta{
+		Value: valueType,
+		Entry: entryType,
+	}
+
 	primitiveMeta := meta.PrimitiveMeta{
 		Name: primitiveType,
 		ServiceMeta: meta.ServiceMeta{
@@ -321,6 +285,7 @@ func (m *Module) executeService(service pgs.Service) {
 			Comment: service.SourceCodeInfo().LeadingComments(),
 			Methods: methods,
 		},
+		State: stateMeta,
 	}
 
 	// Generate the store metadata.

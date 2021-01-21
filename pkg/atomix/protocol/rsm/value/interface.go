@@ -17,7 +17,7 @@ type ServiceEventsStream interface {
 	Session() rsm.Session
 
 	// Notify sends a value on the stream
-	Notify(value *value.EventsOutput) error
+	Notify(value *value.EventsResponse) error
 
 	// Close closes the stream
 	Close()
@@ -45,7 +45,7 @@ func (s *ServiceAdaptorEventsStream) Session() rsm.Session {
 	return s.stream.Session()
 }
 
-func (s *ServiceAdaptorEventsStream) Notify(value *value.EventsOutput) error {
+func (s *ServiceAdaptorEventsStream) Notify(value *value.EventsResponse) error {
 	bytes, err := proto.Marshal(value)
 	if err != nil {
 		return err
@@ -62,13 +62,9 @@ var _ ServiceEventsStream = &ServiceAdaptorEventsStream{}
 
 type Service interface {
 	// Set sets the value
-	Set(*value.SetInput) (*value.SetOutput, error)
+	Set(*value.SetRequest) (*value.SetResponse, error)
 	// Get gets the value
-	Get(*value.GetInput) (*value.GetOutput, error)
+	Get(*value.GetRequest) (*value.GetResponse, error)
 	// Events listens for value change events
-	Events(*value.EventsInput, ServiceEventsStream) (rsm.StreamCloser, error)
-	// Snapshot exports a snapshot of the primitive state
-	Snapshot() (*value.Snapshot, error)
-	// Restore imports a snapshot of the primitive state
-	Restore(*value.Snapshot) error
+	Events(*value.EventsRequest, ServiceEventsStream) (rsm.StreamCloser, error)
 }

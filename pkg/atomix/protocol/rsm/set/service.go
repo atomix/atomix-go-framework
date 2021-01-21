@@ -41,7 +41,7 @@ type setService struct {
 }
 
 func (s *setService) notify(event setapi.Event) error {
-	output := &setapi.EventsOutput{
+	output := &setapi.EventsResponse{
 		Event: event,
 	}
 	for _, stream := range s.streams {
@@ -52,52 +52,52 @@ func (s *setService) notify(event setapi.Event) error {
 	return nil
 }
 
-func (s *setService) Size() (*setapi.SizeOutput, error) {
-	return &setapi.SizeOutput{
+func (s *setService) Size(*setapi.SizeRequest) (*setapi.SizeResponse, error) {
+	return &setapi.SizeResponse{
 		Size_: uint32(len(s.values)),
 	}, nil
 }
 
-func (s *setService) Contains(input *setapi.ContainsInput) (*setapi.ContainsOutput, error) {
-	_, ok := s.values[input.Element.Value]
-	return &setapi.ContainsOutput{
+func (s *setService) Contains(request *setapi.ContainsRequest) (*setapi.ContainsResponse, error) {
+	_, ok := s.values[request.Element.Value]
+	return &setapi.ContainsResponse{
 		Contains: ok,
 	}, nil
 }
 
-func (s *setService) Add(input *setapi.AddInput) (*setapi.AddOutput, error) {
-	if _, ok := s.values[input.Element.Value]; ok {
+func (s *setService) Add(request *setapi.AddRequest) (*setapi.AddResponse, error) {
+	if _, ok := s.values[request.Element.Value]; ok {
 		return nil, errors.NewAlreadyExists("value already exists")
 	}
 
-	s.values[input.Element.Value] = meta.New(input.Element.ObjectMeta)
+	s.values[request.Element.Value] = meta.New(request.Element.ObjectMeta)
 	err := s.notify(setapi.Event{
 		Type:    setapi.Event_ADD,
-		Element: input.Element,
+		Element: request.Element,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &setapi.AddOutput{
-		Element: input.Element,
+	return &setapi.AddResponse{
+		Element: request.Element,
 	}, nil
 }
 
-func (s *setService) Remove(input *setapi.RemoveInput) (*setapi.RemoveOutput, error) {
-	object, ok := s.values[input.Element.Value]
+func (s *setService) Remove(request *setapi.RemoveRequest) (*setapi.RemoveResponse, error) {
+	object, ok := s.values[request.Element.Value]
 	if !ok {
 		return nil, errors.NewNotFound("value not found")
 	}
 
-	if !object.Equal(meta.New(input.Element.ObjectMeta)) {
+	if !object.Equal(meta.New(request.Element.ObjectMeta)) {
 		return nil, errors.NewConflict("metadata mismatch")
 	}
 
-	delete(s.values, input.Element.Value)
+	delete(s.values, request.Element.Value)
 
 	element := setapi.Element{
 		ObjectMeta: object.Proto(),
-		Value:      input.Element.Value,
+		Value:      request.Element.Value,
 	}
 	err := s.notify(setapi.Event{
 		Type:    setapi.Event_REMOVE,
@@ -106,20 +106,20 @@ func (s *setService) Remove(input *setapi.RemoveInput) (*setapi.RemoveOutput, er
 	if err != nil {
 		return nil, err
 	}
-	return &setapi.RemoveOutput{
+	return &setapi.RemoveResponse{
 		Element: element,
 	}, nil
 }
 
-func (s *setService) Clear() error {
+func (s *setService) Clear(*setapi.ClearRequest) (*setapi.ClearResponse, error) {
 	s.values = make(map[string]meta.ObjectMeta)
-	return nil
+	return &setapi.ClearResponse{}, nil
 }
 
-func (s *setService) Events(input *setapi.EventsInput, stream ServiceEventsStream) (rsm.StreamCloser, error) {
-	if input.Replay {
+func (s *setService) Events(request *setapi.EventsRequest, stream ServiceEventsStream) (rsm.StreamCloser, error) {
+	if request.Replay {
 		for value, metadata := range s.values {
-			err := stream.Notify(&setapi.EventsOutput{
+			err := stream.Notify(&setapi.EventsResponse{
 				Event: setapi.Event{
 					Type: setapi.Event_REPLAY,
 					Element: setapi.Element{
@@ -139,9 +139,9 @@ func (s *setService) Events(input *setapi.EventsInput, stream ServiceEventsStrea
 	}, nil
 }
 
-func (s *setService) Elements(input *setapi.ElementsInput, stream ServiceElementsStream) (rsm.StreamCloser, error) {
+func (s *setService) Elements(request *setapi.ElementsRequest, stream ServiceElementsStream) (rsm.StreamCloser, error) {
 	for value, object := range s.values {
-		err := stream.Notify(&setapi.ElementsOutput{
+		err := stream.Notify(&setapi.ElementsResponse{
 			Element: setapi.Element{
 				ObjectMeta: object.Proto(),
 				Value:      value,
@@ -156,10 +156,12 @@ func (s *setService) Elements(input *setapi.ElementsInput, stream ServiceElement
 
 func (s *setService) Snapshot(writer ServiceSnapshotWriter) error {
 	for value, object := range s.values {
-		err := writer.Write(&setapi.SnapshotEntry{
-			Element: setapi.Element{
-				ObjectMeta: object.Proto(),
-				Value:      value,
+		err := writer.Write(&setapi.SnapshotResponse{
+			Entry: setapi.SnapshotEntry{
+				Element: setapi.Element{
+					ObjectMeta: object.Proto(),
+					Value:      value,
+				},
 			},
 		})
 		if err != nil {
@@ -169,7 +171,7 @@ func (s *setService) Snapshot(writer ServiceSnapshotWriter) error {
 	return nil
 }
 
-func (s *setService) Restore(entry *setapi.SnapshotEntry) error {
-	s.values[entry.Element.Value] = meta.New(entry.Element.ObjectMeta)
+func (s *setService) Restore(request *setapi.RestoreRequest) error {
+	s.values[request.Entry.Element.Value] = meta.New(request.Entry.Element.ObjectMeta)
 	return nil
 }

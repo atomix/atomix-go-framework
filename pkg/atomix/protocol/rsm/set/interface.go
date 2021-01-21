@@ -3,9 +3,7 @@ package set
 import (
 	set "github.com/atomix/api/go/atomix/primitive/set"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
-	"io"
 )
 
 type ServiceEventsStream interface {
@@ -19,7 +17,7 @@ type ServiceEventsStream interface {
 	Session() rsm.Session
 
 	// Notify sends a value on the stream
-	Notify(value *set.EventsOutput) error
+	Notify(value *set.EventsResponse) error
 
 	// Close closes the stream
 	Close()
@@ -47,7 +45,7 @@ func (s *ServiceAdaptorEventsStream) Session() rsm.Session {
 	return s.stream.Session()
 }
 
-func (s *ServiceAdaptorEventsStream) Notify(value *set.EventsOutput) error {
+func (s *ServiceAdaptorEventsStream) Notify(value *set.EventsResponse) error {
 	bytes, err := proto.Marshal(value)
 	if err != nil {
 		return err
@@ -73,7 +71,7 @@ type ServiceElementsStream interface {
 	Session() rsm.Session
 
 	// Notify sends a value on the stream
-	Notify(value *set.ElementsOutput) error
+	Notify(value *set.ElementsResponse) error
 
 	// Close closes the stream
 	Close()
@@ -101,7 +99,7 @@ func (s *ServiceAdaptorElementsStream) Session() rsm.Session {
 	return s.stream.Session()
 }
 
-func (s *ServiceAdaptorElementsStream) Notify(value *set.ElementsOutput) error {
+func (s *ServiceAdaptorElementsStream) Notify(value *set.ElementsResponse) error {
 	bytes, err := proto.Marshal(value)
 	if err != nil {
 		return err
@@ -116,80 +114,19 @@ func (s *ServiceAdaptorElementsStream) Close() {
 
 var _ ServiceElementsStream = &ServiceAdaptorElementsStream{}
 
-type ServiceSnapshotWriter interface {
-	// Write writes a value to the stream
-	Write(value *set.SnapshotEntry) error
-
-	// Close closes the stream
-	Close()
-}
-
-func newServiceSnapshotWriter(writer io.Writer) ServiceSnapshotWriter {
-	return &ServiceAdaptorSnapshotWriter{
-		writer: writer,
-	}
-}
-
-type ServiceAdaptorSnapshotWriter struct {
-	writer io.Writer
-}
-
-func (s *ServiceAdaptorSnapshotWriter) Write(value *set.SnapshotEntry) error {
-	bytes, err := proto.Marshal(value)
-	if err != nil {
-		return err
-	}
-	return util.WriteBytes(s.writer, bytes)
-}
-
-func (s *ServiceAdaptorSnapshotWriter) Close() {
-
-}
-
-var _ ServiceSnapshotWriter = &ServiceAdaptorSnapshotWriter{}
-
-func newServiceSnapshotStreamWriter(stream rsm.Stream) ServiceSnapshotWriter {
-	return &ServiceAdaptorSnapshotStreamWriter{
-		stream: stream,
-	}
-}
-
-type ServiceAdaptorSnapshotStreamWriter struct {
-	stream rsm.Stream
-}
-
-func (s *ServiceAdaptorSnapshotStreamWriter) Write(value *set.SnapshotEntry) error {
-	bytes, err := proto.Marshal(value)
-	if err != nil {
-		return err
-	}
-	s.stream.Value(bytes)
-	return nil
-}
-
-func (s *ServiceAdaptorSnapshotStreamWriter) Close() {
-	s.stream.Close()
-}
-
-var _ ServiceSnapshotWriter = &ServiceAdaptorSnapshotStreamWriter{}
-
 type Service interface {
 	// Size gets the number of elements in the set
-	Size() (*set.SizeOutput, error)
+	Size(*set.SizeRequest) (*set.SizeResponse, error)
 	// Contains returns whether the set contains a value
-	Contains(*set.ContainsInput) (*set.ContainsOutput, error)
+	Contains(*set.ContainsRequest) (*set.ContainsResponse, error)
 	// Add adds a value to the set
-	Add(*set.AddInput) (*set.AddOutput, error)
+	Add(*set.AddRequest) (*set.AddResponse, error)
 	// Remove removes a value from the set
-	Remove(*set.RemoveInput) (*set.RemoveOutput, error)
+	Remove(*set.RemoveRequest) (*set.RemoveResponse, error)
 	// Clear removes all values from the set
-	Clear() error
+	Clear(*set.ClearRequest) (*set.ClearResponse, error)
 	// Events listens for set change events
-	Events(*set.EventsInput, ServiceEventsStream) (rsm.StreamCloser, error)
+	Events(*set.EventsRequest, ServiceEventsStream) (rsm.StreamCloser, error)
 	// Elements lists all elements in the set
-	Elements(*set.ElementsInput, ServiceElementsStream) (rsm.StreamCloser, error)
-	// Snapshot exports a snapshot of the primitive state
-	Snapshot(ServiceSnapshotWriter) error
-	// Restore imports a snapshot of the primitive state
-	Restore(*set.SnapshotEntry) error
+	Elements(*set.ElementsRequest, ServiceElementsStream) (rsm.StreamCloser, error)
 }

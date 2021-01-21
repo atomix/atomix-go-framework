@@ -1,165 +1,211 @@
+// Copyright 2019-present Open Networking Foundation.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package _map
 
 import (
 	"context"
-	_map "github.com/atomix/api/go/atomix/primitive/map"
-	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
-	streams "github.com/atomix/go-framework/pkg/atomix/stream"
-	"github.com/atomix/go-framework/pkg/atomix/util"
-	"github.com/golang/protobuf/proto"
-	"io"
+	mapapi "github.com/atomix/api/go/atomix/primitive/map"
+	metaapi "github.com/atomix/api/go/atomix/primitive/meta"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/meta"
 )
 
-const ServiceType gossip.ServiceType = "Map"
-
-// RegisterService registers the service on the given node
-func RegisterService(node *gossip.Node) {
-	node.RegisterService(ServiceType, newServiceFunc)
+func init() {
+	registerService(func(protocol Protocol) Service {
+		return &mapService{
+			protocol: protocol,
+			entries:  make(map[string]*mapapi.Entry),
+		}
+	})
 }
 
-var newServiceFunc gossip.NewServiceFunc
-
-type ServiceEventsStream interface {
-	// Notify sends a value on the stream
-	Notify(value *_map.EventsOutput) error
-
-	// Close closes the stream
-	Close()
+type mapService struct {
+	protocol Protocol
+	entries  map[string]*mapapi.Entry
+	streams  []chan<- mapapi.EventsResponse
 }
 
-func newServiceEventsStream(stream streams.WriteStream) ServiceEventsStream {
-	return &ServiceAdaptorEventsStream{
-		stream: stream,
+func (s *mapService) Protocol() Protocol {
+	return s.protocol
+}
+
+func (s *mapService) Update(ctx context.Context, update *mapapi.Entry) error {
+	stored, ok := s.entries[update.Key.Key]
+	if !ok || meta.New(update.Key.ObjectMeta).After(meta.New(stored.Key.ObjectMeta)) {
+		s.entries[update.Key.Key] = update
+		return s.Protocol().Broadcast(ctx, update)
 	}
-}
-
-type ServiceAdaptorEventsStream struct {
-	stream streams.WriteStream
-}
-
-func (s *ServiceAdaptorEventsStream) Notify(value *_map.EventsOutput) error {
-	bytes, err := proto.Marshal(value)
-	if err != nil {
-		return err
-	}
-	s.stream.Value(bytes)
 	return nil
 }
 
-func (s *ServiceAdaptorEventsStream) Close() {
-	s.stream.Close()
+func (s *mapService) Read(ctx context.Context, key string) (*mapapi.Entry, error) {
+	return s.entries[key], nil
 }
 
-var _ ServiceEventsStream = &ServiceAdaptorEventsStream{}
-
-type ServiceEntriesStream interface {
-	// Notify sends a value on the stream
-	Notify(value *_map.EntriesOutput) error
-
-	// Close closes the stream
-	Close()
-}
-
-func newServiceEntriesStream(stream streams.WriteStream) ServiceEntriesStream {
-	return &ServiceAdaptorEntriesStream{
-		stream: stream,
+func (s *mapService) List(ctx context.Context, ch chan<- mapapi.Entry) error {
+	for _, entry := range s.entries {
+		ch <- *entry
 	}
-}
-
-type ServiceAdaptorEntriesStream struct {
-	stream streams.WriteStream
-}
-
-func (s *ServiceAdaptorEntriesStream) Notify(value *_map.EntriesOutput) error {
-	bytes, err := proto.Marshal(value)
-	if err != nil {
-		return err
-	}
-	s.stream.Value(bytes)
 	return nil
 }
 
-func (s *ServiceAdaptorEntriesStream) Close() {
-	s.stream.Close()
+func (s *mapService) Size(ctx context.Context, _ *mapapi.SizeRequest) (*mapapi.SizeResponse, error) {
+	return &mapapi.SizeResponse{
+		Size_: uint32(len(s.entries)),
+	}, nil
 }
 
-var _ ServiceEntriesStream = &ServiceAdaptorEntriesStream{}
-
-type ServiceSnapshotWriter interface {
-	// Write writes a value to the stream
-	Write(value *_map.SnapshotEntry) error
-
-	// Close closes the stream
-	Close()
-}
-
-func newServiceSnapshotWriter(writer io.Writer) ServiceSnapshotWriter {
-	return &ServiceAdaptorSnapshotWriter{
-		writer: writer,
+func (s *mapService) Put(ctx context.Context, input *mapapi.PutRequest) (*mapapi.PutResponse, error) {
+	entry, ok := s.entries[input.Entry.Key.Key]
+	if ok {
+		storedMeta := meta.New(entry.Key.ObjectMeta)
+		updateMeta := meta.New(input.Entry.Key.ObjectMeta)
+		if storedMeta.Timestamp.After(updateMeta.Timestamp) {
+			return nil, errors.NewConflict("concurrent update")
+		}
 	}
-}
 
-type ServiceAdaptorSnapshotWriter struct {
-	writer io.Writer
-}
-
-func (s *ServiceAdaptorSnapshotWriter) Write(value *_map.SnapshotEntry) error {
-	bytes, err := proto.Marshal(value)
-	if err != nil {
-		return err
+	if err := checkPreconditions(entry, input.Preconditions); err != nil {
+		return nil, err
 	}
-	return util.WriteBytes(s.writer, bytes)
-}
 
-func (s *ServiceAdaptorSnapshotWriter) Close() {
+	entry = &input.Entry
+	s.entries[input.Entry.Key.Key] = entry
 
-}
-
-var _ ServiceSnapshotWriter = &ServiceAdaptorSnapshotWriter{}
-
-func newServiceSnapshotStreamWriter(stream streams.WriteStream) ServiceSnapshotWriter {
-	return &ServiceAdaptorSnapshotStreamWriter{
-		stream: stream,
+	if !ok {
+		s.notify(mapapi.Event{
+			Type:  mapapi.Event_INSERT,
+			Entry: *entry,
+		})
+	} else {
+		s.notify(mapapi.Event{
+			Type:  mapapi.Event_UPDATE,
+			Entry: *entry,
+		})
 	}
-}
 
-type ServiceAdaptorSnapshotStreamWriter struct {
-	stream streams.WriteStream
-}
-
-func (s *ServiceAdaptorSnapshotStreamWriter) Write(value *_map.SnapshotEntry) error {
-	bytes, err := proto.Marshal(value)
-	if err != nil {
-		return err
+	if err := s.Protocol().Broadcast(ctx, entry); err != nil {
+		return nil, err
 	}
-	s.stream.Value(bytes)
+
+	return &mapapi.PutResponse{
+		Entry: *entry,
+	}, nil
+}
+
+func (s *mapService) Get(ctx context.Context, input *mapapi.GetRequest) (*mapapi.GetResponse, error) {
+	entry, ok := s.entries[input.Key]
+	if !ok {
+		return nil, errors.NewNotFound("key '%s' not found", input.Key)
+	}
+	return &mapapi.GetResponse{
+		Entry: *entry,
+	}, nil
+}
+
+func (s *mapService) Remove(ctx context.Context, input *mapapi.RemoveRequest) (*mapapi.RemoveResponse, error) {
+	entry, ok := s.entries[input.Key.Key]
+	if !ok {
+		return nil, errors.NewNotFound("key '%s' not found", input.Key)
+	}
+
+	storedMeta := meta.New(entry.Key.ObjectMeta)
+	updateMeta := meta.New(input.Key.ObjectMeta)
+	if storedMeta.Timestamp.After(updateMeta.Timestamp) {
+		return nil, errors.NewConflict("concurrent update")
+	}
+
+	if err := checkPreconditions(entry, input.Preconditions); err != nil {
+		return nil, err
+	}
+
+	entry = &mapapi.Entry{
+		Key: input.Key,
+	}
+	entry.Key.Type = metaapi.ObjectMeta_TOMBSTONE
+	s.entries[input.Key.Key] = entry
+
+	s.notify(mapapi.Event{
+		Type:  mapapi.Event_REMOVE,
+		Entry: *entry,
+	})
+
+	if err := s.Protocol().Broadcast(ctx, entry); err != nil {
+		return nil, err
+	}
+
+	return &mapapi.RemoveResponse{
+		Entry: *entry,
+	}, nil
+}
+
+func (s *mapService) Clear(ctx context.Context, _ *mapapi.ClearRequest) (*mapapi.ClearResponse, error) {
+	for _, entry := range s.entries {
+		if entry.Key.Type != metaapi.ObjectMeta_TOMBSTONE {
+			entry.Key.Type = metaapi.ObjectMeta_TOMBSTONE
+			if err := s.Protocol().Broadcast(ctx, entry); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return &mapapi.ClearResponse{}, nil
+}
+
+func (s *mapService) Events(ctx context.Context, input *mapapi.EventsRequest, ch chan<- mapapi.EventsResponse) error {
+	if input.Replay {
+		for _, entry := range s.entries {
+			ch <- mapapi.EventsResponse{
+				Event: mapapi.Event{
+					Type:  mapapi.Event_REPLAY,
+					Entry: *entry,
+				},
+			}
+		}
+	}
+	s.streams = append(s.streams, ch)
 	return nil
 }
 
-func (s *ServiceAdaptorSnapshotStreamWriter) Close() {
-	s.stream.Close()
+func (s *mapService) Entries(ctx context.Context, input *mapapi.EntriesRequest, ch chan<- mapapi.EntriesResponse) error {
+	for _, entry := range s.entries {
+		ch <- mapapi.EntriesResponse{
+			Entry: *entry,
+		}
+	}
+	return nil
 }
 
-var _ ServiceSnapshotWriter = &ServiceAdaptorSnapshotStreamWriter{}
+func (s *mapService) notify(event mapapi.Event) {
+	for _, ch := range s.streams {
+		ch <- mapapi.EventsResponse{
+			Event: event,
+		}
+	}
+}
 
-type Service interface {
-	gossip.Service
-	// Size returns the size of the map
-	Size(context.Context) (*_map.SizeOutput, error)
-	// Put puts an entry into the map
-	Put(context.Context, *_map.PutInput) (*_map.PutOutput, error)
-	// Get gets the entry for a key
-	Get(context.Context, *_map.GetInput) (*_map.GetOutput, error)
-	// Remove removes an entry from the map
-	Remove(context.Context, *_map.RemoveInput) (*_map.RemoveOutput, error)
-	// Clear removes all entries from the map
-	Clear(context.Context) error
-	// Events listens for change events
-	Events(context.Context, *_map.EventsInput, ServiceEventsStream) error
-	// Entries lists all entries in the map
-	Entries(context.Context, *_map.EntriesInput, ServiceEntriesStream) error
-	// Snapshot exports a snapshot of the primitive state
-	Snapshot(context.Context, ServiceSnapshotWriter) error
-	// Restore imports a snapshot of the primitive state
-	Restore(context.Context, *_map.SnapshotEntry) error
+func checkPreconditions(entry *mapapi.Entry, preconditions []mapapi.Precondition) error {
+	for _, precondition := range preconditions {
+		switch p := precondition.Precondition.(type) {
+		case *mapapi.Precondition_Metadata:
+			if entry == nil {
+				return errors.NewConflict("metadata precondition failed")
+			}
+			if !meta.NewTimestamp(*entry.Key.ObjectMeta.Timestamp).Equal(meta.NewTimestamp(*p.Metadata.Timestamp)) {
+				return errors.NewConflict("metadata mismatch")
+			}
+		}
+	}
+	return nil
 }

@@ -40,7 +40,7 @@ type listService struct {
 }
 
 func (l *listService) notify(event listapi.Event) error {
-	output := &listapi.EventsOutput{
+	output := &listapi.EventsResponse{
 		Event: event,
 	}
 	for _, stream := range l.streams {
@@ -51,29 +51,29 @@ func (l *listService) notify(event listapi.Event) error {
 	return nil
 }
 
-func (l *listService) Size() (*listapi.SizeOutput, error) {
-	return &listapi.SizeOutput{
+func (l *listService) Size(*listapi.SizeRequest) (*listapi.SizeResponse, error) {
+	return &listapi.SizeResponse{
 		Size_: uint32(len(l.items)),
 	}, nil
 }
 
-func (l *listService) Contains(input *listapi.ContainsInput) (*listapi.ContainsOutput, error) {
+func (l *listService) Contains(input *listapi.ContainsRequest) (*listapi.ContainsResponse, error) {
 	for _, value := range l.items {
 		if value.Value == input.Value.Value {
 			if !meta.Equal(value.ObjectMeta, input.Value.ObjectMeta) {
 				return nil, errors.NewConflict("metadata mismatch")
 			}
-			return &listapi.ContainsOutput{
+			return &listapi.ContainsResponse{
 				Contains: true,
 			}, nil
 		}
 	}
-	return &listapi.ContainsOutput{
+	return &listapi.ContainsResponse{
 		Contains: false,
 	}, nil
 }
 
-func (l *listService) Append(input *listapi.AppendInput) (*listapi.AppendOutput, error) {
+func (l *listService) Append(input *listapi.AppendRequest) (*listapi.AppendResponse, error) {
 	index := len(l.items)
 	l.items = append(l.items, input.Value)
 	err := l.notify(listapi.Event{
@@ -86,10 +86,10 @@ func (l *listService) Append(input *listapi.AppendInput) (*listapi.AppendOutput,
 	if err != nil {
 		return nil, err
 	}
-	return &listapi.AppendOutput{}, nil
+	return &listapi.AppendResponse{}, nil
 }
 
-func (l *listService) Insert(input *listapi.InsertInput) (*listapi.InsertOutput, error) {
+func (l *listService) Insert(input *listapi.InsertRequest) (*listapi.InsertResponse, error) {
 	index := input.Item.Index
 	if index >= uint32(len(l.items)) {
 		return nil, errors.NewInvalid("index %d out of bounds", index)
@@ -116,16 +116,16 @@ func (l *listService) Insert(input *listapi.InsertInput) (*listapi.InsertOutput,
 	if err != nil {
 		return nil, err
 	}
-	return &listapi.InsertOutput{}, nil
+	return &listapi.InsertResponse{}, nil
 }
 
-func (l *listService) Get(input *listapi.GetInput) (*listapi.GetOutput, error) {
+func (l *listService) Get(input *listapi.GetRequest) (*listapi.GetResponse, error) {
 	index := int(input.Index)
 	if index >= len(l.items) {
 		return nil, errors.NewInvalid("index %d out of bounds", index)
 	}
 	value := l.items[index]
-	return &listapi.GetOutput{
+	return &listapi.GetResponse{
 		Item: listapi.Item{
 			Index: uint32(index),
 			Value: value,
@@ -133,7 +133,7 @@ func (l *listService) Get(input *listapi.GetInput) (*listapi.GetOutput, error) {
 	}, nil
 }
 
-func (l *listService) Set(input *listapi.SetInput) (*listapi.SetOutput, error) {
+func (l *listService) Set(input *listapi.SetRequest) (*listapi.SetResponse, error) {
 	index := input.Item.Index
 	if index >= uint32(len(l.items)) {
 		return nil, errors.NewInvalid("index %d out of bounds", index)
@@ -167,10 +167,10 @@ func (l *listService) Set(input *listapi.SetInput) (*listapi.SetOutput, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &listapi.SetOutput{}, nil
+	return &listapi.SetResponse{}, nil
 }
 
-func (l *listService) Remove(input *listapi.RemoveInput) (*listapi.RemoveOutput, error) {
+func (l *listService) Remove(input *listapi.RemoveRequest) (*listapi.RemoveResponse, error) {
 	index := input.Index
 	if index >= uint32(len(l.items)) {
 		return nil, errors.NewInvalid("index %d out of bounds", index)
@@ -193,7 +193,7 @@ func (l *listService) Remove(input *listapi.RemoveInput) (*listapi.RemoveOutput,
 	if err != nil {
 		return nil, err
 	}
-	return &listapi.RemoveOutput{
+	return &listapi.RemoveResponse{
 		Item: listapi.Item{
 			Index: uint32(index),
 			Value: value,
@@ -201,22 +201,22 @@ func (l *listService) Remove(input *listapi.RemoveInput) (*listapi.RemoveOutput,
 	}, nil
 }
 
-func (l *listService) Clear() error {
+func (l *listService) Clear(request *listapi.ClearRequest) (*listapi.ClearResponse, error) {
 	l.items = []listapi.Value{}
-	return nil
+	return &listapi.ClearResponse{}, nil
 }
 
-func (l *listService) Events(input *listapi.EventsInput, stream ServiceEventsStream) (rsm.StreamCloser, error) {
+func (l *listService) Events(input *listapi.EventsRequest, stream ServiceEventsStream) (rsm.StreamCloser, error) {
 	l.streams[stream.ID()] = stream
 	return func() {
 		delete(l.streams, stream.ID())
 	}, nil
 }
 
-func (l *listService) Elements(input *listapi.ElementsInput, stream ServiceElementsStream) (rsm.StreamCloser, error) {
+func (l *listService) Elements(input *listapi.ElementsRequest, stream ServiceElementsStream) (rsm.StreamCloser, error) {
 	defer stream.Close()
 	for index, value := range l.items {
-		err := stream.Notify(&listapi.ElementsOutput{
+		err := stream.Notify(&listapi.ElementsResponse{
 			Item: listapi.Item{
 				Index: uint32(index),
 				Value: value,
@@ -232,10 +232,12 @@ func (l *listService) Elements(input *listapi.ElementsInput, stream ServiceEleme
 func (l *listService) Snapshot(writer ServiceSnapshotWriter) error {
 	defer writer.Close()
 	for index, value := range l.items {
-		err := writer.Write(&listapi.SnapshotEntry{
-			Item: listapi.Item{
-				Index: uint32(index),
-				Value: value,
+		err := writer.Write(&listapi.SnapshotResponse{
+			Entry: listapi.SnapshotEntry{
+				Item: listapi.Item{
+					Index: uint32(index),
+					Value: value,
+				},
 			},
 		})
 		if err != nil {
@@ -245,8 +247,8 @@ func (l *listService) Snapshot(writer ServiceSnapshotWriter) error {
 	return nil
 }
 
-func (l *listService) Restore(input *listapi.SnapshotEntry) error {
-	l.items = append(l.items, input.Item.Value)
+func (l *listService) Restore(request *listapi.RestoreRequest) error {
+	l.items = append(l.items, request.Entry.Item.Value)
 	return nil
 }
 

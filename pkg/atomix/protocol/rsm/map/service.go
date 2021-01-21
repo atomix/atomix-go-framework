@@ -40,7 +40,7 @@ type mapService struct {
 	streams map[rsm.StreamID]ServiceEventsStream
 }
 
-func (m *mapService) notify(event *_map.EventsOutput) error {
+func (m *mapService) notify(event *_map.EventsResponse) error {
 	for _, stream := range m.streams {
 		if err := stream.Notify(event); err != nil {
 			return err
@@ -49,36 +49,36 @@ func (m *mapService) notify(event *_map.EventsOutput) error {
 	return nil
 }
 
-func (m *mapService) Size() (*_map.SizeOutput, error) {
-	return &_map.SizeOutput{
+func (m *mapService) Size(*_map.SizeRequest) (*_map.SizeResponse, error) {
+	return &_map.SizeResponse{
 		Size_: uint32(len(m.entries)),
 	}, nil
 }
 
-func (m *mapService) Put(input *_map.PutInput) (*_map.PutOutput, error) {
+func (m *mapService) Put(input *_map.PutRequest) (*_map.PutResponse, error) {
 	panic("implement me")
 }
 
-func (m *mapService) Get(input *_map.GetInput) (*_map.GetOutput, error) {
+func (m *mapService) Get(input *_map.GetRequest) (*_map.GetResponse, error) {
 	panic("implement me")
 }
 
-func (m *mapService) Remove(input *_map.RemoveInput) (*_map.RemoveOutput, error) {
+func (m *mapService) Remove(input *_map.RemoveRequest) (*_map.RemoveResponse, error) {
 	panic("implement me")
 }
 
-func (m *mapService) Clear() error {
+func (m *mapService) Clear(*_map.ClearRequest) (*_map.ClearResponse, error) {
 	panic("implement me")
 }
 
-func (m *mapService) Events(input *_map.EventsInput, stream ServiceEventsStream) (rsm.StreamCloser, error) {
+func (m *mapService) Events(input *_map.EventsRequest, stream ServiceEventsStream) (rsm.StreamCloser, error) {
 	m.streams[stream.ID()] = stream
 	return func() {
 		delete(m.streams, stream.ID())
 	}, nil
 }
 
-func (m *mapService) Entries(input *_map.EntriesInput, stream ServiceEntriesStream) (rsm.StreamCloser, error) {
+func (m *mapService) Entries(input *_map.EntriesRequest, stream ServiceEntriesStream) (rsm.StreamCloser, error) {
 	panic("implement me")
 }
 
@@ -86,6 +86,6 @@ func (m *mapService) Snapshot(writer ServiceSnapshotWriter) error {
 	panic("implement me")
 }
 
-func (m *mapService) Restore(entry *_map.SnapshotEntry) error {
+func (m *mapService) Restore(request *_map.RestoreRequest) error {
 	panic("implement me")
 }

@@ -36,45 +36,34 @@ type counterService struct {
 	value int64
 }
 
-func (c *counterService) Set(input *counter.SetInput) (*counter.SetOutput, error) {
+func (c *counterService) Set(input *counter.SetRequest) (*counter.SetResponse, error) {
 	if err := checkPreconditions(c.value, input.Preconditions); err != nil {
 		return nil, err
 	}
 	c.value = input.Value
-	return &counter.SetOutput{
+	return &counter.SetResponse{
 		Value: c.value,
 	}, nil
 }
 
-func (c *counterService) Get(input *counter.GetInput) (*counter.GetOutput, error) {
-	return &counter.GetOutput{
+func (c *counterService) Get(input *counter.GetRequest) (*counter.GetResponse, error) {
+	return &counter.GetResponse{
 		Value: c.value,
 	}, nil
 }
 
-func (c *counterService) Increment(input *counter.IncrementInput) (*counter.IncrementOutput, error) {
+func (c *counterService) Increment(input *counter.IncrementRequest) (*counter.IncrementResponse, error) {
 	c.value += input.Delta
-	return &counter.IncrementOutput{
+	return &counter.IncrementResponse{
 		Value: c.value,
 	}, nil
 }
 
-func (c *counterService) Decrement(input *counter.DecrementInput) (*counter.DecrementOutput, error) {
+func (c *counterService) Decrement(input *counter.DecrementRequest) (*counter.DecrementResponse, error) {
 	c.value -= input.Delta
-	return &counter.DecrementOutput{
+	return &counter.DecrementResponse{
 		Value: c.value,
 	}, nil
-}
-
-func (c *counterService) Snapshot() (*counter.Snapshot, error) {
-	return &counter.Snapshot{
-		Value: c.value,
-	}, nil
-}
-
-func (c *counterService) Restore(snapshot *counter.Snapshot) error {
-	c.value = snapshot.Value
-	return nil
 }
 
 func checkPreconditions(value int64, preconditions []counter.Precondition) error {

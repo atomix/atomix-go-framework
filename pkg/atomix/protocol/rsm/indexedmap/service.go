@@ -45,58 +45,50 @@ type indexedMapService struct {
 	streams    map[rsm.StreamID]ServiceEventsStream
 }
 
-func (m *indexedMapService) Size() (*indexedmap.SizeOutput, error) {
+func (m *indexedMapService) Size(*indexedmap.SizeRequest) (*indexedmap.SizeResponse, error) {
 	panic("implement me")
 }
 
-func (m *indexedMapService) Put(*indexedmap.PutInput) (*indexedmap.PutOutput, error) {
+func (m *indexedMapService) Put(*indexedmap.PutRequest) (*indexedmap.PutResponse, error) {
 	panic("implement me")
 }
 
-func (m *indexedMapService) Get(*indexedmap.GetInput) (*indexedmap.GetOutput, error) {
+func (m *indexedMapService) Get(*indexedmap.GetRequest) (*indexedmap.GetResponse, error) {
 	panic("implement me")
 }
 
-func (m *indexedMapService) FirstEntry() (*indexedmap.FirstEntryOutput, error) {
+func (m *indexedMapService) FirstEntry(*indexedmap.FirstEntryRequest) (*indexedmap.FirstEntryResponse, error) {
 	panic("implement me")
 }
 
-func (m *indexedMapService) LastEntry() (*indexedmap.LastEntryOutput, error) {
+func (m *indexedMapService) LastEntry(*indexedmap.LastEntryRequest) (*indexedmap.LastEntryResponse, error) {
 	panic("implement me")
 }
 
-func (m *indexedMapService) PrevEntry(*indexedmap.PrevEntryInput) (*indexedmap.PrevEntryOutput, error) {
+func (m *indexedMapService) PrevEntry(*indexedmap.PrevEntryRequest) (*indexedmap.PrevEntryResponse, error) {
 	panic("implement me")
 }
 
-func (m *indexedMapService) NextEntry(*indexedmap.NextEntryInput) (*indexedmap.NextEntryOutput, error) {
+func (m *indexedMapService) NextEntry(*indexedmap.NextEntryRequest) (*indexedmap.NextEntryResponse, error) {
 	panic("implement me")
 }
 
-func (m *indexedMapService) Remove(*indexedmap.RemoveInput) (*indexedmap.RemoveOutput, error) {
+func (m *indexedMapService) Remove(*indexedmap.RemoveRequest) (*indexedmap.RemoveResponse, error) {
 	panic("implement me")
 }
 
-func (m *indexedMapService) Clear() error {
+func (m *indexedMapService) Clear(*indexedmap.ClearRequest) (*indexedmap.ClearResponse, error) {
 	panic("implement me")
 }
 
-func (m *indexedMapService) Events(input *indexedmap.EventsInput, stream ServiceEventsStream) (rsm.StreamCloser, error) {
+func (m *indexedMapService) Events(input *indexedmap.EventsRequest, stream ServiceEventsStream) (rsm.StreamCloser, error) {
 	m.streams[stream.ID()] = stream
 	return func() {
 		delete(m.streams, stream.ID())
 	}, nil
 }
 
-func (m *indexedMapService) Entries(*indexedmap.EntriesInput, ServiceEntriesStream) (rsm.StreamCloser, error) {
-	panic("implement me")
-}
-
-func (m *indexedMapService) Snapshot(ServiceSnapshotWriter) error {
-	panic("implement me")
-}
-
-func (m *indexedMapService) Restore(*indexedmap.SnapshotEntry) error {
+func (m *indexedMapService) Entries(*indexedmap.EntriesRequest, ServiceEntriesStream) (rsm.StreamCloser, error) {
 	panic("implement me")
 }
 

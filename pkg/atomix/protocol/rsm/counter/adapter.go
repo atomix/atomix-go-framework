@@ -4,9 +4,7 @@ import (
 	counter "github.com/atomix/api/go/atomix/primitive/counter"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
-	"io"
 )
 
 const Type = "Counter"
@@ -16,8 +14,6 @@ const (
 	getOp       = "Get"
 	incrementOp = "Increment"
 	decrementOp = "Decrement"
-	snapshotOp  = "Snapshot"
-	restoreOp   = "Restore"
 )
 
 var newServiceFunc rsm.NewServiceFunc
@@ -52,8 +48,6 @@ func (s *ServiceAdaptor) init() {
 	s.RegisterUnaryOperation(getOp, s.get)
 	s.RegisterUnaryOperation(incrementOp, s.increment)
 	s.RegisterUnaryOperation(decrementOp, s.decrement)
-	s.RegisterUnaryOperation(snapshotOp, s.snapshot)
-	s.RegisterUnaryOperation(restoreOp, s.restore)
 }
 
 func (s *ServiceAdaptor) SessionOpen(session rsm.Session) {
@@ -74,155 +68,92 @@ func (s *ServiceAdaptor) SessionClosed(session rsm.Session) {
 	}
 }
 
-func (s *ServiceAdaptor) Backup(writer io.Writer) error {
-	snapshot, err := s.rsm.Snapshot()
+func (s *ServiceAdaptor) set(input []byte) ([]byte, error) {
+	request := &counter.SetRequest{}
+	err := proto.Unmarshal(input, request)
 	if err != nil {
 		s.log.Error(err)
-		return err
+		return nil, err
 	}
-	bytes, err := proto.Marshal(snapshot)
+
+	response, err := s.rsm.Set(request)
 	if err != nil {
 		s.log.Error(err)
-		return err
+		return nil, err
 	}
-	return util.WriteBytes(writer, bytes)
+
+	output, err := proto.Marshal(response)
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
+	}
+	return output, nil
 }
 
-func (s *ServiceAdaptor) Restore(reader io.Reader) error {
-	bytes, err := util.ReadBytes(reader)
+func (s *ServiceAdaptor) get(input []byte) ([]byte, error) {
+	request := &counter.GetRequest{}
+	err := proto.Unmarshal(input, request)
 	if err != nil {
 		s.log.Error(err)
-		return err
+		return nil, err
 	}
-	snapshot := &counter.Snapshot{}
-	err = proto.Unmarshal(bytes, snapshot)
-	if err != nil {
-		return err
-	}
-	err = s.rsm.Restore(snapshot)
+
+	response, err := s.rsm.Get(request)
 	if err != nil {
 		s.log.Error(err)
-		return err
+		return nil, err
 	}
-	return nil
+
+	output, err := proto.Marshal(response)
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
+	}
+	return output, nil
 }
 
-func (s *ServiceAdaptor) set(in []byte) ([]byte, error) {
-	input := &counter.SetInput{}
-	err := proto.Unmarshal(in, input)
+func (s *ServiceAdaptor) increment(input []byte) ([]byte, error) {
+	request := &counter.IncrementRequest{}
+	err := proto.Unmarshal(input, request)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
 
-	output, err := s.rsm.Set(input)
+	response, err := s.rsm.Increment(request)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
 
-	out, err := proto.Marshal(output)
+	output, err := proto.Marshal(response)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
-	return out, nil
+	return output, nil
 }
 
-func (s *ServiceAdaptor) get(in []byte) ([]byte, error) {
-	input := &counter.GetInput{}
-	err := proto.Unmarshal(in, input)
+func (s *ServiceAdaptor) decrement(input []byte) ([]byte, error) {
+	request := &counter.DecrementRequest{}
+	err := proto.Unmarshal(input, request)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
 
-	output, err := s.rsm.Get(input)
+	response, err := s.rsm.Decrement(request)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
 
-	out, err := proto.Marshal(output)
+	output, err := proto.Marshal(response)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
-	return out, nil
-}
-
-func (s *ServiceAdaptor) increment(in []byte) ([]byte, error) {
-	input := &counter.IncrementInput{}
-	err := proto.Unmarshal(in, input)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-
-	output, err := s.rsm.Increment(input)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-
-	out, err := proto.Marshal(output)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-	return out, nil
-}
-
-func (s *ServiceAdaptor) decrement(in []byte) ([]byte, error) {
-	input := &counter.DecrementInput{}
-	err := proto.Unmarshal(in, input)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-
-	output, err := s.rsm.Decrement(input)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-
-	out, err := proto.Marshal(output)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-	return out, nil
-}
-
-func (s *ServiceAdaptor) snapshot(in []byte) ([]byte, error) {
-	output, err := s.rsm.Snapshot()
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-
-	out, err := proto.Marshal(output)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-	return out, nil
-}
-
-func (s *ServiceAdaptor) restore(in []byte) ([]byte, error) {
-	input := &counter.Snapshot{}
-	err := proto.Unmarshal(in, input)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-	err = s.rsm.Restore(input)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-	return nil, nil
+	return output, nil
 }
 
 var _ rsm.Service = &ServiceAdaptor{}

@@ -16,7 +16,9 @@ package meta
 
 import (
 	"fmt"
-	"github.com/atomix/api/go/atomix/primitive"
+	"github.com/atomix/api/go/atomix/primitive/extensions/operation"
+	"github.com/atomix/api/go/atomix/primitive/extensions/partition"
+	"github.com/atomix/api/go/atomix/primitive/extensions/state"
 	"github.com/golang/protobuf/proto"
 	"github.com/lyft/protoc-gen-star"
 	"github.com/lyft/protoc-gen-star/lang/go"
@@ -71,6 +73,52 @@ func (c *Context) GetPackageMeta(entity pgs.Entity) PackageMeta {
 	}
 }
 
+func (c *Context) GetStateValueTypeMeta(service pgs.Service) (*StateTypeMeta, error) {
+	stateTypeExt, err := GetStateValueType(service)
+	if err != nil {
+		return nil, err
+	} else if stateTypeExt == nil {
+		return nil, nil
+	}
+	return c.findStateTypeMeta(service, *stateTypeExt)
+}
+
+func (c *Context) GetStateEntryTypeMeta(service pgs.Service) (*StateTypeMeta, error) {
+	stateTypeExt, err := GetStateEntryType(service)
+	if err != nil {
+		return nil, err
+	} else if stateTypeExt == nil {
+		return nil, nil
+	}
+	return c.findStateTypeMeta(service, *stateTypeExt)
+}
+
+func (c *Context) findStateTypeMeta(service pgs.Service, stateTypeExt string) (*StateTypeMeta, error) {
+	stateType, err := c.ParseTypeString(stateTypeExt)
+	if err != nil {
+		return nil, err
+	}
+
+	messageType, ok := c.FindMessage(service, stateType)
+	if !ok {
+		return nil, fmt.Errorf("cannot find message type %s", stateType.Name)
+	}
+
+	keyField, err := c.GetStateKeyFieldMeta(messageType)
+	if err != nil {
+		return nil, err
+	}
+	digestField, err := c.GetStateDigestFieldMeta(messageType)
+	if err != nil {
+		return nil, err
+	}
+	return &StateTypeMeta{
+		Type:   c.GetMessageTypeMeta(messageType),
+		Key:    keyField,
+		Digest: digestField,
+	}, nil
+}
+
 // ParseTypeString parses the given type string into type metadata
 func (c *Context) ParseTypeString(t string) (TypeMeta, error) {
 	parts := strings.Split(t, ".")
@@ -104,11 +152,11 @@ func (c *Context) ParseTypeString(t string) (TypeMeta, error) {
 }
 
 // FindMessage finds a message from its type metadata
-func (c *Context) FindMessage(entity pgs.Entity, typeMeta TypeMeta) pgs.Message {
+func (c *Context) FindMessage(entity pgs.Entity, typeMeta TypeMeta) (pgs.Message, bool) {
 	for _, message := range entity.File().Messages() {
 		messageTypeMeta := c.GetMessageTypeMeta(message)
 		if messageTypeMeta.Package.Path == typeMeta.Package.Path && messageTypeMeta.Name == typeMeta.Name {
-			return message
+			return message, true
 		}
 	}
 
@@ -116,11 +164,11 @@ func (c *Context) FindMessage(entity pgs.Entity, typeMeta TypeMeta) pgs.Message 
 		for _, message := range file.Messages() {
 			messageTypeMeta := c.GetMessageTypeMeta(message)
 			if messageTypeMeta.Package.Path == typeMeta.Package.Path && messageTypeMeta.Name == typeMeta.Name {
-				return message
+				return message, true
 			}
 		}
 	}
-	return nil
+	return nil, false
 }
 
 // GetMessageTypeMeta extracts the type metadata for the given message
@@ -298,7 +346,7 @@ func (c *Context) GetMessageFieldTypeMeta(field pgs.Field) TypeMeta {
 // GetRepeatedFieldTypeMeta extracts the type metadata for the given repeated field
 func (c *Context) GetRepeatedFieldTypeMeta(field pgs.Field) TypeMeta {
 	elementTypeMeta := c.GetFieldElementTypeMeta(field)
-	elementTypeMeta.IsRepeated = true;
+	elementTypeMeta.IsRepeated = true
 	return elementTypeMeta
 }
 
@@ -434,29 +482,24 @@ func (c *Context) GetEnumValueTypeMeta(enumValue pgs.EnumValue) TypeMeta {
 	}
 }
 
-// GetHeaderField extracts the metadata for the header field in the given message
-func (c *Context) GetHeaderFieldMeta(message pgs.Message) (*FieldRefMeta, error) {
-	return c.findAnnotatedField(message, primitive.E_Header)
+// GetStateKeyFieldMeta extracts the metadata for the state key field in the given message
+func (c *Context) GetStateKeyFieldMeta(message pgs.Message) (*FieldRefMeta, error) {
+	return c.findAnnotatedField(message, state.E_Key)
 }
 
-// GetInputField extracts the metadata for the input field in the given message
-func (c *Context) GetInputFieldMeta(message pgs.Message) (*FieldRefMeta, error) {
-	return c.findAnnotatedField(message, primitive.E_Input)
-}
-
-// GetOutputField extracts the metadata for the output field in the given message
-func (c *Context) GetOutputFieldMeta(message pgs.Message) (*FieldRefMeta, error) {
-	return c.findAnnotatedField(message, primitive.E_Output)
+// GetStateDigestFieldMeta extracts the metadata for the state digest field in the given message
+func (c *Context) GetStateDigestFieldMeta(message pgs.Message) (*FieldRefMeta, error) {
+	return c.findAnnotatedField(message, state.E_Digest)
 }
 
 // GetPartitionKeyField extracts the metadata for the partitionkey field in the given message
 func (c *Context) GetPartitionKeyFieldMeta(message pgs.Message) (*FieldRefMeta, error) {
-	return c.findAnnotatedField(message, primitive.E_Partitionkey)
+	return c.findAnnotatedField(message, partition.E_Key)
 }
 
 // GetPartitionRangeField extracts the metadata for the partitionrange field in the given message
 func (c *Context) GetPartitionRangeFieldMeta(message pgs.Message) (*FieldRefMeta, error) {
-	return c.findAnnotatedField(message, primitive.E_Partitionrange)
+	return c.findAnnotatedField(message, partition.E_Range)
 }
 
 // GetAggregateFields extracts the metadata for aggregated fields in the given message
@@ -467,8 +510,8 @@ func (c *Context) GetAggregateFields(message pgs.Message) ([]AggregatorMeta, err
 func (c *Context) findAggregateFields(message pgs.Message) ([]AggregatorMeta, error) {
 	fields := make([]AggregatorMeta, 0)
 	for _, field := range message.Fields() {
-		var aggregate primitive.AggregateStrategy
-		ok, err := field.Extension(primitive.E_Aggregate, &aggregate)
+		var aggregate operation.AggregateStrategy
+		ok, err := field.Extension(operation.E_Aggregate, &aggregate)
 		if err != nil {
 			return nil, err
 		} else if ok {
@@ -484,9 +527,9 @@ func (c *Context) findAggregateFields(message pgs.Message) ([]AggregatorMeta, er
 						},
 					},
 				},
-				IsChooseFirst: aggregate == primitive.AggregateStrategy_CHOOSE_FIRST,
-				IsAppend:      aggregate == primitive.AggregateStrategy_APPEND,
-				IsSum:         aggregate == primitive.AggregateStrategy_SUM,
+				IsChooseFirst: aggregate == operation.AggregateStrategy_CHOOSE_FIRST,
+				IsAppend:      aggregate == operation.AggregateStrategy_APPEND,
+				IsSum:         aggregate == operation.AggregateStrategy_SUM,
 			})
 		} else if field.Type().IsEmbed() {
 			children, err := c.findAggregateFields(field.Type().Embed())

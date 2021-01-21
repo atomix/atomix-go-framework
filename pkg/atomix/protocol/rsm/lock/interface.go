@@ -6,13 +6,13 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-type LockOutputFuture struct {
+type LockResponseFuture struct {
 	stream rsm.Stream
-	output *lock.LockOutput
+	output *lock.LockResponse
 	err    error
 }
 
-func (f *LockOutputFuture) setStream(stream rsm.Stream) {
+func (f *LockResponseFuture) setStream(stream rsm.Stream) {
 	if f.output != nil {
 		bytes, err := proto.Marshal(f.output)
 		if err != nil {
@@ -29,7 +29,7 @@ func (f *LockOutputFuture) setStream(stream rsm.Stream) {
 	}
 }
 
-func (f *LockOutputFuture) Complete(output *lock.LockOutput) {
+func (f *LockResponseFuture) Complete(output *lock.LockResponse) {
 	if f.stream != nil {
 		bytes, err := proto.Marshal(output)
 		if err != nil {
@@ -43,7 +43,7 @@ func (f *LockOutputFuture) Complete(output *lock.LockOutput) {
 	}
 }
 
-func (f *LockOutputFuture) Fail(err error) {
+func (f *LockResponseFuture) Fail(err error) {
 	if f.stream != nil {
 		f.stream.Error(err)
 		f.stream.Close()
@@ -54,13 +54,9 @@ func (f *LockOutputFuture) Fail(err error) {
 
 type Service interface {
 	// Lock attempts to acquire the lock
-	Lock(*lock.LockInput) (*LockOutputFuture, error)
+	Lock(*lock.LockRequest) (*LockResponseFuture, error)
 	// Unlock releases the lock
-	Unlock(*lock.UnlockInput) (*lock.UnlockOutput, error)
+	Unlock(*lock.UnlockRequest) (*lock.UnlockResponse, error)
 	// GetLock gets the lock state
-	GetLock(*lock.GetLockInput) (*lock.GetLockOutput, error)
-	// Snapshot exports a snapshot of the primitive state
-	Snapshot() (*lock.Snapshot, error)
-	// Restore imports a snapshot of the primitive state
-	Restore(*lock.Snapshot) error
+	GetLock(*lock.GetLockRequest) (*lock.GetLockResponse, error)
 }

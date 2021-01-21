@@ -1,4 +1,5 @@
 {{- $server := printf "%sServer" .Generator.Prefix }}
+{{- $service := printf "%sService" .Generator.Prefix }}
 package {{ .Package.Name }}
 
 import (
@@ -9,16 +10,9 @@ import (
 	"google.golang.org/grpc"
 	{{- $added := false }}
 	{{- range .Primitive.Methods }}
-	{{- if and (not $added) .Scope.IsGlobal }}
-	"github.com/atomix/go-framework/pkg/atomix/util/async"
-	{{- $added = true }}
-	{{- end }}
-	{{- end }}
-	{{- $added = false }}
-	{{- range .Primitive.Methods }}
 	{{- if and (not $added) .Response.IsStream }}
-	streams "github.com/atomix/go-framework/pkg/atomix/stream"
-	primitiveapi "github.com/atomix/api/go/atomix/primitive"
+	"sync"
+	"github.com/atomix/go-framework/pkg/atomix/util/async"
 	{{- $added = true }}
 	{{- end }}
 	{{- end }}
@@ -38,14 +32,14 @@ import (
 // Register{{ $server }} registers the primitive on the given node
 func Register{{ $server }}(node *gossip.Node) {
 	node.RegisterServer(func(server *grpc.Server, manager *gossip.Manager) {
-		{{ .Primitive.Type.Package.Alias }}.Register{{ .Primitive.Type.Name }}Server(server, new{{ $server }}(newManager(manager)))
+		{{ .Primitive.Type.Package.Alias }}.Register{{ .Primitive.Type.Name }}Server(server, new{{ $server }}(manager))
 	})
 	node.RegisterServer(registerServerFunc)
 }
 
 var registerServerFunc gossip.RegisterServerFunc
 
-func new{{ $server }}(manager *Manager) {{ .Primitive.Type.Package.Alias }}.{{ .Primitive.Type.Name }}Server {
+func new{{ $server }}(manager *gossip.Manager) {{ .Primitive.Type.Package.Alias }}.{{ .Primitive.Type.Name }}Server {
 	return &{{ $server }}{
 		manager: manager,
 		log: logging.GetLogger("atomix", "protocol", "gossip", {{ .Primitive.Name | lower | quote }}),
@@ -55,7 +49,7 @@ func new{{ $server }}(manager *Manager) {{ .Primitive.Type.Package.Alias }}.{{ .
 {{- $primitive := .Primitive }}
 {{- $serviceInt := printf "%sService" .Generator.Prefix }}
 type {{ $server }} struct {
-    manager *Manager
+    manager *gossip.Manager
 	log logging.Logger
 }
 
@@ -126,36 +120,17 @@ func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "t
         return nil, err
     }
 
-    service, err := partition.GetService(request.Header.PrimitiveID.Name)
+    service, err := partition.ServiceFrom(ctx)
     if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
         return nil, errors.Proto(err)
     }
 
-    {{- if and .Request.Input .Response.Output }}
-    input := {{ template "ref" .Request.Input }}request{{ template "field" .Request.Input }}
-    output, err := service.{{ .Name }}(ctx, input)
-    {{- else if .Request.Input }}
-    input := {{ template "ref" .Request.Input }}request{{ template "field" .Request.Input }}
-    err = service.{{ .Name }}(ctx, input)
-    {{- else if .Response.Output }}
-    output, err := service.{{ .Name }}(ctx)
-    {{- else }}
-    err = service.{{ .Name }}(ctx)
-    {{- end }}
+    response, err := service.({{ $service }}).{{ .Name }}(ctx, request)
     if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
         return nil, errors.Proto(err)
     }
-
-    response := &{{ template "type" .Response.Type }}{}
-    {{- if .Response.Output }}
-    {{- if .Response.Output.Field.Type.IsPointer }}
-    response{{ template "field" .Response.Output }} = output
-    {{- else }}
-    response{{ template "field" .Response.Output }} = *output
-    {{- end }}
-    {{- end }}
 	{{- else if .Scope.IsGlobal }}
 	partitions, err := s.manager.PartitionsFrom(ctx)
 	if err != nil {
@@ -163,283 +138,109 @@ func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "t
 	    return nil, errors.Proto(err)
 	}
 
-	{{- if .Request.Input }}
-    input := {{ template "ref" .Request.Input }}request{{ template "field" .Request.Input }}
-	{{- end }}
-
-	{{- if .Response.Output }}
-	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
+	responses, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
 	    partition := partitions[i]
-	    service, err := partition.GetService(request.Header.PrimitiveID.Name)
+	    service, err := partition.ServiceFrom(ctx)
 	    if err != nil {
 	        return nil, err
 	    }
-	    {{- if .Request.Input }}
-	    return service.{{ .Name }}(ctx, input)
-	    {{- else }}
-	    return service.{{ .Name }}(ctx)
-	    {{- end }}
+	    return service.({{ $service }}).{{ .Name }}(ctx, request)
     })
-    {{- else }}
-    err = async.IterAsync(len(partitions), func(i int) error {
-        partition := partitions[i]
-        service, err := partition.GetService(request.Header.PrimitiveID.Name)
-        if err != nil {
-            return err
-        }
-	    {{- if .Request.Input }}
-	    return service.{{ .Name }}(ctx, input)
-	    {{- else }}
-	    return service.{{ .Name }}(ctx)
-	    {{- end }}
-    })
-	{{- end }}
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
 	    return nil, errors.Proto(err)
 	}
 
-    response := &{{ template "type" .Response.Type }}{}
-    {{- if .Response.Output }}
-    {{- range .Response.Output.Aggregates }}
+    response := responses[0].(*{{ template "type" .Response.Type }})
+    {{- range .Response.Aggregates }}
     {{- if .IsChooseFirst }}
-    response{{ template "field" $method.Response.Output }}{{ template "field" . }} = outputs[0]{{ template "cast" $method.Response.Output }}{{ template "field" . }}
+    response{{ template "field" . }} = responses[0].(*{{ template "type" $method.Response.Type }}){{ template "field" . }}
     {{- else if .IsAppend }}
-    for _, o := range outputs {
-        response{{ template "field" $method.Response.Output }}{{ template "field" . }} = append(response{{ template "field" $method.Response.Output }}{{ template "field" . }}, o{{ template "cast" $method.Response.Output }}{{ template "field" . }}...)
+    for _, r := range responses {
+        response{{ template "field" . }} = append(response{{ template "field" . }}, r.(*{{ template "type" $method.Response.Type }}){{ template "field" . }}...)
     }
     {{- else if .IsSum }}
-    for _, o := range outputs {
-        response{{ template "field" $method.Response.Output }}{{ template "field" . }} += o{{ template "cast" $method.Response.Output }}{{ template "field" . }}
+    for _, r := range responses {
+        response{{ template "field" . }} += r.(*{{ template "type" $method.Response.Type }}){{ template "field" . }}
     }
-    {{- end }}
     {{- end }}
     {{- end }}
 	{{- end }}
 	s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
 	return response, nil
 }
-{{ else if .Request.IsStream }}
-func (s *{{ $server }}) {{ .Name }}(srv {{ template "type" $primitive.Type }}_{{ .Name }}Server) error {
-    response := &{{ template "type" .Response.Type }}{}
-    for {
-        request, err := srv.Recv()
-        if err == io.EOF {
-            s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
-            return srv.SendAndClose(response)
-        } else if err != nil {
-            s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
-            return errors.Proto(err)
-        }
-
-        s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
-        {{- if .Scope.IsPartition }}
-        partition, err := s.manager.PartitionFrom(srv.Context())
-        if err != nil {
-            s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
-            return err
-        }
-
-        service, err := partition.GetService(request.Header.PrimitiveID.Name)
-        if err != nil {
-            s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
-            return errors.Proto(err)
-        }
-
-        {{- if and .Request.Input .Response.Output }}
-        input := {{ template "ref" .Request.Input }}request{{ template "field" .Request.Input }}
-        output, err := service.{{ .Name }}(srv.Context(), input)
-        {{- else if .Request.Input }}
-        input := {{ template "ref" .Request.Input }}request{{ template "field" .Request.Input }}
-        err = service.{{ .Name }}(srv.Context(), input)
-        {{- else if .Response.Output }}
-        output, err := service.{{ .Name }}(srv.Context())
-        {{- else }}
-        err = service.{{ .Name }}(srv.Context())
-        {{- end }}
-        if err != nil {
-            s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
-            return errors.Proto(err)
-        }
-
-        response = &{{ template "type" .Response.Type }}{}
-        {{- if .Response.Output }}
-        {{- if .Response.Output.Field.Type.IsPointer }}
-        response{{ template "field" .Response.Output }} = output
-        {{- else }}
-        response{{ template "field" .Response.Output }} = *output
-        {{- end }}
-        {{- end }}
-        {{- else if .Scope.IsGlobal }}
-        partitions, err := s.manager.PartitionsFrom(srv.Context())
-        if err != nil {
-            s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
-            return errors.Proto(err)
-        }
-
-        {{- if .Request.Input }}
-        input := {{ template "ref" .Request.Input }}request{{ template "field" .Request.Input }}
-        {{- end }}
-
-        {{- if .Response.Output }}
-        outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
-            partition := partitions[i]
-            service, err := partition.GetService(request.Header.PrimitiveID.Name)
-            if err != nil {
-                return nil, err
-            }
-            {{- if .Request.Input }}
-            return service.{{ .Name }}(srv.Context(), input)
-            {{- else }}
-            return service.{{ .Name }}(srv.Context())
-            {{- end }}
-        })
-        {{- else }}
-        err = async.IterAsync(len(partitions), func(i int) error {
-            partition := partitions[i]
-            service, err := partition.GetService(request.Header.PrimitiveID.Name)
-            if err != nil {
-                return err
-            }
-            {{- if .Request.Input }}
-            return service.{{ .Name }}(srv.Context(), input)
-            {{- else }}
-            return service.{{ .Name }}(srv.Context())
-            {{- end }}
-        })
-        {{- end }}
-        if err != nil {
-            s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
-            return errors.Proto(err)
-        }
-
-        response = &{{ template "type" .Response.Type }}{}
-        {{- if .Response.Output }}
-        {{- range .Response.Output.Aggregates }}
-        {{- if .IsChooseFirst }}
-        response{{ template "field" $method.Response.Output }}{{ template "field" . }} = outputs[0]{{ template "cast" $method.Response.Output }}{{ template "field" . }}
-        {{- else if .IsAppend }}
-        for _, o := range outputs {
-            response{{ template "field" $method.Response.Output }}{{ template "field" . }} = append(response{{ template "field" $method.Response.Output }}{{ template "field" . }}, o{{ template "cast" $method.Response.Output }}{{ template "field" . }}...)
-        }
-        {{- else if .IsSum }}
-        for _, o := range outputs {
-            response{{ template "field" $method.Response.Output }}{{ template "field" . }} += o{{ template "cast" $method.Response.Output }}{{ template "field" . }}
-        }
-        {{- end }}
-        {{- end }}
-        {{- end }}
-        {{- end }}
-    }
-}
 {{ else if .Response.IsStream }}
-{{- $newStream := printf "new%s%sStream" $serviceInt .Name }}
-{{- $newInformer := printf "new%s%sInformer" $serviceInt .Name }}
 func (s *{{ $server }}) {{ .Name }}(request *{{ template "type" .Request.Type }}, srv {{ template "type" $primitive.Type }}_{{ .Name }}Server) error {
     s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
 
-    stream := streams.NewBufferedStream()
-    {{- if .Scope.IsPartition }}
-    partition, err := s.manager.PartitionFrom(srv.Context())
-    if err != nil {
-        s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
-        return errors.Proto(err)
-    }
-
-    service, err := partition.GetService(request.Header.PrimitiveID.Name)
-    if err != nil {
-        s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
-        return errors.Proto(err)
-    }
-
-    {{- if .Type.IsSnapshot }}
-    {{- $newWriter := printf "new%s%sStreamWriter" $serviceInt .Name }}
-    err = service.{{ .Name }}(srv.Context(), {{ $newWriter }}(stream))
-    {{- else if and .Request.Input .Response.Output }}
-    input := {{ template "ref" .Request.Input }}request{{ template "field" .Request.Input }}
-    err = service.{{ .Name }}(srv.Context(), input, {{ $newStream }}(stream))
-    {{- else if .Request.Input }}
-    input := {{ template "ref" .Request.Input }}request{{ template "field" .Request.Input }}
-    err = service.{{ .Name }}(srv.Context(), input, {{ $newInformer }}(stream))
-    {{- else if .Response.Output }}
-    err = service.{{ .Name }}(srv.Context(), {{ $newStream }}(stream))
-    {{- else }}
-    err = service.{{ .Name }}(srv.Context(), {{ $newInformer }}(stream))
-    {{- end }}
-    {{- else if .Scope.IsGlobal }}
     partitions, err := s.manager.PartitionsFrom(srv.Context())
     if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
         return errors.Proto(err)
     }
 
-    {{- if .Request.Input }}
-    input := {{ template "ref" .Request.Input }}request{{ template "field" .Request.Input }}
-    {{- end }}
+    responseCh := make(chan {{ template "type" .Response.Type }})
+    wg := &sync.WaitGroup{}
+    wg.Add(len(partitions))
     err = async.IterAsync(len(partitions), func(i int) error {
         partition := partitions[i]
-        service, err := partition.GetService(request.Header.PrimitiveID.Name)
+        service, err := partition.ServiceFrom(srv.Context())
         if err != nil {
             return err
         }
-        {{- if .Type.IsSnapshot }}
-        {{- $newWriter := printf "new%s%sStreamWriter" $serviceInt .Name }}
-        return service.{{ .Name }}(srv.Context(), {{ $newWriter }}(stream))
-        {{- else if and .Request.Input .Response.Output }}
-        return service.{{ .Name }}(srv.Context(), input, {{ $newStream }}(stream))
-        {{- else if .Request.Input }}
-        return service.{{ .Name }}(srv.Context(), input, {{ $newInformer }}(stream))
-        {{- else if .Response.Output }}
-        return service.{{ .Name }}(srv.Context(), {{ $newStream }}(stream))
-        {{- else }}
-        return service.{{ .Name }}(srv.Context(), {{ $newInformer }}(stream))
-        {{- end }}
+
+        partitionCh := make(chan {{ template "type" .Response.Type }})
+        errCh := make(chan error)
+        go func() {
+            err := service.({{ $service }}).{{ .Name }}(srv.Context(), request, partitionCh)
+            if err != nil {
+                errCh <- err
+            }
+        }()
+
+        defer wg.Done()
+        for {
+            select {
+            case response, ok := <-partitionCh:
+                if ok {
+                    responseCh <- response
+                } else {
+                    return nil
+                }
+            case err := <-errCh:
+                return err
+            }
+        }
     })
-    {{- end }}
     if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
         return errors.Proto(err)
     }
 
-    response := &{{ template "type" .Response.Type }}{}
-    response{{ template "field" .Response.Header }} = primitiveapi.ResponseHeader{
-        ResponseType: primitiveapi.ResponseType_RESPONSE_STREAM,
-    }
-    err = srv.Send(response)
-    if err != nil {
-        s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
-        return errors.Proto(err)
-    }
+    go func() {
+        wg.Wait()
+        close(responseCh)
+    }()
 
     for {
-        result, ok := stream.Receive()
-        if !ok {
-            break
-        }
-
-        if result.Failed() {
-            s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, result.Error)
-            return errors.Proto(result.Error)
-        }
-
-        response := &{{ template "type" .Response.Type }}{}
-        {{- if .Response.Output }}
-        {{- if .Response.Output.Field.Type.IsPointer }}
-        response{{ template "field" .Response.Output }} = result.Value{{ template "cast" .Response.Output }}
-        {{- else }}
-        response{{ template "field" .Response.Output }} = *result.Value{{ template "cast" .Response.Output }}
-        {{- end }}
-        {{- end }}
-
-        err = srv.Send(response)
-        if err != nil {
-            s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
-            return errors.Proto(err)
+        select {
+        case response, ok := <-responseCh:
+            if ok {
+                s.log.Debugf("Sending {{ .Response.Type.Name }} %v", response)
+                err = srv.Send(&response)
+                if err != nil {
+                    s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
+                    return errors.Proto(err)
+                }
+            } else {
+                s.log.Debugf("Finished {{ .Request.Type.Name }} %+v", request)
+                return nil
+            }
+        case <-srv.Context().Done():
+            s.log.Debugf("Finished {{ .Request.Type.Name }} %+v", request)
+            return nil
         }
     }
-
-    s.log.Debugf("Finished {{ .Request.Type.Name }} %+v", request)
-    return nil
 }
 {{ end }}
 {{- end }}
