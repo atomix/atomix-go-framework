@@ -6,9 +6,9 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
-	"github.com/atomix/go-framework/pkg/atomix/util/async"
+	async "github.com/atomix/go-framework/pkg/atomix/util/async"
 	"google.golang.org/grpc"
-	"sync"
+	sync "sync"
 )
 
 // RegisterServer registers the primitive on the given node

@@ -43,16 +43,14 @@ package {{ .Package.Name }}
 
 import (
 	"context"
-	{{- $added := false }}
-	{{- range .Primitive.Methods }}
-	{{- if and (not $added) (or .Type.IsAsync .Response.IsStream) }}
-	"github.com/golang/protobuf/proto"
-	{{- $added = true }}
-	{{- end }}
-	{{- end }}
 	{{- $package := .Package }}
 	{{- range .Imports }}
 	{{ .Alias }} {{ .Path | quote }}
+	{{- end }}
+	{{- range .Primitive.Methods }}
+	{{- if or .Type.IsAsync .Response.IsStream }}
+	{{ import "github.com/golang/protobuf/proto" }}
+	{{- end }}
 	{{- end }}
 	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/meta"

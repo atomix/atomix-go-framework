@@ -7,7 +7,7 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/gossip"
 	"google.golang.org/grpc"
-	"io"
+	io "io"
 )
 
 const Type = "Value"

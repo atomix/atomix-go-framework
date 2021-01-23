@@ -6,17 +6,15 @@
 package {{ .Package.Name }}
 
 import (
-	{{- $added := false }}
-	{{- range .Primitive.Methods }}
-	{{- if and (not $added) (or .Type.IsAsync .Response.IsStream) }}
-	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
-	"github.com/golang/protobuf/proto"
-	{{- $added = true }}
-	{{- end }}
-	{{- end }}
 	{{- $package := .Package }}
 	{{- range .Imports }}
 	{{ .Alias }} {{ .Path | quote }}
+	{{- end }}
+	{{- range .Primitive.Methods }}
+	{{- if or .Type.IsAsync .Response.IsStream }}
+	{{ import "github.com/atomix/go-framework/pkg/atomix/protocol/rsm" }}
+	{{ import "github.com/golang/protobuf/proto" }}
+	{{- end }}
 	{{- end }}
 )
 

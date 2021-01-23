@@ -2,8 +2,8 @@ package indexedmap
 
 import (
 	indexedmap "github.com/atomix/api/go/atomix/primitive/indexedmap"
-	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
-	"github.com/golang/protobuf/proto"
+	rsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
+	proto "github.com/golang/protobuf/proto"
 )
 
 type ServiceEventsStream interface {

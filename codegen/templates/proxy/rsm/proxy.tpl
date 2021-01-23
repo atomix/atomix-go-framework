@@ -4,27 +4,6 @@ package {{ .Package.Name }}
 import (
 	"context"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
-	{{- $added := false }}
-	{{- range .Primitive.Methods }}
-	{{- if and (not $added) .Scope.IsGlobal }}
-	"github.com/atomix/go-framework/pkg/atomix/util/async"
-	{{- $added = true }}
-	{{- end }}
-	{{- end }}
-	{{- $added = false }}
-	{{- range .Primitive.Methods }}
-	{{- if and (not $added) .Response.IsStream }}
-	streams "github.com/atomix/go-framework/pkg/atomix/stream"
-	{{- $added = true }}
-	{{- end }}
-	{{- end }}
-	{{- $added = false }}
-	{{- range .Primitive.Methods }}
-	{{- if and (not $added) .Request.IsStream }}
-	"io"
-	{{- $added = true }}
-	{{- end }}
-	{{- end }}
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/golang/protobuf/proto"
@@ -32,6 +11,17 @@ import (
 	{{- $package := .Package }}
 	{{- range .Imports }}
 	{{ .Alias }} {{ .Path | quote }}
+	{{- end }}
+	{{- range .Primitive.Methods }}
+	{{- if .Scope.IsGlobal }}
+	{{ import "github.com/atomix/go-framework/pkg/atomix/util/async" }}
+	{{- end }}
+	{{- if .Request.IsStream }}
+	{{ import "io" }}
+	{{- end }}
+	{{- if .Response.IsStream }}
+	{{ import "streams" "github.com/atomix/go-framework/pkg/atomix/stream" }}
+	{{- end }}
 	{{- end }}
 )
 

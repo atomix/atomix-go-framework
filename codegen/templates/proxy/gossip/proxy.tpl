@@ -7,30 +7,20 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"google.golang.org/grpc"
-	{{- $added := false }}
-	{{- range .Primitive.Methods }}
-	{{- if and (not $added) .Scope.IsGlobal }}
-	"github.com/atomix/go-framework/pkg/atomix/util/async"
-	{{- $added = true }}
-	{{- end }}
-	{{- end }}
-	{{- $added = false }}
-	{{- range .Primitive.Methods }}
-	{{- if and (not $added) (or .Request.IsStream .Response.IsStream) }}
-	"io"
-	{{- $added = true }}
-	{{- end }}
-	{{- end }}
-	{{- $added = false }}
-	{{- range .Primitive.Methods }}
-	{{- if and (not $added) .Scope.IsGlobal (or .Request.IsStream .Response.IsStream) }}
-	"sync"
-	{{- $added = true }}
-	{{- end }}
-	{{- end }}
 	{{- $package := .Package }}
 	{{- range .Imports }}
 	{{ .Alias }} {{ .Path | quote }}
+	{{- end }}
+	{{- range .Primitive.Methods }}
+	{{- if .Scope.IsGlobal }}
+	{{ import "github.com/atomix/go-framework/pkg/atomix/util/async" }}
+	{{- end }}
+	{{- if or .Request.IsStream .Response.IsStream }}
+	{{ import "io" }}
+	{{- end }}
+	{{- if and .Scope.IsGlobal (or .Request.IsStream .Response.IsStream) }}
+	{{ import "sync" }}
+	{{- end }}
 	{{- end }}
 )
 

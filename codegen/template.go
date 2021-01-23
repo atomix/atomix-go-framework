@@ -15,8 +15,11 @@
 package codegen
 
 import (
+	"fmt"
+	"github.com/atomix/go-framework/codegen/meta"
 	"github.com/iancoleman/strcase"
 	"path"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"text/template"
@@ -69,7 +72,14 @@ var ternary = func(v1, v2 interface{}, b bool) interface{} {
 }
 
 // NewTemplate creates a new Template for the given template file
-func NewTemplate(file string) *template.Template {
+func NewTemplate(file string, imports map[string]meta.PackageMeta) *template.Template {
+	paths := make(map[string]string)
+	aliases := make(map[string]string)
+	for alias, pkg := range imports {
+		paths[alias] = pkg.Path
+		aliases[pkg.Path] = alias
+	}
+
 	t := template.New(path.Base(file))
 	funcs := template.FuncMap{
 		"toCamel":      toCamelCase,
@@ -82,6 +92,42 @@ func NewTemplate(file string) *template.Template {
 		"split":        split,
 		"trim":         trim,
 		"ternary":      ternary,
+		"import": func(args ...string) string {
+			var path string
+			var alias string
+			if len(args) == 1 {
+				path = args[0]
+				alias = filepath.Base(path)
+			} else {
+				alias = args[0]
+				path = args[1]
+			}
+
+			if _, ok := aliases[path]; ok {
+				return ""
+			}
+
+			baseAlias := alias
+			i := 0
+			for {
+				p, ok := paths[alias]
+				if ok {
+					if p == path {
+						return ""
+					} else {
+						alias = fmt.Sprintf("%s%d", baseAlias, i)
+					}
+				} else {
+					paths[alias] = path
+					aliases[path] = alias
+					return fmt.Sprintf("%s \"%s\"", alias, path)
+				}
+				i++
+			}
+		},
+		"alias": func(path string) string {
+			return aliases[path]
+		},
 		"include": func(name string, data interface{}) (string, error) {
 			var buf strings.Builder
 			err := t.ExecuteTemplate(&buf, name, data)

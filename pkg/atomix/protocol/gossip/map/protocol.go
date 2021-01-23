@@ -3,9 +3,10 @@ package _map
 import (
 	"context"
 	_map "github.com/atomix/api/go/atomix/primitive/map"
+	proto "github.com/golang/protobuf/proto"
+
 	"github.com/atomix/go-framework/pkg/atomix/meta"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
-	"github.com/golang/protobuf/proto"
 )
 
 const ServiceType gossip.ServiceType = "Map"

@@ -6,10 +6,11 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
-	streams "github.com/atomix/go-framework/pkg/atomix/stream"
-	"github.com/atomix/go-framework/pkg/atomix/util/async"
+	async "github.com/atomix/go-framework/pkg/atomix/util/async"
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
+
+	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 )
 
 const Type = "Set"

@@ -8,24 +8,18 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
 	"google.golang.org/grpc"
-	{{- $added := false }}
-	{{- range .Primitive.Methods }}
-	{{- if and (not $added) .Response.IsStream }}
-	"sync"
-	"github.com/atomix/go-framework/pkg/atomix/util/async"
-	{{- $added = true }}
-	{{- end }}
-	{{- end }}
-	{{- $added = false }}
-	{{- range .Primitive.Methods }}
-	{{- if and (not $added) .Request.IsStream }}
-	"io"
-	{{- $added = true }}
-	{{- end }}
-	{{- end }}
 	{{- $package := .Package }}
 	{{- range .Imports }}
 	{{ .Alias }} {{ .Path | quote }}
+	{{- end }}
+	{{- range .Primitive.Methods }}
+	{{- if .Request.IsStream }}
+	{{ import "io" }}
+	{{- end }}
+	{{- if .Response.IsStream }}
+	{{ import "sync" }}
+	{{ import "github.com/atomix/go-framework/pkg/atomix/util/async" }}
+	{{- end }}
 	{{- end }}
 )
 

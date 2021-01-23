@@ -6,10 +6,11 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/gossip"
-	"github.com/atomix/go-framework/pkg/atomix/util/async"
+	async "github.com/atomix/go-framework/pkg/atomix/util/async"
 	"google.golang.org/grpc"
-	"io"
-	"sync"
+
+	io "io"
+	sync "sync"
 )
 
 const Type = "Map"

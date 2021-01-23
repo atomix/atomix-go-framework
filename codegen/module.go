@@ -300,6 +300,6 @@ func (m *Module) executeService(service pgs.Service) {
 	}
 
 	for file, template := range m.templates {
-		m.OverwriteGeneratorTemplateFile(m.ctx.GetFilePath(service, file), NewTemplate(m.ctx.GetTemplatePath(template)), meta)
+		m.OverwriteGeneratorTemplateFile(m.ctx.GetFilePath(service, file), NewTemplate(m.ctx.GetTemplatePath(template), importsSet), meta)
 	}
 }
