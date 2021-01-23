@@ -1,6 +1,4 @@
 {{- $serviceType := printf "%sServiceType" .Generator.Prefix }}
-{{- $serviceInt := printf "%sService" .Generator.Prefix }}
-{{- $serviceImpl := printf "%sServiceAdaptor" .Generator.Prefix }}
 
 {{- define "type" }}{{ printf "%s.%s" .Package.Alias .Name }}{{ end }}
 
@@ -13,25 +11,30 @@ import (
 	{{ .Alias }} {{ .Path | quote }}
 	{{- end }}
 	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 )
+
+var log = logging.GetLogger("atomix", "protocol", "gossip", {{ .Primitive.Name | lower | quote }})
 
 const {{ $serviceType }} gossip.ServiceType = {{ .Primitive.Name | quote }}
 
-// Register{{ $serviceInt }} registers the service on the given node
-func Register{{ $serviceInt }}(node *gossip.Node) {
-	node.RegisterService(ServiceType, func(serviceID gossip.ServiceID, partition *gossip.Partition) (gossip.Service, error) {
+// RegisterService registers the service on the given node
+func RegisterService(node *gossip.Node) {
+	node.RegisterService(ServiceType, func(ctx context.Context, serviceID gossip.ServiceID, partition *gossip.Partition) (gossip.Service, error) {
 		client, err := newClient(serviceID, partition)
 		if err != nil {
 			return nil, err
 		}
-		return new{{ $serviceInt }}(client), nil
+		service := newService(client)
+		manager := newManager(client, service)
+		return service, manager.start(ctx)
 	})
 }
 
-var new{{ $serviceInt }} func(replicas ReplicationClient) Service
+var newService func(replicas ReplicationClient) Service
 
-func register{{ $serviceInt }}(f func(replicas ReplicationClient) Service) {
-	new{{ $serviceInt }} = f
+func registerService(f func(replicas ReplicationClient) Service) {
+	newService = f
 }
 
 type Delegate interface {
@@ -53,7 +56,7 @@ type Delegate interface {
     {{- end }}
 }
 
-type {{ $serviceInt }} interface {
+type Service interface {
 	gossip.Service
 	Delegate() Delegate
     {{- range .Primitive.Methods }}

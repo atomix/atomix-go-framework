@@ -1,7 +1,3 @@
-{{- $serviceType := printf "%sServiceType" .Generator.Prefix }}
-{{- $serviceInt := printf "%sService" .Generator.Prefix }}
-{{- $serviceImpl := printf "%sServiceAdaptor" .Generator.Prefix }}
-
 {{- define "type" }}{{ printf "%s.%s" .Package.Alias .Name }}{{ end }}
 
 {{- define "field" }}
@@ -43,6 +39,7 @@ package {{ .Package.Name }}
 
 import (
 	"context"
+	"math/rand"
 	{{- $package := .Package }}
 	{{- range .Imports }}
 	{{ .Alias }} {{ .Path | quote }}
@@ -68,10 +65,14 @@ func newClient(serviceID gossip.ServiceID, partition *gossip.Partition) (Replica
 
 type ReplicationClient interface {
     {{- if .Primitive.State.Value }}
+	Bootstrap(ctx context.Context) (*{{ template "type" .Primitive.State.Value.Type }}, error)
 	Repair(ctx context.Context, value *{{ template "type" .Primitive.State.Value.Type }}) (*{{ template "type" .Primitive.State.Value.Type }}, error)
+	Advertise(ctx context.Context, value *{{ template "type" .Primitive.State.Value.Type }}) error
 	Update(ctx context.Context, value *{{ template "type" .Primitive.State.Value.Type }}) error
 	{{- else if .Primitive.State.Entry }}
+	Bootstrap(ctx context.Context, ch chan<- {{ template "type" .Primitive.State.Entry.Type }}) error
 	Repair(ctx context.Context, entry *{{ template "type" .Primitive.State.Entry.Type }}) (*{{ template "type" .Primitive.State.Entry.Type }}, error)
+	Advertise(ctx context.Context, entry *{{ template "type" .Primitive.State.Entry.Type }}) error
 	Update(ctx context.Context, entry *{{ template "type" .Primitive.State.Entry.Type }}) error
 	{{- end }}
 }
@@ -79,6 +80,24 @@ type ReplicationClient interface {
 {{- if .Primitive.State.Value }}
 type replicationClient struct {
 	group *gossip.PeerGroup
+}
+
+func (p *replicationClient) Bootstrap(ctx context.Context) (*{{ template "type" .Primitive.State.Value.Type }}, error) {
+	objects, err := p.group.Read(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+
+    var value *{{ template "type" .Primitive.State.Value.Type }}
+	for _, object := range objects {
+		if meta.FromProto(object.ObjectMeta).After(meta.FromProto(value{{ template "field" .Primitive.State.Value.Digest }})) {
+			err = proto.Unmarshal(object.Value, value)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return value, nil
 }
 
 func (p *replicationClient) Repair(ctx context.Context, value *{{ template "type" .Primitive.State.Value.Type }}) (*{{ template "type" .Primitive.State.Value.Type }}, error) {
@@ -98,6 +117,13 @@ func (p *replicationClient) Repair(ctx context.Context, value *{{ template "type
 	return value, nil
 }
 
+func (p *replicationClient) Advertise(ctx context.Context, value *{{ template "type" .Primitive.State.Value.Type }}) error {
+	peers := p.group.Peers()
+	peer := peers[rand.Intn(len(peers))]
+	peer.Advertise(ctx, "", meta.FromProto(value{{ template "field" .Primitive.State.Value.Digest }}))
+	return nil
+}
+
 func (p *replicationClient) Update(ctx context.Context, value *{{ template "type" .Primitive.State.Value.Type }}) error {
 	bytes, err := proto.Marshal(value)
 	if err != nil {
@@ -113,6 +139,25 @@ func (p *replicationClient) Update(ctx context.Context, value *{{ template "type
 {{- else if .Primitive.State.Entry }}
 type replicationClient struct {
 	group *gossip.PeerGroup
+}
+
+func (p *replicationClient) Bootstrap(ctx context.Context, ch chan<- {{ template "type" .Primitive.State.Entry.Type }}) error {
+	objectCh := make(chan gossip.Object)
+	if err := p.group.ReadAll(ctx, objectCh); err != nil {
+		return err
+	}
+	go func() {
+		for object := range objectCh {
+			var entry {{ template "type" .Primitive.State.Entry.Type }}
+			err := proto.Unmarshal(object.Value, &entry)
+			if err != nil {
+				log.Errorf("Bootstrap failed: %v", err)
+			} else {
+				ch <- entry
+			}
+		}
+	}()
+	return nil
 }
 
 func (p *replicationClient) Repair(ctx context.Context, entry *{{ template "type" .Primitive.State.Entry.Type }}) (*{{ template "type" .Primitive.State.Entry.Type }}, error) {
@@ -134,6 +179,13 @@ func (p *replicationClient) Repair(ctx context.Context, entry *{{ template "type
 		}
 	}
 	return entry, nil
+}
+
+func (p *replicationClient) Advertise(ctx context.Context, entry *{{ template "type" .Primitive.State.Entry.Type }}) error {
+	peers := p.group.Peers()
+	peer := peers[rand.Intn(len(peers))]
+	peer.Advertise(ctx, entry{{ template "field" .Primitive.State.Entry.Key }}, meta.FromProto(entry{{ template "field" .Primitive.State.Entry.Digest }}))
+	return nil
 }
 
 func (p *replicationClient) Update(ctx context.Context, entry *{{ template "type" .Primitive.State.Entry.Type }}) error {

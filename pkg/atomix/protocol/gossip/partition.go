@@ -15,15 +15,18 @@
 package gossip
 
 import (
+	"context"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/time"
 	"sync"
 )
 
 // NewPartition creates a new proxy partition
-func NewPartition(p *cluster.Partition, registry Registry) *Partition {
+func NewPartition(p *cluster.Partition, clock time.Clock, registry Registry) *Partition {
 	return &Partition{
 		Partition: p,
+		clock:     clock,
 		registry:  registry,
 		services:  make(map[ServiceID]Service),
 	}
@@ -35,13 +38,14 @@ type PartitionID int
 // Partition is a proxy partition
 type Partition struct {
 	*cluster.Partition
+	clock    time.Clock
 	registry Registry
 	ID       PartitionID
 	services map[ServiceID]Service
 	mu       sync.RWMutex
 }
 
-func (p *Partition) GetService(serviceType ServiceType, serviceID ServiceID) (Service, error) {
+func (p *Partition) GetService(ctx context.Context, serviceType ServiceType, serviceID ServiceID) (Service, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	service, ok := p.services[serviceID]
@@ -50,7 +54,7 @@ func (p *Partition) GetService(serviceType ServiceType, serviceID ServiceID) (Se
 		if err != nil {
 			return nil, err
 		}
-		service, err = f(serviceID, p)
+		service, err = f(ctx, serviceID, p)
 		if err != nil {
 			return nil, err
 		}
@@ -59,8 +63,8 @@ func (p *Partition) GetService(serviceType ServiceType, serviceID ServiceID) (Se
 	return service, nil
 }
 
-func (p *Partition) getReplica(serviceType ServiceType, serviceID ServiceID) (Replica, error) {
-	service, err := p.GetService(serviceType, serviceID)
+func (p *Partition) getReplica(ctx context.Context, serviceType ServiceType, serviceID ServiceID) (Replica, error) {
+	service, err := p.GetService(ctx, serviceType, serviceID)
 	if err != nil {
 		return nil, err
 	}

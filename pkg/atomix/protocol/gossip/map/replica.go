@@ -4,6 +4,7 @@ import (
 	"context"
 	_map "github.com/atomix/api/go/atomix/primitive/map"
 	proto "github.com/golang/protobuf/proto"
+	"math/rand"
 
 	"github.com/atomix/go-framework/pkg/atomix/meta"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
@@ -20,11 +21,32 @@ func newClient(serviceID gossip.ServiceID, partition *gossip.Partition) (Replica
 }
 
 type ReplicationClient interface {
+	Bootstrap(ctx context.Context, ch chan<- _map.Entry) error
 	Repair(ctx context.Context, entry *_map.Entry) (*_map.Entry, error)
+	Advertise(ctx context.Context, entry *_map.Entry) error
 	Update(ctx context.Context, entry *_map.Entry) error
 }
 type replicationClient struct {
 	group *gossip.PeerGroup
+}
+
+func (p *replicationClient) Bootstrap(ctx context.Context, ch chan<- _map.Entry) error {
+	objectCh := make(chan gossip.Object)
+	if err := p.group.ReadAll(ctx, objectCh); err != nil {
+		return err
+	}
+	go func() {
+		for object := range objectCh {
+			var entry _map.Entry
+			err := proto.Unmarshal(object.Value, &entry)
+			if err != nil {
+				log.Errorf("Bootstrap failed: %v", err)
+			} else {
+				ch <- entry
+			}
+		}
+	}()
+	return nil
 }
 
 func (p *replicationClient) Repair(ctx context.Context, entry *_map.Entry) (*_map.Entry, error) {
@@ -42,6 +64,13 @@ func (p *replicationClient) Repair(ctx context.Context, entry *_map.Entry) (*_ma
 		}
 	}
 	return entry, nil
+}
+
+func (p *replicationClient) Advertise(ctx context.Context, entry *_map.Entry) error {
+	peers := p.group.Peers()
+	peer := peers[rand.Intn(len(peers))]
+	peer.Advertise(ctx, entry.Key.Key, meta.FromProto(entry.Key.ObjectMeta))
+	return nil
 }
 
 func (p *replicationClient) Update(ctx context.Context, entry *_map.Entry) error {

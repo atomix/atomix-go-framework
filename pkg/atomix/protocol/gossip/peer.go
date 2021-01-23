@@ -19,6 +19,7 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/meta"
+	"github.com/atomix/go-framework/pkg/atomix/time"
 	"google.golang.org/grpc"
 	"io"
 	"sync"
@@ -26,11 +27,12 @@ import (
 
 type PeerID string
 
-func newPeer(group *PeerGroup, replica *cluster.Replica) (*Peer, error) {
+func newPeer(group *PeerGroup, replica *cluster.Replica, clock time.Clock) (*Peer, error) {
 	peer := &Peer{
 		ID:      PeerID(replica.ID),
 		group:   group,
 		replica: replica,
+		clock:   clock,
 		objects: make(map[string]Object),
 	}
 	if err := peer.connect(); err != nil {
@@ -43,6 +45,7 @@ type Peer struct {
 	ID          PeerID
 	group       *PeerGroup
 	replica     *cluster.Replica
+	clock       time.Clock
 	client      GossipProtocolClient
 	stream      GossipProtocol_GossipClient
 	advertiseCh chan Advertise
@@ -67,9 +70,12 @@ func (p *Peer) connect() error {
 	err = stream.Send(&GossipMessage{
 		Message: &GossipMessage_Initialize{
 			Initialize: &Initialize{
-				PartitionID: PartitionID(p.group.partition.ID),
-				ServiceType: p.group.serviceType,
-				ServiceID:   p.group.serviceID,
+				Header: RequestHeader{
+					PartitionID: p.group.partition.ID,
+					ServiceType: p.group.serviceType,
+					ServiceID:   p.group.serviceID,
+					Timestamp:   p.clock.Scheme().Codec().EncodeProto(p.clock.Increment()),
+				},
 			},
 		},
 	})
@@ -86,7 +92,7 @@ func (p *Peer) connect() error {
 				log.Error(err)
 				return
 			} else {
-				replica, err := p.group.partition.getReplica(p.group.serviceType, p.group.serviceID)
+				replica, err := p.group.partition.getReplica(ctx, p.group.serviceType, p.group.serviceID)
 				if err != nil {
 					log.Error(err)
 					return
@@ -94,6 +100,7 @@ func (p *Peer) connect() error {
 
 				switch m := msg.Message.(type) {
 				case *GossipMessage_Advertise:
+					timestamp := p.clock.Update(time.NewTimestamp(m.Advertise.Header.Timestamp))
 					object, err := replica.Read(stream.Context(), m.Advertise.Key)
 					if err != nil {
 						log.Error(err)
@@ -103,6 +110,9 @@ func (p *Peer) connect() error {
 							err := stream.Send(&GossipMessage{
 								Message: &GossipMessage_Update{
 									Update: &Update{
+										Header: GossipHeader{
+											Timestamp: p.clock.Scheme().Codec().EncodeProto(timestamp),
+										},
 										Object: *object,
 									},
 								},
@@ -115,6 +125,9 @@ func (p *Peer) connect() error {
 							err := stream.Send(&GossipMessage{
 								Message: &GossipMessage_Advertise{
 									Advertise: &Advertise{
+										Header: GossipHeader{
+											Timestamp: p.clock.Scheme().Codec().EncodeProto(timestamp),
+										},
 										ObjectMeta: object.ObjectMeta,
 										Key:        object.Key,
 									},
@@ -127,6 +140,7 @@ func (p *Peer) connect() error {
 						}
 					}
 				case *GossipMessage_Update:
+					p.clock.Update(time.NewTimestamp(m.Update.Header.Timestamp))
 					err = replica.Update(stream.Context(), &m.Update.Object)
 					if err != nil {
 						log.Error(err)
@@ -168,15 +182,34 @@ func (p *Peer) connect() error {
 	return nil
 }
 
-func (p *Peer) Clone(ctx context.Context, ch chan<- Object) error {
-	request := &CloneRequest{
+func (p *Peer) Read(ctx context.Context, key string) (*Object, error) {
+	request := &ReadRequest{
 		Header: RequestHeader{
 			PartitionID: p.group.partition.ID,
 			ServiceType: p.group.serviceType,
 			ServiceID:   p.group.serviceID,
+			Timestamp:   p.clock.Scheme().Codec().EncodeProto(p.clock.Get()),
+		},
+		Key: key,
+	}
+	response, err := p.client.Read(ctx, request)
+	if err != nil {
+		return nil, errors.From(err)
+	}
+	p.clock.Update(time.NewTimestamp(response.Header.Timestamp))
+	return response.Object, nil
+}
+
+func (p *Peer) ReadAll(ctx context.Context, ch chan<- Object) error {
+	request := &ReadAllRequest{
+		Header: RequestHeader{
+			PartitionID: p.group.partition.ID,
+			ServiceType: p.group.serviceType,
+			ServiceID:   p.group.serviceID,
+			Timestamp:   p.clock.Scheme().Codec().EncodeProto(p.clock.Get()),
 		},
 	}
-	stream, err := p.client.Clone(ctx, request)
+	stream, err := p.client.ReadAll(ctx, request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -191,27 +224,12 @@ func (p *Peer) Clone(ctx context.Context, ch chan<- Object) error {
 				}
 				return
 			} else {
+				p.clock.Update(time.NewTimestamp(response.Header.Timestamp))
 				ch <- response.Object
 			}
 		}
 	}()
 	return nil
-}
-
-func (p *Peer) Read(ctx context.Context, key string) (*Object, error) {
-	request := &ReadRequest{
-		Header: RequestHeader{
-			PartitionID: p.group.partition.ID,
-			ServiceType: p.group.serviceType,
-			ServiceID:   p.group.serviceID,
-		},
-		Key: key,
-	}
-	response, err := p.client.Read(ctx, request)
-	if err != nil {
-		return nil, errors.From(err)
-	}
-	return response.Object, nil
 }
 
 func (p *Peer) Advertise(ctx context.Context, key string, digest meta.ObjectMeta) {

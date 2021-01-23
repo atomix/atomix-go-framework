@@ -87,53 +87,65 @@ func (s *mapService) Size(ctx context.Context, _ *mapapi.SizeRequest) (*mapapi.S
 	}, nil
 }
 
-func (s *mapService) Put(ctx context.Context, input *mapapi.PutRequest) (*mapapi.PutResponse, error) {
+func (s *mapService) Put(ctx context.Context, request *mapapi.PutRequest) (*mapapi.PutResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	entry, ok := s.entries[input.Entry.Key.Key]
-	if ok {
-		storedMeta := meta.FromProto(entry.Key.ObjectMeta)
-		updateMeta := meta.FromProto(input.Entry.Key.ObjectMeta)
-		if storedMeta.Timestamp.After(updateMeta.Timestamp) {
-			return nil, errors.NewConflict("concurrent update")
+	oldEntry, ok := s.entries[request.Entry.Key.Key]
+	if !ok {
+		newEntry := &request.Entry
+		newEntry.Key.Timestamp = request.Headers.Timestamp
+		s.entries[request.Entry.Key.Key] = newEntry
+		if err := s.replicas.Update(ctx, newEntry); err != nil {
+			return nil, err
 		}
+		s.notify(mapapi.Event{
+			Type:  mapapi.Event_INSERT,
+			Entry: *newEntry,
+		})
 	}
 
-	if err := checkPreconditions(entry, input.Preconditions); err != nil {
+	if err := checkPreconditions(oldEntry, request.Preconditions); err != nil {
 		return nil, err
 	}
 
-	entry = &input.Entry
-	s.entries[input.Entry.Key.Key] = entry
+	if oldEntry.Key.Timestamp != nil && time.NewTimestamp(*oldEntry.Key.Timestamp).After(time.NewTimestamp(*request.Headers.Timestamp)) {
+		return &mapapi.PutResponse{
+			Entry: *oldEntry,
+		}, nil
+	}
 
-	if !ok {
+	newEntry := &request.Entry
+	newEntry.Key.Timestamp = request.Headers.Timestamp
+	s.entries[request.Entry.Key.Key] = newEntry
+
+	if err := s.replicas.Update(ctx, newEntry); err != nil {
+		return nil, err
+	}
+
+	if !ok || oldEntry.Key.Type == metaapi.ObjectMeta_TOMBSTONE {
 		s.notify(mapapi.Event{
 			Type:  mapapi.Event_INSERT,
-			Entry: *entry,
+			Entry: *newEntry,
 		})
 	} else {
 		s.notify(mapapi.Event{
 			Type:  mapapi.Event_UPDATE,
-			Entry: *entry,
+			Entry: *newEntry,
 		})
 	}
 
-	if err := s.replicas.Update(ctx, entry); err != nil {
-		return nil, err
-	}
-
 	return &mapapi.PutResponse{
-		Entry: *entry,
+		Entry: *newEntry,
 	}, nil
 }
 
-func (s *mapService) Get(ctx context.Context, input *mapapi.GetRequest) (*mapapi.GetResponse, error) {
+func (s *mapService) Get(ctx context.Context, request *mapapi.GetRequest) (*mapapi.GetResponse, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	entry, ok := s.entries[input.Key]
+	entry, ok := s.entries[request.Key]
 	if !ok {
-		return nil, errors.NewNotFound("key '%s' not found", input.Key)
+		return nil, errors.NewNotFound("key '%s' not found", request.Key)
 	}
 	entry, err := s.replicas.Repair(ctx, entry)
 	if err != nil {
@@ -144,30 +156,30 @@ func (s *mapService) Get(ctx context.Context, input *mapapi.GetRequest) (*mapapi
 	}, nil
 }
 
-func (s *mapService) Remove(ctx context.Context, input *mapapi.RemoveRequest) (*mapapi.RemoveResponse, error) {
+func (s *mapService) Remove(ctx context.Context, request *mapapi.RemoveRequest) (*mapapi.RemoveResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	entry, ok := s.entries[input.Key.Key]
+	entry, ok := s.entries[request.Key.Key]
 	if !ok {
-		return nil, errors.NewNotFound("key '%s' not found", input.Key)
+		return nil, errors.NewNotFound("key '%s' not found", request.Key)
 	}
 
 	storedMeta := meta.FromProto(entry.Key.ObjectMeta)
-	updateMeta := meta.FromProto(input.Key.ObjectMeta)
+	updateMeta := meta.FromProto(request.Key.ObjectMeta)
 	if storedMeta.Timestamp.After(updateMeta.Timestamp) {
 		return nil, errors.NewConflict("concurrent update")
 	}
 
-	if err := checkPreconditions(entry, input.Preconditions); err != nil {
+	if err := checkPreconditions(entry, request.Preconditions); err != nil {
 		return nil, err
 	}
 
 	entry = &mapapi.Entry{
-		Key: input.Key,
+		Key: request.Key,
 	}
 	entry.Key.Type = metaapi.ObjectMeta_TOMBSTONE
-	s.entries[input.Key.Key] = entry
+	s.entries[request.Key.Key] = entry
 
 	s.notify(mapapi.Event{
 		Type:  mapapi.Event_REMOVE,
@@ -197,12 +209,12 @@ func (s *mapService) Clear(ctx context.Context, _ *mapapi.ClearRequest) (*mapapi
 	return &mapapi.ClearResponse{}, nil
 }
 
-func (s *mapService) Events(ctx context.Context, input *mapapi.EventsRequest, ch chan<- mapapi.EventsResponse) error {
+func (s *mapService) Events(ctx context.Context, request *mapapi.EventsRequest, ch chan<- mapapi.EventsResponse) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.streams = append(s.streams, ch)
 	ch <- mapapi.EventsResponse{}
-	if input.Replay {
+	if request.Replay {
 		for _, entry := range s.entries {
 			ch <- mapapi.EventsResponse{
 				Event: mapapi.Event{
@@ -215,7 +227,7 @@ func (s *mapService) Events(ctx context.Context, input *mapapi.EventsRequest, ch
 	return nil
 }
 
-func (s *mapService) Entries(ctx context.Context, input *mapapi.EntriesRequest, ch chan<- mapapi.EntriesResponse) error {
+func (s *mapService) Entries(ctx context.Context, request *mapapi.EntriesRequest, ch chan<- mapapi.EntriesResponse) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	for _, entry := range s.entries {

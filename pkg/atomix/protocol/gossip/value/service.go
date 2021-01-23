@@ -3,19 +3,24 @@ package value
 import (
 	"context"
 	value "github.com/atomix/api/go/atomix/primitive/value"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
 )
+
+var log = logging.GetLogger("atomix", "protocol", "gossip", "value")
 
 const ServiceType gossip.ServiceType = "Value"
 
 // RegisterService registers the service on the given node
 func RegisterService(node *gossip.Node) {
-	node.RegisterService(ServiceType, func(serviceID gossip.ServiceID, partition *gossip.Partition) (gossip.Service, error) {
+	node.RegisterService(ServiceType, func(ctx context.Context, serviceID gossip.ServiceID, partition *gossip.Partition) (gossip.Service, error) {
 		client, err := newClient(serviceID, partition)
 		if err != nil {
 			return nil, err
 		}
-		return newService(client), nil
+		service := newService(client)
+		manager := newManager(client, service)
+		return service, manager.start(ctx)
 	})
 }
 

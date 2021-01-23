@@ -28,11 +28,12 @@ import (
 
 // newManager creates a new CRDT manager
 func newManager(cluster *cluster.Cluster, scheme time.Scheme, registry Registry) *Manager {
+	clock := scheme.NewClock()
 	partitions := cluster.Partitions()
 	proxyPartitions := make([]*Partition, 0, len(partitions))
 	proxyPartitionsByID := make(map[PartitionID]*Partition)
 	for _, partition := range partitions {
-		proxyPartition := NewPartition(partition, registry)
+		proxyPartition := NewPartition(partition, clock, registry)
 		proxyPartitions = append(proxyPartitions, proxyPartition)
 		proxyPartitionsByID[proxyPartition.ID] = proxyPartition
 	}
@@ -40,7 +41,7 @@ func newManager(cluster *cluster.Cluster, scheme time.Scheme, registry Registry)
 		Cluster:        cluster,
 		partitions:     proxyPartitions,
 		partitionsByID: proxyPartitionsByID,
-		clock:          scheme.NewClock(),
+		clock:          clock,
 	}
 }
 

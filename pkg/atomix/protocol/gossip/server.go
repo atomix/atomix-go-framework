@@ -18,6 +18,7 @@ import (
 	"context"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/meta"
+	"github.com/atomix/go-framework/pkg/atomix/time"
 	"io"
 )
 
@@ -34,7 +35,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 	}
 
 	init := msg.GetInitialize()
-	replica, err := s.getReplica(init.PartitionID, init.ServiceType, init.ServiceID)
+	replica, err := s.getReplica(stream.Context(), init.Header.PartitionID, init.Header.ServiceType, init.Header.ServiceID)
 	if err != nil {
 		return errors.Proto(err)
 	}
@@ -49,6 +50,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 
 		switch m := msg.Message.(type) {
 		case *GossipMessage_Advertise:
+			timestamp := s.manager.clock.Update(time.NewTimestamp(m.Advertise.Header.Timestamp))
 			object, err := replica.Read(stream.Context(), m.Advertise.Key)
 			if err != nil {
 				return err
@@ -57,6 +59,9 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 					err := stream.Send(&GossipMessage{
 						Message: &GossipMessage_Update{
 							Update: &Update{
+								Header: GossipHeader{
+									Timestamp: s.manager.clock.Scheme().Codec().EncodeProto(timestamp),
+								},
 								Object: *object,
 							},
 						},
@@ -68,6 +73,9 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 					err := stream.Send(&GossipMessage{
 						Message: &GossipMessage_Advertise{
 							Advertise: &Advertise{
+								Header: GossipHeader{
+									Timestamp: s.manager.clock.Scheme().Codec().EncodeProto(timestamp),
+								},
 								ObjectMeta: object.ObjectMeta,
 								Key:        object.Key,
 							},
@@ -79,6 +87,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 				}
 			}
 		case *GossipMessage_Update:
+			s.manager.clock.Update(time.NewTimestamp(m.Update.Header.Timestamp))
 			err := replica.Update(stream.Context(), &m.Update.Object)
 			if err != nil {
 				return err
@@ -87,8 +96,27 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 	}
 }
 
-func (s *GossipServer) Clone(request *CloneRequest, stream GossipProtocol_CloneServer) error {
-	replica, err := s.getReplica(request.Header.PartitionID, request.Header.ServiceType, request.Header.ServiceID)
+func (s *GossipServer) Read(ctx context.Context, request *ReadRequest) (*ReadResponse, error) {
+	timestamp := s.manager.clock.Update(time.NewTimestamp(request.Header.Timestamp))
+	replica, err := s.getReplica(ctx, request.Header.PartitionID, request.Header.ServiceType, request.Header.ServiceID)
+	if err != nil {
+		return nil, errors.Proto(err)
+	}
+	object, err := replica.Read(ctx, request.Key)
+	if err != nil {
+		return nil, errors.Proto(err)
+	}
+	return &ReadResponse{
+		Header: ResponseHeader{
+			Timestamp: s.manager.clock.Scheme().Codec().EncodeProto(timestamp),
+		},
+		Object: object,
+	}, nil
+}
+
+func (s *GossipServer) ReadAll(request *ReadAllRequest, stream GossipProtocol_ReadAllServer) error {
+	timestamp := s.manager.clock.Update(time.NewTimestamp(request.Header.Timestamp))
+	replica, err := s.getReplica(stream.Context(), request.Header.PartitionID, request.Header.ServiceType, request.Header.ServiceID)
 	if err != nil {
 		return errors.Proto(err)
 	}
@@ -107,7 +135,10 @@ func (s *GossipServer) Clone(request *CloneRequest, stream GossipProtocol_CloneS
 		select {
 		case object, ok := <-objectCh:
 			if ok {
-				err := stream.Send(&CloneResponse{
+				err := stream.Send(&ReadAllResponse{
+					Header: ResponseHeader{
+						Timestamp: s.manager.clock.Scheme().Codec().EncodeProto(timestamp),
+					},
 					Object: object,
 				})
 				if err != nil {
@@ -130,24 +161,10 @@ func (s *GossipServer) Clone(request *CloneRequest, stream GossipProtocol_CloneS
 	}
 }
 
-func (s *GossipServer) Read(ctx context.Context, request *ReadRequest) (*ReadResponse, error) {
-	replica, err := s.getReplica(request.Header.PartitionID, request.Header.ServiceType, request.Header.ServiceID)
-	if err != nil {
-		return nil, errors.Proto(err)
-	}
-	object, err := replica.Read(ctx, request.Key)
-	if err != nil {
-		return nil, errors.Proto(err)
-	}
-	return &ReadResponse{
-		Object: object,
-	}, nil
-}
-
-func (s *GossipServer) getReplica(partitionID PartitionID, serviceType ServiceType, serviceID ServiceID) (Replica, error) {
+func (s *GossipServer) getReplica(ctx context.Context, partitionID PartitionID, serviceType ServiceType, serviceID ServiceID) (Replica, error) {
 	partition, err := s.manager.Partition(partitionID)
 	if err != nil {
 		return nil, err
 	}
-	return partition.getReplica(serviceType, serviceID)
+	return partition.getReplica(ctx, serviceType, serviceID)
 }

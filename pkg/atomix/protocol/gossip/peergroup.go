@@ -85,7 +85,7 @@ func (g *PeerGroup) updatePeers(replicaSet cluster.ReplicaSet) error {
 		}
 		peer, ok := g.peersByID[PeerID(replicaID)]
 		if !ok {
-			p, err := newPeer(g, replica)
+			p, err := newPeer(g, replica, g.partition.clock)
 			if err != nil {
 				return err
 			}
@@ -142,7 +142,7 @@ func (g *PeerGroup) ReadAll(ctx context.Context, ch chan<- Object) error {
 	err := async.IterAsync(len(peers), func(i int) error {
 		peer := peers[i]
 		peerCh := make(chan Object)
-		err := peer.Clone(ctx, peerCh)
+		err := peer.ReadAll(ctx, peerCh)
 		if err != nil {
 			return err
 		}

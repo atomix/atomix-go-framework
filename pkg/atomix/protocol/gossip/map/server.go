@@ -41,7 +41,7 @@ func (s *Server) Size(ctx context.Context, request *_map.SizeRequest) (*_map.Siz
 
 	responses, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
 		partition := partitions[i]
-		service, err := partition.GetService(ServiceType, gossip.ServiceID(request.Headers.PrimitiveID))
+		service, err := partition.GetService(ctx, ServiceType, gossip.ServiceID(request.Headers.PrimitiveID))
 		if err != nil {
 			return nil, err
 		}
@@ -74,7 +74,7 @@ func (s *Server) Put(ctx context.Context, request *_map.PutRequest) (*_map.PutRe
 		return nil, err
 	}
 
-	service, err := partition.GetService(ServiceType, gossip.ServiceID(request.Headers.PrimitiveID))
+	service, err := partition.GetService(ctx, ServiceType, gossip.ServiceID(request.Headers.PrimitiveID))
 	if err != nil {
 		s.log.Errorf("Request PutRequest %+v failed: %v", request, err)
 		return nil, errors.Proto(err)
@@ -99,7 +99,7 @@ func (s *Server) Get(ctx context.Context, request *_map.GetRequest) (*_map.GetRe
 		return nil, err
 	}
 
-	service, err := partition.GetService(ServiceType, gossip.ServiceID(request.Headers.PrimitiveID))
+	service, err := partition.GetService(ctx, ServiceType, gossip.ServiceID(request.Headers.PrimitiveID))
 	if err != nil {
 		s.log.Errorf("Request GetRequest %+v failed: %v", request, err)
 		return nil, errors.Proto(err)
@@ -124,7 +124,7 @@ func (s *Server) Remove(ctx context.Context, request *_map.RemoveRequest) (*_map
 		return nil, err
 	}
 
-	service, err := partition.GetService(ServiceType, gossip.ServiceID(request.Headers.PrimitiveID))
+	service, err := partition.GetService(ctx, ServiceType, gossip.ServiceID(request.Headers.PrimitiveID))
 	if err != nil {
 		s.log.Errorf("Request RemoveRequest %+v failed: %v", request, err)
 		return nil, errors.Proto(err)
@@ -151,7 +151,7 @@ func (s *Server) Clear(ctx context.Context, request *_map.ClearRequest) (*_map.C
 
 	responses, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
 		partition := partitions[i]
-		service, err := partition.GetService(ServiceType, gossip.ServiceID(request.Headers.PrimitiveID))
+		service, err := partition.GetService(ctx, ServiceType, gossip.ServiceID(request.Headers.PrimitiveID))
 		if err != nil {
 			return nil, err
 		}
@@ -187,7 +187,7 @@ func (s *Server) Events(request *_map.EventsRequest, srv _map.MapService_EventsS
 	wg.Add(len(partitions))
 	err = async.IterAsync(len(partitions), func(i int) error {
 		partition := partitions[i]
-		service, err := partition.GetService(ServiceType, gossip.ServiceID(request.Headers.PrimitiveID))
+		service, err := partition.GetService(srv.Context(), ServiceType, gossip.ServiceID(request.Headers.PrimitiveID))
 		if err != nil {
 			return err
 		}
@@ -257,7 +257,7 @@ func (s *Server) Entries(request *_map.EntriesRequest, srv _map.MapService_Entri
 	wg.Add(len(partitions))
 	err = async.IterAsync(len(partitions), func(i int) error {
 		partition := partitions[i]
-		service, err := partition.GetService(ServiceType, gossip.ServiceID(request.Headers.PrimitiveID))
+		service, err := partition.GetService(srv.Context(), ServiceType, gossip.ServiceID(request.Headers.PrimitiveID))
 		if err != nil {
 			return err
 		}

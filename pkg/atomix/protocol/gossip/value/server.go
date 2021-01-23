@@ -39,7 +39,7 @@ func (s *Server) Set(ctx context.Context, request *value.SetRequest) (*value.Set
 		return nil, err
 	}
 
-	service, err := partition.GetService(ServiceType, gossip.ServiceID(request.Headers.PrimitiveID))
+	service, err := partition.GetService(ctx, ServiceType, gossip.ServiceID(request.Headers.PrimitiveID))
 	if err != nil {
 		s.log.Errorf("Request SetRequest %+v failed: %v", request, err)
 		return nil, errors.Proto(err)
@@ -64,7 +64,7 @@ func (s *Server) Get(ctx context.Context, request *value.GetRequest) (*value.Get
 		return nil, err
 	}
 
-	service, err := partition.GetService(ServiceType, gossip.ServiceID(request.Headers.PrimitiveID))
+	service, err := partition.GetService(ctx, ServiceType, gossip.ServiceID(request.Headers.PrimitiveID))
 	if err != nil {
 		s.log.Errorf("Request GetRequest %+v failed: %v", request, err)
 		return nil, errors.Proto(err)
@@ -95,7 +95,7 @@ func (s *Server) Events(request *value.EventsRequest, srv value.ValueService_Eve
 	wg.Add(len(partitions))
 	err = async.IterAsync(len(partitions), func(i int) error {
 		partition := partitions[i]
-		service, err := partition.GetService(ServiceType, gossip.ServiceID(request.Headers.PrimitiveID))
+		service, err := partition.GetService(srv.Context(), ServiceType, gossip.ServiceID(request.Headers.PrimitiveID))
 		if err != nil {
 			return err
 		}

@@ -19,12 +19,18 @@ syntax = "proto3";
 package atomix.protocol.gossip;
 
 import "atomix/primitive/meta/object.proto";
+import "atomix/primitive/meta/timestamp.proto";
 import "gogoproto/gogo.proto";
 
 message RequestHeader {
     uint32 partition_id = 1 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "PartitionID"];
     string service_type = 2 [(gogoproto.casttype) = "ServiceType"];
     string service_id = 3 [(gogoproto.customname) = "ServiceID", (gogoproto.casttype) = "ServiceID"];
+    atomix.primitive.meta.Timestamp timestamp = 4 [(gogoproto.nullable) = false];
+}
+
+message ResponseHeader {
+    atomix.primitive.meta.Timestamp timestamp = 1 [(gogoproto.nullable) = false];
 }
 
 message ReadAllRequest {
@@ -32,7 +38,8 @@ message ReadAllRequest {
 }
 
 message ReadAllResponse {
-    Object object = 1 [(gogoproto.nullable) = false];
+    ResponseHeader header = 1 [(gogoproto.nullable) = false];
+    Object object = 2 [(gogoproto.nullable) = false];
 }
 
 message ReadRequest {
@@ -42,7 +49,8 @@ message ReadRequest {
 }
 
 message ReadResponse {
-    Object object = 1;
+    ResponseHeader header = 1 [(gogoproto.nullable) = false];
+    Object object = 2;
 }
 
 message Object {
@@ -59,19 +67,23 @@ message GossipMessage {
     }
 }
 
+message GossipHeader {
+    atomix.primitive.meta.Timestamp timestamp = 1 [(gogoproto.nullable) = false];
+}
+
 message Initialize {
-    uint32 partition_id = 1 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "PartitionID"];
-    string service_type = 2 [(gogoproto.casttype) = "ServiceType"];
-    string service_id = 3 [(gogoproto.customname) = "ServiceID", (gogoproto.casttype) = "ServiceID"];
+    RequestHeader header = 1 [(gogoproto.nullable) = false];
 }
 
 message Advertise {
-    atomix.primitive.meta.ObjectMeta meta = 1 [(gogoproto.embed) = true, (gogoproto.nullable) = false];
-    string key = 2;
+    GossipHeader header = 1 [(gogoproto.nullable) = false];
+    atomix.primitive.meta.ObjectMeta meta = 2 [(gogoproto.embed) = true, (gogoproto.nullable) = false];
+    string key = 3;
 }
 
 message Update {
-    Object object = 1 [(gogoproto.nullable) = false];
+    GossipHeader header = 1 [(gogoproto.nullable) = false];
+    Object object = 2 [(gogoproto.nullable) = false];
 }
 
 service GossipProtocol {

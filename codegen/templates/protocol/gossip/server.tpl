@@ -113,7 +113,7 @@ func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "t
         return nil, err
     }
 
-    service, err := partition.GetService({{ $serviceType }}, gossip.ServiceID(request{{ template "field" .Request.Headers }}.PrimitiveID))
+    service, err := partition.GetService(ctx, {{ $serviceType }}, gossip.ServiceID(request{{ template "field" .Request.Headers }}.PrimitiveID))
     if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
         return nil, errors.Proto(err)
@@ -134,7 +134,7 @@ func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "t
 
 	responses, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
 	    partition := partitions[i]
-	    service, err := partition.GetService({{ $serviceType }}, gossip.ServiceID(request{{ template "field" .Request.Headers }}.PrimitiveID))
+	    service, err := partition.GetService(ctx, {{ $serviceType }}, gossip.ServiceID(request{{ template "field" .Request.Headers }}.PrimitiveID))
 	    if err != nil {
 	        return nil, err
 	    }
@@ -184,7 +184,7 @@ func (s *{{ $server }}) {{ .Name }}(request *{{ template "type" .Request.Type }}
     wg.Add(len(partitions))
     err = async.IterAsync(len(partitions), func(i int) error {
         partition := partitions[i]
-        service, err := partition.GetService({{ $serviceType }}, gossip.ServiceID(request{{ template "field" .Request.Headers }}.PrimitiveID))
+        service, err := partition.GetService(srv.Context(), {{ $serviceType }}, gossip.ServiceID(request{{ template "field" .Request.Headers }}.PrimitiveID))
         if err != nil {
             return err
         }
