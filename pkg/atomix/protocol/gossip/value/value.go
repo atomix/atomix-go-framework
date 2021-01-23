@@ -19,51 +19,53 @@ import (
 	valueapi "github.com/atomix/api/go/atomix/primitive/value"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/meta"
-	"github.com/atomix/go-framework/pkg/atomix/time"
+	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
 	"sync"
 )
 
 func init() {
-	registerReplica(func(protocol Protocol) Replica {
-		clock := time.NewLogicalClock()
-		return &valueReplica{
-			protocol: protocol,
-			clock:    clock,
-			value: &valueapi.Value{
-				ObjectMeta: meta.NewTimestamped(clock.Get()).AsTombstone().Proto(),
-			},
+	registerService(func(replicas ReplicationClient) Service {
+		return &valueService{
+			replicas: replicas,
 		}
 	})
 }
 
-type valueReplica struct {
-	protocol Protocol
-	clock    time.Clock
+type valueDelegate struct {
+	service *valueService
+}
+
+func (s *valueDelegate) Read(ctx context.Context) (*valueapi.Value, error) {
+	s.service.mu.RLock()
+	defer s.service.mu.RUnlock()
+	return s.service.value, nil
+}
+
+func (s *valueDelegate) Update(ctx context.Context, value *valueapi.Value) error {
+	s.service.mu.Lock()
+	defer s.service.mu.Unlock()
+	if meta.FromProto(value.ObjectMeta).After(meta.FromProto(s.service.value.ObjectMeta)) {
+		s.service.value = value
+	}
+	return nil
+}
+
+type valueService struct {
+	replicas ReplicationClient
 	value    *valueapi.Value
 	streams  []chan<- valueapi.EventsResponse
 	mu       sync.RWMutex
 }
 
-func (s *valueReplica) Service() Service {
-	return s
+func (s *valueService) Replica() gossip.Replica {
+	return newReplica(s)
 }
 
-func (s *valueReplica) Read(ctx context.Context) (*valueapi.Value, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.value, nil
+func (s *valueService) Delegate() Delegate {
+	return &valueDelegate{s}
 }
 
-func (s *valueReplica) Update(ctx context.Context, value *valueapi.Value) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if meta.FromProto(value.ObjectMeta).After(meta.FromProto(s.value.ObjectMeta)) {
-		s.value = value
-	}
-	return nil
-}
-
-func (s *valueReplica) Set(ctx context.Context, input *valueapi.SetRequest) (*valueapi.SetResponse, error) {
+func (s *valueService) Set(ctx context.Context, input *valueapi.SetRequest) (*valueapi.SetResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.value != nil && meta.FromProto(s.value.ObjectMeta).After(meta.FromProto(input.Value.ObjectMeta)) {
@@ -84,7 +86,7 @@ func (s *valueReplica) Set(ctx context.Context, input *valueapi.SetRequest) (*va
 		Value: input.Value,
 	})
 
-	err = s.protocol.BroadcastUpdate(ctx, &input.Value)
+	err = s.replicas.Update(ctx, &input.Value)
 	if err != nil {
 		return nil, err
 	}
@@ -93,14 +95,14 @@ func (s *valueReplica) Set(ctx context.Context, input *valueapi.SetRequest) (*va
 	}, nil
 }
 
-func (s *valueReplica) Get(ctx context.Context, input *valueapi.GetRequest) (*valueapi.GetResponse, error) {
+func (s *valueService) Get(ctx context.Context, input *valueapi.GetRequest) (*valueapi.GetResponse, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	var value *valueapi.Value
 	if s.value != nil {
 		value = s.value
 	}
-	value, err := s.protocol.RepairRead(ctx, value)
+	value, err := s.replicas.Repair(ctx, value)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +111,7 @@ func (s *valueReplica) Get(ctx context.Context, input *valueapi.GetRequest) (*va
 	}, nil
 }
 
-func (s *valueReplica) Events(ctx context.Context, request *valueapi.EventsRequest, ch chan<- valueapi.EventsResponse) error {
+func (s *valueService) Events(ctx context.Context, request *valueapi.EventsRequest, ch chan<- valueapi.EventsResponse) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.streams = append(s.streams, ch)
@@ -117,7 +119,7 @@ func (s *valueReplica) Events(ctx context.Context, request *valueapi.EventsReque
 	return nil
 }
 
-func (s *valueReplica) notify(event valueapi.Event) {
+func (s *valueService) notify(event valueapi.Event) {
 	for _, ch := range s.streams {
 		ch <- valueapi.EventsResponse{
 			Event: event,

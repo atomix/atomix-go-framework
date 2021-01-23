@@ -20,57 +20,66 @@ import (
 	metaapi "github.com/atomix/api/go/atomix/primitive/meta"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/meta"
+	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/time"
 	"sync"
 )
 
 func init() {
-	registerReplica(func(protocol Protocol) Replica {
-		return &mapReplica{
-			protocol: protocol,
+	registerService(func(replicas ReplicationClient) Service {
+		return &mapService{
+			replicas: replicas,
 			entries:  make(map[string]*mapapi.Entry),
 		}
 	})
 }
 
-type mapReplica struct {
-	protocol Protocol
-	entries  map[string]*mapapi.Entry
-	streams  []chan<- mapapi.EventsResponse
-	mu       sync.RWMutex
+type mapDelegate struct {
+	service *mapService
 }
 
-func (s *mapReplica) Service() Service {
-	return s
-}
-
-func (s *mapReplica) Update(ctx context.Context, update *mapapi.Entry) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	stored, ok := s.entries[update.Key.Key]
+func (s *mapDelegate) Update(ctx context.Context, update *mapapi.Entry) error {
+	s.service.mu.Lock()
+	defer s.service.mu.Unlock()
+	stored, ok := s.service.entries[update.Key.Key]
 	if !ok || meta.FromProto(update.Key.ObjectMeta).After(meta.FromProto(stored.Key.ObjectMeta)) {
-		s.entries[update.Key.Key] = update
-		return s.protocol.BroadcastUpdate(ctx, update)
+		s.service.entries[update.Key.Key] = update
+		return s.service.replicas.Update(ctx, update)
 	}
 	return nil
 }
 
-func (s *mapReplica) Read(ctx context.Context, key string) (*mapapi.Entry, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.entries[key], nil
+func (s *mapDelegate) Read(ctx context.Context, key string) (*mapapi.Entry, error) {
+	s.service.mu.RLock()
+	defer s.service.mu.RUnlock()
+	return s.service.entries[key], nil
 }
 
-func (s *mapReplica) List(ctx context.Context, ch chan<- mapapi.Entry) error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	for _, entry := range s.entries {
+func (s *mapDelegate) List(ctx context.Context, ch chan<- mapapi.Entry) error {
+	s.service.mu.RLock()
+	defer s.service.mu.RUnlock()
+	for _, entry := range s.service.entries {
 		ch <- *entry
 	}
 	return nil
 }
 
-func (s *mapReplica) Size(ctx context.Context, _ *mapapi.SizeRequest) (*mapapi.SizeResponse, error) {
+type mapService struct {
+	replicas ReplicationClient
+	entries  map[string]*mapapi.Entry
+	streams  []chan<- mapapi.EventsResponse
+	mu       sync.RWMutex
+}
+
+func (s *mapService) Replica() gossip.Replica {
+	return newReplica(s)
+}
+
+func (s *mapService) Delegate() Delegate {
+	return &mapDelegate{s}
+}
+
+func (s *mapService) Size(ctx context.Context, _ *mapapi.SizeRequest) (*mapapi.SizeResponse, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return &mapapi.SizeResponse{
@@ -78,7 +87,7 @@ func (s *mapReplica) Size(ctx context.Context, _ *mapapi.SizeRequest) (*mapapi.S
 	}, nil
 }
 
-func (s *mapReplica) Put(ctx context.Context, input *mapapi.PutRequest) (*mapapi.PutResponse, error) {
+func (s *mapService) Put(ctx context.Context, input *mapapi.PutRequest) (*mapapi.PutResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -110,7 +119,7 @@ func (s *mapReplica) Put(ctx context.Context, input *mapapi.PutRequest) (*mapapi
 		})
 	}
 
-	if err := s.protocol.BroadcastUpdate(ctx, entry); err != nil {
+	if err := s.replicas.Update(ctx, entry); err != nil {
 		return nil, err
 	}
 
@@ -119,19 +128,23 @@ func (s *mapReplica) Put(ctx context.Context, input *mapapi.PutRequest) (*mapapi
 	}, nil
 }
 
-func (s *mapReplica) Get(ctx context.Context, input *mapapi.GetRequest) (*mapapi.GetResponse, error) {
+func (s *mapService) Get(ctx context.Context, input *mapapi.GetRequest) (*mapapi.GetResponse, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	entry, ok := s.entries[input.Key]
 	if !ok {
 		return nil, errors.NewNotFound("key '%s' not found", input.Key)
 	}
+	entry, err := s.replicas.Repair(ctx, entry)
+	if err != nil {
+		return nil, err
+	}
 	return &mapapi.GetResponse{
 		Entry: *entry,
 	}, nil
 }
 
-func (s *mapReplica) Remove(ctx context.Context, input *mapapi.RemoveRequest) (*mapapi.RemoveResponse, error) {
+func (s *mapService) Remove(ctx context.Context, input *mapapi.RemoveRequest) (*mapapi.RemoveResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -161,7 +174,7 @@ func (s *mapReplica) Remove(ctx context.Context, input *mapapi.RemoveRequest) (*
 		Entry: *entry,
 	})
 
-	if err := s.protocol.BroadcastUpdate(ctx, entry); err != nil {
+	if err := s.replicas.Update(ctx, entry); err != nil {
 		return nil, err
 	}
 
@@ -170,13 +183,13 @@ func (s *mapReplica) Remove(ctx context.Context, input *mapapi.RemoveRequest) (*
 	}, nil
 }
 
-func (s *mapReplica) Clear(ctx context.Context, _ *mapapi.ClearRequest) (*mapapi.ClearResponse, error) {
+func (s *mapService) Clear(ctx context.Context, _ *mapapi.ClearRequest) (*mapapi.ClearResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, entry := range s.entries {
 		if entry.Key.Type != metaapi.ObjectMeta_TOMBSTONE {
 			entry.Key.Type = metaapi.ObjectMeta_TOMBSTONE
-			if err := s.protocol.BroadcastUpdate(ctx, entry); err != nil {
+			if err := s.replicas.Update(ctx, entry); err != nil {
 				return nil, err
 			}
 		}
@@ -184,7 +197,7 @@ func (s *mapReplica) Clear(ctx context.Context, _ *mapapi.ClearRequest) (*mapapi
 	return &mapapi.ClearResponse{}, nil
 }
 
-func (s *mapReplica) Events(ctx context.Context, input *mapapi.EventsRequest, ch chan<- mapapi.EventsResponse) error {
+func (s *mapService) Events(ctx context.Context, input *mapapi.EventsRequest, ch chan<- mapapi.EventsResponse) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.streams = append(s.streams, ch)
@@ -202,7 +215,7 @@ func (s *mapReplica) Events(ctx context.Context, input *mapapi.EventsRequest, ch
 	return nil
 }
 
-func (s *mapReplica) Entries(ctx context.Context, input *mapapi.EntriesRequest, ch chan<- mapapi.EntriesResponse) error {
+func (s *mapService) Entries(ctx context.Context, input *mapapi.EntriesRequest, ch chan<- mapapi.EntriesResponse) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	for _, entry := range s.entries {
@@ -213,7 +226,7 @@ func (s *mapReplica) Entries(ctx context.Context, input *mapapi.EntriesRequest, 
 	return nil
 }
 
-func (s *mapReplica) notify(event mapapi.Event) {
+func (s *mapService) notify(event mapapi.Event) {
 	for _, ch := range s.streams {
 		ch <- mapapi.EventsResponse{
 			Event: event,

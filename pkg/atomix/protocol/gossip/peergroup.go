@@ -110,7 +110,29 @@ func (g *PeerGroup) Peers() []*Peer {
 	return g.peers
 }
 
-func (g *PeerGroup) Clone(ctx context.Context, ch chan<- Object) error {
+func (g *PeerGroup) Read(ctx context.Context, key string) ([]Object, error) {
+	g.peersMu.RLock()
+	peers := g.peers
+	g.peersMu.RUnlock()
+
+	results, err := async.ExecuteAsync(len(peers), func(i int) (interface{}, error) {
+		peer := peers[i]
+		return peer.Read(ctx, key)
+	})
+	if err != nil {
+		return nil, errors.From(err)
+	}
+
+	objects := make([]Object, 0, len(results))
+	for _, result := range results {
+		if result != nil {
+			objects = append(objects, *result.(*Object))
+		}
+	}
+	return objects, nil
+}
+
+func (g *PeerGroup) ReadAll(ctx context.Context, ch chan<- Object) error {
 	g.peersMu.RLock()
 	peers := g.peers
 	g.peersMu.RUnlock()
@@ -139,28 +161,6 @@ func (g *PeerGroup) Clone(ctx context.Context, ch chan<- Object) error {
 		close(ch)
 	}()
 	return nil
-}
-
-func (g *PeerGroup) Read(ctx context.Context, key string) ([]Object, error) {
-	g.peersMu.RLock()
-	peers := g.peers
-	g.peersMu.RUnlock()
-
-	results, err := async.ExecuteAsync(len(peers), func(i int) (interface{}, error) {
-		peer := peers[i]
-		return peer.Read(ctx, key)
-	})
-	if err != nil {
-		return nil, errors.From(err)
-	}
-
-	objects := make([]Object, 0, len(results))
-	for _, result := range results {
-		if result != nil {
-			objects = append(objects, *result.(*Object))
-		}
-	}
-	return objects, nil
 }
 
 func (g *PeerGroup) Advertise(ctx context.Context, key string, digest meta.ObjectMeta) {

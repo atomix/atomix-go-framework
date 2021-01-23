@@ -25,11 +25,12 @@ type ServiceType string
 type ServiceID string
 
 // Service is a gossip service
-type Service interface{}
+type Service interface {
+	Replica() Replica
+}
 
-// Replica is a gossip replica interface
+// Replica is a service replica interface
 type Replica interface {
-	Service() Service
 	Read(ctx context.Context, key string) (*Object, error)
 	ReadAll(ctx context.Context, ch chan<- Object) error
 	Update(ctx context.Context, object *Object) error
