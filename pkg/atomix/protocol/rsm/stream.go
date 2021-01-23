@@ -113,7 +113,6 @@ type sessionStream struct {
 	completeID uint64
 	lastIndex  Index
 	ctx        PartitionContext
-	stream     streams.WriteStream
 	results    *list.List
 }
 

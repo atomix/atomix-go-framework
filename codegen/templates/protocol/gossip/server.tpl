@@ -34,10 +34,7 @@ func Register{{ $server }}(node *gossip.Node) {
 	node.RegisterServer(func(server *grpc.Server, manager *gossip.Manager) {
 		{{ .Primitive.Type.Package.Alias }}.Register{{ .Primitive.Type.Name }}Server(server, new{{ $server }}(manager))
 	})
-	node.RegisterServer(registerServerFunc)
 }
-
-var registerServerFunc gossip.RegisterServerFunc
 
 func new{{ $server }}(manager *gossip.Manager) {{ .Primitive.Type.Package.Alias }}.{{ .Primitive.Type.Name }}Server {
 	return &{{ $server }}{

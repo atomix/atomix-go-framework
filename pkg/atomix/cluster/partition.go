@@ -79,7 +79,7 @@ func (p *Partition) Update(config protocolapi.ProtocolPartition) error {
 	replicas := make(map[ReplicaID]*Replica)
 	for _, id := range config.Replicas {
 		replicaID := ReplicaID(id)
-		replica, ok := p.cluster.Replica(replicaID)
+		replica, ok := p.cluster.replicas[replicaID]
 		if !ok {
 			return errors.NewNotFound("replica '%s' not a member of the cluster", replicaID)
 		}

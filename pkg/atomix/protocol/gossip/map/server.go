@@ -16,10 +16,7 @@ func RegisterServer(node *gossip.Node) {
 	node.RegisterServer(func(server *grpc.Server, manager *gossip.Manager) {
 		_map.RegisterMapServiceServer(server, newServer(manager))
 	})
-	node.RegisterServer(registerServerFunc)
 }
-
-var registerServerFunc gossip.RegisterServerFunc
 
 func newServer(manager *gossip.Manager) _map.MapServiceServer {
 	return &Server{

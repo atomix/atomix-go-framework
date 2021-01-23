@@ -126,9 +126,7 @@ func (s *Session) DoCommandStream(ctx context.Context, name string, input []byte
 				switch response.Type {
 				case rsm.SessionResponseType_OPEN_STREAM:
 					if streamState.serialize(response.Context) {
-						outStream.Value(SessionOutput{
-							Result: response.Result,
-						})
+						outStream.Send(response.Result)
 					}
 				case rsm.SessionResponseType_CLOSE_STREAM:
 					if streamState.serialize(response.Context) {
@@ -142,9 +140,7 @@ func (s *Session) DoCommandStream(ctx context.Context, name string, input []byte
 
 					// Attempt to serialize the response to the stream and skip the response if serialization failed.
 					if streamState.serialize(response.Context) {
-						outStream.Value(SessionOutput{
-							Result: response.Result,
-						})
+						outStream.Send(response.Result)
 					}
 				}
 			case <-ctx.Done():

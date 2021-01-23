@@ -60,6 +60,7 @@ func (n *Node) Start() error {
 			f(s, manager)
 		}
 	}
+	services = append(services, RegisterPrimitiveServer)
 
 	member, ok := n.Cluster.Member()
 	if !ok {
