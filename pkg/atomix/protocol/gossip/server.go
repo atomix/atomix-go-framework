@@ -19,8 +19,19 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/meta"
 	"github.com/atomix/go-framework/pkg/atomix/time"
+	"google.golang.org/grpc"
 	"io"
 )
+
+func RegisterGossipServer(server *grpc.Server, manager *Manager) {
+	RegisterGossipProtocolServer(server, newGossipServer(manager))
+}
+
+func newGossipServer(manager *Manager) GossipProtocolServer {
+	return &GossipServer{
+		manager: manager,
+	}
+}
 
 type GossipServer struct {
 	manager *Manager

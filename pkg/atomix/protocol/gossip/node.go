@@ -64,6 +64,9 @@ func (n *Node) Start() error {
 		}
 	}
 	services = append(services, RegisterPrimitiveServer)
+	services = append(services, func(server *grpc.Server) {
+		RegisterGossipServer(server, manager)
+	})
 
 	member, ok := n.Cluster.Member()
 	if !ok {

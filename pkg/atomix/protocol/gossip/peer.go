@@ -60,9 +60,9 @@ func (p *Peer) connect() error {
 	if err != nil {
 		return err
 	}
-	client := NewGossipProtocolClient(conn)
+	p.client = NewGossipProtocolClient(conn)
 	ctx, cancel := context.WithCancel(context.Background())
-	stream, err := client.Gossip(ctx)
+	stream, err := p.client.Gossip(ctx)
 	if err != nil {
 		return err
 	}

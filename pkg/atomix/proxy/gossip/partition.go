@@ -16,6 +16,7 @@ package gossip
 
 import (
 	"context"
+	"fmt"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/headers"
 	"google.golang.org/grpc"
@@ -45,9 +46,7 @@ type Partition struct {
 }
 
 func (p *Partition) AddHeaders(ctx context.Context) context.Context {
-	var md metadata.MD
-	headers.PartitionID.AddInt(md, int(p.ID))
-	return metadata.NewOutgoingContext(ctx, md)
+	return metadata.AppendToOutgoingContext(ctx, headers.PartitionID.Name(), fmt.Sprint(p.ID))
 }
 
 // Connect gets the connection to the partition
