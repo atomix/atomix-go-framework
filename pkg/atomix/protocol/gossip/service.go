@@ -31,6 +31,6 @@ type Service interface{}
 type Replica interface {
 	Service() Service
 	Read(ctx context.Context, key string) (*Object, error)
+	ReadAll(ctx context.Context, ch chan<- Object) error
 	Update(ctx context.Context, object *Object) error
-	Clone(ctx context.Context, ch chan<- Object) error
 }

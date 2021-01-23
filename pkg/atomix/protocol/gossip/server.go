@@ -96,7 +96,7 @@ func (s *GossipServer) Clone(request *CloneRequest, stream GossipProtocol_CloneS
 	objectCh := make(chan Object)
 	errCh := make(chan error)
 	go func() {
-		err := replica.Clone(stream.Context(), objectCh)
+		err := replica.ReadAll(stream.Context(), objectCh)
 		if err != nil {
 			errCh <- err
 		}

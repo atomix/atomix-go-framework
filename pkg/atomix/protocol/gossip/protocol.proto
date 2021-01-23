@@ -27,11 +27,11 @@ message RequestHeader {
     string service_id = 3 [(gogoproto.customname) = "ServiceID", (gogoproto.casttype) = "ServiceID"];
 }
 
-message CloneRequest {
+message ReadAllRequest {
     RequestHeader header = 1 [(gogoproto.nullable) = false];
 }
 
-message CloneResponse {
+message ReadAllResponse {
     Object object = 1 [(gogoproto.nullable) = false];
 }
 
@@ -75,7 +75,7 @@ message Update {
 }
 
 service GossipProtocol {
-    rpc Clone (CloneRequest) returns (stream CloneResponse);
+    rpc ReadAll (ReadAllRequest) returns (stream ReadAllResponse);
     rpc Read (ReadRequest) returns (ReadResponse);
     rpc Gossip (stream GossipMessage) returns (stream GossipMessage);
 }
