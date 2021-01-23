@@ -57,3 +57,23 @@ func (c *LogicalClock) Increment() Timestamp {
 	c.timestamp = timestamp
 	return timestamp
 }
+
+// NewCompositeClock creates a new composite clock
+func NewCompositeClock(clocks ...Clock) Clock {
+	return &CompositeClock{
+		Clocks: clocks,
+	}
+}
+
+// CompositeClock is a clock that produces CompositeTimestamps
+type CompositeClock struct {
+	Clocks []Clock
+}
+
+func (c *CompositeClock) Increment() Timestamp {
+	timestamps := make([]Timestamp, len(c.Clocks))
+	for i, clock := range c.Clocks {
+		timestamps[i] = clock.Increment()
+	}
+	return NewCompositeTimestamp(timestamps...)
+}
