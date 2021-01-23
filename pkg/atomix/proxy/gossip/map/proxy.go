@@ -41,7 +41,7 @@ func (s *Proxy) Size(ctx context.Context, request *_map.SizeRequest) (*_map.Size
 			return nil, err
 		}
 		client := _map.NewMapServiceClient(conn)
-		ctx = partition.AddHeaders(ctx)
+		ctx = partition.AddPartitions(ctx)
 		return client.Size(ctx, request)
 	})
 	if err != nil {
@@ -68,7 +68,7 @@ func (s *Proxy) Put(ctx context.Context, request *_map.PutRequest) (*_map.PutRes
 	}
 
 	client := _map.NewMapServiceClient(conn)
-	ctx = partition.AddHeaders(ctx)
+	ctx = partition.AddPartition(ctx)
 	response, err := client.Put(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request PutRequest failed: %v", err)
@@ -89,7 +89,7 @@ func (s *Proxy) Get(ctx context.Context, request *_map.GetRequest) (*_map.GetRes
 	}
 
 	client := _map.NewMapServiceClient(conn)
-	ctx = partition.AddHeaders(ctx)
+	ctx = partition.AddPartition(ctx)
 	response, err := client.Get(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
@@ -110,7 +110,7 @@ func (s *Proxy) Remove(ctx context.Context, request *_map.RemoveRequest) (*_map.
 	}
 
 	client := _map.NewMapServiceClient(conn)
-	ctx = partition.AddHeaders(ctx)
+	ctx = partition.AddPartition(ctx)
 	response, err := client.Remove(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request RemoveRequest failed: %v", err)
@@ -131,7 +131,7 @@ func (s *Proxy) Clear(ctx context.Context, request *_map.ClearRequest) (*_map.Cl
 			return nil, err
 		}
 		client := _map.NewMapServiceClient(conn)
-		ctx = partition.AddHeaders(ctx)
+		ctx = partition.AddPartitions(ctx)
 		return client.Clear(ctx, request)
 	})
 	if err != nil {
@@ -158,7 +158,7 @@ func (s *Proxy) Events(request *_map.EventsRequest, srv _map.MapService_EventsSe
 			return err
 		}
 		client := _map.NewMapServiceClient(conn)
-		ctx := partition.AddHeaders(srv.Context())
+		ctx := partition.AddPartitions(srv.Context())
 		stream, err := client.Events(ctx, request)
 		if err != nil {
 			s.log.Errorf("Request EventsRequest failed: %v", err)
@@ -226,7 +226,7 @@ func (s *Proxy) Entries(request *_map.EntriesRequest, srv _map.MapService_Entrie
 			return err
 		}
 		client := _map.NewMapServiceClient(conn)
-		ctx := partition.AddHeaders(srv.Context())
+		ctx := partition.AddPartitions(srv.Context())
 		stream, err := client.Entries(ctx, request)
 		if err != nil {
 			s.log.Errorf("Request EntriesRequest failed: %v", err)

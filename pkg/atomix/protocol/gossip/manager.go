@@ -90,7 +90,7 @@ func (m *Manager) PartitionFrom(ctx context.Context) (*Partition, error) {
 		return nil, errors.NewUnavailable("no partitions header found")
 	}
 
-	partitionNames := md.Get(partitionsKey)
+	partitionNames := md.Get(partitionKey)
 	if len(partitionNames) != 1 {
 		return nil, errors.NewUnavailable("no partitions header found")
 	}

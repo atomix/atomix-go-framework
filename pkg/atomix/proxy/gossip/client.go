@@ -26,6 +26,8 @@ import (
 const (
 	primitiveTypeKey = "Primitive-Type"
 	primitiveNameKey = "Primitive-Name"
+	serviceTypeKey   = "Service-Type"
+	serviceIDKey     = "Service-Id"
 )
 
 // NewClient creates a new proxy client

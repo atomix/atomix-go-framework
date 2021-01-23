@@ -40,7 +40,7 @@ func (s *Proxy) Set(ctx context.Context, request *value.SetRequest) (*value.SetR
 	}
 
 	client := value.NewValueServiceClient(conn)
-	ctx = partition.AddHeaders(ctx)
+	ctx = partition.AddPartition(ctx)
 	response, err := client.Set(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request SetRequest failed: %v", err)
@@ -63,7 +63,7 @@ func (s *Proxy) Get(ctx context.Context, request *value.GetRequest) (*value.GetR
 	}
 
 	client := value.NewValueServiceClient(conn)
-	ctx = partition.AddHeaders(ctx)
+	ctx = partition.AddPartition(ctx)
 	response, err := client.Get(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
@@ -87,7 +87,7 @@ func (s *Proxy) Events(request *value.EventsRequest, srv value.ValueService_Even
 	}
 
 	client := value.NewValueServiceClient(conn)
-	ctx := partition.AddHeaders(srv.Context())
+	ctx := partition.AddPartition(srv.Context())
 	stream, err := client.Events(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request EventsRequest failed: %v", err)

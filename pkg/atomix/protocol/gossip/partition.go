@@ -27,6 +27,7 @@ func NewPartition(p *cluster.Partition, registry Registry) *Partition {
 	return &Partition{
 		Partition: p,
 		registry:  registry,
+		services: make(map[ServiceID]Service),
 	}
 }
 

@@ -24,7 +24,8 @@ import (
 	"sync"
 )
 
-const partitionsKey = "partitions"
+const partitionsKey = "Partitions"
+const partitionKey = "Partition"
 
 // NewPartition creates a new proxy partition
 func NewPartition(c *cluster.Cluster, p *cluster.Partition) *Partition {
@@ -46,9 +47,29 @@ type Partition struct {
 	mu      sync.RWMutex
 }
 
-// AddHeaders adds the header for the partition to the given context
-func (p *Partition) AddHeaders(ctx context.Context) context.Context {
-	return metadata.AppendToOutgoingContext(ctx, partitionsKey, fmt.Sprint(p.ID))
+func (p *Partition) addService(ctx context.Context) context.Context {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if ok {
+		primitiveTypes := md.Get(primitiveTypeKey)
+		if len(primitiveTypes) > 0 {
+			ctx = metadata.AppendToOutgoingContext(ctx, serviceTypeKey, primitiveTypes[0])
+		}
+		primitiveNames := md.Get(primitiveNameKey)
+		if len(primitiveNames) > 0 {
+			ctx = metadata.AppendToOutgoingContext(ctx, serviceIDKey, primitiveNames[0])
+		}
+	}
+	return ctx
+}
+
+// AddPartition adds the header for the partition to the given context
+func (p *Partition) AddPartition(ctx context.Context) context.Context {
+	return metadata.AppendToOutgoingContext(p.addService(ctx), partitionKey, fmt.Sprint(p.ID))
+}
+
+// AddPartitions adds the header for the partitions to the given context
+func (p *Partition) AddPartitions(ctx context.Context) context.Context {
+	return metadata.AppendToOutgoingContext(p.addService(ctx), partitionsKey, fmt.Sprint(p.ID))
 }
 
 // Connect gets the connection to the partition

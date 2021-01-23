@@ -124,7 +124,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	}
 
 	client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-	ctx = partition.AddHeaders(ctx)
+	ctx = partition.AddPartition(ctx)
 	response, err := client.{{ .Name }}(ctx, request)
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
@@ -140,7 +140,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
             return nil, err
         }
         client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-        ctx = partition.AddHeaders(ctx)
+        ctx = partition.AddPartitions(ctx)
 		return client.{{ .Name }}(ctx, request)
 	})
 	if err != nil {
@@ -193,7 +193,7 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	}
 
 	client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-	ctx := partition.AddHeaders(srv.Context())
+	ctx := partition.AddPartition(srv.Context())
 	stream, err := client.{{ .Name }}(ctx, request)
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
@@ -228,7 +228,7 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
             return err
         }
         client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-        ctx := partition.AddHeaders(srv.Context())
+        ctx := partition.AddPartitions(srv.Context())
         stream, err := client.{{ .Name }}(ctx, request)
         if err != nil {
             s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
