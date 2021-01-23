@@ -22,8 +22,8 @@ import (
 // RegisterServerFunc is a function for registering a server
 type RegisterServerFunc func(server *grpc.Server, manager *Manager)
 
-// NewServiceFunc is a function for creating a service
-type NewServiceFunc func(serviceID ServiceID, partition *Partition) (Service, error)
+// NewServiceFunc is a function for creating a replica
+type NewServiceFunc func(serviceID ServiceID, partition *Partition) (Replica, error)
 
 // Registry is a primitive registry
 type Registry interface {

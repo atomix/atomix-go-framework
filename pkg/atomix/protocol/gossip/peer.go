@@ -86,7 +86,7 @@ func (p *Peer) connect() error {
 				log.Error(err)
 				return
 			} else {
-				service, err := p.group.partition.GetService(p.group.serviceType, p.group.serviceID)
+				replica, err := p.group.partition.getReplica(p.group.serviceType, p.group.serviceID)
 				if err != nil {
 					log.Error(err)
 					return
@@ -94,7 +94,7 @@ func (p *Peer) connect() error {
 
 				switch m := msg.Message.(type) {
 				case *GossipMessage_Advertise:
-					object, err := service.Read(stream.Context(), m.Advertise.Key)
+					object, err := replica.Read(stream.Context(), m.Advertise.Key)
 					if err != nil {
 						log.Error(err)
 						return
@@ -127,7 +127,7 @@ func (p *Peer) connect() error {
 						}
 					}
 				case *GossipMessage_Update:
-					err = service.Update(stream.Context(), &m.Update.Object)
+					err = replica.Update(stream.Context(), &m.Update.Object)
 					if err != nil {
 						log.Error(err)
 						return
@@ -171,7 +171,7 @@ func (p *Peer) connect() error {
 func (p *Peer) Clone(ctx context.Context, ch chan<- Object) error {
 	request := &CloneRequest{
 		Header: RequestHeader{
-			PartitionID: PartitionID(p.group.partition.ID),
+			PartitionID: p.group.partition.ID,
 			ServiceType: p.group.serviceType,
 			ServiceID:   p.group.serviceID,
 		},
@@ -201,7 +201,7 @@ func (p *Peer) Clone(ctx context.Context, ch chan<- Object) error {
 func (p *Peer) Read(ctx context.Context, key string) (*Object, error) {
 	request := &ReadRequest{
 		Header: RequestHeader{
-			PartitionID: PartitionID(p.group.partition.ID),
+			PartitionID: p.group.partition.ID,
 			ServiceType: p.group.serviceType,
 			ServiceID:   p.group.serviceID,
 		},

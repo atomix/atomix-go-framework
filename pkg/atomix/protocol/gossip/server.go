@@ -34,7 +34,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 	}
 
 	init := msg.GetInitialize()
-	service, err := s.getService(init.PartitionID, init.ServiceType, init.ServiceID)
+	replica, err := s.getReplica(init.PartitionID, init.ServiceType, init.ServiceID)
 	if err != nil {
 		return errors.Proto(err)
 	}
@@ -49,7 +49,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 
 		switch m := msg.Message.(type) {
 		case *GossipMessage_Advertise:
-			object, err := service.Read(stream.Context(), m.Advertise.Key)
+			object, err := replica.Read(stream.Context(), m.Advertise.Key)
 			if err != nil {
 				return err
 			} else if object != nil {
@@ -79,7 +79,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 				}
 			}
 		case *GossipMessage_Update:
-			err := service.Update(stream.Context(), &m.Update.Object)
+			err := replica.Update(stream.Context(), &m.Update.Object)
 			if err != nil {
 				return err
 			}
@@ -88,7 +88,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 }
 
 func (s *GossipServer) Clone(request *CloneRequest, stream GossipProtocol_CloneServer) error {
-	service, err := s.getService(request.Header.PartitionID, request.Header.ServiceType, request.Header.ServiceID)
+	replica, err := s.getReplica(request.Header.PartitionID, request.Header.ServiceType, request.Header.ServiceID)
 	if err != nil {
 		return errors.Proto(err)
 	}
@@ -96,7 +96,7 @@ func (s *GossipServer) Clone(request *CloneRequest, stream GossipProtocol_CloneS
 	objectCh := make(chan Object)
 	errCh := make(chan error)
 	go func() {
-		err := service.Clone(stream.Context(), objectCh)
+		err := replica.Clone(stream.Context(), objectCh)
 		if err != nil {
 			errCh <- err
 		}
@@ -131,11 +131,11 @@ func (s *GossipServer) Clone(request *CloneRequest, stream GossipProtocol_CloneS
 }
 
 func (s *GossipServer) Read(ctx context.Context, request *ReadRequest) (*ReadResponse, error) {
-	service, err := s.getService(request.Header.PartitionID, request.Header.ServiceType, request.Header.ServiceID)
+	replica, err := s.getReplica(request.Header.PartitionID, request.Header.ServiceType, request.Header.ServiceID)
 	if err != nil {
 		return nil, errors.Proto(err)
 	}
-	object, err := service.Read(ctx, request.Key)
+	object, err := replica.Read(ctx, request.Key)
 	if err != nil {
 		return nil, errors.Proto(err)
 	}
@@ -144,14 +144,10 @@ func (s *GossipServer) Read(ctx context.Context, request *ReadRequest) (*ReadRes
 	}, nil
 }
 
-func (s *GossipServer) getService(partitionID PartitionID, serviceType ServiceType, serviceID ServiceID) (Service, error) {
+func (s *GossipServer) getReplica(partitionID PartitionID, serviceType ServiceType, serviceID ServiceID) (Replica, error) {
 	partition, err := s.manager.Partition(partitionID)
 	if err != nil {
 		return nil, err
 	}
-	service, err := partition.GetService(serviceType, serviceID)
-	if err != nil {
-		return nil, err
-	}
-	return service, nil
+	return partition.getReplica(serviceType, serviceID)
 }

@@ -60,13 +60,13 @@ const {{ $serviceType }} gossip.ServiceType = {{ .Primitive.Name | quote }}
 
 // Register{{ $serviceInt }} registers the service on the given node
 func Register{{ $serviceInt }}(node *gossip.Node) {
-	node.RegisterService(ServiceType, func(serviceID gossip.ServiceID, partition *gossip.Partition) (gossip.Service, error) {
+	node.RegisterService(ServiceType, func(serviceID gossip.ServiceID, partition *gossip.Partition) (gossip.Replica, error) {
 		protocol, err := newProtocol(serviceID, partition)
 		if err != nil {
 			return nil, err
 		}
 		service := new{{ $serviceInt }}Func(protocol)
-		return &gossip{{ $serviceInt }}{service: service}, nil
+		return &gossipReplica{service: service}, nil
 	})
 }
 
@@ -132,11 +132,15 @@ func (p *serviceProtocol) Broadcast(ctx context.Context, value *{{ template "typ
 	return nil
 }
 
-type gossipService struct {
+type gossipReplica struct {
 	service Service
 }
 
-func (s *gossipService) Read(ctx context.Context, _ string) (*gossip.Object, error) {
+func (s *gossipReplica) Service() gossip.Service {
+    return s.service
+}
+
+func (s *gossipReplica) Read(ctx context.Context, _ string) (*gossip.Object, error) {
 	value, err := s.service.Read(ctx)
 	if err != nil {
 		return nil, err
@@ -156,7 +160,7 @@ func (s *gossipService) Read(ctx context.Context, _ string) (*gossip.Object, err
 	}, nil
 }
 
-func (s *gossipService) Update(ctx context.Context, object *gossip.Object) error {
+func (s *gossipReplica) Update(ctx context.Context, object *gossip.Object) error {
 	value := &{{ template "type" .Primitive.State.Value.Type }}{}
 	err := proto.Unmarshal(object.Value, value)
 	if err != nil {
@@ -165,7 +169,7 @@ func (s *gossipService) Update(ctx context.Context, object *gossip.Object) error
 	return s.service.Update(ctx, value)
 }
 
-func (s *gossipService) Clone(ctx context.Context, ch chan<- gossip.Object) error {
+func (s *gossipReplica) Clone(ctx context.Context, ch chan<- gossip.Object) error {
     errCh := make(chan error)
     go func() {
         defer close(errCh)
@@ -228,11 +232,15 @@ func (p *serviceProtocol) Broadcast(ctx context.Context, entry *{{ template "typ
 	return nil
 }
 
-type gossipService struct {
+type gossipReplica struct {
 	service Service
 }
 
-func (s *gossipService) Read(ctx context.Context, key string) (*gossip.Object, error) {
+func (s *gossipReplica) Service() gossip.Service {
+    return s.service
+}
+
+func (s *gossipReplica) Read(ctx context.Context, key string) (*gossip.Object, error) {
 	entry, err := s.service.Read(ctx, key)
 	if err != nil {
 		return nil, err
@@ -255,7 +263,7 @@ func (s *gossipService) Read(ctx context.Context, key string) (*gossip.Object, e
 	}, nil
 }
 
-func (s *gossipService) Update(ctx context.Context, object *gossip.Object) error {
+func (s *gossipReplica) Update(ctx context.Context, object *gossip.Object) error {
 	entry := &{{ template "type" .Primitive.State.Entry.Type }}{}
 	err := proto.Unmarshal(object.Value, entry)
 	if err != nil {
@@ -264,7 +272,7 @@ func (s *gossipService) Update(ctx context.Context, object *gossip.Object) error
 	return s.service.Update(ctx, entry)
 }
 
-func (s *gossipService) Clone(ctx context.Context, ch chan<- gossip.Object) error {
+func (s *gossipReplica) Clone(ctx context.Context, ch chan<- gossip.Object) error {
 	entriesCh := make(chan {{ template "type" .Primitive.State.Entry.Type }})
 	errCh := make(chan error)
 	go func() {
@@ -297,7 +305,7 @@ func (s *gossipService) Clone(ctx context.Context, ch chan<- gossip.Object) erro
 }
 {{- end }}
 
-var _ gossip.Service = &gossipService{}
+var _ gossip.Replica = &gossipReplica{}
 
 type Replica interface {
     Protocol() Protocol

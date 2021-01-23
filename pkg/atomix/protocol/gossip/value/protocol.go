@@ -12,13 +12,13 @@ const ServiceType gossip.ServiceType = "Value"
 
 // RegisterService registers the service on the given node
 func RegisterService(node *gossip.Node) {
-	node.RegisterService(ServiceType, func(serviceID gossip.ServiceID, partition *gossip.Partition) (gossip.Service, error) {
+	node.RegisterService(ServiceType, func(serviceID gossip.ServiceID, partition *gossip.Partition) (gossip.Replica, error) {
 		protocol, err := newProtocol(serviceID, partition)
 		if err != nil {
 			return nil, err
 		}
 		service := newServiceFunc(protocol)
-		return &gossipService{service: service}, nil
+		return &gossipReplica{service: service}, nil
 	})
 }
 
@@ -78,11 +78,15 @@ func (p *serviceProtocol) Broadcast(ctx context.Context, value *value.Value) err
 	return nil
 }
 
-type gossipService struct {
+type gossipReplica struct {
 	service Service
 }
 
-func (s *gossipService) Read(ctx context.Context, _ string) (*gossip.Object, error) {
+func (s *gossipReplica) Service() gossip.Service {
+	return s.service
+}
+
+func (s *gossipReplica) Read(ctx context.Context, _ string) (*gossip.Object, error) {
 	value, err := s.service.Read(ctx)
 	if err != nil {
 		return nil, err
@@ -100,7 +104,7 @@ func (s *gossipService) Read(ctx context.Context, _ string) (*gossip.Object, err
 	}, nil
 }
 
-func (s *gossipService) Update(ctx context.Context, object *gossip.Object) error {
+func (s *gossipReplica) Update(ctx context.Context, object *gossip.Object) error {
 	value := &value.Value{}
 	err := proto.Unmarshal(object.Value, value)
 	if err != nil {
@@ -109,7 +113,7 @@ func (s *gossipService) Update(ctx context.Context, object *gossip.Object) error
 	return s.service.Update(ctx, value)
 }
 
-func (s *gossipService) Clone(ctx context.Context, ch chan<- gossip.Object) error {
+func (s *gossipReplica) Clone(ctx context.Context, ch chan<- gossip.Object) error {
 	errCh := make(chan error)
 	go func() {
 		defer close(errCh)
@@ -132,7 +136,7 @@ func (s *gossipService) Clone(ctx context.Context, ch chan<- gossip.Object) erro
 	return <-errCh
 }
 
-var _ gossip.Service = &gossipService{}
+var _ gossip.Replica = &gossipReplica{}
 
 type Replica interface {
 	Protocol() Protocol

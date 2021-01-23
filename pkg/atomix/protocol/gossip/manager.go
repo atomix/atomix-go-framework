@@ -81,7 +81,11 @@ func (m *Manager) ServiceFrom(ctx context.Context) (Service, error) {
 
 	serviceType := ServiceType(serviceTypes[0])
 	serviceID := ServiceID(serviceIDs[0])
-	return partition.GetService(serviceType, serviceID)
+	replica, err := partition.getReplica(serviceType, serviceID)
+	if err != nil {
+		return nil, err
+	}
+	return replica.Service(), nil
 }
 
 func (m *Manager) PartitionFrom(ctx context.Context) (*Partition, error) {

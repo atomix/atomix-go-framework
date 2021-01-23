@@ -43,7 +43,7 @@ func (n *Node) RegisterServer(f RegisterServerFunc) {
 	n.registry.RegisterServer(f)
 }
 
-// RegisterService registers a service
+// RegisterService registers a service type
 func (n *Node) RegisterService(t ServiceType, f NewServiceFunc) {
 	n.registry.RegisterService(t, f)
 }

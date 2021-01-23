@@ -27,7 +27,7 @@ func NewPartition(p *cluster.Partition, registry Registry) *Partition {
 	return &Partition{
 		Partition: p,
 		registry:  registry,
-		services: make(map[ServiceID]Service),
+		replicas:  make(map[ServiceID]Replica),
 	}
 }
 
@@ -39,7 +39,7 @@ type Partition struct {
 	*cluster.Partition
 	registry Registry
 	ID       PartitionID
-	services map[ServiceID]Service
+	replicas map[ServiceID]Replica
 	mu       sync.RWMutex
 }
 
@@ -63,34 +63,38 @@ func (p *Partition) ServiceFrom(ctx context.Context) (Service, error) {
 	}
 	serviceType := ServiceType(serviceTypes[0])
 	serviceID := ServiceID(serviceIDs[0])
-	return p.GetService(serviceType, serviceID)
+	replica, err := p.getReplica(serviceType, serviceID)
+	if err != nil {
+		return nil, err
+	}
+	return replica.Service(), nil
 }
 
-func (p *Partition) GetService(serviceType ServiceType, serviceID ServiceID) (Service, error) {
+func (p *Partition) getReplica(serviceType ServiceType, serviceID ServiceID) (Replica, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	service, ok := p.services[serviceID]
+	replica, ok := p.replicas[serviceID]
 	if !ok {
 		f, err := p.registry.GetServiceFunc(serviceType)
 		if err != nil {
 			return nil, err
 		}
-		service, err = f(serviceID, p)
+		replica, err = f(serviceID, p)
 		if err != nil {
 			return nil, err
 		}
-		p.services[serviceID] = service
+		p.replicas[serviceID] = replica
 	}
-	return service, nil
+	return replica, nil
 }
 
-func (p *Partition) DeleteService(t ServiceType, serviceID ServiceID) error {
+func (p *Partition) deleteReplica(serviceType ServiceType, serviceID ServiceID) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	_, ok := p.services[serviceID]
+	_, ok := p.replicas[serviceID]
 	if !ok {
 		return errors.NewNotFound("service '%s' not found", serviceID)
 	}
-	delete(p.services, serviceID)
+	delete(p.replicas, serviceID)
 	return nil
 }
