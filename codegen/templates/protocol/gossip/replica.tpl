@@ -51,19 +51,22 @@ import (
 	{{- end }}
 	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/meta"
+	"github.com/atomix/go-framework/pkg/atomix/time"
 )
 
-func newClient(serviceID gossip.ServiceID, partition *gossip.Partition) (ReplicationClient, error) {
+func newClient(serviceID gossip.ServiceID, partition *gossip.Partition, clock time.Clock) (ReplicationClient, error) {
 	group, err := gossip.NewPeerGroup(partition, ServiceType, serviceID)
 	if err != nil {
 		return nil, err
 	}
 	return &replicationClient{
 		group: group,
+		clock: clock,
 	}, nil
 }
 
 type ReplicationClient interface {
+    Clock() time.Clock
     {{- if .Primitive.State.Value }}
 	Bootstrap(ctx context.Context) (*{{ template "type" .Primitive.State.Value.Type }}, error)
 	Repair(ctx context.Context, value *{{ template "type" .Primitive.State.Value.Type }}) (*{{ template "type" .Primitive.State.Value.Type }}, error)
@@ -77,11 +80,16 @@ type ReplicationClient interface {
 	{{- end }}
 }
 
-{{- if .Primitive.State.Value }}
 type replicationClient struct {
 	group *gossip.PeerGroup
+	clock time.Clock
 }
 
+func (p *replicationClient) Clock() time.Clock {
+    return p.clock
+}
+
+{{- if .Primitive.State.Value }}
 func (p *replicationClient) Bootstrap(ctx context.Context) (*{{ template "type" .Primitive.State.Value.Type }}, error) {
 	objects, err := p.group.Read(ctx, "")
 	if err != nil {
@@ -137,10 +145,6 @@ func (p *replicationClient) Update(ctx context.Context, value *{{ template "type
 	return nil
 }
 {{- else if .Primitive.State.Entry }}
-type replicationClient struct {
-	group *gossip.PeerGroup
-}
-
 func (p *replicationClient) Bootstrap(ctx context.Context, ch chan<- {{ template "type" .Primitive.State.Entry.Type }}) error {
 	objectCh := make(chan gossip.Object)
 	if err := p.group.ReadAll(ctx, objectCh); err != nil {

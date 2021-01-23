@@ -5,30 +5,38 @@ import (
 	value "github.com/atomix/api/go/atomix/primitive/value"
 	"github.com/atomix/go-framework/pkg/atomix/meta"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
+	"github.com/atomix/go-framework/pkg/atomix/time"
 	proto "github.com/golang/protobuf/proto"
 	"math/rand"
 )
 
-func newClient(serviceID gossip.ServiceID, partition *gossip.Partition) (ReplicationClient, error) {
+func newClient(serviceID gossip.ServiceID, partition *gossip.Partition, clock time.Clock) (ReplicationClient, error) {
 	group, err := gossip.NewPeerGroup(partition, ServiceType, serviceID)
 	if err != nil {
 		return nil, err
 	}
 	return &replicationClient{
 		group: group,
+		clock: clock,
 	}, nil
 }
 
 type ReplicationClient interface {
+	Clock() time.Clock
 	Bootstrap(ctx context.Context) (*value.Value, error)
 	Repair(ctx context.Context, value *value.Value) (*value.Value, error)
 	Advertise(ctx context.Context, value *value.Value) error
 	Update(ctx context.Context, value *value.Value) error
 }
+
 type replicationClient struct {
 	group *gossip.PeerGroup
+	clock time.Clock
 }
 
+func (p *replicationClient) Clock() time.Clock {
+	return p.clock
+}
 func (p *replicationClient) Bootstrap(ctx context.Context) (*value.Value, error) {
 	objects, err := p.group.Read(ctx, "")
 	if err != nil {

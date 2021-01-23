@@ -20,6 +20,7 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/meta"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
+	"github.com/atomix/go-framework/pkg/atomix/time"
 	"sync"
 )
 
@@ -27,6 +28,9 @@ func init() {
 	registerService(func(replicas ReplicationClient) Service {
 		return &valueService{
 			replicas: replicas,
+			value: &valueapi.Value{
+				ObjectMeta: meta.NewTimestamped(replicas.Clock().Get()).AsTombstone().Proto(),
+			},
 		}
 	})
 }
@@ -68,7 +72,7 @@ func (s *valueService) Delegate() Delegate {
 func (s *valueService) Set(ctx context.Context, input *valueapi.SetRequest) (*valueapi.SetResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.value != nil && meta.FromProto(s.value.ObjectMeta).After(meta.FromProto(input.Value.ObjectMeta)) {
+	if !time.NewTimestamp(*input.Headers.Timestamp).After(time.NewTimestamp(*s.value.Timestamp)) {
 		return &valueapi.SetResponse{
 			Value: *s.value,
 		}, nil
@@ -80,16 +84,17 @@ func (s *valueService) Set(ctx context.Context, input *valueapi.SetRequest) (*va
 	}
 
 	s.value = &input.Value
-
-	s.notify(valueapi.Event{
-		Type:  valueapi.Event_UPDATE,
-		Value: input.Value,
-	})
+	s.value.Timestamp = input.Headers.Timestamp
 
 	err = s.replicas.Update(ctx, &input.Value)
 	if err != nil {
 		return nil, err
 	}
+
+	s.notify(valueapi.Event{
+		Type:  valueapi.Event_UPDATE,
+		Value: input.Value,
+	})
 	return &valueapi.SetResponse{
 		Value: input.Value,
 	}, nil

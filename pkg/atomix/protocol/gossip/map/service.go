@@ -5,6 +5,7 @@ import (
 	_map "github.com/atomix/api/go/atomix/primitive/map"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
+	"github.com/atomix/go-framework/pkg/atomix/time"
 )
 
 var log = logging.GetLogger("atomix", "protocol", "gossip", "map")
@@ -13,8 +14,8 @@ const ServiceType gossip.ServiceType = "Map"
 
 // RegisterService registers the service on the given node
 func RegisterService(node *gossip.Node) {
-	node.RegisterService(ServiceType, func(ctx context.Context, serviceID gossip.ServiceID, partition *gossip.Partition) (gossip.Service, error) {
-		client, err := newClient(serviceID, partition)
+	node.RegisterService(ServiceType, func(ctx context.Context, serviceID gossip.ServiceID, partition *gossip.Partition, clock time.Clock) (gossip.Service, error) {
+		client, err := newClient(serviceID, partition, clock)
 		if err != nil {
 			return nil, err
 		}

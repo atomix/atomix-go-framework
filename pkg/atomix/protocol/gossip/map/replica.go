@@ -8,28 +8,36 @@ import (
 
 	"github.com/atomix/go-framework/pkg/atomix/meta"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
+	"github.com/atomix/go-framework/pkg/atomix/time"
 )
 
-func newClient(serviceID gossip.ServiceID, partition *gossip.Partition) (ReplicationClient, error) {
+func newClient(serviceID gossip.ServiceID, partition *gossip.Partition, clock time.Clock) (ReplicationClient, error) {
 	group, err := gossip.NewPeerGroup(partition, ServiceType, serviceID)
 	if err != nil {
 		return nil, err
 	}
 	return &replicationClient{
 		group: group,
+		clock: clock,
 	}, nil
 }
 
 type ReplicationClient interface {
+	Clock() time.Clock
 	Bootstrap(ctx context.Context, ch chan<- _map.Entry) error
 	Repair(ctx context.Context, entry *_map.Entry) (*_map.Entry, error)
 	Advertise(ctx context.Context, entry *_map.Entry) error
 	Update(ctx context.Context, entry *_map.Entry) error
 }
+
 type replicationClient struct {
 	group *gossip.PeerGroup
+	clock time.Clock
 }
 
+func (p *replicationClient) Clock() time.Clock {
+	return p.clock
+}
 func (p *replicationClient) Bootstrap(ctx context.Context, ch chan<- _map.Entry) error {
 	objectCh := make(chan gossip.Object)
 	if err := p.group.ReadAll(ctx, objectCh); err != nil {

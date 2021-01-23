@@ -54,7 +54,7 @@ func (p *Partition) GetService(ctx context.Context, serviceType ServiceType, ser
 		if err != nil {
 			return nil, err
 		}
-		service, err = f(ctx, serviceID, p)
+		service, err = f(ctx, serviceID, p, p.clock)
 		if err != nil {
 			return nil, err
 		}
