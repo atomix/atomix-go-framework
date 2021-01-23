@@ -18,15 +18,22 @@ type Replica interface {
 	Read(ctx context.Context) (*value.Value, error)
 	Update(ctx context.Context, value *value.Value) error
 }
-type serviceReplica struct {
+
+func newReplicaAdaptor(replica Replica) gossip.Replica {
+	return &serviceReplicaAdaptor{
+		replica: replica,
+	}
+}
+
+type serviceReplicaAdaptor struct {
 	replica Replica
 }
 
-func (s *serviceReplica) Service() gossip.Service {
+func (s *serviceReplicaAdaptor) Service() gossip.Service {
 	return s.replica
 }
 
-func (s *serviceReplica) Read(ctx context.Context, _ string) (*gossip.Object, error) {
+func (s *serviceReplicaAdaptor) Read(ctx context.Context, _ string) (*gossip.Object, error) {
 	value, err := s.replica.Read(ctx)
 	if err != nil {
 		return nil, err
@@ -44,7 +51,7 @@ func (s *serviceReplica) Read(ctx context.Context, _ string) (*gossip.Object, er
 	}, nil
 }
 
-func (s *serviceReplica) Update(ctx context.Context, object *gossip.Object) error {
+func (s *serviceReplicaAdaptor) Update(ctx context.Context, object *gossip.Object) error {
 	value := &value.Value{}
 	err := proto.Unmarshal(object.Value, value)
 	if err != nil {
@@ -53,7 +60,7 @@ func (s *serviceReplica) Update(ctx context.Context, object *gossip.Object) erro
 	return s.replica.Update(ctx, value)
 }
 
-func (s *serviceReplica) ReadAll(ctx context.Context, ch chan<- gossip.Object) error {
+func (s *serviceReplicaAdaptor) ReadAll(ctx context.Context, ch chan<- gossip.Object) error {
 	errCh := make(chan error)
 	go func() {
 		defer close(errCh)
@@ -76,4 +83,4 @@ func (s *serviceReplica) ReadAll(ctx context.Context, ch chan<- gossip.Object) e
 	return <-errCh
 }
 
-var _ gossip.Replica = &serviceReplica{}
+var _ gossip.Replica = &serviceReplicaAdaptor{}

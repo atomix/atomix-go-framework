@@ -20,15 +20,22 @@ type Replica interface {
 	List(ctx context.Context, ch chan<- _map.Entry) error
 	Update(ctx context.Context, entry *_map.Entry) error
 }
-type serviceReplica struct {
+
+func newReplicaAdaptor(replica Replica) gossip.Replica {
+	return &serviceReplicaAdaptor{
+		replica: replica,
+	}
+}
+
+type serviceReplicaAdaptor struct {
 	replica Replica
 }
 
-func (s *serviceReplica) Service() gossip.Service {
+func (s *serviceReplicaAdaptor) Service() gossip.Service {
 	return s.replica
 }
 
-func (s *serviceReplica) Read(ctx context.Context, key string) (*gossip.Object, error) {
+func (s *serviceReplicaAdaptor) Read(ctx context.Context, key string) (*gossip.Object, error) {
 	entry, err := s.replica.Read(ctx, key)
 	if err != nil {
 		return nil, err
@@ -47,7 +54,7 @@ func (s *serviceReplica) Read(ctx context.Context, key string) (*gossip.Object, 
 	}, nil
 }
 
-func (s *serviceReplica) Update(ctx context.Context, object *gossip.Object) error {
+func (s *serviceReplicaAdaptor) Update(ctx context.Context, object *gossip.Object) error {
 	entry := &_map.Entry{}
 	err := proto.Unmarshal(object.Value, entry)
 	if err != nil {
@@ -56,7 +63,7 @@ func (s *serviceReplica) Update(ctx context.Context, object *gossip.Object) erro
 	return s.replica.Update(ctx, entry)
 }
 
-func (s *serviceReplica) ReadAll(ctx context.Context, ch chan<- gossip.Object) error {
+func (s *serviceReplicaAdaptor) ReadAll(ctx context.Context, ch chan<- gossip.Object) error {
 	entriesCh := make(chan _map.Entry)
 	errCh := make(chan error)
 	go func() {
@@ -84,4 +91,4 @@ func (s *serviceReplica) ReadAll(ctx context.Context, ch chan<- gossip.Object) e
 	return <-errCh
 }
 
-var _ gossip.Replica = &serviceReplica{}
+var _ gossip.Replica = &serviceReplicaAdaptor{}

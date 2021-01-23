@@ -81,16 +81,22 @@ type Replica interface {
     {{- end }}
 }
 
-{{- if .Primitive.State.Value }}
-type serviceReplica struct {
+func newReplicaAdaptor(replica Replica) gossip.Replica {
+    return &serviceReplicaAdaptor{
+        replica: replica,
+    }
+}
+
+{{ if .Primitive.State.Value }}
+type serviceReplicaAdaptor struct {
 	replica Replica
 }
 
-func (s *serviceReplica) Service() gossip.Service {
+func (s *serviceReplicaAdaptor) Service() gossip.Service {
     return s.replica
 }
 
-func (s *serviceReplica) Read(ctx context.Context, _ string) (*gossip.Object, error) {
+func (s *serviceReplicaAdaptor) Read(ctx context.Context, _ string) (*gossip.Object, error) {
 	value, err := s.replica.Read(ctx)
 	if err != nil {
 		return nil, err
@@ -110,7 +116,7 @@ func (s *serviceReplica) Read(ctx context.Context, _ string) (*gossip.Object, er
 	}, nil
 }
 
-func (s *serviceReplica) Update(ctx context.Context, object *gossip.Object) error {
+func (s *serviceReplicaAdaptor) Update(ctx context.Context, object *gossip.Object) error {
 	value := &{{ template "type" .Primitive.State.Value.Type }}{}
 	err := proto.Unmarshal(object.Value, value)
 	if err != nil {
@@ -119,7 +125,7 @@ func (s *serviceReplica) Update(ctx context.Context, object *gossip.Object) erro
 	return s.replica.Update(ctx, value)
 }
 
-func (s *serviceReplica) ReadAll(ctx context.Context, ch chan<- gossip.Object) error {
+func (s *serviceReplicaAdaptor) ReadAll(ctx context.Context, ch chan<- gossip.Object) error {
     errCh := make(chan error)
     go func() {
         defer close(errCh)
@@ -143,16 +149,16 @@ func (s *serviceReplica) ReadAll(ctx context.Context, ch chan<- gossip.Object) e
     }()
 	return <-errCh
 }
-{{- else if .Primitive.State.Entry }}
-type serviceReplica struct {
+{{ else if .Primitive.State.Entry }}
+type serviceReplicaAdaptor struct {
 	replica Replica
 }
 
-func (s *serviceReplica) Service() gossip.Service {
+func (s *serviceReplicaAdaptor) Service() gossip.Service {
     return s.replica
 }
 
-func (s *serviceReplica) Read(ctx context.Context, key string) (*gossip.Object, error) {
+func (s *serviceReplicaAdaptor) Read(ctx context.Context, key string) (*gossip.Object, error) {
 	entry, err := s.replica.Read(ctx, key)
 	if err != nil {
 		return nil, err
@@ -175,7 +181,7 @@ func (s *serviceReplica) Read(ctx context.Context, key string) (*gossip.Object, 
 	}, nil
 }
 
-func (s *serviceReplica) Update(ctx context.Context, object *gossip.Object) error {
+func (s *serviceReplicaAdaptor) Update(ctx context.Context, object *gossip.Object) error {
 	entry := &{{ template "type" .Primitive.State.Entry.Type }}{}
 	err := proto.Unmarshal(object.Value, entry)
 	if err != nil {
@@ -184,7 +190,7 @@ func (s *serviceReplica) Update(ctx context.Context, object *gossip.Object) erro
 	return s.replica.Update(ctx, entry)
 }
 
-func (s *serviceReplica) ReadAll(ctx context.Context, ch chan<- gossip.Object) error {
+func (s *serviceReplicaAdaptor) ReadAll(ctx context.Context, ch chan<- gossip.Object) error {
 	entriesCh := make(chan {{ template "type" .Primitive.State.Entry.Type }})
 	errCh := make(chan error)
 	go func() {
@@ -215,6 +221,6 @@ func (s *serviceReplica) ReadAll(ctx context.Context, ch chan<- gossip.Object) e
 	}()
 	return <-errCh
 }
-{{- end }}
+{{ end }}
 
-var _ gossip.Replica = &serviceReplica{}
+var _ gossip.Replica = &serviceReplicaAdaptor{}

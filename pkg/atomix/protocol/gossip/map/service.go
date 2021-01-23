@@ -15,7 +15,7 @@ func RegisterService(node *gossip.Node) {
 		if err != nil {
 			return nil, err
 		}
-		return &serviceReplica{replica: newReplica(protocol)}, nil
+		return newReplicaAdaptor(newReplica(protocol)), nil
 	})
 }
 
