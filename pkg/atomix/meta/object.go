@@ -16,6 +16,7 @@ package meta
 
 import (
 	metaapi "github.com/atomix/api/go/atomix/primitive/meta"
+	"github.com/atomix/go-framework/pkg/atomix/time"
 )
 
 func Equal(m1, m2 metaapi.ObjectMeta) bool {
@@ -28,9 +29,9 @@ func New(meta metaapi.ObjectMeta) ObjectMeta {
 	if meta.Revision != nil {
 		revision = Revision(meta.Revision.Num)
 	}
-	var timestamp Timestamp
+	var timestamp time.Timestamp
 	if meta.Timestamp != nil {
-		timestamp = NewTimestamp(*meta.Timestamp)
+		timestamp = time.NewTimestamp(*meta.Timestamp)
 	}
 	return ObjectMeta{
 		Revision:  revision,
@@ -48,7 +49,7 @@ type Object interface {
 // ObjectMeta contains metadata about an object
 type ObjectMeta struct {
 	Revision  Revision
-	Timestamp Timestamp
+	Timestamp time.Timestamp
 	Tombstone bool
 }
 

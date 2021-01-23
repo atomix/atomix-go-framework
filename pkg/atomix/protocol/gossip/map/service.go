@@ -20,6 +20,7 @@ import (
 	metaapi "github.com/atomix/api/go/atomix/primitive/meta"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/meta"
+	"github.com/atomix/go-framework/pkg/atomix/time"
 	"sync"
 )
 
@@ -226,7 +227,7 @@ func checkPreconditions(entry *mapapi.Entry, preconditions []mapapi.Precondition
 			if entry == nil {
 				return errors.NewConflict("metadata precondition failed")
 			}
-			if !meta.NewTimestamp(*entry.Key.ObjectMeta.Timestamp).Equal(meta.NewTimestamp(*p.Metadata.Timestamp)) {
+			if !time.NewTimestamp(*entry.Key.ObjectMeta.Timestamp).Equal(time.NewTimestamp(*p.Metadata.Timestamp)) {
 				return errors.NewConflict("metadata mismatch")
 			}
 		}
