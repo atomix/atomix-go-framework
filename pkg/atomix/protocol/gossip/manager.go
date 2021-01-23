@@ -20,6 +20,7 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/headers"
 	"github.com/atomix/go-framework/pkg/atomix/util"
+	"google.golang.org/grpc/metadata"
 )
 
 // newManager creates a new CRDT manager
@@ -46,15 +47,20 @@ type Manager struct {
 }
 
 func (m *Manager) ServiceFrom(ctx context.Context) (Service, error) {
-	partitionID, ok := headers.PartitionID.GetInt(ctx)
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.NewInvalid("no headers found")
+	}
+
+	partitionID, ok := headers.PartitionID.GetInt(md)
 	if !ok {
 		return nil, errors.NewUnavailable("no %s header found", headers.PartitionID.Name())
 	}
-	serviceType, ok := headers.ServiceType.GetString(ctx)
+	serviceType, ok := headers.ServiceType.GetString(md)
 	if !ok {
 		return nil, errors.NewUnavailable("no %s header found", headers.ServiceType.Name())
 	}
-	serviceID, ok := headers.ServiceID.GetString(ctx)
+	serviceID, ok := headers.ServiceID.GetString(md)
 	if !ok {
 		return nil, errors.NewUnavailable("no %s header found", headers.ServiceID.Name())
 	}
@@ -72,7 +78,12 @@ func (m *Manager) ServiceFrom(ctx context.Context) (Service, error) {
 }
 
 func (m *Manager) PartitionFrom(ctx context.Context) (*Partition, error) {
-	partitionID, ok := headers.PartitionID.GetInt(ctx)
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.NewInvalid("no headers found")
+	}
+
+	partitionID, ok := headers.PartitionID.GetInt(md)
 	if !ok {
 		return nil, errors.NewUnavailable("no %s header found", headers.PartitionID.Name())
 	}
@@ -80,7 +91,12 @@ func (m *Manager) PartitionFrom(ctx context.Context) (*Partition, error) {
 }
 
 func (m *Manager) PartitionsFrom(ctx context.Context) ([]*Partition, error) {
-	partitionIDs, ok := headers.PartitionID.GetInts(ctx)
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.NewInvalid("no headers found")
+	}
+
+	partitionIDs, ok := headers.PartitionID.GetInts(md)
 	if !ok {
 		return nil, errors.NewUnavailable("no %s header found", headers.PartitionID.Name())
 	}

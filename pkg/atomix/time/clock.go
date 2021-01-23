@@ -21,6 +21,8 @@ import (
 
 // Clock is an interface for clocks
 type Clock interface {
+	// Scheme returns the clock's scheme
+	Scheme() Scheme
 	// Get gets the current timestamp
 	Get() Timestamp
 	// Increment increments the clock
@@ -40,6 +42,10 @@ func NewPhysicalClock() Clock {
 type PhysicalClock struct {
 	timestamp Timestamp
 	mu        sync.RWMutex
+}
+
+func (c *PhysicalClock) Scheme() Scheme {
+	return PhysicalScheme
 }
 
 func (c *PhysicalClock) Get() Timestamp {
@@ -84,6 +90,10 @@ type LogicalClock struct {
 	mu        sync.RWMutex
 }
 
+func (c *LogicalClock) Scheme() Scheme {
+	return LogicalScheme
+}
+
 func (c *LogicalClock) Get() Timestamp {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -121,13 +131,69 @@ func (c *LogicalClock) Update(t Timestamp) Timestamp {
 	return c.timestamp
 }
 
+// NewEpochClock creates a new epoch clock
+func NewEpochClock() Clock {
+	return &EpochClock{
+		timestamp: NewEpochTimestamp(Epoch(0), LogicalTime(0)).(EpochTimestamp),
+	}
+}
+
+// EpochClock is a clock that produces EpochTimestamps
+type EpochClock struct {
+	timestamp EpochTimestamp
+	mu        sync.RWMutex
+}
+
+func (c *EpochClock) Scheme() Scheme {
+	return EpochScheme
+}
+
+func (c *EpochClock) Get() Timestamp {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.timestamp
+}
+
+func (c *EpochClock) Increment() Timestamp {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.timestamp = NewEpochTimestamp(c.timestamp.Epoch, c.timestamp.Time+1).(EpochTimestamp)
+	return c.timestamp
+}
+
+func (c *EpochClock) Update(t Timestamp) Timestamp {
+	update, ok := t.(EpochTimestamp)
+	if !ok {
+		panic("not a logical timestamp")
+	}
+
+	c.mu.RLock()
+	current := c.timestamp
+	c.mu.RUnlock()
+	if !update.After(current) {
+		return current
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if update.After(c.timestamp) {
+		c.timestamp = update
+	}
+	return c.timestamp
+}
+
 // NewCompositeClock creates a new composite clock
-func NewCompositeClock(clocks ...Clock) Clock {
-	timestamps := make([]Timestamp, len(clocks))
-	for i, clock := range clocks {
+func NewCompositeClock(schemes ...Scheme) Clock {
+	scheme := newCompositeScheme(schemes...)
+	clocks := make([]Clock, len(schemes))
+	timestamps := make([]Timestamp, len(schemes))
+	for i, scheme := range schemes {
+		clock := scheme.NewClock()
+		clocks[i] = clock
 		timestamps[i] = clock.Get()
 	}
 	return &CompositeClock{
+		scheme:    scheme,
 		clocks:    clocks,
 		timestamp: NewCompositeTimestamp(timestamps...),
 	}
@@ -135,9 +201,14 @@ func NewCompositeClock(clocks ...Clock) Clock {
 
 // CompositeClock is a clock that produces CompositeTimestamps
 type CompositeClock struct {
+	scheme    Scheme
 	clocks    []Clock
 	timestamp Timestamp
 	mu        sync.RWMutex
+}
+
+func (c *CompositeClock) Scheme() Scheme {
+	return c.scheme
 }
 
 func (c *CompositeClock) Get() Timestamp {

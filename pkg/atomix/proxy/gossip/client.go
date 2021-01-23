@@ -21,6 +21,7 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/headers"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/atomix/go-framework/pkg/atomix/util/async"
+	"google.golang.org/grpc/metadata"
 )
 
 // NewClient creates a new proxy client
@@ -47,7 +48,11 @@ type Client struct {
 }
 
 func (p *Client) getPrimitiveName(ctx context.Context) (string, error) {
-	name, ok := headers.PrimitiveName.GetString(ctx)
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return "", errors.NewInvalid("no headers found")
+	}
+	name, ok := headers.PrimitiveName.GetString(md)
 	if !ok {
 		return "", errors.NewInvalid("no primitive name header set")
 	}

@@ -26,25 +26,25 @@ func NewTimestamp(meta metaapi.Timestamp) Timestamp {
 		return NewPhysicalTimestamp(PhysicalTime(t.PhysicalTimestamp.Time))
 	case *metaapi.Timestamp_LogicalTimestamp:
 		return NewLogicalTimestamp(LogicalTime(t.LogicalTimestamp.Time))
-	case *metaapi.Timestamp_VectorTimestamp:
-		times := make([]LogicalTime, len(t.VectorTimestamp.Time))
-		for i, time := range t.VectorTimestamp.Time {
-			times[i] = LogicalTime(time)
-		}
-		return NewVectorTimestamp(times, 0)
 	case *metaapi.Timestamp_EpochTimestamp:
 		return NewEpochTimestamp(Epoch(t.EpochTimestamp.Epoch.Num), LogicalTime(t.EpochTimestamp.Sequence.Num))
+	case *metaapi.Timestamp_CompositeTimestamp:
+		timestamps := make([]Timestamp, 0, len(t.CompositeTimestamp.Timestamps))
+		for _, timestamp := range t.CompositeTimestamp.Timestamps {
+			timestamps = append(timestamps, NewTimestamp(timestamp))
+		}
+		return NewCompositeTimestamp(timestamps...)
 	default:
 		panic("unknown timestamp type")
 	}
 }
 
-// Timestamp is a request timestamp
+// Timestamp is a timestamp
 type Timestamp interface {
+	Scheme() Scheme
 	Before(Timestamp) bool
 	After(Timestamp) bool
 	Equal(Timestamp) bool
-	Proto() metaapi.Timestamp
 }
 
 type LogicalTime uint64
@@ -57,6 +57,10 @@ func NewLogicalTimestamp(time LogicalTime) Timestamp {
 
 type LogicalTimestamp struct {
 	Time LogicalTime
+}
+
+func (t LogicalTimestamp) Scheme() Scheme {
+	return LogicalScheme
 }
 
 func (t LogicalTimestamp) Increment() LogicalTimestamp {
@@ -89,81 +93,6 @@ func (t LogicalTimestamp) Equal(u Timestamp) bool {
 	return t.Time == v.Time
 }
 
-func (t LogicalTimestamp) Proto() metaapi.Timestamp {
-	return metaapi.Timestamp{
-		Timestamp: &metaapi.Timestamp_LogicalTimestamp{
-			LogicalTimestamp: &metaapi.LogicalTimestamp{
-				Time: metaapi.LogicalTime(t.Time),
-			},
-		},
-	}
-}
-
-func NewVectorTimestamp(times []LogicalTime, i int) Timestamp {
-	return VectorTimestamp{
-		Times: times,
-		i:     i,
-	}
-}
-
-type VectorTimestamp struct {
-	Times []LogicalTime
-	i     int
-}
-
-func (t VectorTimestamp) Before(u Timestamp) bool {
-	v, ok := u.(VectorTimestamp)
-	if !ok {
-		panic("not a vector timestamp")
-	}
-	for i := range v.Times {
-		if t.Times[t.i] >= v.Times[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func (t VectorTimestamp) After(u Timestamp) bool {
-	v, ok := u.(VectorTimestamp)
-	if !ok {
-		panic("not a vector timestamp")
-	}
-	for i := range v.Times {
-		if t.Times[t.i] <= v.Times[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func (t VectorTimestamp) Equal(u Timestamp) bool {
-	v, ok := u.(VectorTimestamp)
-	if !ok {
-		panic("not a vector timestamp")
-	}
-	for i := range v.Times {
-		if t.Times[t.i] != v.Times[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func (t VectorTimestamp) Proto() metaapi.Timestamp {
-	times := make([]metaapi.LogicalTime, len(t.Times))
-	for i, time := range t.Times {
-		times[i] = metaapi.LogicalTime(time)
-	}
-	return metaapi.Timestamp{
-		Timestamp: &metaapi.Timestamp_VectorTimestamp{
-			VectorTimestamp: &metaapi.VectorTimestamp{
-				Time: times,
-			},
-		},
-	}
-}
-
 type PhysicalTime time.Time
 
 func NewPhysicalTimestamp(time PhysicalTime) Timestamp {
@@ -174,6 +103,10 @@ func NewPhysicalTimestamp(time PhysicalTime) Timestamp {
 
 type PhysicalTimestamp struct {
 	Time PhysicalTime
+}
+
+func (t PhysicalTimestamp) Scheme() Scheme {
+	return PhysicalScheme
 }
 
 func (t PhysicalTimestamp) Before(u Timestamp) bool {
@@ -200,16 +133,6 @@ func (t PhysicalTimestamp) Equal(u Timestamp) bool {
 	return time.Time(t.Time).Equal(time.Time(v.Time))
 }
 
-func (t PhysicalTimestamp) Proto() metaapi.Timestamp {
-	return metaapi.Timestamp{
-		Timestamp: &metaapi.Timestamp_PhysicalTimestamp{
-			PhysicalTimestamp: &metaapi.PhysicalTimestamp{
-				Time: metaapi.PhysicalTime(t.Time),
-			},
-		},
-	}
-}
-
 type Epoch uint64
 
 func NewEpochTimestamp(epoch Epoch, time LogicalTime) Timestamp {
@@ -222,6 +145,10 @@ func NewEpochTimestamp(epoch Epoch, time LogicalTime) Timestamp {
 type EpochTimestamp struct {
 	Epoch Epoch
 	Time  LogicalTime
+}
+
+func (t EpochTimestamp) Scheme() Scheme {
+	return EpochScheme
 }
 
 func (t EpochTimestamp) Before(u Timestamp) bool {
@@ -248,29 +175,24 @@ func (t EpochTimestamp) Equal(u Timestamp) bool {
 	return t.Epoch == v.Epoch && t.Time == v.Time
 }
 
-func (t EpochTimestamp) Proto() metaapi.Timestamp {
-	return metaapi.Timestamp{
-		Timestamp: &metaapi.Timestamp_EpochTimestamp{
-			EpochTimestamp: &metaapi.EpochTimestamp{
-				Epoch: metaapi.Epoch{
-					Num: metaapi.EpochNum(t.Epoch),
-				},
-				Sequence: metaapi.Sequence{
-					Num: metaapi.SequenceNum(t.Time),
-				},
-			},
-		},
-	}
-}
-
 func NewCompositeTimestamp(timestamps ...Timestamp) Timestamp {
+	schemes := make([]Scheme, len(timestamps))
+	for i, timestamp := range timestamps {
+		schemes[i] = timestamp.Scheme()
+	}
 	return CompositeTimestamp{
+		scheme:     newCompositeScheme(schemes...),
 		Timestamps: timestamps,
 	}
 }
 
 type CompositeTimestamp struct {
+	scheme     Scheme
 	Timestamps []Timestamp
+}
+
+func (t CompositeTimestamp) Scheme() Scheme {
+	return t.scheme
 }
 
 func (t CompositeTimestamp) Before(u Timestamp) bool {
@@ -347,18 +269,4 @@ func (t CompositeTimestamp) Equal(u Timestamp) bool {
 		}
 	}
 	return true
-}
-
-func (t CompositeTimestamp) Proto() metaapi.Timestamp {
-	timestamps := make([]metaapi.Timestamp, 0, len(t.Timestamps))
-	for _, timestamp := range t.Timestamps {
-		timestamps = append(timestamps, timestamp.Proto())
-	}
-	return metaapi.Timestamp{
-		Timestamp: &metaapi.Timestamp_CompositeTimestamp{
-			CompositeTimestamp: &metaapi.CompositeTimestamp{
-				Timestamps: timestamps,
-			},
-		},
-	}
 }

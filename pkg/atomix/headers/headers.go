@@ -15,7 +15,6 @@
 package headers
 
 import (
-	"context"
 	"fmt"
 	"google.golang.org/grpc/metadata"
 	"strconv"
@@ -34,149 +33,139 @@ const (
 	Timestamp     Header = "Atomix-Timestamp"
 )
 
-func (h Header) Set(ctx context.Context, value interface{}) context.Context {
-	return metadata.AppendToOutgoingContext(ctx, h.String(), fmt.Sprint(value))
+func (h Header) Set(md metadata.MD, value interface{}) {
+	md[h.String()] = append(md[h.String()], fmt.Sprint(value))
 }
 
-func (h Header) SetString(ctx context.Context, value string) context.Context {
-	return metadata.AppendToOutgoingContext(ctx, h.String(), value)
+func (h Header) SetString(md metadata.MD, value string) {
+	md[h.String()] = append(md[h.String()], value)
 }
 
-func (h Header) SetBool(ctx context.Context, value bool) context.Context {
-	return metadata.AppendToOutgoingContext(ctx, h.String(), strconv.FormatBool(value))
+func (h Header) SetBool(md metadata.MD, value bool) {
+	md[h.String()] = append(md[h.String()], strconv.FormatBool(value))
 }
 
-func (h Header) SetInt(ctx context.Context, value int) context.Context {
-	return h.Set(ctx, value)
+func (h Header) SetInt(md metadata.MD, value int) {
+	h.Set(md, value)
 }
 
-func (h Header) SetInt32(ctx context.Context, value int32) context.Context {
-	return h.Set(ctx, value)
+func (h Header) SetInt32(md metadata.MD, value int32) {
+	h.Set(md, value)
 }
 
-func (h Header) SetInt64(ctx context.Context, value int64) context.Context {
-	return h.Set(ctx, value)
+func (h Header) SetInt64(md metadata.MD, value int64) {
+	h.Set(md, value)
 }
 
-func (h Header) SetUint(ctx context.Context, value uint) context.Context {
-	return h.Set(ctx, value)
+func (h Header) SetUint(md metadata.MD, value uint) {
+	h.Set(md, value)
 }
 
-func (h Header) SetUint32(ctx context.Context, value uint32) context.Context {
-	return h.Set(ctx, value)
+func (h Header) SetUint32(md metadata.MD, value uint32) {
+	h.Set(md, value)
 }
 
-func (h Header) SetUint64(ctx context.Context, value uint64) context.Context {
-	return h.Set(ctx, value)
+func (h Header) SetUint64(md metadata.MD, value uint64) {
+	h.Set(md, value)
 }
 
-func (h Header) SetFloat32(ctx context.Context, value float32) context.Context {
-	return h.Set(ctx, value)
+func (h Header) SetFloat32(md metadata.MD, value float32) {
+	h.Set(md, value)
 }
 
-func (h Header) SetFloat64(ctx context.Context, value float64) context.Context {
-	return h.Set(ctx, value)
+func (h Header) SetFloat64(md metadata.MD, value float64) {
+	h.Set(md, value)
 }
 
-func (h Header) SetTime(ctx context.Context, value time.Time) context.Context {
-	return h.SetInt64(ctx, value.UnixNano())
+func (h Header) SetTime(md metadata.MD, value time.Time) {
+	h.SetInt64(md, value.UnixNano())
 }
 
-func (h Header) Sets(ctx context.Context, values ...interface{}) context.Context {
+func (h Header) Sets(md metadata.MD, values ...interface{}) {
 	for _, value := range values {
-		ctx = h.Set(ctx, value)
+		h.Set(md, value)
 	}
-	return ctx
 }
 
-func (h Header) SetStrings(ctx context.Context, values ...string) context.Context {
+func (h Header) SetStrings(md metadata.MD, values ...string) {
 	for _, value := range values {
-		ctx = h.SetString(ctx, value)
+		h.SetString(md, value)
 	}
-	return ctx
 }
 
-func (h Header) SetInts(ctx context.Context, values ...int) context.Context {
+func (h Header) SetInts(md metadata.MD, values ...int) {
 	for _, value := range values {
-		ctx = h.SetInt(ctx, value)
+		h.SetInt(md, value)
 	}
-	return ctx
 }
 
-func (h Header) Add(ctx context.Context, value interface{}) context.Context {
-	return metadata.AppendToOutgoingContext(ctx, h.String(), fmt.Sprint(value))
+func (h Header) Add(md metadata.MD, value interface{}) {
+	md[h.String()] = append(md[h.String()], fmt.Sprint(value))
 }
 
-func (h Header) AddString(ctx context.Context, value string) context.Context {
-	return metadata.AppendToOutgoingContext(ctx, h.String(), value)
+func (h Header) AddString(md metadata.MD, value string) {
+	md[h.String()] = append(md[h.String()], value)
 }
 
-func (h Header) AddBool(ctx context.Context, value bool) context.Context {
-	return metadata.AppendToOutgoingContext(ctx, h.String(), strconv.FormatBool(value))
+func (h Header) AddBool(md metadata.MD, value bool) {
+	md[h.String()] = append(md[h.String()], strconv.FormatBool(value))
 }
 
-func (h Header) AddInt(ctx context.Context, value int) context.Context {
-	return h.Add(ctx, value)
+func (h Header) AddInt(md metadata.MD, value int) {
+	h.Add(md, value)
 }
 
-func (h Header) AddInt32(ctx context.Context, value int32) context.Context {
-	return h.Add(ctx, value)
+func (h Header) AddInt32(md metadata.MD, value int32) {
+	h.Add(md, value)
 }
 
-func (h Header) AddInt64(ctx context.Context, value int64) context.Context {
-	return h.Add(ctx, value)
+func (h Header) AddInt64(md metadata.MD, value int64) {
+	h.Add(md, value)
 }
 
-func (h Header) AddUint(ctx context.Context, value uint) context.Context {
-	return h.Add(ctx, value)
+func (h Header) AddUint(md metadata.MD, value uint) {
+	h.Add(md, value)
 }
 
-func (h Header) AddUint32(ctx context.Context, value uint32) context.Context {
-	return h.Add(ctx, value)
+func (h Header) AddUint32(md metadata.MD, value uint32) {
+	h.Add(md, value)
 }
 
-func (h Header) AddUint64(ctx context.Context, value uint64) context.Context {
-	return h.Add(ctx, value)
+func (h Header) AddUint64(md metadata.MD, value uint64) {
+	h.Add(md, value)
 }
 
-func (h Header) AddFloat32(ctx context.Context, value float32) context.Context {
-	return h.Add(ctx, value)
+func (h Header) AddFloat32(md metadata.MD, value float32) {
+	h.Add(md, value)
 }
 
-func (h Header) AddFloat64(ctx context.Context, value float64) context.Context {
-	return h.Add(ctx, value)
+func (h Header) AddFloat64(md metadata.MD, value float64) {
+	h.Add(md, value)
 }
 
-func (h Header) AddTime(ctx context.Context, value time.Time) context.Context {
-	return h.AddInt64(ctx, value.UnixNano())
+func (h Header) AddTime(md metadata.MD, value time.Time) {
+	h.AddInt64(md, value.UnixNano())
 }
 
-func (h Header) Adds(ctx context.Context, values ...interface{}) context.Context {
+func (h Header) Adds(md metadata.MD, values ...interface{}) {
 	for _, value := range values {
-		ctx = h.Add(ctx, value)
+		h.Add(md, value)
 	}
-	return ctx
 }
 
-func (h Header) AddStrings(ctx context.Context, values ...string) context.Context {
+func (h Header) AddStrings(md metadata.MD, values ...string) {
 	for _, value := range values {
-		ctx = h.AddString(ctx, value)
+		h.AddString(md, value)
 	}
-	return ctx
 }
 
-func (h Header) AddInts(ctx context.Context, values ...int) context.Context {
+func (h Header) AddInts(md metadata.MD, values ...int) {
 	for _, value := range values {
-		ctx = h.AddInt(ctx, value)
+		h.AddInt(md, value)
 	}
-	return ctx
 }
 
-func (h Header) Get(ctx context.Context) (string, bool) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return "", false
-	}
+func (h Header) Get(md metadata.MD) (string, bool) {
 	values := md.Get(h.String())
 	if len(values) == 0 {
 		return "", false
@@ -184,12 +173,12 @@ func (h Header) Get(ctx context.Context) (string, bool) {
 	return values[0], true
 }
 
-func (h Header) GetString(ctx context.Context) (string, bool) {
-	return h.Get(ctx)
+func (h Header) GetString(md metadata.MD) (string, bool) {
+	return h.Get(md)
 }
 
-func (h Header) GetBool(ctx context.Context) (bool, bool) {
-	value, ok := h.Get(ctx)
+func (h Header) GetBool(md metadata.MD) (bool, bool) {
+	value, ok := h.Get(md)
 	if !ok {
 		return false, false
 	}
@@ -200,8 +189,8 @@ func (h Header) GetBool(ctx context.Context) (bool, bool) {
 	return b, true
 }
 
-func (h Header) GetInt(ctx context.Context) (int, bool) {
-	value, ok := h.Get(ctx)
+func (h Header) GetInt(md metadata.MD) (int, bool) {
+	value, ok := h.Get(md)
 	if !ok {
 		return 0, false
 	}
@@ -212,8 +201,8 @@ func (h Header) GetInt(ctx context.Context) (int, bool) {
 	return int(i), true
 }
 
-func (h Header) GetInt32(ctx context.Context) (int32, bool) {
-	value, ok := h.Get(ctx)
+func (h Header) GetInt32(md metadata.MD) (int32, bool) {
+	value, ok := h.Get(md)
 	if !ok {
 		return 0, false
 	}
@@ -224,8 +213,8 @@ func (h Header) GetInt32(ctx context.Context) (int32, bool) {
 	return int32(i), true
 }
 
-func (h Header) GetInt64(ctx context.Context) (int64, bool) {
-	value, ok := h.Get(ctx)
+func (h Header) GetInt64(md metadata.MD) (int64, bool) {
+	value, ok := h.Get(md)
 	if !ok {
 		return 0, false
 	}
@@ -236,8 +225,8 @@ func (h Header) GetInt64(ctx context.Context) (int64, bool) {
 	return int64(i), true
 }
 
-func (h Header) GetUint(ctx context.Context) (uint, bool) {
-	value, ok := h.Get(ctx)
+func (h Header) GetUint(md metadata.MD) (uint, bool) {
+	value, ok := h.Get(md)
 	if !ok {
 		return 0, false
 	}
@@ -248,8 +237,8 @@ func (h Header) GetUint(ctx context.Context) (uint, bool) {
 	return uint(i), true
 }
 
-func (h Header) GetUint32(ctx context.Context) (uint32, bool) {
-	value, ok := h.Get(ctx)
+func (h Header) GetUint32(md metadata.MD) (uint32, bool) {
+	value, ok := h.Get(md)
 	if !ok {
 		return 0, false
 	}
@@ -260,8 +249,8 @@ func (h Header) GetUint32(ctx context.Context) (uint32, bool) {
 	return uint32(i), true
 }
 
-func (h Header) GetUint64(ctx context.Context) (uint64, bool) {
-	value, ok := h.Get(ctx)
+func (h Header) GetUint64(md metadata.MD) (uint64, bool) {
+	value, ok := h.Get(md)
 	if !ok {
 		return 0, false
 	}
@@ -272,8 +261,8 @@ func (h Header) GetUint64(ctx context.Context) (uint64, bool) {
 	return uint64(i), true
 }
 
-func (h Header) GetFloat32(ctx context.Context) (float32, bool) {
-	value, ok := h.Get(ctx)
+func (h Header) GetFloat32(md metadata.MD) (float32, bool) {
+	value, ok := h.Get(md)
 	if !ok {
 		return 0, false
 	}
@@ -284,8 +273,8 @@ func (h Header) GetFloat32(ctx context.Context) (float32, bool) {
 	return float32(f), true
 }
 
-func (h Header) GetFloat64(ctx context.Context) (float64, bool) {
-	value, ok := h.Get(ctx)
+func (h Header) GetFloat64(md metadata.MD) (float64, bool) {
+	value, ok := h.Get(md)
 	if !ok {
 		return 0, false
 	}
@@ -296,19 +285,15 @@ func (h Header) GetFloat64(ctx context.Context) (float64, bool) {
 	return float64(f), true
 }
 
-func (h Header) GetTime(ctx context.Context) (time.Time, bool) {
-	i, ok := h.GetInt64(ctx)
+func (h Header) GetTime(md metadata.MD) (time.Time, bool) {
+	i, ok := h.GetInt64(md)
 	if !ok {
 		return time.Time{}, false
 	}
 	return time.Unix(0, i), true
 }
 
-func (h Header) Gets(ctx context.Context) ([]string, bool) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return nil, false
-	}
+func (h Header) Gets(md metadata.MD) ([]string, bool) {
 	values := md.Get(h.String())
 	if len(values) == 0 {
 		return nil, false
@@ -316,12 +301,12 @@ func (h Header) Gets(ctx context.Context) ([]string, bool) {
 	return values, true
 }
 
-func (h Header) GetStrings(ctx context.Context) ([]string, bool) {
-	return h.Gets(ctx)
+func (h Header) GetStrings(md metadata.MD) ([]string, bool) {
+	return h.Gets(md)
 }
 
-func (h Header) GetInts(ctx context.Context) ([]int, bool) {
-	values, ok := h.Gets(ctx)
+func (h Header) GetInts(md metadata.MD) ([]int, bool) {
+	values, ok := h.Gets(md)
 	if !ok {
 		return nil, false
 	}

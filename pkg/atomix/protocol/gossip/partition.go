@@ -19,6 +19,7 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/headers"
+	"google.golang.org/grpc/metadata"
 	"sync"
 )
 
@@ -44,11 +45,16 @@ type Partition struct {
 }
 
 func (p *Partition) ServiceFrom(ctx context.Context) (Service, error) {
-	serviceType, ok := headers.ServiceType.GetString(ctx)
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.NewInvalid("no headers found")
+	}
+
+	serviceType, ok := headers.ServiceType.GetString(md)
 	if !ok {
 		return nil, errors.NewUnavailable("no %s header found", headers.ServiceType.Name())
 	}
-	serviceID, ok := headers.ServiceID.GetString(ctx)
+	serviceID, ok := headers.ServiceID.GetString(md)
 	if !ok {
 		return nil, errors.NewUnavailable("no %s header found", headers.ServiceID.Name())
 	}

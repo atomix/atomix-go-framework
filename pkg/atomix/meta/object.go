@@ -91,7 +91,7 @@ func (m ObjectMeta) Proto() metaapi.ObjectMeta {
 		}
 	}
 	if m.Timestamp != nil {
-		timestamp := m.Timestamp.Proto()
+		timestamp := m.Timestamp.Scheme().Codec().EncodeProto(m.Timestamp)
 		meta.Timestamp = &timestamp
 	}
 	if m.Tombstone {
