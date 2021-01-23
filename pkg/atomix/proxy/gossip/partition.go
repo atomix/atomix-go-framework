@@ -16,16 +16,13 @@ package gossip
 
 import (
 	"context"
-	"fmt"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
+	"github.com/atomix/go-framework/pkg/atomix/headers"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 	"math/rand"
 	"sync"
+	"time"
 )
-
-const partitionsKey = "Partitions"
-const partitionKey = "Partition"
 
 // NewPartition creates a new proxy partition
 func NewPartition(c *cluster.Cluster, p *cluster.Partition) *Partition {
@@ -47,29 +44,50 @@ type Partition struct {
 	mu      sync.RWMutex
 }
 
-func (p *Partition) addService(ctx context.Context) context.Context {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if ok {
-		primitiveTypes := md.Get(primitiveTypeKey)
-		if len(primitiveTypes) > 0 {
-			ctx = metadata.AppendToOutgoingContext(ctx, serviceTypeKey, primitiveTypes[0])
-		}
-		primitiveNames := md.Get(primitiveNameKey)
-		if len(primitiveNames) > 0 {
-			ctx = metadata.AppendToOutgoingContext(ctx, serviceIDKey, primitiveNames[0])
-		}
+func (p *Partition) addTimestamp(ctx context.Context) context.Context {
+	timestamp, ok := headers.Timestamp.GetTime(ctx)
+	if !ok {
+		timestamp = time.Now()
 	}
+	return headers.Timestamp.SetTime(ctx, timestamp)
+}
+
+func (p *Partition) addService(ctx context.Context) context.Context {
+	primitiveType, ok := headers.PrimitiveType.GetString(ctx)
+	if !ok {
+		return ctx
+	}
+	ctx = headers.ServiceType.SetString(ctx, primitiveType)
+	primitiveName, ok := headers.PrimitiveName.GetString(ctx)
+	if !ok {
+		return ctx
+	}
+	ctx = headers.ServiceID.SetString(ctx, primitiveName)
 	return ctx
+}
+
+func (p *Partition) addPartitions(ctx context.Context) context.Context {
+	return headers.PartitionID.AddInt(ctx, int(p.ID))
+}
+
+func (p *Partition) addPartition(ctx context.Context) context.Context {
+	return headers.PartitionID.SetInt(ctx, int(p.ID))
 }
 
 // AddPartition adds the header for the partition to the given context
 func (p *Partition) AddPartition(ctx context.Context) context.Context {
-	return metadata.AppendToOutgoingContext(p.addService(ctx), partitionKey, fmt.Sprint(p.ID))
+	ctx = p.addService(ctx)
+	ctx = p.addTimestamp(ctx)
+	ctx = p.addPartition(ctx)
+	return ctx
 }
 
 // AddPartitions adds the header for the partitions to the given context
 func (p *Partition) AddPartitions(ctx context.Context) context.Context {
-	return metadata.AppendToOutgoingContext(p.addService(ctx), partitionsKey, fmt.Sprint(p.ID))
+	ctx = p.addService(ctx)
+	ctx = p.addTimestamp(ctx)
+	ctx = p.addPartitions(ctx)
+	return ctx
 }
 
 // Connect gets the connection to the partition

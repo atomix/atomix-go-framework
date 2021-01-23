@@ -18,16 +18,9 @@ import (
 	"context"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/headers"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/atomix/go-framework/pkg/atomix/util/async"
-	"google.golang.org/grpc/metadata"
-)
-
-const (
-	primitiveTypeKey = "Primitive-Type"
-	primitiveNameKey = "Primitive-Name"
-	serviceTypeKey   = "Service-Type"
-	serviceIDKey     = "Service-Id"
 )
 
 // NewClient creates a new proxy client
@@ -54,15 +47,11 @@ type Client struct {
 }
 
 func (p *Client) getPrimitiveName(ctx context.Context) (string, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
+	name, ok := headers.PrimitiveName.GetString(ctx)
 	if !ok {
-		return "", errors.NewInvalid("no metadata found")
+		return "", errors.NewInvalid("no primitive name header set")
 	}
-	names := md.Get(primitiveNameKey)
-	if len(names) != 1 {
-		return "", errors.NewInvalid("no primitive name found")
-	}
-	return names[0], nil
+	return name, nil
 }
 
 func (p *Client) PartitionFrom(ctx context.Context) (*Partition, error) {

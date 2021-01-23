@@ -18,7 +18,7 @@ import (
 	"context"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"google.golang.org/grpc/metadata"
+	"github.com/atomix/go-framework/pkg/atomix/headers"
 	"sync"
 )
 
@@ -44,26 +44,16 @@ type Partition struct {
 }
 
 func (p *Partition) ServiceFrom(ctx context.Context) (Service, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
+	serviceType, ok := headers.ServiceType.GetString(ctx)
 	if !ok {
-		return nil, errors.NewUnavailable("no partitions header found")
+		return nil, errors.NewUnavailable("no %s header found", headers.ServiceType.Name())
+	}
+	serviceID, ok := headers.ServiceID.GetString(ctx)
+	if !ok {
+		return nil, errors.NewUnavailable("no %s header found", headers.ServiceID.Name())
 	}
 
-	partitionIDs := md.Get(partitionKey)
-	if len(partitionIDs) != 1 {
-		return nil, errors.NewUnavailable("no partition header found")
-	}
-	serviceTypes := md.Get(serviceTypeKey)
-	if len(serviceTypes) != 1 {
-		return nil, errors.NewUnavailable("no service-type header found")
-	}
-	serviceIDs := md.Get(serviceIdKey)
-	if len(serviceIDs) != 1 {
-		return nil, errors.NewUnavailable("no service-id header found")
-	}
-	serviceType := ServiceType(serviceTypes[0])
-	serviceID := ServiceID(serviceIDs[0])
-	replica, err := p.getReplica(serviceType, serviceID)
+	replica, err := p.getReplica(ServiceType(serviceType), ServiceID(serviceID))
 	if err != nil {
 		return nil, err
 	}

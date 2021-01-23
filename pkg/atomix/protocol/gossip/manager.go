@@ -18,15 +18,9 @@ import (
 	"context"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/headers"
 	"github.com/atomix/go-framework/pkg/atomix/util"
-	"google.golang.org/grpc/metadata"
-	"strconv"
 )
-
-const partitionsKey = "Partitions"
-const partitionKey = "Partition"
-const serviceTypeKey = "Service-Type"
-const serviceIdKey = "Service-Id"
 
 // newManager creates a new CRDT manager
 func newManager(cluster *cluster.Cluster, registry Registry) *Manager {
@@ -52,36 +46,25 @@ type Manager struct {
 }
 
 func (m *Manager) ServiceFrom(ctx context.Context) (Service, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
+	partitionID, ok := headers.PartitionID.GetInt(ctx)
 	if !ok {
-		return nil, errors.NewUnavailable("no partitions header found")
+		return nil, errors.NewUnavailable("no %s header found", headers.PartitionID.Name())
+	}
+	serviceType, ok := headers.ServiceType.GetString(ctx)
+	if !ok {
+		return nil, errors.NewUnavailable("no %s header found", headers.ServiceType.Name())
+	}
+	serviceID, ok := headers.ServiceID.GetString(ctx)
+	if !ok {
+		return nil, errors.NewUnavailable("no %s header found", headers.ServiceID.Name())
 	}
 
-	partitionIDs := md.Get(partitionKey)
-	if len(partitionIDs) != 1 {
-		return nil, errors.NewUnavailable("no partition header found")
-	}
-	serviceTypes := md.Get(serviceTypeKey)
-	if len(serviceTypes) != 1 {
-		return nil, errors.NewUnavailable("no service-type header found")
-	}
-	serviceIDs := md.Get(serviceIdKey)
-	if len(serviceIDs) != 1 {
-		return nil, errors.NewUnavailable("no service-id header found")
-	}
-
-	partitionID, err := strconv.Atoi(partitionIDs[0])
-	if err != nil {
-		return nil, errors.NewUnavailable("partition header is invalid: %v", err)
-	}
 	partition, err := m.Partition(PartitionID(partitionID))
 	if err != nil {
 		return nil, err
 	}
 
-	serviceType := ServiceType(serviceTypes[0])
-	serviceID := ServiceID(serviceIDs[0])
-	replica, err := partition.getReplica(serviceType, serviceID)
+	replica, err := partition.getReplica(ServiceType(serviceType), ServiceID(serviceID))
 	if err != nil {
 		return nil, err
 	}
@@ -89,36 +72,21 @@ func (m *Manager) ServiceFrom(ctx context.Context) (Service, error) {
 }
 
 func (m *Manager) PartitionFrom(ctx context.Context) (*Partition, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
+	partitionID, ok := headers.PartitionID.GetInt(ctx)
 	if !ok {
-		return nil, errors.NewUnavailable("no partitions header found")
-	}
-
-	partitionNames := md.Get(partitionKey)
-	if len(partitionNames) != 1 {
-		return nil, errors.NewUnavailable("no partitions header found")
-	}
-
-	partitionID, err := strconv.Atoi(partitionNames[0])
-	if err != nil {
-		return nil, errors.NewUnavailable("partition header is invalid: %v", err)
+		return nil, errors.NewUnavailable("no %s header found", headers.PartitionID.Name())
 	}
 	return m.Partition(PartitionID(partitionID))
 }
 
 func (m *Manager) PartitionsFrom(ctx context.Context) ([]*Partition, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
+	partitionIDs, ok := headers.PartitionID.GetInts(ctx)
 	if !ok {
-		return nil, errors.NewUnavailable("no partitions header found")
+		return nil, errors.NewUnavailable("no %s header found", headers.PartitionID.Name())
 	}
 
-	partitionNames := md.Get(partitionsKey)
-	partitions := make([]*Partition, 0, len(partitionNames))
-	for _, partitionName := range partitionNames {
-		partitionID, err := strconv.Atoi(partitionName)
-		if err != nil {
-			return nil, errors.NewUnavailable("partition header is invalid: %v", err)
-		}
+	partitions := make([]*Partition, 0, len(partitionIDs))
+	for _, partitionID := range partitionIDs {
 		partition, err := m.Partition(PartitionID(partitionID))
 		if err != nil {
 			return nil, err
