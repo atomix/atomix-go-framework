@@ -15,14 +15,12 @@
 package gossip
 
 import (
-	"context"
+	"github.com/atomix/api/go/atomix/primitive"
+	"github.com/atomix/api/go/atomix/primitive/meta"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/headers"
 	"github.com/atomix/go-framework/pkg/atomix/time"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/atomix/go-framework/pkg/atomix/util/async"
-	"google.golang.org/grpc/metadata"
 )
 
 // NewClient creates a new proxy client
@@ -36,7 +34,7 @@ func NewClient(cluster *cluster.Cluster, scheme time.Scheme) *Client {
 		proxyPartitionsByID[proxyPartition.ID] = proxyPartition
 	}
 	return &Client{
-		cluster:        cluster,
+		Cluster:        cluster,
 		partitions:     proxyPartitions,
 		partitionsByID: proxyPartitionsByID,
 		clock:          scheme.NewClock(),
@@ -45,55 +43,32 @@ func NewClient(cluster *cluster.Cluster, scheme time.Scheme) *Client {
 
 // Client is a client for communicating with the storage layer
 type Client struct {
-	cluster        *cluster.Cluster
+	Cluster        *cluster.Cluster
 	partitions     []*Partition
 	partitionsByID map[PartitionID]*Partition
 	clock          time.Clock
 }
 
-func (p *Client) getPrimitiveName(ctx context.Context) (string, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return "", errors.NewInvalid("no headers found")
+func (p *Client) prepareTimestamp(timestamp *meta.Timestamp) *meta.Timestamp {
+	var t time.Timestamp
+	if timestamp != nil {
+		t = p.clock.Update(time.NewTimestamp(*timestamp))
+	} else {
+		t = p.clock.Increment()
 	}
-	name, ok := headers.PrimitiveName.GetString(md)
-	if !ok {
-		return "", errors.NewInvalid("no primitive name header set")
-	}
-	return name, nil
+	proto := p.clock.Scheme().Codec().EncodeProto(t)
+	return &proto
 }
 
-func (p *Client) AddOutgoingMD(md metadata.MD) {
-	primitiveType, ok := headers.PrimitiveType.GetString(md)
-	if ok {
-		headers.ServiceType.SetString(md, primitiveType)
-	}
-	primitiveName, ok := headers.PrimitiveName.GetString(md)
-	if ok {
-		headers.ServiceID.SetString(md, primitiveName)
-	}
-	ts := p.clock.Increment()
-	p.clock.Scheme().Codec().EncodeMD(md, ts)
+func (p *Client) PrepareRequest(headers *primitive.RequestHeaders) {
+	p.prepareTimestamp(headers.Timestamp)
 }
 
-func (p *Client) HandleIncomingMD(md metadata.MD) error {
-	ts, err := p.clock.Scheme().Codec().DecodeMD(md)
-	if err != nil {
-		return err
-	}
-	p.clock.Update(ts)
-	return nil
+func (p *Client) PrepareResponse(headers *primitive.ResponseHeaders) {
+	p.prepareTimestamp(headers.Timestamp)
 }
 
-func (p *Client) PartitionFrom(ctx context.Context) (*Partition, error) {
-	name, err := p.getPrimitiveName(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return p.PartitionBy([]byte(name)), nil
-}
-
-func (p *Client) Partition(ctx context.Context, partitionID PartitionID) *Partition {
+func (p *Client) Partition(partitionID PartitionID) *Partition {
 	return p.partitionsByID[partitionID]
 }
 

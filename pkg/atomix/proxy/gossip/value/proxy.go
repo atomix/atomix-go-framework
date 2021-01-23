@@ -7,7 +7,6 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/gossip"
 	"google.golang.org/grpc"
-	metadata "google.golang.org/grpc/metadata"
 	io "io"
 )
 
@@ -30,10 +29,7 @@ type Proxy struct {
 
 func (s *Proxy) Set(ctx context.Context, request *value.SetRequest) (*value.SetResponse, error) {
 	s.log.Debugf("Received SetRequest %+v", request)
-	partition, err := s.PartitionFrom(ctx)
-	if err != nil {
-		return nil, errors.Proto(err)
-	}
+	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID))
 
 	conn, err := partition.Connect()
 	if err != nil {
@@ -41,34 +37,21 @@ func (s *Proxy) Set(ctx context.Context, request *value.SetRequest) (*value.SetR
 	}
 
 	client := value.NewValueServiceClient(conn)
-
-	outMD, _ := metadata.FromIncomingContext(ctx)
-	s.AddOutgoingMD(outMD)
-	partition.AddOutgoingMD(outMD)
-	partition.AddOutgoingMD(outMD)
-	ctx = metadata.NewOutgoingContext(ctx, outMD)
-
-	var inMD metadata.MD
-	response, err := client.Set(ctx, request, grpc.Trailer(&inMD))
+	s.PrepareRequest(&request.Headers)
+	ctx = partition.AddHeaders(ctx)
+	response, err := client.Set(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	err = s.HandleIncomingMD(inMD)
-	if err != nil {
-		s.log.Errorf("Request SetRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
+	s.PrepareResponse(&response.Headers)
 	s.log.Debugf("Sending SetResponse %+v", response)
 	return response, nil
 }
 
 func (s *Proxy) Get(ctx context.Context, request *value.GetRequest) (*value.GetResponse, error) {
 	s.log.Debugf("Received GetRequest %+v", request)
-	partition, err := s.PartitionFrom(ctx)
-	if err != nil {
-		return nil, errors.Proto(err)
-	}
+	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID))
 
 	conn, err := partition.Connect()
 	if err != nil {
@@ -76,34 +59,21 @@ func (s *Proxy) Get(ctx context.Context, request *value.GetRequest) (*value.GetR
 	}
 
 	client := value.NewValueServiceClient(conn)
-
-	outMD, _ := metadata.FromIncomingContext(ctx)
-	s.AddOutgoingMD(outMD)
-	partition.AddOutgoingMD(outMD)
-	partition.AddOutgoingMD(outMD)
-	ctx = metadata.NewOutgoingContext(ctx, outMD)
-
-	var inMD metadata.MD
-	response, err := client.Get(ctx, request, grpc.Trailer(&inMD))
+	s.PrepareRequest(&request.Headers)
+	ctx = partition.AddHeaders(ctx)
+	response, err := client.Get(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	err = s.HandleIncomingMD(inMD)
-	if err != nil {
-		s.log.Errorf("Request GetRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
+	s.PrepareResponse(&response.Headers)
 	s.log.Debugf("Sending GetResponse %+v", response)
 	return response, nil
 }
 
 func (s *Proxy) Events(request *value.EventsRequest, srv value.ValueService_EventsServer) error {
 	s.log.Debugf("Received EventsRequest %+v", request)
-	partition, err := s.PartitionFrom(srv.Context())
-	if err != nil {
-		return errors.Proto(err)
-	}
+	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID))
 
 	conn, err := partition.Connect()
 	if err != nil {
@@ -112,15 +82,9 @@ func (s *Proxy) Events(request *value.EventsRequest, srv value.ValueService_Even
 	}
 
 	client := value.NewValueServiceClient(conn)
-
-	outMD, _ := metadata.FromIncomingContext(srv.Context())
-	s.AddOutgoingMD(outMD)
-	partition.AddOutgoingMD(outMD)
-	partition.AddOutgoingMD(outMD)
-	ctx := metadata.NewOutgoingContext(srv.Context(), outMD)
-
-	var inMD metadata.MD
-	stream, err := client.Events(ctx, request, grpc.Trailer(&inMD))
+	s.PrepareRequest(&request.Headers)
+	ctx := partition.AddHeaders(srv.Context())
+	stream, err := client.Events(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
@@ -130,16 +94,12 @@ func (s *Proxy) Events(request *value.EventsRequest, srv value.ValueService_Even
 		response, err := stream.Recv()
 		if err == io.EOF {
 			s.log.Debugf("Finished EventsRequest %+v", request)
-			err = s.HandleIncomingMD(inMD)
-			if err != nil {
-				s.log.Errorf("Request EventsRequest failed: %v", err)
-				return errors.Proto(err)
-			}
 			return nil
 		} else if err != nil {
 			s.log.Errorf("Request EventsRequest failed: %v", err)
 			return errors.Proto(err)
 		}
+		s.PrepareResponse(&response.Headers)
 		s.log.Debugf("Sending EventsResponse %+v", response)
 		if err := srv.Send(response); err != nil {
 			s.log.Errorf("Response EventsResponse failed: %v", err)

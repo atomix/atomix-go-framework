@@ -16,6 +16,8 @@ package gossip
 
 import (
 	"context"
+	"github.com/atomix/api/go/atomix/primitive"
+	"github.com/atomix/api/go/atomix/primitive/meta"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/headers"
@@ -50,49 +52,23 @@ type Manager struct {
 	clock          time.Clock
 }
 
-func (m *Manager) HandleIncomingMD(md metadata.MD) error {
-	ts, err := m.clock.Scheme().Codec().DecodeMD(md)
-	if err != nil {
-		return err
+func (m *Manager) prepareTimestamp(timestamp *meta.Timestamp) *meta.Timestamp {
+	var t time.Timestamp
+	if timestamp != nil {
+		t = m.clock.Update(time.NewTimestamp(*timestamp))
+	} else {
+		t = m.clock.Increment()
 	}
-	m.clock.Update(ts)
-	return nil
+	proto := m.clock.Scheme().Codec().EncodeProto(t)
+	return &proto
 }
 
-func (m *Manager) AddOutgoingMD(md metadata.MD) {
-	ts := m.clock.Get()
-	m.clock.Scheme().Codec().EncodeMD(md, ts)
+func (m *Manager) PrepareRequest(headers *primitive.RequestHeaders) {
+	m.prepareTimestamp(headers.Timestamp)
 }
 
-func (m *Manager) ServiceFrom(ctx context.Context) (Service, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return nil, errors.NewInvalid("no headers found")
-	}
-
-	partitionID, ok := headers.PartitionID.GetInt(md)
-	if !ok {
-		return nil, errors.NewUnavailable("no %s header found", headers.PartitionID.Name())
-	}
-	serviceType, ok := headers.ServiceType.GetString(md)
-	if !ok {
-		return nil, errors.NewUnavailable("no %s header found", headers.ServiceType.Name())
-	}
-	serviceID, ok := headers.ServiceID.GetString(md)
-	if !ok {
-		return nil, errors.NewUnavailable("no %s header found", headers.ServiceID.Name())
-	}
-
-	partition, err := m.Partition(PartitionID(partitionID))
-	if err != nil {
-		return nil, err
-	}
-
-	replica, err := partition.getReplica(ServiceType(serviceType), ServiceID(serviceID))
-	if err != nil {
-		return nil, err
-	}
-	return replica.Service(), nil
+func (m *Manager) PrepareResponse(headers *primitive.ResponseHeaders) {
+	m.prepareTimestamp(headers.Timestamp)
 }
 
 func (m *Manager) PartitionFrom(ctx context.Context) (*Partition, error) {

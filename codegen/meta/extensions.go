@@ -87,6 +87,18 @@ func GetOperationType(method pgs.Method) (operations.OperationType, error) {
 	return operationType, nil
 }
 
+// GetHeaders gets the headers extension from the given field
+func GetHeaders(field pgs.Field) (bool, error) {
+	var headers bool
+	ok, err := field.Extension(operations.E_Headers, &headers)
+	if err != nil {
+		return false, err
+	} else if !ok {
+		return false, nil
+	}
+	return headers, nil
+}
+
 // GetPartitionStrategy gets the partition strategy extension from the given method
 func GetPartitionStrategy(method pgs.Method) (*partitions.PartitionStrategy, error) {
 	var strategy partitions.PartitionStrategy

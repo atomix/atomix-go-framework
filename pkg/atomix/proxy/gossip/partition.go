@@ -44,25 +44,10 @@ type Partition struct {
 	mu      sync.RWMutex
 }
 
-func (p *Partition) addService(md metadata.MD) {
-	primitiveType, ok := headers.PrimitiveType.GetString(md)
-	if ok {
-		headers.ServiceType.SetString(md, primitiveType)
-	}
-	primitiveName, ok := headers.PrimitiveName.GetString(md)
-	if ok {
-		headers.ServiceID.SetString(md, primitiveName)
-	}
-}
-
-func (p *Partition) addPartition(md metadata.MD) {
+func (p *Partition) AddHeaders(ctx context.Context) context.Context {
+	var md metadata.MD
 	headers.PartitionID.AddInt(md, int(p.ID))
-}
-
-// AddOutgoingMD adds the header for the partition to the given context
-func (p *Partition) AddOutgoingMD(md metadata.MD) {
-	p.addService(md)
-	p.addPartition(md)
+	return metadata.NewOutgoingContext(ctx, md)
 }
 
 // Connect gets the connection to the partition

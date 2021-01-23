@@ -11,7 +11,6 @@ import (
 	{{- range .Imports }}
 	{{ .Alias }} {{ .Path | quote }}
 	{{- end }}
-	{{ import "metadata" "google.golang.org/grpc/metadata" }}
 	{{- range .Primitive.Methods }}
 	{{- if .Scope.IsGlobal }}
 	{{ import "github.com/atomix/go-framework/pkg/atomix/util/async" }}
@@ -113,10 +112,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	{{- else if .Request.PartitionRange }}
 	partitionRange := {{ template "val" .Request.PartitionRange }}request{{ template "field" .Request.PartitionRange }}
 	{{- else }}
-    partition, err := s.PartitionFrom(ctx)
-    if err != nil {
-        return nil, errors.Proto(err)
-    }
+    partition := s.PartitionBy([]byte(request{{ template "field" .Request.Headers }}.PrimitiveID))
 	{{- end }}
 
 	conn, err := partition.Connect()
@@ -125,51 +121,31 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	}
 
 	client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-
-	outMD, _ := metadata.FromIncomingContext(ctx)
-	s.AddOutgoingMD(outMD)
-	partition.AddOutgoingMD(outMD)
-	partition.AddOutgoingMD(outMD)
-	ctx = metadata.NewOutgoingContext(ctx, outMD)
-
-	var inMD metadata.MD
-	response, err := client.{{ .Name }}(ctx, request, grpc.Trailer(&inMD))
+	s.PrepareRequest({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
+	ctx = partition.AddHeaders(ctx)
+	response, err := client.{{ .Name }}(ctx, request)
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
-	err = s.HandleIncomingMD(inMD)
-	if err != nil {
-        s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-		return nil, errors.Proto(err)
-	}
+	s.PrepareResponse({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
 	{{- else if .Scope.IsGlobal }}
 	partitions := s.Partitions()
 	responses, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
         partition := partitions[i]
         conn, err := partition.Connect()
         if err != nil {
-            s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
             return nil, err
         }
         client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-
-        outMD, _ := metadata.FromIncomingContext(ctx)
-        s.AddOutgoingMD(outMD)
-        partition.AddOutgoingMD(outMD)
-        partition.AddOutgoingMD(outMD)
-        ctx := metadata.NewOutgoingContext(ctx, outMD)
-
-        var inMD metadata.MD
-		response, err := client.{{ .Name }}(ctx, request, grpc.Trailer(&inMD))
+    	s.PrepareRequest({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
+        ctx := partition.AddHeaders(ctx)
+		response, err := client.{{ .Name }}(ctx, request)
 		if err != nil {
 		    return nil, err
 		}
-        err = s.HandleIncomingMD(inMD)
-        if err != nil {
-            return nil, err
-        }
-        return response, nil
+    	s.PrepareResponse({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
+    	return response, nil
 	})
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
@@ -208,10 +184,7 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	{{- else if .Request.PartitionRange }}
 	partitionRange := {{ template "val" .Request.PartitionRange }}request{{ template "field" .Request.PartitionRange }}
 	{{- else }}
-    partition, err := s.PartitionFrom(srv.Context())
-    if err != nil {
-        return errors.Proto(err)
-    }
+    partition := s.PartitionBy([]byte(request{{ template "field" .Request.Headers }}.PrimitiveID))
 	{{- end }}
 
 	conn, err := partition.Connect()
@@ -221,15 +194,9 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	}
 
 	client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-
-    outMD, _ := metadata.FromIncomingContext(srv.Context())
-    s.AddOutgoingMD(outMD)
-    partition.AddOutgoingMD(outMD)
-    partition.AddOutgoingMD(outMD)
-    ctx := metadata.NewOutgoingContext(srv.Context(), outMD)
-
-    var inMD metadata.MD
-	stream, err := client.{{ .Name }}(ctx, request, grpc.Trailer(&inMD))
+	s.PrepareRequest({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
+	ctx := partition.AddHeaders(srv.Context())
+	stream, err := client.{{ .Name }}(ctx, request)
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 		return errors.Proto(err)
@@ -239,16 +206,12 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 		response, err := stream.Recv()
 		if err == io.EOF {
 			s.log.Debugf("Finished {{ .Request.Type.Name }} %+v", request)
-            err = s.HandleIncomingMD(inMD)
-            if err != nil {
-                s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-                return errors.Proto(err)
-            }
 			return nil
 		} else if err != nil {
             s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 			return errors.Proto(err)
 		}
+    	s.PrepareResponse({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
 		s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
 		if err := srv.Send(response); err != nil {
             s.log.Errorf("Response {{ .Response.Type.Name }} failed: %v", err)
@@ -268,15 +231,9 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
             return err
         }
         client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-
-        outMD, _ := metadata.FromIncomingContext(srv.Context())
-        s.AddOutgoingMD(outMD)
-        partition.AddOutgoingMD(outMD)
-        partition.AddOutgoingMD(outMD)
-        ctx := metadata.NewOutgoingContext(srv.Context(), outMD)
-
-        var inMD metadata.MD
-        stream, err := client.{{ .Name }}(ctx, request, grpc.Trailer(&inMD))
+	    s.PrepareRequest({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
+        ctx := partition.AddHeaders(srv.Context())
+        stream, err := client.{{ .Name }}(ctx, request)
         if err != nil {
             s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
             return err
@@ -287,11 +244,6 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
             for {
                 response, err := stream.Recv()
                 if err == io.EOF {
-                    err = s.HandleIncomingMD(inMD)
-                    if err != nil {
-                        s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
-                        errCh <- err
-                    }
                     return
                 } else if err != nil {
                     errCh <- err
@@ -317,6 +269,7 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
         select {
         case response, ok := <-responseCh:
             if ok {
+    	        s.PrepareResponse({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
                 s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
                 err := srv.Send(response)
                 if err != nil {

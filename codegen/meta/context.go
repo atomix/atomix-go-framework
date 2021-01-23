@@ -482,6 +482,11 @@ func (c *Context) GetEnumValueTypeMeta(enumValue pgs.EnumValue) TypeMeta {
 	}
 }
 
+// GetHeadersFieldMeta extracts the metadata for the headers field in the given message
+func (c *Context) GetHeadersFieldMeta(message pgs.Message) (*FieldRefMeta, error) {
+	return c.findAnnotatedField(message, operation.E_Headers)
+}
+
 // GetStateKeyFieldMeta extracts the metadata for the state key field in the given message
 func (c *Context) GetStateKeyFieldMeta(message pgs.Message) (*FieldRefMeta, error) {
 	return c.findAnnotatedField(message, state.E_Key)

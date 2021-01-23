@@ -1,3 +1,4 @@
+{{- $serviceType := printf "%sServiceType" .Generator.Prefix }}
 {{- $server := printf "%sServer" .Generator.Prefix }}
 {{- $service := printf "%sService" .Generator.Prefix }}
 package {{ .Package.Name }}
@@ -12,7 +13,6 @@ import (
 	{{- range .Imports }}
 	{{ .Alias }} {{ .Path | quote }}
 	{{- end }}
-	{{ import "metadata" "google.golang.org/grpc/metadata" }}
 	{{- range .Primitive.Methods }}
 	{{- if .Request.IsStream }}
 	{{ import "io" }}
@@ -105,12 +105,7 @@ Query
 {{ if and .Request.IsDiscrete .Response.IsDiscrete }}
 func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "type" .Request.Type }}) (*{{ template "type" .Response.Type }}, error) {
 	s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
-	inMD, _ := metadata.FromIncomingContext(ctx)
-	err := s.manager.HandleIncomingMD(inMD)
-	if err != nil {
-		return nil, errors.Proto(err)
-	}
-
+	s.manager.PrepareRequest({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
 	{{- if .Scope.IsPartition }}
     partition, err := s.manager.PartitionFrom(ctx)
     if err != nil {
@@ -118,7 +113,7 @@ func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "t
         return nil, err
     }
 
-    service, err := partition.ServiceFrom(ctx)
+    service, err := partition.GetService({{ $serviceType }}, gossip.ServiceID(request{{ template "field" .Request.Headers }}.PrimitiveID))
     if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
         return nil, errors.Proto(err)
@@ -129,6 +124,7 @@ func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "t
         s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
         return nil, errors.Proto(err)
     }
+    s.manager.PrepareResponse({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
 	{{- else if .Scope.IsGlobal }}
 	partitions, err := s.manager.PartitionsFrom(ctx)
 	if err != nil {
@@ -138,11 +134,16 @@ func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "t
 
 	responses, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
 	    partition := partitions[i]
-	    service, err := partition.ServiceFrom(ctx)
+	    service, err := partition.GetService({{ $serviceType }}, gossip.ServiceID(request{{ template "field" .Request.Headers }}.PrimitiveID))
 	    if err != nil {
 	        return nil, err
 	    }
-	    return service.({{ $service }}).{{ .Name }}(ctx, request)
+	    response, err := service.({{ $service }}).{{ .Name }}(ctx, request)
+	    if err != nil {
+	        return nil, err
+	    }
+    	s.manager.PrepareResponse({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
+    	return response, nil
     })
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
@@ -164,22 +165,13 @@ func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "t
     {{- end }}
     {{- end }}
 	{{- end }}
-
-	var outMD metadata.MD
-	s.manager.AddOutgoingMD(outMD)
-	grpc.SetTrailer(ctx, outMD)
-
 	s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
 	return response, nil
 }
 {{ else if .Response.IsStream }}
 func (s *{{ $server }}) {{ .Name }}(request *{{ template "type" .Request.Type }}, srv {{ template "type" $primitive.Type }}_{{ .Name }}Server) error {
     s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
-	inMD, _ := metadata.FromIncomingContext(srv.Context())
-	err := s.manager.HandleIncomingMD(inMD)
-	if err != nil {
-		return errors.Proto(err)
-	}
+	s.manager.PrepareRequest({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
 
     partitions, err := s.manager.PartitionsFrom(srv.Context())
     if err != nil {
@@ -192,7 +184,7 @@ func (s *{{ $server }}) {{ .Name }}(request *{{ template "type" .Request.Type }}
     wg.Add(len(partitions))
     err = async.IterAsync(len(partitions), func(i int) error {
         partition := partitions[i]
-        service, err := partition.ServiceFrom(srv.Context())
+        service, err := partition.GetService({{ $serviceType }}, gossip.ServiceID(request{{ template "field" .Request.Headers }}.PrimitiveID))
         if err != nil {
             return err
         }
@@ -229,6 +221,7 @@ func (s *{{ $server }}) {{ .Name }}(request *{{ template "type" .Request.Type }}
         select {
         case response, ok := <-responseCh:
             if ok {
+                s.manager.PrepareResponse({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
                 s.log.Debugf("Sending {{ .Response.Type.Name }} %v", response)
                 err = srv.Send(&response)
                 if err != nil {
@@ -237,16 +230,10 @@ func (s *{{ $server }}) {{ .Name }}(request *{{ template "type" .Request.Type }}
                 }
             } else {
                 s.log.Debugf("Finished {{ .Request.Type.Name }} %+v", request)
-                var outMD metadata.MD
-                s.manager.AddOutgoingMD(outMD)
-                grpc.SetTrailer(srv.Context(), outMD)
                 return nil
             }
         case <-srv.Context().Done():
             s.log.Debugf("Finished {{ .Request.Type.Name }} %+v", request)
-            var outMD metadata.MD
-            s.manager.AddOutgoingMD(outMD)
-            grpc.SetTrailer(srv.Context(), outMD)
             return nil
         }
     }

@@ -15,11 +15,8 @@
 package gossip
 
 import (
-	"context"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/headers"
-	"google.golang.org/grpc/metadata"
 	"sync"
 )
 
@@ -44,22 +41,8 @@ type Partition struct {
 	mu       sync.RWMutex
 }
 
-func (p *Partition) ServiceFrom(ctx context.Context) (Service, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return nil, errors.NewInvalid("no headers found")
-	}
-
-	serviceType, ok := headers.ServiceType.GetString(md)
-	if !ok {
-		return nil, errors.NewUnavailable("no %s header found", headers.ServiceType.Name())
-	}
-	serviceID, ok := headers.ServiceID.GetString(md)
-	if !ok {
-		return nil, errors.NewUnavailable("no %s header found", headers.ServiceID.Name())
-	}
-
-	replica, err := p.getReplica(ServiceType(serviceType), ServiceID(serviceID))
+func (p *Partition) GetService(serviceType ServiceType, serviceID ServiceID) (Service, error) {
+	replica, err := p.getReplica(serviceType, serviceID)
 	if err != nil {
 		return nil, err
 	}

@@ -146,7 +146,7 @@ type MessageMeta struct {
 // RequestMeta is the type metadata for a message
 type RequestMeta struct {
 	MessageMeta
-	Header         FieldRefMeta
+	Headers        FieldRefMeta
 	PartitionKey   *FieldRefMeta
 	PartitionRange *FieldRefMeta
 	IsDiscrete     bool
@@ -156,7 +156,7 @@ type RequestMeta struct {
 // ResponseMeta is the type metadata for a message
 type ResponseMeta struct {
 	MessageMeta
-	Header     FieldRefMeta
+	Headers    FieldRefMeta
 	Aggregates []AggregatorMeta
 	IsDiscrete bool
 	IsStream   bool
