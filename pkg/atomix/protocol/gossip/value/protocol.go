@@ -55,7 +55,7 @@ func (p *serviceProtocol) Repair(ctx context.Context, value *value.Value) (*valu
 	}
 
 	for _, object := range objects {
-		if meta.New(object.ObjectMeta).After(meta.New(value.ObjectMeta)) {
+		if meta.FromProto(object.ObjectMeta).After(meta.FromProto(value.ObjectMeta)) {
 			err = proto.Unmarshal(object.Value, value)
 			if err != nil {
 				return nil, err

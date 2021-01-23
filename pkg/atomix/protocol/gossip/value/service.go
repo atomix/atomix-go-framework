@@ -19,19 +19,29 @@ import (
 	valueapi "github.com/atomix/api/go/atomix/primitive/value"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/meta"
+	"github.com/atomix/go-framework/pkg/atomix/time"
+	"sync"
 )
 
 func init() {
 	registerService(func(protocol Protocol) Service {
+		clock := time.NewLogicalClock()
 		return &valueService{
 			protocol: protocol,
+			clock:    clock,
+			value: &valueapi.Value{
+				ObjectMeta: meta.NewTimestamped(clock.Get()).AsTombstone().Proto(),
+			},
 		}
 	})
 }
 
 type valueService struct {
 	protocol Protocol
+	clock    time.Clock
 	value    *valueapi.Value
+	streams  []chan<- valueapi.EventsResponse
+	mu       sync.RWMutex
 }
 
 func (s *valueService) Protocol() Protocol {
@@ -39,18 +49,24 @@ func (s *valueService) Protocol() Protocol {
 }
 
 func (s *valueService) Read(ctx context.Context) (*valueapi.Value, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return s.value, nil
 }
 
 func (s *valueService) Update(ctx context.Context, value *valueapi.Value) error {
-	if meta.New(value.ObjectMeta).After(meta.New(s.value.ObjectMeta)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if meta.FromProto(value.ObjectMeta).After(meta.FromProto(s.value.ObjectMeta)) {
 		s.value = value
 	}
 	return nil
 }
 
 func (s *valueService) Set(ctx context.Context, input *valueapi.SetRequest) (*valueapi.SetResponse, error) {
-	if s.value != nil && meta.New(s.value.ObjectMeta).After(meta.New(input.Value.ObjectMeta)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.value != nil && meta.FromProto(s.value.ObjectMeta).After(meta.FromProto(input.Value.ObjectMeta)) {
 		return &valueapi.SetResponse{
 			Value: *s.value,
 		}, nil
@@ -62,6 +78,12 @@ func (s *valueService) Set(ctx context.Context, input *valueapi.SetRequest) (*va
 	}
 
 	s.value = &input.Value
+
+	s.notify(valueapi.Event{
+		Type:  valueapi.Event_UPDATE,
+		Value: input.Value,
+	})
+
 	err = s.Protocol().Broadcast(ctx, &input.Value)
 	if err != nil {
 		return nil, err
@@ -72,6 +94,8 @@ func (s *valueService) Set(ctx context.Context, input *valueapi.SetRequest) (*va
 }
 
 func (s *valueService) Get(ctx context.Context, input *valueapi.GetRequest) (*valueapi.GetResponse, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	var value valueapi.Value
 	if s.value != nil {
 		value = *s.value
@@ -81,8 +105,19 @@ func (s *valueService) Get(ctx context.Context, input *valueapi.GetRequest) (*va
 	}, nil
 }
 
-func (s *valueService) Events(ctx context.Context, request *valueapi.EventsRequest, responses chan<- valueapi.EventsResponse) error {
-	panic("implement me")
+func (s *valueService) Events(ctx context.Context, request *valueapi.EventsRequest, ch chan<- valueapi.EventsResponse) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.streams = append(s.streams, ch)
+	return nil
+}
+
+func (s *valueService) notify(event valueapi.Event) {
+	for _, ch := range s.streams {
+		ch <- valueapi.EventsResponse{
+			Event: event,
+		}
+	}
 }
 
 func checkPreconditions(value *valueapi.Value, preconditions []valueapi.Precondition) error {
@@ -92,7 +127,7 @@ func checkPreconditions(value *valueapi.Value, preconditions []valueapi.Precondi
 			if value == nil {
 				return errors.NewConflict("metadata precondition failed")
 			}
-			if !meta.New(value.ObjectMeta).Equal(meta.New(*p.Metadata)) {
+			if !meta.FromProto(value.ObjectMeta).Equal(meta.FromProto(*p.Metadata)) {
 				return errors.NewConflict("metadata mismatch")
 			}
 		}

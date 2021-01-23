@@ -53,7 +53,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 			if err != nil {
 				return err
 			} else if object != nil {
-				if meta.New(object.ObjectMeta).After(meta.New(m.Advertise.ObjectMeta)) {
+				if meta.FromProto(object.ObjectMeta).After(meta.FromProto(m.Advertise.ObjectMeta)) {
 					err := stream.Send(&GossipMessage{
 						Message: &GossipMessage_Update{
 							Update: &Update{
@@ -64,7 +64,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 					if err != nil {
 						return err
 					}
-				} else if meta.New(m.Advertise.ObjectMeta).After(meta.New(object.ObjectMeta)) {
+				} else if meta.FromProto(m.Advertise.ObjectMeta).After(meta.FromProto(object.ObjectMeta)) {
 					err := stream.Send(&GossipMessage{
 						Message: &GossipMessage_Advertise{
 							Advertise: &Advertise{

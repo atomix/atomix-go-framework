@@ -48,7 +48,7 @@ func (s *mapService) Update(ctx context.Context, update *mapapi.Entry) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	stored, ok := s.entries[update.Key.Key]
-	if !ok || meta.New(update.Key.ObjectMeta).After(meta.New(stored.Key.ObjectMeta)) {
+	if !ok || meta.FromProto(update.Key.ObjectMeta).After(meta.FromProto(stored.Key.ObjectMeta)) {
 		s.entries[update.Key.Key] = update
 		return s.Protocol().Broadcast(ctx, update)
 	}
@@ -84,8 +84,8 @@ func (s *mapService) Put(ctx context.Context, input *mapapi.PutRequest) (*mapapi
 
 	entry, ok := s.entries[input.Entry.Key.Key]
 	if ok {
-		storedMeta := meta.New(entry.Key.ObjectMeta)
-		updateMeta := meta.New(input.Entry.Key.ObjectMeta)
+		storedMeta := meta.FromProto(entry.Key.ObjectMeta)
+		updateMeta := meta.FromProto(input.Entry.Key.ObjectMeta)
 		if storedMeta.Timestamp.After(updateMeta.Timestamp) {
 			return nil, errors.NewConflict("concurrent update")
 		}
@@ -140,8 +140,8 @@ func (s *mapService) Remove(ctx context.Context, input *mapapi.RemoveRequest) (*
 		return nil, errors.NewNotFound("key '%s' not found", input.Key)
 	}
 
-	storedMeta := meta.New(entry.Key.ObjectMeta)
-	updateMeta := meta.New(input.Key.ObjectMeta)
+	storedMeta := meta.FromProto(entry.Key.ObjectMeta)
+	updateMeta := meta.FromProto(input.Key.ObjectMeta)
 	if storedMeta.Timestamp.After(updateMeta.Timestamp) {
 		return nil, errors.NewConflict("concurrent update")
 	}

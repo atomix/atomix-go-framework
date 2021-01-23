@@ -20,11 +20,25 @@ import (
 )
 
 func Equal(m1, m2 metaapi.ObjectMeta) bool {
-	return New(m1).Equal(New(m2))
+	return FromProto(m1).Equal(FromProto(m2))
 }
 
-// New creates new object metadata from the given proto metadata
-func New(meta metaapi.ObjectMeta) ObjectMeta {
+// NewRevision creates a new object metadata with the given revision
+func NewRevision(revision Revision) ObjectMeta {
+	return ObjectMeta{
+		Revision: revision,
+	}
+}
+
+// NewTimestamped creates a new object metadata with the given timestamp
+func NewTimestamped(timestamp time.Timestamp) ObjectMeta {
+	return ObjectMeta{
+		Timestamp: timestamp,
+	}
+}
+
+// FromProto creates new object metadata from the given proto metadata
+func FromProto(meta metaapi.ObjectMeta) ObjectMeta {
 	var revision Revision
 	if meta.Revision != nil {
 		revision = Revision(meta.Revision.Num)
@@ -53,6 +67,18 @@ type ObjectMeta struct {
 	Tombstone bool
 }
 
+func (m ObjectMeta) AsObject() ObjectMeta {
+	copy := m
+	copy.Tombstone = false
+	return copy
+}
+
+func (m ObjectMeta) AsTombstone() ObjectMeta {
+	copy := m
+	copy.Tombstone = true
+	return copy
+}
+
 func (m ObjectMeta) Meta() ObjectMeta {
 	return m
 }
@@ -67,6 +93,11 @@ func (m ObjectMeta) Proto() metaapi.ObjectMeta {
 	if m.Timestamp != nil {
 		timestamp := m.Timestamp.Proto()
 		meta.Timestamp = &timestamp
+	}
+	if m.Tombstone {
+		meta.Type = metaapi.ObjectMeta_TOMBSTONE
+	} else {
+		meta.Type = metaapi.ObjectMeta_OBJECT
 	}
 	return meta
 }

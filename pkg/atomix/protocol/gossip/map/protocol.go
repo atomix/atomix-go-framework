@@ -56,7 +56,7 @@ func (p *serviceProtocol) Repair(ctx context.Context, entry *_map.Entry) (*_map.
 	}
 
 	for _, object := range objects {
-		if meta.New(object.ObjectMeta).After(meta.New(entry.Key.ObjectMeta)) {
+		if meta.FromProto(object.ObjectMeta).After(meta.FromProto(entry.Key.ObjectMeta)) {
 			err = proto.Unmarshal(object.Value, entry)
 			if err != nil {
 				return nil, err

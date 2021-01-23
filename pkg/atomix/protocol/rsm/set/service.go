@@ -70,7 +70,7 @@ func (s *setService) Add(request *setapi.AddRequest) (*setapi.AddResponse, error
 		return nil, errors.NewAlreadyExists("value already exists")
 	}
 
-	s.values[request.Element.Value] = meta.New(request.Element.ObjectMeta)
+	s.values[request.Element.Value] = meta.FromProto(request.Element.ObjectMeta)
 	err := s.notify(setapi.Event{
 		Type:    setapi.Event_ADD,
 		Element: request.Element,
@@ -89,7 +89,7 @@ func (s *setService) Remove(request *setapi.RemoveRequest) (*setapi.RemoveRespon
 		return nil, errors.NewNotFound("value not found")
 	}
 
-	if !object.Equal(meta.New(request.Element.ObjectMeta)) {
+	if !object.Equal(meta.FromProto(request.Element.ObjectMeta)) {
 		return nil, errors.NewConflict("metadata mismatch")
 	}
 
