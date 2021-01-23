@@ -262,3 +262,103 @@ func (t EpochTimestamp) Proto() metaapi.Timestamp {
 		},
 	}
 }
+
+func NewCompositeTimestamp(timestamps ...Timestamp) Timestamp {
+	return CompositeTimestamp{
+		Timestamps: timestamps,
+	}
+}
+
+type CompositeTimestamp struct {
+	Timestamps []Timestamp
+}
+
+func (t CompositeTimestamp) Before(u Timestamp) bool {
+	v, ok := u.(CompositeTimestamp)
+	if !ok {
+		panic("not a composite timestamp")
+	}
+	if len(t.Timestamps) != len(v.Timestamps) {
+		panic("incompatible composite timestamps")
+	}
+	for i := 0; i < len(t.Timestamps); i++ {
+		t1 := t.Timestamps[i]
+		t2 := v.Timestamps[i]
+		if t1.Before(t2) {
+			return true
+		} else if i > 0 {
+			for j := 0; j < i; j++ {
+				v1 := t.Timestamps[j]
+				v2 := v.Timestamps[j]
+				if !v1.Equal(v2) {
+					return false
+				}
+			}
+			if !t1.Before(t2) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func (t CompositeTimestamp) After(u Timestamp) bool {
+	v, ok := u.(CompositeTimestamp)
+	if !ok {
+		panic("not a composite timestamp")
+	}
+	if len(t.Timestamps) != len(v.Timestamps) {
+		panic("incompatible composite timestamps")
+	}
+	for i := 0; i < len(t.Timestamps); i++ {
+		t1 := t.Timestamps[i]
+		t2 := v.Timestamps[i]
+		if t1.After(t2) {
+			return true
+		} else if i > 0 {
+			for j := 0; j < i; j++ {
+				v1 := t.Timestamps[j]
+				v2 := v.Timestamps[j]
+				if !v1.Equal(v2) {
+					return false
+				}
+			}
+			if !t1.After(t2) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func (t CompositeTimestamp) Equal(u Timestamp) bool {
+	v, ok := u.(CompositeTimestamp)
+	if !ok {
+		panic("not a composite timestamp")
+	}
+	if len(t.Timestamps) != len(v.Timestamps) {
+		panic("incompatible composite timestamps")
+	}
+	for i := 0; i < len(t.Timestamps); i++ {
+		t1 := t.Timestamps[i]
+		t2 := v.Timestamps[i]
+		if !t1.Equal(t2) {
+			return false
+		}
+	}
+	return true
+}
+
+func (t CompositeTimestamp) Proto() metaapi.Timestamp {
+	timestamps := make([]metaapi.Timestamp, 0, len(t.Timestamps))
+	for _, timestamp := range t.Timestamps {
+		timestamps = append(timestamps, timestamp.Proto())
+	}
+	return metaapi.Timestamp{
+		Timestamp: &metaapi.Timestamp_CompositeTimestamp{
+			CompositeTimestamp: &metaapi.CompositeTimestamp{
+				Timestamps: timestamps,
+			},
+		},
+	}
+}
