@@ -11,6 +11,7 @@ import (
 	{{- range .Imports }}
 	{{ .Alias }} {{ .Path | quote }}
 	{{- end }}
+	{{ import "metadata" "google.golang.org/grpc/metadata" }}
 	{{- range .Primitive.Methods }}
 	{{- if .Scope.IsGlobal }}
 	{{ import "github.com/atomix/go-framework/pkg/atomix/util/async" }}
@@ -124,11 +125,23 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	}
 
 	client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-	ctx = partition.AddPartition(ctx)
-	response, err := client.{{ .Name }}(ctx, request)
+
+	outMD, _ := metadata.FromIncomingContext(ctx)
+	s.AddOutgoingMD(outMD)
+	partition.AddOutgoingMD(outMD)
+	partition.AddOutgoingMD(outMD)
+	ctx = metadata.NewOutgoingContext(ctx, outMD)
+
+	var inMD metadata.MD
+	response, err := client.{{ .Name }}(ctx, request, grpc.Trailer(&inMD))
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
+	}
+	err = s.HandleIncomingMD(inMD)
+	if err != nil {
+        s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
+		return nil, errors.Proto(err)
 	}
 	{{- else if .Scope.IsGlobal }}
 	partitions := s.Partitions()
@@ -140,8 +153,23 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
             return nil, err
         }
         client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-        ctx = partition.AddPartitions(ctx)
-		return client.{{ .Name }}(ctx, request)
+
+        outMD, _ := metadata.FromIncomingContext(ctx)
+        s.AddOutgoingMD(outMD)
+        partition.AddOutgoingMD(outMD)
+        partition.AddOutgoingMD(outMD)
+        ctx := metadata.NewOutgoingContext(ctx, outMD)
+
+        var inMD metadata.MD
+		response, err := client.{{ .Name }}(ctx, request, grpc.Trailer(&inMD))
+		if err != nil {
+		    return nil, err
+		}
+        err = s.HandleIncomingMD(inMD)
+        if err != nil {
+            return nil, err
+        }
+        return response, nil
 	})
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
@@ -193,8 +221,15 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	}
 
 	client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-	ctx := partition.AddPartition(srv.Context())
-	stream, err := client.{{ .Name }}(ctx, request)
+
+    outMD, _ := metadata.FromIncomingContext(srv.Context())
+    s.AddOutgoingMD(outMD)
+    partition.AddOutgoingMD(outMD)
+    partition.AddOutgoingMD(outMD)
+    ctx := metadata.NewOutgoingContext(srv.Context(), outMD)
+
+    var inMD metadata.MD
+	stream, err := client.{{ .Name }}(ctx, request, grpc.Trailer(&inMD))
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 		return errors.Proto(err)
@@ -204,6 +239,11 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 		response, err := stream.Recv()
 		if err == io.EOF {
 			s.log.Debugf("Finished {{ .Request.Type.Name }} %+v", request)
+            err = s.HandleIncomingMD(inMD)
+            if err != nil {
+                s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
+                return errors.Proto(err)
+            }
 			return nil
 		} else if err != nil {
             s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
@@ -228,8 +268,15 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
             return err
         }
         client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-        ctx := partition.AddPartitions(srv.Context())
-        stream, err := client.{{ .Name }}(ctx, request)
+
+        outMD, _ := metadata.FromIncomingContext(srv.Context())
+        s.AddOutgoingMD(outMD)
+        partition.AddOutgoingMD(outMD)
+        partition.AddOutgoingMD(outMD)
+        ctx := metadata.NewOutgoingContext(srv.Context(), outMD)
+
+        var inMD metadata.MD
+        stream, err := client.{{ .Name }}(ctx, request, grpc.Trailer(&inMD))
         if err != nil {
             s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
             return err
@@ -240,6 +287,11 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
             for {
                 response, err := stream.Recv()
                 if err == io.EOF {
+                    err = s.HandleIncomingMD(inMD)
+                    if err != nil {
+                        s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
+                        errCh <- err
+                    }
                     return
                 } else if err != nil {
                     errCh <- err

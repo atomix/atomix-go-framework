@@ -8,6 +8,7 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
 	async "github.com/atomix/go-framework/pkg/atomix/util/async"
 	"google.golang.org/grpc"
+	metadata "google.golang.org/grpc/metadata"
 	sync "sync"
 )
 
@@ -32,6 +33,11 @@ type Server struct {
 
 func (s *Server) Set(ctx context.Context, request *value.SetRequest) (*value.SetResponse, error) {
 	s.log.Debugf("Received SetRequest %+v", request)
+	inMD, _ := metadata.FromIncomingContext(ctx)
+	err := s.manager.HandleIncomingMD(inMD)
+	if err != nil {
+		return nil, errors.Proto(err)
+	}
 	partition, err := s.manager.PartitionFrom(ctx)
 	if err != nil {
 		s.log.Errorf("Request SetRequest %+v failed: %v", request, err)
@@ -49,12 +55,22 @@ func (s *Server) Set(ctx context.Context, request *value.SetRequest) (*value.Set
 		s.log.Errorf("Request SetRequest %+v failed: %v", request, err)
 		return nil, errors.Proto(err)
 	}
+
+	var outMD metadata.MD
+	s.manager.AddOutgoingMD(outMD)
+	grpc.SetTrailer(ctx, outMD)
+
 	s.log.Debugf("Sending SetResponse %+v", response)
 	return response, nil
 }
 
 func (s *Server) Get(ctx context.Context, request *value.GetRequest) (*value.GetResponse, error) {
 	s.log.Debugf("Received GetRequest %+v", request)
+	inMD, _ := metadata.FromIncomingContext(ctx)
+	err := s.manager.HandleIncomingMD(inMD)
+	if err != nil {
+		return nil, errors.Proto(err)
+	}
 	partition, err := s.manager.PartitionFrom(ctx)
 	if err != nil {
 		s.log.Errorf("Request GetRequest %+v failed: %v", request, err)
@@ -72,12 +88,22 @@ func (s *Server) Get(ctx context.Context, request *value.GetRequest) (*value.Get
 		s.log.Errorf("Request GetRequest %+v failed: %v", request, err)
 		return nil, errors.Proto(err)
 	}
+
+	var outMD metadata.MD
+	s.manager.AddOutgoingMD(outMD)
+	grpc.SetTrailer(ctx, outMD)
+
 	s.log.Debugf("Sending GetResponse %+v", response)
 	return response, nil
 }
 
 func (s *Server) Events(request *value.EventsRequest, srv value.ValueService_EventsServer) error {
 	s.log.Debugf("Received EventsRequest %+v", request)
+	inMD, _ := metadata.FromIncomingContext(srv.Context())
+	err := s.manager.HandleIncomingMD(inMD)
+	if err != nil {
+		return errors.Proto(err)
+	}
 
 	partitions, err := s.manager.PartitionsFrom(srv.Context())
 	if err != nil {
@@ -135,10 +161,16 @@ func (s *Server) Events(request *value.EventsRequest, srv value.ValueService_Eve
 				}
 			} else {
 				s.log.Debugf("Finished EventsRequest %+v", request)
+				var outMD metadata.MD
+				s.manager.AddOutgoingMD(outMD)
+				grpc.SetTrailer(srv.Context(), outMD)
 				return nil
 			}
 		case <-srv.Context().Done():
 			s.log.Debugf("Finished EventsRequest %+v", request)
+			var outMD metadata.MD
+			s.manager.AddOutgoingMD(outMD)
+			grpc.SetTrailer(srv.Context(), outMD)
 			return nil
 		}
 	}

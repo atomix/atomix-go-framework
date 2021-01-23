@@ -22,7 +22,6 @@ import (
 	"google.golang.org/grpc/metadata"
 	"math/rand"
 	"sync"
-	"time"
 )
 
 // NewPartition creates a new proxy partition
@@ -45,14 +44,6 @@ type Partition struct {
 	mu      sync.RWMutex
 }
 
-func (p *Partition) addTimestamp(md metadata.MD) {
-	timestamp, ok := headers.Timestamp.GetTime(md)
-	if !ok {
-		timestamp = time.Now()
-	}
-	headers.Timestamp.SetTime(md, timestamp)
-}
-
 func (p *Partition) addService(md metadata.MD) {
 	primitiveType, ok := headers.PrimitiveType.GetString(md)
 	if ok {
@@ -64,36 +55,14 @@ func (p *Partition) addService(md metadata.MD) {
 	}
 }
 
-func (p *Partition) addPartitions(md metadata.MD) {
+func (p *Partition) addPartition(md metadata.MD) {
 	headers.PartitionID.AddInt(md, int(p.ID))
 }
 
-func (p *Partition) addPartition(md metadata.MD) {
-	headers.PartitionID.SetInt(md, int(p.ID))
-}
-
-// AddPartition adds the header for the partition to the given context
-func (p *Partition) AddPartition(ctx context.Context) context.Context {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		md = metadata.MD{}
-	}
+// AddOutgoingMD adds the header for the partition to the given context
+func (p *Partition) AddOutgoingMD(md metadata.MD) {
 	p.addService(md)
-	p.addTimestamp(md)
 	p.addPartition(md)
-	return metadata.NewOutgoingContext(ctx, md)
-}
-
-// AddPartitions adds the header for the partitions to the given context
-func (p *Partition) AddPartitions(ctx context.Context) context.Context {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		md = metadata.MD{}
-	}
-	p.addService(md)
-	p.addTimestamp(md)
-	p.addPartitions(md)
-	return ctx
 }
 
 // Connect gets the connection to the partition

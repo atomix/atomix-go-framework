@@ -19,13 +19,14 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/headers"
+	"github.com/atomix/go-framework/pkg/atomix/time"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/atomix/go-framework/pkg/atomix/util/async"
 	"google.golang.org/grpc/metadata"
 )
 
 // NewClient creates a new proxy client
-func NewClient(cluster *cluster.Cluster) *Client {
+func NewClient(cluster *cluster.Cluster, scheme time.Scheme) *Client {
 	partitions := cluster.Partitions()
 	proxyPartitions := make([]*Partition, 0, len(partitions))
 	proxyPartitionsByID := make(map[PartitionID]*Partition)
@@ -35,8 +36,10 @@ func NewClient(cluster *cluster.Cluster) *Client {
 		proxyPartitionsByID[proxyPartition.ID] = proxyPartition
 	}
 	return &Client{
+		cluster:        cluster,
 		partitions:     proxyPartitions,
 		partitionsByID: proxyPartitionsByID,
+		clock:          scheme.NewClock(),
 	}
 }
 
@@ -45,6 +48,7 @@ type Client struct {
 	cluster        *cluster.Cluster
 	partitions     []*Partition
 	partitionsByID map[PartitionID]*Partition
+	clock          time.Clock
 }
 
 func (p *Client) getPrimitiveName(ctx context.Context) (string, error) {
@@ -57,6 +61,28 @@ func (p *Client) getPrimitiveName(ctx context.Context) (string, error) {
 		return "", errors.NewInvalid("no primitive name header set")
 	}
 	return name, nil
+}
+
+func (p *Client) AddOutgoingMD(md metadata.MD) {
+	primitiveType, ok := headers.PrimitiveType.GetString(md)
+	if ok {
+		headers.ServiceType.SetString(md, primitiveType)
+	}
+	primitiveName, ok := headers.PrimitiveName.GetString(md)
+	if ok {
+		headers.ServiceID.SetString(md, primitiveName)
+	}
+	ts := p.clock.Increment()
+	p.clock.Scheme().Codec().EncodeMD(md, ts)
+}
+
+func (p *Client) HandleIncomingMD(md metadata.MD) error {
+	ts, err := p.clock.Scheme().Codec().DecodeMD(md)
+	if err != nil {
+		return err
+	}
+	p.clock.Update(ts)
+	return nil
 }
 
 func (p *Client) PartitionFrom(ctx context.Context) (*Partition, error) {

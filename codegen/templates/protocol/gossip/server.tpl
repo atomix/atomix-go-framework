@@ -12,6 +12,7 @@ import (
 	{{- range .Imports }}
 	{{ .Alias }} {{ .Path | quote }}
 	{{- end }}
+	{{ import "metadata" "google.golang.org/grpc/metadata" }}
 	{{- range .Primitive.Methods }}
 	{{- if .Request.IsStream }}
 	{{ import "io" }}
@@ -104,6 +105,12 @@ Query
 {{ if and .Request.IsDiscrete .Response.IsDiscrete }}
 func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "type" .Request.Type }}) (*{{ template "type" .Response.Type }}, error) {
 	s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
+	inMD, _ := metadata.FromIncomingContext(ctx)
+	err := s.manager.HandleIncomingMD(inMD)
+	if err != nil {
+		return nil, errors.Proto(err)
+	}
+
 	{{- if .Scope.IsPartition }}
     partition, err := s.manager.PartitionFrom(ctx)
     if err != nil {
@@ -157,12 +164,22 @@ func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "t
     {{- end }}
     {{- end }}
 	{{- end }}
+
+	var outMD metadata.MD
+	s.manager.AddOutgoingMD(outMD)
+	grpc.SetTrailer(ctx, outMD)
+
 	s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
 	return response, nil
 }
 {{ else if .Response.IsStream }}
 func (s *{{ $server }}) {{ .Name }}(request *{{ template "type" .Request.Type }}, srv {{ template "type" $primitive.Type }}_{{ .Name }}Server) error {
     s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
+	inMD, _ := metadata.FromIncomingContext(srv.Context())
+	err := s.manager.HandleIncomingMD(inMD)
+	if err != nil {
+		return errors.Proto(err)
+	}
 
     partitions, err := s.manager.PartitionsFrom(srv.Context())
     if err != nil {
@@ -220,10 +237,16 @@ func (s *{{ $server }}) {{ .Name }}(request *{{ template "type" .Request.Type }}
                 }
             } else {
                 s.log.Debugf("Finished {{ .Request.Type.Name }} %+v", request)
+                var outMD metadata.MD
+                s.manager.AddOutgoingMD(outMD)
+                grpc.SetTrailer(srv.Context(), outMD)
                 return nil
             }
         case <-srv.Context().Done():
             s.log.Debugf("Finished {{ .Request.Type.Name }} %+v", request)
+            var outMD metadata.MD
+            s.manager.AddOutgoingMD(outMD)
+            grpc.SetTrailer(srv.Context(), outMD)
             return nil
         }
     }

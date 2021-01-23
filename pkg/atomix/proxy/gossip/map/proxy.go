@@ -8,6 +8,7 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/proxy/gossip"
 	async "github.com/atomix/go-framework/pkg/atomix/util/async"
 	"google.golang.org/grpc"
+	metadata "google.golang.org/grpc/metadata"
 
 	io "io"
 	sync "sync"
@@ -41,8 +42,23 @@ func (s *Proxy) Size(ctx context.Context, request *_map.SizeRequest) (*_map.Size
 			return nil, err
 		}
 		client := _map.NewMapServiceClient(conn)
-		ctx = partition.AddPartitions(ctx)
-		return client.Size(ctx, request)
+
+		outMD, _ := metadata.FromIncomingContext(ctx)
+		s.AddOutgoingMD(outMD)
+		partition.AddOutgoingMD(outMD)
+		partition.AddOutgoingMD(outMD)
+		ctx := metadata.NewOutgoingContext(ctx, outMD)
+
+		var inMD metadata.MD
+		response, err := client.Size(ctx, request, grpc.Trailer(&inMD))
+		if err != nil {
+			return nil, err
+		}
+		err = s.HandleIncomingMD(inMD)
+		if err != nil {
+			return nil, err
+		}
+		return response, nil
 	})
 	if err != nil {
 		s.log.Errorf("Request SizeRequest failed: %v", err)
@@ -68,8 +84,20 @@ func (s *Proxy) Put(ctx context.Context, request *_map.PutRequest) (*_map.PutRes
 	}
 
 	client := _map.NewMapServiceClient(conn)
-	ctx = partition.AddPartition(ctx)
-	response, err := client.Put(ctx, request)
+
+	outMD, _ := metadata.FromIncomingContext(ctx)
+	s.AddOutgoingMD(outMD)
+	partition.AddOutgoingMD(outMD)
+	partition.AddOutgoingMD(outMD)
+	ctx = metadata.NewOutgoingContext(ctx, outMD)
+
+	var inMD metadata.MD
+	response, err := client.Put(ctx, request, grpc.Trailer(&inMD))
+	if err != nil {
+		s.log.Errorf("Request PutRequest failed: %v", err)
+		return nil, errors.Proto(err)
+	}
+	err = s.HandleIncomingMD(inMD)
 	if err != nil {
 		s.log.Errorf("Request PutRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -89,8 +117,20 @@ func (s *Proxy) Get(ctx context.Context, request *_map.GetRequest) (*_map.GetRes
 	}
 
 	client := _map.NewMapServiceClient(conn)
-	ctx = partition.AddPartition(ctx)
-	response, err := client.Get(ctx, request)
+
+	outMD, _ := metadata.FromIncomingContext(ctx)
+	s.AddOutgoingMD(outMD)
+	partition.AddOutgoingMD(outMD)
+	partition.AddOutgoingMD(outMD)
+	ctx = metadata.NewOutgoingContext(ctx, outMD)
+
+	var inMD metadata.MD
+	response, err := client.Get(ctx, request, grpc.Trailer(&inMD))
+	if err != nil {
+		s.log.Errorf("Request GetRequest failed: %v", err)
+		return nil, errors.Proto(err)
+	}
+	err = s.HandleIncomingMD(inMD)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -110,8 +150,20 @@ func (s *Proxy) Remove(ctx context.Context, request *_map.RemoveRequest) (*_map.
 	}
 
 	client := _map.NewMapServiceClient(conn)
-	ctx = partition.AddPartition(ctx)
-	response, err := client.Remove(ctx, request)
+
+	outMD, _ := metadata.FromIncomingContext(ctx)
+	s.AddOutgoingMD(outMD)
+	partition.AddOutgoingMD(outMD)
+	partition.AddOutgoingMD(outMD)
+	ctx = metadata.NewOutgoingContext(ctx, outMD)
+
+	var inMD metadata.MD
+	response, err := client.Remove(ctx, request, grpc.Trailer(&inMD))
+	if err != nil {
+		s.log.Errorf("Request RemoveRequest failed: %v", err)
+		return nil, errors.Proto(err)
+	}
+	err = s.HandleIncomingMD(inMD)
 	if err != nil {
 		s.log.Errorf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -131,8 +183,23 @@ func (s *Proxy) Clear(ctx context.Context, request *_map.ClearRequest) (*_map.Cl
 			return nil, err
 		}
 		client := _map.NewMapServiceClient(conn)
-		ctx = partition.AddPartitions(ctx)
-		return client.Clear(ctx, request)
+
+		outMD, _ := metadata.FromIncomingContext(ctx)
+		s.AddOutgoingMD(outMD)
+		partition.AddOutgoingMD(outMD)
+		partition.AddOutgoingMD(outMD)
+		ctx := metadata.NewOutgoingContext(ctx, outMD)
+
+		var inMD metadata.MD
+		response, err := client.Clear(ctx, request, grpc.Trailer(&inMD))
+		if err != nil {
+			return nil, err
+		}
+		err = s.HandleIncomingMD(inMD)
+		if err != nil {
+			return nil, err
+		}
+		return response, nil
 	})
 	if err != nil {
 		s.log.Errorf("Request ClearRequest failed: %v", err)
@@ -158,8 +225,15 @@ func (s *Proxy) Events(request *_map.EventsRequest, srv _map.MapService_EventsSe
 			return err
 		}
 		client := _map.NewMapServiceClient(conn)
-		ctx := partition.AddPartitions(srv.Context())
-		stream, err := client.Events(ctx, request)
+
+		outMD, _ := metadata.FromIncomingContext(srv.Context())
+		s.AddOutgoingMD(outMD)
+		partition.AddOutgoingMD(outMD)
+		partition.AddOutgoingMD(outMD)
+		ctx := metadata.NewOutgoingContext(srv.Context(), outMD)
+
+		var inMD metadata.MD
+		stream, err := client.Events(ctx, request, grpc.Trailer(&inMD))
 		if err != nil {
 			s.log.Errorf("Request EventsRequest failed: %v", err)
 			return err
@@ -170,6 +244,11 @@ func (s *Proxy) Events(request *_map.EventsRequest, srv _map.MapService_EventsSe
 			for {
 				response, err := stream.Recv()
 				if err == io.EOF {
+					err = s.HandleIncomingMD(inMD)
+					if err != nil {
+						s.log.Errorf("Request EventsRequest failed: %v", err)
+						errCh <- err
+					}
 					return
 				} else if err != nil {
 					errCh <- err
@@ -226,8 +305,15 @@ func (s *Proxy) Entries(request *_map.EntriesRequest, srv _map.MapService_Entrie
 			return err
 		}
 		client := _map.NewMapServiceClient(conn)
-		ctx := partition.AddPartitions(srv.Context())
-		stream, err := client.Entries(ctx, request)
+
+		outMD, _ := metadata.FromIncomingContext(srv.Context())
+		s.AddOutgoingMD(outMD)
+		partition.AddOutgoingMD(outMD)
+		partition.AddOutgoingMD(outMD)
+		ctx := metadata.NewOutgoingContext(srv.Context(), outMD)
+
+		var inMD metadata.MD
+		stream, err := client.Entries(ctx, request, grpc.Trailer(&inMD))
 		if err != nil {
 			s.log.Errorf("Request EntriesRequest failed: %v", err)
 			return err
@@ -238,6 +324,11 @@ func (s *Proxy) Entries(request *_map.EntriesRequest, srv _map.MapService_Entrie
 			for {
 				response, err := stream.Recv()
 				if err == io.EOF {
+					err = s.HandleIncomingMD(inMD)
+					if err != nil {
+						s.log.Errorf("Request EntriesRequest failed: %v", err)
+						errCh <- err
+					}
 					return
 				} else if err != nil {
 					errCh <- err

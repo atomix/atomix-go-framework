@@ -20,6 +20,7 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy"
+	"github.com/atomix/go-framework/pkg/atomix/time"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"google.golang.org/grpc"
 )
@@ -27,10 +28,10 @@ import (
 var log = logging.GetLogger("atomix", "proxy")
 
 // NewNode creates a new server node
-func NewNode(cluster *cluster.Cluster) *Node {
+func NewNode(cluster *cluster.Cluster, scheme time.Scheme) *Node {
 	return &Node{
 		Cluster:  cluster,
-		client:   NewClient(cluster),
+		client:   NewClient(cluster, scheme),
 		registry: NewRegistry(),
 	}
 }

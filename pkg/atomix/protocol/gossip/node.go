@@ -18,6 +18,7 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
+	"github.com/atomix/go-framework/pkg/atomix/time"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"google.golang.org/grpc"
 )
@@ -25,9 +26,10 @@ import (
 var log = logging.GetLogger("atomix", "protocol", "gossip")
 
 // NewNode creates a new server node
-func NewNode(cluster *cluster.Cluster) *Node {
+func NewNode(cluster *cluster.Cluster, scheme time.Scheme) *Node {
 	return &Node{
 		Cluster:  cluster,
+		scheme:   scheme,
 		registry: NewRegistry(),
 	}
 }
@@ -35,6 +37,7 @@ func NewNode(cluster *cluster.Cluster) *Node {
 // Node is an Atomix node
 type Node struct {
 	Cluster  *cluster.Cluster
+	scheme   time.Scheme
 	registry Registry
 }
 
@@ -52,7 +55,7 @@ func (n *Node) RegisterService(t ServiceType, f NewServiceFunc) {
 func (n *Node) Start() error {
 	log.Info("Starting server")
 
-	manager := newManager(n.Cluster, n.registry)
+	manager := newManager(n.Cluster, n.scheme, n.registry)
 	servers := n.registry.GetServers()
 	services := make([]cluster.Service, len(servers))
 	for i, f := range servers {

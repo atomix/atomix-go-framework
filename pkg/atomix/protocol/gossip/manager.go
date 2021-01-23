@@ -19,12 +19,13 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/headers"
+	"github.com/atomix/go-framework/pkg/atomix/time"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"google.golang.org/grpc/metadata"
 )
 
 // newManager creates a new CRDT manager
-func newManager(cluster *cluster.Cluster, registry Registry) *Manager {
+func newManager(cluster *cluster.Cluster, scheme time.Scheme, registry Registry) *Manager {
 	partitions := cluster.Partitions()
 	proxyPartitions := make([]*Partition, 0, len(partitions))
 	proxyPartitionsByID := make(map[PartitionID]*Partition)
@@ -34,8 +35,10 @@ func newManager(cluster *cluster.Cluster, registry Registry) *Manager {
 		proxyPartitionsByID[proxyPartition.ID] = proxyPartition
 	}
 	return &Manager{
+		Cluster:        cluster,
 		partitions:     proxyPartitions,
 		partitionsByID: proxyPartitionsByID,
+		clock:          scheme.NewClock(),
 	}
 }
 
@@ -44,6 +47,21 @@ type Manager struct {
 	Cluster        *cluster.Cluster
 	partitions     []*Partition
 	partitionsByID map[PartitionID]*Partition
+	clock          time.Clock
+}
+
+func (m *Manager) HandleIncomingMD(md metadata.MD) error {
+	ts, err := m.clock.Scheme().Codec().DecodeMD(md)
+	if err != nil {
+		return err
+	}
+	m.clock.Update(ts)
+	return nil
+}
+
+func (m *Manager) AddOutgoingMD(md metadata.MD) {
+	ts := m.clock.Get()
+	m.clock.Scheme().Codec().EncodeMD(md, ts)
 }
 
 func (m *Manager) ServiceFrom(ctx context.Context) (Service, error) {

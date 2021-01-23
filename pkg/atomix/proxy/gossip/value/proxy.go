@@ -7,6 +7,7 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/gossip"
 	"google.golang.org/grpc"
+	metadata "google.golang.org/grpc/metadata"
 	io "io"
 )
 
@@ -40,8 +41,20 @@ func (s *Proxy) Set(ctx context.Context, request *value.SetRequest) (*value.SetR
 	}
 
 	client := value.NewValueServiceClient(conn)
-	ctx = partition.AddPartition(ctx)
-	response, err := client.Set(ctx, request)
+
+	outMD, _ := metadata.FromIncomingContext(ctx)
+	s.AddOutgoingMD(outMD)
+	partition.AddOutgoingMD(outMD)
+	partition.AddOutgoingMD(outMD)
+	ctx = metadata.NewOutgoingContext(ctx, outMD)
+
+	var inMD metadata.MD
+	response, err := client.Set(ctx, request, grpc.Trailer(&inMD))
+	if err != nil {
+		s.log.Errorf("Request SetRequest failed: %v", err)
+		return nil, errors.Proto(err)
+	}
+	err = s.HandleIncomingMD(inMD)
 	if err != nil {
 		s.log.Errorf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -63,8 +76,20 @@ func (s *Proxy) Get(ctx context.Context, request *value.GetRequest) (*value.GetR
 	}
 
 	client := value.NewValueServiceClient(conn)
-	ctx = partition.AddPartition(ctx)
-	response, err := client.Get(ctx, request)
+
+	outMD, _ := metadata.FromIncomingContext(ctx)
+	s.AddOutgoingMD(outMD)
+	partition.AddOutgoingMD(outMD)
+	partition.AddOutgoingMD(outMD)
+	ctx = metadata.NewOutgoingContext(ctx, outMD)
+
+	var inMD metadata.MD
+	response, err := client.Get(ctx, request, grpc.Trailer(&inMD))
+	if err != nil {
+		s.log.Errorf("Request GetRequest failed: %v", err)
+		return nil, errors.Proto(err)
+	}
+	err = s.HandleIncomingMD(inMD)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -87,8 +112,15 @@ func (s *Proxy) Events(request *value.EventsRequest, srv value.ValueService_Even
 	}
 
 	client := value.NewValueServiceClient(conn)
-	ctx := partition.AddPartition(srv.Context())
-	stream, err := client.Events(ctx, request)
+
+	outMD, _ := metadata.FromIncomingContext(srv.Context())
+	s.AddOutgoingMD(outMD)
+	partition.AddOutgoingMD(outMD)
+	partition.AddOutgoingMD(outMD)
+	ctx := metadata.NewOutgoingContext(srv.Context(), outMD)
+
+	var inMD metadata.MD
+	stream, err := client.Events(ctx, request, grpc.Trailer(&inMD))
 	if err != nil {
 		s.log.Errorf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
@@ -98,6 +130,11 @@ func (s *Proxy) Events(request *value.EventsRequest, srv value.ValueService_Even
 		response, err := stream.Recv()
 		if err == io.EOF {
 			s.log.Debugf("Finished EventsRequest %+v", request)
+			err = s.HandleIncomingMD(inMD)
+			if err != nil {
+				s.log.Errorf("Request EventsRequest failed: %v", err)
+				return errors.Proto(err)
+			}
 			return nil
 		} else if err != nil {
 			s.log.Errorf("Request EventsRequest failed: %v", err)
