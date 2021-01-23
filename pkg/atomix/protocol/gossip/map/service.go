@@ -187,6 +187,8 @@ func (s *mapService) Clear(ctx context.Context, _ *mapapi.ClearRequest) (*mapapi
 func (s *mapService) Events(ctx context.Context, input *mapapi.EventsRequest, ch chan<- mapapi.EventsResponse) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.streams = append(s.streams, ch)
+	ch <- mapapi.EventsResponse{}
 	if input.Replay {
 		for _, entry := range s.entries {
 			ch <- mapapi.EventsResponse{
@@ -197,7 +199,6 @@ func (s *mapService) Events(ctx context.Context, input *mapapi.EventsRequest, ch
 			}
 		}
 	}
-	s.streams = append(s.streams, ch)
 	return nil
 }
 

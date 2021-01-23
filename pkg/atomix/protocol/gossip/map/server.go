@@ -180,21 +180,16 @@ func (s *Server) Events(request *_map.EventsRequest, srv _map.MapService_EventsS
 			if err != nil {
 				errCh <- err
 			}
+			close(errCh)
 		}()
 
-		defer wg.Done()
-		for {
-			select {
-			case response, ok := <-partitionCh:
-				if ok {
-					responseCh <- response
-				} else {
-					return nil
-				}
-			case err := <-errCh:
-				return err
+		go func() {
+			defer wg.Done()
+			for response := range partitionCh {
+				responseCh <- response
 			}
-		}
+		}()
+		return <-errCh
 	})
 	if err != nil {
 		s.log.Errorf("Request EventsRequest %+v failed: %v", request, err)
@@ -253,21 +248,16 @@ func (s *Server) Entries(request *_map.EntriesRequest, srv _map.MapService_Entri
 			if err != nil {
 				errCh <- err
 			}
+			close(errCh)
 		}()
 
-		defer wg.Done()
-		for {
-			select {
-			case response, ok := <-partitionCh:
-				if ok {
-					responseCh <- response
-				} else {
-					return nil
-				}
-			case err := <-errCh:
-				return err
+		go func() {
+			defer wg.Done()
+			for response := range partitionCh {
+				responseCh <- response
 			}
-		}
+		}()
+		return <-errCh
 	})
 	if err != nil {
 		s.log.Errorf("Request EntriesRequest %+v failed: %v", request, err)

@@ -6,7 +6,6 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/gossip"
-	"github.com/atomix/go-framework/pkg/atomix/time"
 	"google.golang.org/grpc"
 	io "io"
 )
@@ -18,7 +17,6 @@ func RegisterProxy(node *gossip.Node) {
 	node.RegisterProxy(func(server *grpc.Server, client *gossip.Client) {
 		value.RegisterValueServiceServer(server, &Proxy{
 			Proxy: gossip.NewProxy(client),
-			clock: time.NewLogicalClock(),
 			log:   logging.GetLogger("atomix", "value"),
 		})
 	})
@@ -26,8 +24,7 @@ func RegisterProxy(node *gossip.Node) {
 
 type Proxy struct {
 	*gossip.Proxy
-	clock time.Clock
-	log   logging.Logger
+	log logging.Logger
 }
 
 func (s *Proxy) Set(ctx context.Context, request *value.SetRequest) (*value.SetResponse, error) {

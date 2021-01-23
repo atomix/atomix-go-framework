@@ -109,7 +109,7 @@ func (p *serviceProtocol) Repair(ctx context.Context, value *{{ template "type" 
 	}
 
 	for _, object := range objects {
-		if meta.New(object.ObjectMeta).After(meta.New(value{{ template "field" .Primitive.State.Value.Digest }})) {
+		if meta.FromProto(object.ObjectMeta).After(meta.FromProto(value{{ template "field" .Primitive.State.Value.Digest }})) {
 			err = proto.Unmarshal(object.Value, value)
 			if err != nil {
 				return nil, err
@@ -209,7 +209,7 @@ func (p *serviceProtocol) Repair(ctx context.Context, entry *{{ template "type" 
 	}
 
 	for _, object := range objects {
-		if meta.New(object.ObjectMeta).After(meta.New(entry{{ template "field" .Primitive.State.Entry.Digest }})) {
+		if meta.FromProto(object.ObjectMeta).After(meta.FromProto(entry{{ template "field" .Primitive.State.Entry.Digest }})) {
 			err = proto.Unmarshal(object.Value, entry)
 			if err != nil {
 				return nil, err

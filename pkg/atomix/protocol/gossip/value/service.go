@@ -109,6 +109,7 @@ func (s *valueService) Events(ctx context.Context, request *valueapi.EventsReque
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.streams = append(s.streams, ch)
+	ch <- valueapi.EventsResponse{}
 	return nil
 }
 

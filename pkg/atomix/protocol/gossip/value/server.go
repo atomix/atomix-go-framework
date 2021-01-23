@@ -102,21 +102,16 @@ func (s *Server) Events(request *value.EventsRequest, srv value.ValueService_Eve
 			if err != nil {
 				errCh <- err
 			}
+			close(errCh)
 		}()
 
-		defer wg.Done()
-		for {
-			select {
-			case response, ok := <-partitionCh:
-				if ok {
-					responseCh <- response
-				} else {
-					return nil
-				}
-			case err := <-errCh:
-				return err
+		go func() {
+			defer wg.Done()
+			for response := range partitionCh {
+				responseCh <- response
 			}
-		}
+		}()
+		return <-errCh
 	})
 	if err != nil {
 		s.log.Errorf("Request EventsRequest %+v failed: %v", request, err)
