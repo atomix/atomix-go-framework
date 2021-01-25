@@ -17,7 +17,6 @@ package main
 import (
 	"github.com/atomix/go-framework/codegen"
 	"github.com/lyft/protoc-gen-star"
-	"github.com/lyft/protoc-gen-star/lang/go"
 )
 
 func main() {
@@ -37,6 +36,6 @@ func main() {
 			"server.go":  "/etc/atomix/templates/protocol/gossip/server.tpl",
 			"service.go": "/etc/atomix/templates/protocol/gossip/service.tpl",
 		})).
-		RegisterPostProcessor(pgsgo.GoFmt()).
+		//RegisterPostProcessor(pgsgo.GoFmt()).
 		Render()
 }

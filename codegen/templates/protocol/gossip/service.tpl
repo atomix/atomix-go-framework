@@ -1,6 +1,12 @@
 {{- $serviceType := printf "%sServiceType" .Generator.Prefix }}
 
-{{- define "type" }}{{ printf "%s.%s" .Package.Alias .Name }}{{ end }}
+{{- define "type" -}}
+{{- if .Package.Import -}}
+{{- printf "%s.%s" .Package.Alias .Name -}}
+{{- else -}}
+{{- .Name -}}
+{{- end -}}
+{{- end -}}
 
 package {{ .Package.Name }}
 

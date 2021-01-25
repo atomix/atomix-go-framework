@@ -24,7 +24,13 @@ import (
 )
 
 func NewPeerGroup(partition *Partition, serviceType ServiceType, serviceID ServiceID) (*PeerGroup, error) {
+	var localMemberID MemberID
+	member, ok := partition.Partition.Member()
+	if ok {
+		localMemberID = MemberID(member.ID)
+	}
 	group := &PeerGroup{
+		memberID:    localMemberID,
 		partition:   partition,
 		serviceType: serviceType,
 		serviceID:   serviceID,
@@ -36,6 +42,7 @@ func NewPeerGroup(partition *Partition, serviceType ServiceType, serviceID Servi
 }
 
 type PeerGroup struct {
+	memberID    MemberID
 	partition   *Partition
 	serviceType ServiceType
 	serviceID   ServiceID
@@ -98,6 +105,10 @@ func (g *PeerGroup) updatePeers(replicaSet cluster.ReplicaSet) error {
 	g.peers = peers
 	g.peersByID = peersByID
 	return nil
+}
+
+func (g *PeerGroup) MemberID() MemberID {
+	return g.memberID
 }
 
 func (g *PeerGroup) Peer(id PeerID) *Peer {

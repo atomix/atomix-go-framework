@@ -18,7 +18,8 @@ import (
 	"fmt"
 	"github.com/atomix/api/go/atomix/primitive/extensions/operation"
 	"github.com/atomix/api/go/atomix/primitive/extensions/partition"
-	"github.com/atomix/api/go/atomix/primitive/extensions/state"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
 	"github.com/golang/protobuf/proto"
 	"github.com/lyft/protoc-gen-star"
 	"github.com/lyft/protoc-gen-star/lang/go"
@@ -41,11 +42,11 @@ type Context struct {
 
 // GetFilePath returns the output path for the given entity
 func (c *Context) GetFilePath(entity pgs.Entity, file string) string {
-	outputPath := c.ctx.Params().Str("output_path")
-	if outputPath == "" {
-		outputPath = filepath.Dir(c.ctx.OutputPath(entity).String())
+	path := c.ctx.Params().OutputPath()
+	if path == "" {
+		path = c.ctx.OutputPath(entity).Dir().String()
 	}
-	return filepath.Join(outputPath, file)
+	return filepath.Join(path, file)
 }
 
 // GetFilePath returns the output path for the given entity
@@ -55,68 +56,77 @@ func (c *Context) GetTemplatePath(file string) string {
 
 // GetPackageMeta extracts the package metadata for the given entity
 func (c *Context) GetPackageMeta(entity pgs.Entity) PackageMeta {
-	baseImportPath := pgsgo.ImportPath(c.ctx.Params())
-	filePath := entity.File().InputPath().Dir().String()
-	importPath := c.ctx.ImportPath(entity)
-	baseName := importPath.Base()
-	if baseName == "map" {
-		baseName = "_map"
+	pkgPath := c.ctx.ImportPath(entity).String()
+	pkgMapping, ok := pgsgo.MappedImport(c.ctx.Params(), entity.File().InputPath().String())
+	if ok {
+		pkgPath = pkgMapping
 	}
-	basePath := importPath.String()
-	if basePath == filePath {
-		basePath = baseImportPath
+	pkgName := filepath.Base(pkgPath)
+	if pkgName == "map" {
+		pkgName = "_map"
 	}
+	imported := pkgPath != pgsgo.ImportPath(c.ctx.Params())
 	return PackageMeta{
-		Name:  baseName,
-		Path:  basePath,
-		Alias: baseName,
+		Name:   pkgName,
+		Path:   pkgPath,
+		Alias:  pkgName,
+		Import: imported,
 	}
 }
 
-func (c *Context) GetStateValueTypeMeta(service pgs.Service) (*StateTypeMeta, error) {
-	stateTypeExt, err := GetStateValueType(service)
-	if err != nil {
-		return nil, err
-	} else if stateTypeExt == nil {
+func (c *Context) GetStateMeta(packages map[string]pgs.Package) (*StateMeta, error) {
+	stateType := strings.ToLower(c.ctx.Params().Str("state"))
+	if len(stateType) == 0 {
 		return nil, nil
 	}
-	return c.findStateTypeMeta(service, *stateTypeExt)
-}
 
-func (c *Context) GetStateEntryTypeMeta(service pgs.Service) (*StateTypeMeta, error) {
-	stateTypeExt, err := GetStateEntryType(service)
-	if err != nil {
-		return nil, err
-	} else if stateTypeExt == nil {
-		return nil, nil
-	}
-	return c.findStateTypeMeta(service, *stateTypeExt)
-}
-
-func (c *Context) findStateTypeMeta(service pgs.Service, stateTypeExt string) (*StateTypeMeta, error) {
-	stateType, err := c.ParseTypeString(stateTypeExt)
-	if err != nil {
-		return nil, err
+	stateMeta := &StateMeta{}
+	switch stateType {
+	case "discrete":
+		stateMeta.IsDiscrete = true
+		stateMeta.IsContinuous = false
+	case "continuous":
+		stateMeta.IsDiscrete = false
+		stateMeta.IsContinuous = true
 	}
 
-	messageType, ok := c.FindMessage(service, stateType)
+	entryType := c.ctx.Params().Str("entry")
+	if len(entryType) == 0 {
+		return stateMeta, nil
+	}
+
+	msgType, ok := c.findMessage(entryType, packages)
 	if !ok {
-		return nil, fmt.Errorf("cannot find message type %s", stateType.Name)
+		return nil, errors.NewNotFound("could not find state message '%s'", entryType)
 	}
-
-	keyField, err := c.GetStateKeyFieldMeta(messageType)
+	keyField, err := c.GetStateKeyFieldMeta(msgType)
 	if err != nil {
 		return nil, err
 	}
-	digestField, err := c.GetStateDigestFieldMeta(messageType)
+	digestField, err := c.GetStateDigestFieldMeta(msgType)
 	if err != nil {
 		return nil, err
 	}
-	return &StateTypeMeta{
-		Type:   c.GetMessageTypeMeta(messageType),
+	entryTypeMeta := c.GetMessageTypeMeta(msgType)
+	stateMeta.Entry = &StateTypeMeta{
+		Type:   entryTypeMeta,
 		Key:    keyField,
 		Digest: digestField,
-	}, nil
+	}
+	return stateMeta, nil
+}
+
+func (c *Context) findMessage(typeName string, packages map[string]pgs.Package) (pgs.Message, bool) {
+	for _, pkg := range packages {
+		for _, file := range pkg.Files() {
+			for _, msg := range file.Messages() {
+				if msg.FullyQualifiedName() == typeName {
+					return msg, true
+				}
+			}
+		}
+	}
+	return nil, false
 }
 
 // ParseTypeString parses the given type string into type metadata
@@ -489,12 +499,12 @@ func (c *Context) GetHeadersFieldMeta(message pgs.Message) (*FieldRefMeta, error
 
 // GetStateKeyFieldMeta extracts the metadata for the state key field in the given message
 func (c *Context) GetStateKeyFieldMeta(message pgs.Message) (*FieldRefMeta, error) {
-	return c.findAnnotatedField(message, state.E_Key)
+	return c.findAnnotatedField(message, gossip.E_Key)
 }
 
 // GetStateDigestFieldMeta extracts the metadata for the state digest field in the given message
 func (c *Context) GetStateDigestFieldMeta(message pgs.Message) (*FieldRefMeta, error) {
-	return c.findAnnotatedField(message, state.E_Digest)
+	return c.findAnnotatedField(message, gossip.E_Digest)
 }
 
 // GetPartitionKeyField extracts the metadata for the partitionkey field in the given message

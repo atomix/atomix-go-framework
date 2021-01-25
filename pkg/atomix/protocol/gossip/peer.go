@@ -25,7 +25,17 @@ import (
 	"sync"
 )
 
+type MemberID string
+
+func (i MemberID) String() string {
+	return string(i)
+}
+
 type PeerID string
+
+func (i PeerID) String() string {
+	return string(i)
+}
 
 func newPeer(group *PeerGroup, replica *cluster.Replica, clock time.Clock) (*Peer, error) {
 	peer := &Peer{

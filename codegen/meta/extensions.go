@@ -19,7 +19,6 @@ import (
 	operations "github.com/atomix/api/go/atomix/primitive/extensions/operation"
 	partitions "github.com/atomix/api/go/atomix/primitive/extensions/partition"
 	services "github.com/atomix/api/go/atomix/primitive/extensions/service"
-	states "github.com/atomix/api/go/atomix/primitive/extensions/state"
 	"github.com/gogo/protobuf/gogoproto"
 	gogoprotobuf "github.com/gogo/protobuf/proto"
 	"github.com/golang/protobuf/proto" //nolint:staticcheck
@@ -109,54 +108,6 @@ func GetPartitionStrategy(method pgs.Method) (*partitions.PartitionStrategy, err
 		return nil, nil
 	}
 	return &strategy, nil
-}
-
-// GetStateKey gets the state key extension from the given field
-func GetStateKey(field pgs.Field) (bool, error) {
-	var key bool
-	ok, err := field.Extension(states.E_Key, &key)
-	if err != nil {
-		return false, err
-	} else if !ok {
-		return false, nil
-	}
-	return key, nil
-}
-
-// GetStateValueType gets the state valuetype extension from the given service
-func GetStateValueType(service pgs.Service) (*string, error) {
-	var valueType string
-	ok, err := service.Extension(states.E_Valuetype, &valueType)
-	if err != nil {
-		return nil, err
-	} else if !ok {
-		return nil, nil
-	}
-	return &valueType, nil
-}
-
-// GetStateEntryType gets the state entrytype extension from the given service
-func GetStateEntryType(service pgs.Service) (*string, error) {
-	var entryType string
-	ok, err := service.Extension(states.E_Entrytype, &entryType)
-	if err != nil {
-		return nil, err
-	} else if !ok {
-		return nil, nil
-	}
-	return &entryType, nil
-}
-
-// GetStateDigest gets the state digest extension from the given field
-func GetStateDigest(field pgs.Field) (bool, error) {
-	var digest bool
-	ok, err := field.Extension(states.E_Digest, &digest)
-	if err != nil {
-		return false, err
-	} else if !ok {
-		return false, nil
-	}
-	return digest, nil
 }
 
 func getExtensionDesc(extension *gogoprotobuf.ExtensionDesc) *proto.ExtensionDesc {

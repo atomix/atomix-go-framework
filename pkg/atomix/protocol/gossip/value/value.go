@@ -42,20 +42,29 @@ type valueHandler struct {
 	service *valueService
 }
 
-func (s *valueHandler) Read(ctx context.Context) (*valueapi.Value, error) {
+func (s *valueHandler) Read(ctx context.Context) (*ValueState, error) {
 	s.service.mu.RLock()
 	defer s.service.mu.RUnlock()
-	return s.service.value, nil
+	value := s.service.value
+	return &ValueState{
+		ObjectMeta: value.ObjectMeta,
+		Value:      value.Value,
+	}, nil
 }
 
-func (s *valueHandler) Update(ctx context.Context, value *valueapi.Value) error {
+func (s *valueHandler) Update(ctx context.Context, value *ValueState) error {
 	s.service.mu.Lock()
 	defer s.service.mu.Unlock()
 	if meta.FromProto(value.ObjectMeta).After(meta.FromProto(s.service.value.ObjectMeta)) {
-		s.service.value = value
+		s.service.value = &valueapi.Value{
+			ObjectMeta: value.ObjectMeta,
+			Value:      value.Value,
+		}
 	}
 	return nil
 }
+
+var _ GossipHandler = &valueHandler{}
 
 type valueService struct {
 	protocol GossipProtocol
@@ -81,7 +90,10 @@ func (s *valueService) Set(ctx context.Context, request *valueapi.SetRequest) (*
 	s.value = &request.Value
 	s.value.Timestamp = request.Headers.Timestamp
 
-	err = s.protocol.Group().Update(ctx, &request.Value)
+	err = s.protocol.Group().Update(ctx, &ValueState{
+		ObjectMeta: s.value.ObjectMeta,
+		Value:      s.value.Value,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -102,12 +114,19 @@ func (s *valueService) Get(ctx context.Context, request *valueapi.GetRequest) (*
 	if s.value != nil {
 		value = s.value
 	}
-	value, err := s.protocol.Group().Repair(ctx, value)
+	state, err := s.protocol.Group().Repair(ctx, &ValueState{
+		ObjectMeta: value.ObjectMeta,
+		Value:      value.Value,
+	})
 	if err != nil {
 		return nil, err
 	}
+	s.value = &valueapi.Value{
+		ObjectMeta: state.ObjectMeta,
+		Value:      state.Value,
+	}
 	return &valueapi.GetResponse{
-		Value: *value,
+		Value: *s.value,
 	}, nil
 }
 

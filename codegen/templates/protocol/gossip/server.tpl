@@ -45,7 +45,13 @@ type {{ $server }} struct {
 	log logging.Logger
 }
 
-{{- define "type" }}{{ printf "%s.%s" .Package.Alias .Name }}{{ end }}
+{{- define "type" -}}
+{{- if .Package.Import -}}
+{{- printf "%s.%s" .Package.Alias .Name -}}
+{{- else -}}
+{{- .Name -}}
+{{- end -}}
+{{- end -}}
 
 {{- define "cast" }}.(*{{ template "type" .Field.Type }}){{ end }}
 

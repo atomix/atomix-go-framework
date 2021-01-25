@@ -41,33 +41,71 @@ type mapHandler struct {
 	service *mapService
 }
 
-func (s *mapHandler) Update(ctx context.Context, update *mapapi.Entry) error {
+func (s *mapHandler) Update(ctx context.Context, update *MapEntry) error {
 	s.service.mu.Lock()
 	defer s.service.mu.Unlock()
 	stored, ok := s.service.entries[update.Key.Key]
 	if !ok || meta.FromProto(update.Key.ObjectMeta).After(meta.FromProto(stored.Key.ObjectMeta)) {
-		s.service.entries[update.Key.Key] = update
+		s.service.entries[update.Key.Key] = newMapEntry(update)
 		return s.service.protocol.Group().Update(ctx, update)
 	}
 	return nil
 }
 
-func (s *mapHandler) Read(ctx context.Context, key string) (*mapapi.Entry, error) {
+func (s *mapHandler) Read(ctx context.Context, key string) (*MapEntry, error) {
 	s.service.mu.RLock()
 	defer s.service.mu.RUnlock()
-	return s.service.entries[key], nil
+	return newStateEntry(s.service.entries[key]), nil
 }
 
-func (s *mapHandler) List(ctx context.Context, ch chan<- mapapi.Entry) error {
+func (s *mapHandler) List(ctx context.Context, ch chan<- MapEntry) error {
 	s.service.mu.RLock()
 	defer s.service.mu.RUnlock()
 	for _, entry := range s.service.entries {
-		ch <- *entry
+		ch <- *newStateEntry(entry)
 	}
 	return nil
 }
 
 var _ GossipHandler = &mapHandler{}
+
+func newStateEntry(entry *mapapi.Entry) *MapEntry {
+	if entry == nil {
+		return nil
+	}
+	state := &MapEntry{
+		Key: MapKey{
+			ObjectMeta: entry.Key.ObjectMeta,
+			Key:        entry.Key.Key,
+		},
+	}
+	if entry.Value != nil {
+		state.Value = &MapValue{
+			Value: state.Value.Value,
+			TTL:   state.Value.TTL,
+		}
+	}
+	return state
+}
+
+func newMapEntry(state *MapEntry) *mapapi.Entry {
+	if state == nil {
+		return nil
+	}
+	entry := &mapapi.Entry{
+		Key: mapapi.Key{
+			ObjectMeta: state.Key.ObjectMeta,
+			Key:        state.Key.Key,
+		},
+	}
+	if state.Value != nil {
+		entry.Value = &mapapi.Value{
+			Value: entry.Value.Value,
+			TTL:   entry.Value.TTL,
+		}
+	}
+	return entry
+}
 
 type mapService struct {
 	protocol GossipProtocol
@@ -93,7 +131,7 @@ func (s *mapService) Put(ctx context.Context, request *mapapi.PutRequest) (*mapa
 		newEntry := &request.Entry
 		newEntry.Key.Timestamp = request.Headers.Timestamp
 		s.entries[request.Entry.Key.Key] = newEntry
-		if err := s.protocol.Group().Update(ctx, newEntry); err != nil {
+		if err := s.protocol.Group().Update(ctx, newStateEntry(newEntry)); err != nil {
 			return nil, err
 		}
 		s.notify(mapapi.Event{
@@ -116,7 +154,7 @@ func (s *mapService) Put(ctx context.Context, request *mapapi.PutRequest) (*mapa
 	newEntry.Key.Timestamp = request.Headers.Timestamp
 	s.entries[request.Entry.Key.Key] = newEntry
 
-	if err := s.protocol.Group().Update(ctx, newEntry); err != nil {
+	if err := s.protocol.Group().Update(ctx, newStateEntry(newEntry)); err != nil {
 		return nil, err
 	}
 
@@ -144,12 +182,12 @@ func (s *mapService) Get(ctx context.Context, request *mapapi.GetRequest) (*mapa
 	if !ok {
 		return nil, errors.NewNotFound("key '%s' not found", request.Key)
 	}
-	entry, err := s.protocol.Group().Repair(ctx, entry)
+	state, err := s.protocol.Group().Repair(ctx, newStateEntry(entry))
 	if err != nil {
 		return nil, err
 	}
 	return &mapapi.GetResponse{
-		Entry: *entry,
+		Entry: *newMapEntry(state),
 	}, nil
 }
 
@@ -183,7 +221,7 @@ func (s *mapService) Remove(ctx context.Context, request *mapapi.RemoveRequest) 
 		Entry: *entry,
 	})
 
-	if err := s.protocol.Group().Update(ctx, entry); err != nil {
+	if err := s.protocol.Group().Update(ctx, newStateEntry(entry)); err != nil {
 		return nil, err
 	}
 
@@ -198,7 +236,7 @@ func (s *mapService) Clear(ctx context.Context, _ *mapapi.ClearRequest) (*mapapi
 	for _, entry := range s.entries {
 		if entry.Key.Type != metaapi.ObjectMeta_TOMBSTONE {
 			entry.Key.Type = metaapi.ObjectMeta_TOMBSTONE
-			if err := s.protocol.Group().Update(ctx, entry); err != nil {
+			if err := s.protocol.Group().Update(ctx, newStateEntry(entry)); err != nil {
 				return nil, err
 			}
 		}

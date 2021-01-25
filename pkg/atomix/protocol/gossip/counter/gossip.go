@@ -1,4 +1,4 @@
-package _map
+package counter
 
 import (
 	"context"
@@ -33,9 +33,8 @@ type GossipProtocol interface {
 }
 
 type GossipHandler interface {
-	Read(ctx context.Context, key string) (*MapEntry, error)
-    List(ctx context.Context, ch chan<- MapEntry) error
-	Update(ctx context.Context, entry *MapEntry) error
+	Read(ctx context.Context) (*CounterState, error)
+	Update(ctx context.Context, state *CounterState) error
 }
 
 type GossipServer interface {
@@ -44,10 +43,10 @@ type GossipServer interface {
 }
 
 type GossipClient interface {
-	Bootstrap(ctx context.Context, ch chan<- MapEntry) error
-	Repair(ctx context.Context, state *MapEntry) (*MapEntry, error)
-	Advertise(ctx context.Context, state *MapEntry) error
-	Update(ctx context.Context, state *MapEntry) error
+	Bootstrap(ctx context.Context) (*CounterState, error)
+	Repair(ctx context.Context, state *CounterState) (*CounterState, error)
+	Advertise(ctx context.Context, state *CounterState) error
+	Update(ctx context.Context, state *CounterState) error
 }
 
 type GossipGroup interface {
@@ -120,33 +119,15 @@ func (p *gossipGroup) Members() []GossipMember {
 func (p *gossipGroup) Member(id GossipMemberID) GossipMember {
 	return p.memberIDs[id]
 }
-func (p *gossipGroup) Bootstrap(ctx context.Context, ch chan<- MapEntry) error {
-	objectCh := make(chan gossip.Object)
-	if err := p.group.ReadAll(ctx, objectCh); err != nil {
-		return err
-	}
-	go func() {
-		for object := range objectCh {
-			var entry MapEntry
-			err := proto.Unmarshal(object.Value, &entry)
-			if err != nil {
-				log.Errorf("Bootstrap failed: %v", err)
-			} else {
-				ch <- entry
-			}
-		}
-	}()
-	return nil
-}
-
-func (p *gossipGroup) Repair(ctx context.Context, state *MapEntry) (*MapEntry, error) {
-	objects, err := p.group.Read(ctx, state.Key.Key)
+func (p *gossipGroup) Bootstrap(ctx context.Context) (*CounterState, error) {
+	objects, err := p.group.Read(ctx, "")
 	if err != nil {
 		return nil, err
 	}
 
+    state := &CounterState{}
 	for _, object := range objects {
-		if meta.FromProto(object.ObjectMeta).After(meta.FromProto(state.Key.ObjectMeta)) {
+		if meta.FromProto(object.ObjectMeta).After(meta.FromProto(state.ObjectMeta)) {
 			err = proto.Unmarshal(object.Value, state)
 			if err != nil {
 				return nil, err
@@ -156,20 +137,37 @@ func (p *gossipGroup) Repair(ctx context.Context, state *MapEntry) (*MapEntry, e
 	return state, nil
 }
 
-func (p *gossipGroup) Advertise(ctx context.Context, state *MapEntry) error {
+func (p *gossipGroup) Repair(ctx context.Context, state *CounterState) (*CounterState, error) {
+	objects, err := p.group.Read(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+
+	for _, object := range objects {
+		if meta.FromProto(object.ObjectMeta).After(meta.FromProto(state.ObjectMeta)) {
+			err = proto.Unmarshal(object.Value, state)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return state, nil
+}
+
+func (p *gossipGroup) Advertise(ctx context.Context, state *CounterState) error {
 	peers := p.group.Peers()
 	peer := peers[rand.Intn(len(peers))]
-	peer.Advertise(ctx, state.Key.Key, meta.FromProto(state.Key.ObjectMeta))
+	peer.Advertise(ctx, "", meta.FromProto(state.ObjectMeta))
 	return nil
 }
 
-func (p *gossipGroup) Update(ctx context.Context, state *MapEntry) error {
+func (p *gossipGroup) Update(ctx context.Context, state *CounterState) error {
 	bytes, err := proto.Marshal(state)
 	if err != nil {
 		return err
 	}
 	object := &gossip.Object{
-		ObjectMeta: state.Key.ObjectMeta,
+		ObjectMeta: state.ObjectMeta,
 		Value:      bytes,
 	}
 	p.group.Update(ctx, object)
@@ -219,31 +217,26 @@ func (p *gossipMember) ID() GossipMemberID {
 func (p *gossipMember) Client() *gossip.Peer {
 	return p.peer
 }
-func (p *gossipMember) Bootstrap(ctx context.Context, ch chan<- MapEntry) error {
-	objectCh := make(chan gossip.Object)
-	if err := p.peer.ReadAll(ctx, objectCh); err != nil {
-		return err
-	}
-	go func() {
-		for object := range objectCh {
-			var entry MapEntry
-			err := proto.Unmarshal(object.Value, &entry)
-			if err != nil {
-				log.Errorf("Bootstrap failed: %v", err)
-			} else {
-				ch <- entry
-			}
-		}
-	}()
-	return nil
-}
-
-func (p *gossipMember) Repair(ctx context.Context, state *MapEntry) (*MapEntry, error) {
-	object, err := p.peer.Read(ctx, state.Key.Key)
+func (p *gossipMember) Bootstrap(ctx context.Context) (*CounterState, error) {
+	object, err := p.peer.Read(ctx, "")
 	if err != nil {
 		return nil, err
 	}
-    if meta.FromProto(object.ObjectMeta).After(meta.FromProto(state.Key.ObjectMeta)) {
+
+    state := &CounterState{}
+    err = proto.Unmarshal(object.Value, state)
+    if err != nil {
+        return nil, err
+    }
+	return state, nil
+}
+
+func (p *gossipMember) Repair(ctx context.Context, state *CounterState) (*CounterState, error) {
+	object, err := p.peer.Read(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+    if meta.FromProto(object.ObjectMeta).After(meta.FromProto(state.ObjectMeta)) {
         err = proto.Unmarshal(object.Value, state)
         if err != nil {
             return nil, err
@@ -252,18 +245,18 @@ func (p *gossipMember) Repair(ctx context.Context, state *MapEntry) (*MapEntry, 
 	return state, nil
 }
 
-func (p *gossipMember) Advertise(ctx context.Context, state *MapEntry) error {
-	p.peer.Advertise(ctx, "", meta.FromProto(state.Key.ObjectMeta))
+func (p *gossipMember) Advertise(ctx context.Context, state *CounterState) error {
+	p.peer.Advertise(ctx, "", meta.FromProto(state.ObjectMeta))
 	return nil
 }
 
-func (p *gossipMember) Update(ctx context.Context, state *MapEntry) error {
+func (p *gossipMember) Update(ctx context.Context, state *CounterState) error {
 	bytes, err := proto.Marshal(state)
 	if err != nil {
 		return err
 	}
 	object := &gossip.Object{
-		ObjectMeta: state.Key.ObjectMeta,
+		ObjectMeta: state.ObjectMeta,
 		Value:      bytes,
 	}
 	p.peer.Update(ctx, object)
@@ -292,7 +285,7 @@ func (s *gossipReplica) Type() gossip.ServiceType {
 }
 
 func (s *gossipReplica) Update(ctx context.Context, object *gossip.Object) error {
-	state := &MapEntry{}
+	state := &CounterState{}
 	err := proto.Unmarshal(object.Value, state)
 	if err != nil {
 		return err
@@ -301,7 +294,7 @@ func (s *gossipReplica) Update(ctx context.Context, object *gossip.Object) error
 }
 
 func (s *gossipReplica) Read(ctx context.Context, key string) (*gossip.Object, error) {
-	state, err := s.handler.Read(ctx, key)
+	state, err := s.handler.Read(ctx)
 	if err != nil {
 		return nil, err
 	} else if state == nil {
@@ -313,37 +306,31 @@ func (s *gossipReplica) Read(ctx context.Context, key string) (*gossip.Object, e
 		return nil, err
 	}
 	return &gossip.Object{
-        ObjectMeta: state.Key.ObjectMeta,
-        Key:        state.Key.Key,
+        ObjectMeta: state.ObjectMeta,
 		Value:      bytes,
 	}, nil
 }
 
 func (s *gossipReplica) ReadAll(ctx context.Context, ch chan<- gossip.Object) error {
-	entriesCh := make(chan MapEntry)
-	errCh := make(chan error)
-	go func() {
-		err := s.handler.List(ctx, entriesCh)
-		if err != nil {
-			errCh <- err
-		}
-	}()
-	go func() {
-		defer close(errCh)
-		for state := range entriesCh {
-			bytes, err := proto.Marshal(&state)
-			if err != nil {
-				errCh <- err
-				return
-			}
-			object := gossip.Object{
-				ObjectMeta: state.Key.ObjectMeta,
-				Key: state.Key.Key,
-				Value:      bytes,
-			}
-			ch <- object
-		}
-	}()
+    errCh := make(chan error)
+    go func() {
+        defer close(errCh)
+        state, err := s.handler.Read(ctx)
+        if err != nil {
+            errCh <- err
+            return
+        }
+        bytes, err := proto.Marshal(state)
+        if err != nil {
+            errCh <- err
+            return
+        }
+        object := gossip.Object{
+            ObjectMeta: state.ObjectMeta,
+            Value:      bytes,
+        }
+        ch <- object
+    }()
 	return <-errCh
 }
 
@@ -376,15 +363,13 @@ func (m *gossipEngine) start() {
 }
 
 func (m *gossipEngine) bootstrap(ctx context.Context) error {
-	stateCh := make(chan MapEntry)
-	if err := m.protocol.Group().Bootstrap(ctx, stateCh); err != nil {
-		return err
-	}
-	for state := range stateCh {
-		if err := m.protocol.Server().handler().Update(ctx, &state); err != nil {
-			return err
-		}
-	}
+    state, err := m.protocol.Group().Bootstrap(ctx)
+    if err != nil {
+        return err
+    }
+    if err := m.protocol.Server().handler().Update(ctx, state); err != nil {
+        return err
+    }
 	return nil
 }
 
@@ -398,15 +383,13 @@ func (m *gossipEngine) runAntiEntropy(ctx context.Context) {
 }
 
 func (m *gossipEngine) advertise(ctx context.Context) error {
-	stateCh := make(chan MapEntry)
-	if err := m.protocol.Server().handler().List(ctx, stateCh); err != nil {
-		return err
-	}
-	for state := range stateCh {
-		if err := m.protocol.Group().Advertise(ctx, &state); err != nil {
-			return err
-		}
-	}
+    state, err := m.protocol.Server().handler().Read(context.Background())
+    if err != nil {
+        return err
+    }
+    if err := m.protocol.Group().Advertise(ctx, state); err != nil {
+        return err
+    }
 	return nil
 }
 

@@ -1,26 +1,28 @@
+
+
 package indexedmap
 
 import (
-	indexedmap "github.com/atomix/api/go/atomix/primitive/indexedmap"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/golang/protobuf/proto"
+	indexedmap "github.com/atomix/api/go/atomix/primitive/indexedmap"
 )
 
 const Type = "IndexedMap"
 
 const (
-	sizeOp       = "Size"
-	putOp        = "Put"
-	getOp        = "Get"
-	firstEntryOp = "FirstEntry"
-	lastEntryOp  = "LastEntry"
-	prevEntryOp  = "PrevEntry"
-	nextEntryOp  = "NextEntry"
-	removeOp     = "Remove"
-	clearOp      = "Clear"
-	eventsOp     = "Events"
-	entriesOp    = "Entries"
+    sizeOp = "Size"
+    putOp = "Put"
+    getOp = "Get"
+    firstEntryOp = "FirstEntry"
+    lastEntryOp = "LastEntry"
+    prevEntryOp = "PrevEntry"
+    nextEntryOp = "NextEntry"
+    removeOp = "Remove"
+    clearOp = "Clear"
+    eventsOp = "Events"
+    entriesOp = "Entries"
 )
 
 var newServiceFunc rsm.NewServiceFunc
@@ -65,251 +67,262 @@ func (s *ServiceAdaptor) init() {
 }
 
 func (s *ServiceAdaptor) SessionOpen(session rsm.Session) {
-	if sessionOpen, ok := s.rsm.(rsm.SessionOpenService); ok {
-		sessionOpen.SessionOpen(session)
-	}
+    if sessionOpen, ok := s.rsm.(rsm.SessionOpenService); ok {
+        sessionOpen.SessionOpen(session)
+    }
 }
 
 func (s *ServiceAdaptor) SessionExpired(session rsm.Session) {
-	if sessionExpired, ok := s.rsm.(rsm.SessionExpiredService); ok {
-		sessionExpired.SessionExpired(session)
-	}
+    if sessionExpired, ok := s.rsm.(rsm.SessionExpiredService); ok {
+        sessionExpired.SessionExpired(session)
+    }
 }
 
 func (s *ServiceAdaptor) SessionClosed(session rsm.Session) {
-	if sessionClosed, ok := s.rsm.(rsm.SessionClosedService); ok {
-		sessionClosed.SessionClosed(session)
-	}
+    if sessionClosed, ok := s.rsm.(rsm.SessionClosedService); ok {
+        sessionClosed.SessionClosed(session)
+    }
 }
 
 func (s *ServiceAdaptor) size(input []byte) ([]byte, error) {
-	request := &indexedmap.SizeRequest{}
+    request := &indexedmap.SizeRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.Size(request)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
+	if err !=  nil {
+	    s.log.Error(err)
+    	return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
+
 func (s *ServiceAdaptor) put(input []byte) ([]byte, error) {
-	request := &indexedmap.PutRequest{}
+    request := &indexedmap.PutRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.Put(request)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
+	if err !=  nil {
+	    s.log.Error(err)
+    	return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
+
 func (s *ServiceAdaptor) get(input []byte) ([]byte, error) {
-	request := &indexedmap.GetRequest{}
+    request := &indexedmap.GetRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.Get(request)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
+	if err !=  nil {
+	    s.log.Error(err)
+    	return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
+
 func (s *ServiceAdaptor) firstEntry(input []byte) ([]byte, error) {
-	request := &indexedmap.FirstEntryRequest{}
+    request := &indexedmap.FirstEntryRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.FirstEntry(request)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
+	if err !=  nil {
+	    s.log.Error(err)
+    	return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
+
 func (s *ServiceAdaptor) lastEntry(input []byte) ([]byte, error) {
-	request := &indexedmap.LastEntryRequest{}
+    request := &indexedmap.LastEntryRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.LastEntry(request)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
+	if err !=  nil {
+	    s.log.Error(err)
+    	return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
+
 func (s *ServiceAdaptor) prevEntry(input []byte) ([]byte, error) {
-	request := &indexedmap.PrevEntryRequest{}
+    request := &indexedmap.PrevEntryRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.PrevEntry(request)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
+	if err !=  nil {
+	    s.log.Error(err)
+    	return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
+
 func (s *ServiceAdaptor) nextEntry(input []byte) ([]byte, error) {
-	request := &indexedmap.NextEntryRequest{}
+    request := &indexedmap.NextEntryRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.NextEntry(request)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
+	if err !=  nil {
+	    s.log.Error(err)
+    	return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
+
 func (s *ServiceAdaptor) remove(input []byte) ([]byte, error) {
-	request := &indexedmap.RemoveRequest{}
+    request := &indexedmap.RemoveRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.Remove(request)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
+	if err !=  nil {
+	    s.log.Error(err)
+    	return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
+
 func (s *ServiceAdaptor) clear(input []byte) ([]byte, error) {
-	request := &indexedmap.ClearRequest{}
+    request := &indexedmap.ClearRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.Clear(request)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
+	if err !=  nil {
+	    s.log.Error(err)
+    	return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
+
 func (s *ServiceAdaptor) events(input []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
-	request := &indexedmap.EventsRequest{}
-	err := proto.Unmarshal(input, request)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-	response := newServiceEventsStream(stream)
-	closer, err := s.rsm.Events(request, response)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-	return closer, nil
+    request := &indexedmap.EventsRequest{}
+    err := proto.Unmarshal(input, request)
+    if err != nil {
+        s.log.Error(err)
+        return nil, err
+    }
+    response := newServiceEventsStream(stream)
+    closer, err := s.rsm.Events(request, response)
+    if err != nil {
+        s.log.Error(err)
+        return nil, err
+    }
+    return closer, nil
 }
 
+
 func (s *ServiceAdaptor) entries(input []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
-	request := &indexedmap.EntriesRequest{}
-	err := proto.Unmarshal(input, request)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-	response := newServiceEntriesStream(stream)
-	closer, err := s.rsm.Entries(request, response)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
-	}
-	return closer, nil
+    request := &indexedmap.EntriesRequest{}
+    err := proto.Unmarshal(input, request)
+    if err != nil {
+        s.log.Error(err)
+        return nil, err
+    }
+    response := newServiceEntriesStream(stream)
+    closer, err := s.rsm.Entries(request, response)
+    if err != nil {
+        s.log.Error(err)
+        return nil, err
+    }
+    return closer, nil
 }
+
 
 var _ rsm.Service = &ServiceAdaptor{}

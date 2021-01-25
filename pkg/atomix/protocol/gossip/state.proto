@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package atomix.protocol.gossip;
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.FieldOptions {
+    bool key = 82000;
+    bool digest = 82001;
+}

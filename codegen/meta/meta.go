@@ -34,9 +34,10 @@ type LocationMeta struct {
 
 // PackageMeta is the package for a code file
 type PackageMeta struct {
-	Name  string
-	Path  string
-	Alias string
+	Name   string
+	Path   string
+	Alias  string
+	Import bool
 }
 
 // TypeMeta is the metadata for a store type
@@ -69,7 +70,7 @@ type TypeMeta struct {
 type PrimitiveMeta struct {
 	ServiceMeta
 	Name  string
-	State StateMeta
+	State *StateMeta
 }
 
 // ServiceMeta is the metadata for a service
@@ -80,8 +81,9 @@ type ServiceMeta struct {
 }
 
 type StateMeta struct {
-	Value *StateTypeMeta
-	Entry *StateTypeMeta
+	IsDiscrete   bool
+	IsContinuous bool
+	Entry        *StateTypeMeta
 }
 
 type StateTypeMeta struct {

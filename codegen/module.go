@@ -69,20 +69,20 @@ func (m *Module) Execute(targets map[string]pgs.File, packages map[string]pgs.Pa
 		return m.Artifacts()
 	}
 	for _, target := range targets {
-		m.executeTarget(target)
+		m.executeTarget(target, packages)
 	}
 	return m.Artifacts()
 }
 
-func (m *Module) executeTarget(target pgs.File) {
+func (m *Module) executeTarget(target pgs.File, packages map[string]pgs.Package) {
 	for _, service := range target.Services() {
-		m.executeService(service)
+		m.executeService(service, packages)
 	}
 }
 
 // executeService generates a store from a Protobuf service
 //nolint:gocyclo
-func (m *Module) executeService(service pgs.Service) {
+func (m *Module) executeService(service pgs.Service, packages map[string]pgs.Package) {
 	primitiveType, err := meta.GetPrimitiveType(service)
 	if err != nil {
 		return
@@ -95,7 +95,7 @@ func (m *Module) executeService(service pgs.Service) {
 
 	importsSet := make(map[string]meta.PackageMeta)
 	var addImport = func(t *meta.TypeMeta) {
-		if t.Package.Alias != "" {
+		if t.Package.Import {
 			baseAlias := t.Package.Alias
 			i := 0
 			for {
@@ -272,23 +272,13 @@ func (m *Module) executeService(service pgs.Service) {
 		imports = append(imports, importPkg)
 	}
 
-	valueType, err := m.ctx.GetStateValueTypeMeta(service)
+	stateMeta, err := m.ctx.GetStateMeta(packages)
 	if err != nil {
 		panic(err)
-	} else if valueType != nil {
-		addImport(&valueType.Type)
-	}
-
-	entryType, err := m.ctx.GetStateEntryTypeMeta(service)
-	if err != nil {
-		panic(err)
-	} else if entryType != nil {
-		addImport(&entryType.Type)
-	}
-
-	stateMeta := meta.StateMeta{
-		Value: valueType,
-		Entry: entryType,
+	} else if stateMeta != nil {
+		if stateMeta.Entry != nil {
+			addImport(&stateMeta.Entry.Type)
+		}
 	}
 
 	primitiveMeta := meta.PrimitiveMeta{

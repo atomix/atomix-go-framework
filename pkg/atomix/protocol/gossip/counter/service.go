@@ -1,16 +1,16 @@
-package value
+package counter
 
 import (
 	"context"
-	value "github.com/atomix/api/go/atomix/primitive/value"
+	counter "github.com/atomix/api/go/atomix/primitive/counter"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/time"
 )
 
-var log = logging.GetLogger("atomix", "protocol", "gossip", "value")
+var log = logging.GetLogger("atomix", "protocol", "gossip", "counter")
 
-const ServiceType gossip.ServiceType = "Value"
+const ServiceType gossip.ServiceType = "Counter"
 
 // RegisterService registers the service on the given node
 func RegisterService(node *gossip.Node) {
@@ -37,10 +37,12 @@ func registerService(f func(protocol GossipProtocol) (Service, error)) {
 
 type Service interface {
 	gossip.Service
-    // Set sets the value
-    Set(context.Context, *value.SetRequest) (*value.SetResponse, error)
-    // Get gets the value
-    Get(context.Context, *value.GetRequest) (*value.GetResponse, error)
-    // Events listens for value change events
-    Events(context.Context, *value.EventsRequest, chan<- value.EventsResponse) error
+    // Set sets the counter value
+    Set(context.Context, *counter.SetRequest) (*counter.SetResponse, error)
+    // Get gets the current counter value
+    Get(context.Context, *counter.GetRequest) (*counter.GetResponse, error)
+    // Increment increments the counter value
+    Increment(context.Context, *counter.IncrementRequest) (*counter.IncrementResponse, error)
+    // Decrement decrements the counter value
+    Decrement(context.Context, *counter.DecrementRequest) (*counter.DecrementResponse, error)
 }

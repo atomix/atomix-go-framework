@@ -5,11 +5,11 @@ import (
 	"math/rand"
 	"time"
 
-	value "github.com/atomix/api/go/atomix/primitive/value"
 	"github.com/atomix/go-framework/pkg/atomix/meta"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
 	atime "github.com/atomix/go-framework/pkg/atomix/time"
-	proto "github.com/golang/protobuf/proto"
+
+	"github.com/golang/protobuf/proto"
 )
 
 const antiEntropyPeriod = time.Second
@@ -33,8 +33,8 @@ type GossipProtocol interface {
 }
 
 type GossipHandler interface {
-	Read(ctx context.Context) (*value.Value, error)
-	Update(ctx context.Context, value *value.Value) error
+	Read(ctx context.Context) (*ValueState, error)
+	Update(ctx context.Context, state *ValueState) error
 }
 
 type GossipServer interface {
@@ -43,19 +43,24 @@ type GossipServer interface {
 }
 
 type GossipClient interface {
-	Bootstrap(ctx context.Context) (*value.Value, error)
-	Repair(ctx context.Context, value *value.Value) (*value.Value, error)
-	Advertise(ctx context.Context, value *value.Value) error
-	Update(ctx context.Context, value *value.Value) error
+	Bootstrap(ctx context.Context) (*ValueState, error)
+	Repair(ctx context.Context, state *ValueState) (*ValueState, error)
+	Advertise(ctx context.Context, state *ValueState) error
+	Update(ctx context.Context, state *ValueState) error
 }
 
 type GossipGroup interface {
 	GossipClient
+	MemberID() GossipMemberID
 	Members() []GossipMember
 	Member(GossipMemberID) GossipMember
 }
 
 type GossipMemberID gossip.PeerID
+
+func (i GossipMemberID) String() string {
+    return string(i)
+}
 
 type GossipMember interface {
 	GossipClient
@@ -103,6 +108,10 @@ type gossipGroup struct {
 	memberIDs map[GossipMemberID]GossipMember
 }
 
+func (p *gossipGroup) MemberID() GossipMemberID {
+    return GossipMemberID(p.group.MemberID())
+}
+
 func (p *gossipGroup) Members() []GossipMember {
 	return p.members
 }
@@ -110,25 +119,25 @@ func (p *gossipGroup) Members() []GossipMember {
 func (p *gossipGroup) Member(id GossipMemberID) GossipMember {
 	return p.memberIDs[id]
 }
-func (p *gossipGroup) Bootstrap(ctx context.Context) (*value.Value, error) {
+func (p *gossipGroup) Bootstrap(ctx context.Context) (*ValueState, error) {
 	objects, err := p.group.Read(ctx, "")
 	if err != nil {
 		return nil, err
 	}
 
-	value := &value.Value{}
+    state := &ValueState{}
 	for _, object := range objects {
-		if meta.FromProto(object.ObjectMeta).After(meta.FromProto(value.ObjectMeta)) {
-			err = proto.Unmarshal(object.Value, value)
+		if meta.FromProto(object.ObjectMeta).After(meta.FromProto(state.ObjectMeta)) {
+			err = proto.Unmarshal(object.Value, state)
 			if err != nil {
 				return nil, err
 			}
 		}
 	}
-	return value, nil
+	return state, nil
 }
 
-func (p *gossipGroup) Repair(ctx context.Context, state *value.Value) (*value.Value, error) {
+func (p *gossipGroup) Repair(ctx context.Context, state *ValueState) (*ValueState, error) {
 	objects, err := p.group.Read(ctx, "")
 	if err != nil {
 		return nil, err
@@ -145,14 +154,14 @@ func (p *gossipGroup) Repair(ctx context.Context, state *value.Value) (*value.Va
 	return state, nil
 }
 
-func (p *gossipGroup) Advertise(ctx context.Context, state *value.Value) error {
+func (p *gossipGroup) Advertise(ctx context.Context, state *ValueState) error {
 	peers := p.group.Peers()
 	peer := peers[rand.Intn(len(peers))]
 	peer.Advertise(ctx, "", meta.FromProto(state.ObjectMeta))
 	return nil
 }
 
-func (p *gossipGroup) Update(ctx context.Context, state *value.Value) error {
+func (p *gossipGroup) Update(ctx context.Context, state *ValueState) error {
 	bytes, err := proto.Marshal(state)
 	if err != nil {
 		return err
@@ -208,41 +217,40 @@ func (p *gossipMember) ID() GossipMemberID {
 func (p *gossipMember) Client() *gossip.Peer {
 	return p.peer
 }
-func (p *gossipMember) Bootstrap(ctx context.Context) (*value.Value, error) {
+func (p *gossipMember) Bootstrap(ctx context.Context) (*ValueState, error) {
 	object, err := p.peer.Read(ctx, "")
 	if err != nil {
 		return nil, err
 	}
 
-	state := &value.Value{}
-	err = proto.Unmarshal(object.Value, state)
-	if err != nil {
-		return nil, err
-	}
+    state := &ValueState{}
+    err = proto.Unmarshal(object.Value, state)
+    if err != nil {
+        return nil, err
+    }
 	return state, nil
 }
 
-func (p *gossipMember) Repair(ctx context.Context, state *value.Value) (*value.Value, error) {
+func (p *gossipMember) Repair(ctx context.Context, state *ValueState) (*ValueState, error) {
 	object, err := p.peer.Read(ctx, "")
 	if err != nil {
 		return nil, err
 	}
-
-	if meta.FromProto(object.ObjectMeta).After(meta.FromProto(state.ObjectMeta)) {
-		err = proto.Unmarshal(object.Value, state)
-		if err != nil {
-			return nil, err
-		}
+    if meta.FromProto(object.ObjectMeta).After(meta.FromProto(state.ObjectMeta)) {
+        err = proto.Unmarshal(object.Value, state)
+        if err != nil {
+            return nil, err
+        }
 	}
 	return state, nil
 }
 
-func (p *gossipMember) Advertise(ctx context.Context, state *value.Value) error {
+func (p *gossipMember) Advertise(ctx context.Context, state *ValueState) error {
 	p.peer.Advertise(ctx, "", meta.FromProto(state.ObjectMeta))
 	return nil
 }
 
-func (p *gossipMember) Update(ctx context.Context, state *value.Value) error {
+func (p *gossipMember) Update(ctx context.Context, state *ValueState) error {
 	bytes, err := proto.Marshal(state)
 	if err != nil {
 		return err
@@ -277,7 +285,7 @@ func (s *gossipReplica) Type() gossip.ServiceType {
 }
 
 func (s *gossipReplica) Update(ctx context.Context, object *gossip.Object) error {
-	state := &value.Value{}
+	state := &ValueState{}
 	err := proto.Unmarshal(object.Value, state)
 	if err != nil {
 		return err
@@ -298,32 +306,31 @@ func (s *gossipReplica) Read(ctx context.Context, key string) (*gossip.Object, e
 		return nil, err
 	}
 	return &gossip.Object{
-		ObjectMeta: state.ObjectMeta,
-		Key:        "",
+        ObjectMeta: state.ObjectMeta,
 		Value:      bytes,
 	}, nil
 }
 
 func (s *gossipReplica) ReadAll(ctx context.Context, ch chan<- gossip.Object) error {
-	errCh := make(chan error)
-	go func() {
-		defer close(errCh)
-		state, err := s.handler.Read(ctx)
-		if err != nil {
-			errCh <- err
-			return
-		}
-		bytes, err := proto.Marshal(state)
-		if err != nil {
-			errCh <- err
-			return
-		}
-		object := gossip.Object{
-			ObjectMeta: state.ObjectMeta,
-			Value:      bytes,
-		}
-		ch <- object
-	}()
+    errCh := make(chan error)
+    go func() {
+        defer close(errCh)
+        state, err := s.handler.Read(ctx)
+        if err != nil {
+            errCh <- err
+            return
+        }
+        bytes, err := proto.Marshal(state)
+        if err != nil {
+            errCh <- err
+            return
+        }
+        object := gossip.Object{
+            ObjectMeta: state.ObjectMeta,
+            Value:      bytes,
+        }
+        ch <- object
+    }()
 	return <-errCh
 }
 
@@ -356,13 +363,13 @@ func (m *gossipEngine) start() {
 }
 
 func (m *gossipEngine) bootstrap(ctx context.Context) error {
-	state, err := m.protocol.Group().Bootstrap(ctx)
-	if err != nil {
-		return err
-	}
-	if err := m.protocol.Server().handler().Update(ctx, state); err != nil {
-		return err
-	}
+    state, err := m.protocol.Group().Bootstrap(ctx)
+    if err != nil {
+        return err
+    }
+    if err := m.protocol.Server().handler().Update(ctx, state); err != nil {
+        return err
+    }
 	return nil
 }
 
@@ -376,13 +383,13 @@ func (m *gossipEngine) runAntiEntropy(ctx context.Context) {
 }
 
 func (m *gossipEngine) advertise(ctx context.Context) error {
-	state, err := m.protocol.Server().handler().Read(context.Background())
-	if err != nil {
-		return err
-	}
-	if err := m.protocol.Group().Advertise(ctx, state); err != nil {
-		return err
-	}
+    state, err := m.protocol.Server().handler().Read(context.Background())
+    if err != nil {
+        return err
+    }
+    if err := m.protocol.Group().Advertise(ctx, state); err != nil {
+        return err
+    }
 	return nil
 }
 
