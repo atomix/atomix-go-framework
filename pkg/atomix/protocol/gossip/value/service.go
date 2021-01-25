@@ -15,31 +15,28 @@ const ServiceType gossip.ServiceType = "Value"
 // RegisterService registers the service on the given node
 func RegisterService(node *gossip.Node) {
 	node.RegisterService(ServiceType, func(ctx context.Context, serviceID gossip.ServiceID, partition *gossip.Partition, clock time.Clock) (gossip.Service, error) {
-		client, err := newClient(serviceID, partition, clock)
+		protocol, err := newGossipProtocol(serviceID, partition, clock)
 		if err != nil {
 			return nil, err
 		}
-		service := newService(client)
-		manager := newManager(client, service)
-		go manager.start()
+		service, err := newService(protocol)
+		if err != nil {
+			return nil, err
+		}
+		engine := newGossipEngine(protocol)
+		go engine.start()
 		return service, nil
 	})
 }
 
-var newService func(replicas ReplicationClient) Service
+var newService func(protocol GossipProtocol) (Service, error)
 
-func registerService(f func(replicas ReplicationClient) Service) {
+func registerService(f func(protocol GossipProtocol) (Service, error)) {
 	newService = f
-}
-
-type Delegate interface {
-	Read(ctx context.Context) (*value.Value, error)
-	Update(ctx context.Context, value *value.Value) error
 }
 
 type Service interface {
 	gossip.Service
-	Delegate() Delegate
 	// Set sets the value
 	Set(context.Context, *value.SetRequest) (*value.SetResponse, error)
 	// Get gets the value

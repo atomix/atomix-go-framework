@@ -20,42 +20,45 @@ import (
 	metaapi "github.com/atomix/api/go/atomix/primitive/meta"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/meta"
-	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/time"
 	"sync"
 )
 
 func init() {
-	registerService(func(replicas ReplicationClient) Service {
-		return &mapService{
-			replicas: replicas,
+	registerService(func(protocol GossipProtocol) (Service, error) {
+		service := &mapService{
+			protocol: protocol,
 			entries:  make(map[string]*mapapi.Entry),
 		}
+		if err := protocol.Server().Register(&mapHandler{service}); err != nil {
+			return nil, err
+		}
+		return service, nil
 	})
 }
 
-type mapDelegate struct {
+type mapHandler struct {
 	service *mapService
 }
 
-func (s *mapDelegate) Update(ctx context.Context, update *mapapi.Entry) error {
+func (s *mapHandler) Update(ctx context.Context, update *mapapi.Entry) error {
 	s.service.mu.Lock()
 	defer s.service.mu.Unlock()
 	stored, ok := s.service.entries[update.Key.Key]
 	if !ok || meta.FromProto(update.Key.ObjectMeta).After(meta.FromProto(stored.Key.ObjectMeta)) {
 		s.service.entries[update.Key.Key] = update
-		return s.service.replicas.Update(ctx, update)
+		return s.service.protocol.Group().Update(ctx, update)
 	}
 	return nil
 }
 
-func (s *mapDelegate) Read(ctx context.Context, key string) (*mapapi.Entry, error) {
+func (s *mapHandler) Read(ctx context.Context, key string) (*mapapi.Entry, error) {
 	s.service.mu.RLock()
 	defer s.service.mu.RUnlock()
 	return s.service.entries[key], nil
 }
 
-func (s *mapDelegate) List(ctx context.Context, ch chan<- mapapi.Entry) error {
+func (s *mapHandler) List(ctx context.Context, ch chan<- mapapi.Entry) error {
 	s.service.mu.RLock()
 	defer s.service.mu.RUnlock()
 	for _, entry := range s.service.entries {
@@ -64,19 +67,13 @@ func (s *mapDelegate) List(ctx context.Context, ch chan<- mapapi.Entry) error {
 	return nil
 }
 
+var _ GossipHandler = &mapHandler{}
+
 type mapService struct {
-	replicas ReplicationClient
+	protocol GossipProtocol
 	entries  map[string]*mapapi.Entry
 	streams  []chan<- mapapi.EventsResponse
 	mu       sync.RWMutex
-}
-
-func (s *mapService) Replica() gossip.Replica {
-	return newReplica(s)
-}
-
-func (s *mapService) Delegate() Delegate {
-	return &mapDelegate{s}
 }
 
 func (s *mapService) Size(ctx context.Context, _ *mapapi.SizeRequest) (*mapapi.SizeResponse, error) {
@@ -96,7 +93,7 @@ func (s *mapService) Put(ctx context.Context, request *mapapi.PutRequest) (*mapa
 		newEntry := &request.Entry
 		newEntry.Key.Timestamp = request.Headers.Timestamp
 		s.entries[request.Entry.Key.Key] = newEntry
-		if err := s.replicas.Update(ctx, newEntry); err != nil {
+		if err := s.protocol.Group().Update(ctx, newEntry); err != nil {
 			return nil, err
 		}
 		s.notify(mapapi.Event{
@@ -119,7 +116,7 @@ func (s *mapService) Put(ctx context.Context, request *mapapi.PutRequest) (*mapa
 	newEntry.Key.Timestamp = request.Headers.Timestamp
 	s.entries[request.Entry.Key.Key] = newEntry
 
-	if err := s.replicas.Update(ctx, newEntry); err != nil {
+	if err := s.protocol.Group().Update(ctx, newEntry); err != nil {
 		return nil, err
 	}
 
@@ -147,7 +144,7 @@ func (s *mapService) Get(ctx context.Context, request *mapapi.GetRequest) (*mapa
 	if !ok {
 		return nil, errors.NewNotFound("key '%s' not found", request.Key)
 	}
-	entry, err := s.replicas.Repair(ctx, entry)
+	entry, err := s.protocol.Group().Repair(ctx, entry)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +183,7 @@ func (s *mapService) Remove(ctx context.Context, request *mapapi.RemoveRequest) 
 		Entry: *entry,
 	})
 
-	if err := s.replicas.Update(ctx, entry); err != nil {
+	if err := s.protocol.Group().Update(ctx, entry); err != nil {
 		return nil, err
 	}
 
@@ -201,7 +198,7 @@ func (s *mapService) Clear(ctx context.Context, _ *mapapi.ClearRequest) (*mapapi
 	for _, entry := range s.entries {
 		if entry.Key.Type != metaapi.ObjectMeta_TOMBSTONE {
 			entry.Key.Type = metaapi.ObjectMeta_TOMBSTONE
-			if err := s.replicas.Update(ctx, entry); err != nil {
+			if err := s.protocol.Group().Update(ctx, entry); err != nil {
 				return nil, err
 			}
 		}

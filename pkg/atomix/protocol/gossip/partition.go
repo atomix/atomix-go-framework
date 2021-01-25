@@ -29,6 +29,7 @@ func NewPartition(p *cluster.Partition, clock time.Clock, registry Registry) *Pa
 		clock:     clock,
 		registry:  registry,
 		services:  make(map[ServiceID]Service),
+		replicas:  make(map[ServiceID]Replica),
 	}
 }
 
@@ -38,42 +39,77 @@ type PartitionID int
 // Partition is a proxy partition
 type Partition struct {
 	*cluster.Partition
-	clock    time.Clock
-	registry Registry
-	ID       PartitionID
-	services map[ServiceID]Service
-	mu       sync.RWMutex
+	clock      time.Clock
+	registry   Registry
+	ID         PartitionID
+	services   map[ServiceID]Service
+	servicesMu sync.RWMutex
+	replicas   map[ServiceID]Replica
+	replicasMu sync.RWMutex
 }
 
 func (p *Partition) GetService(ctx context.Context, serviceType ServiceType, serviceID ServiceID) (Service, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.servicesMu.RLock()
 	service, ok := p.services[serviceID]
-	if !ok {
-		f, err := p.registry.GetServiceFunc(serviceType)
-		if err != nil {
-			return nil, err
-		}
-		service, err = f(ctx, serviceID, p, p.clock)
-		if err != nil {
-			return nil, err
-		}
-		p.services[serviceID] = service
+	p.servicesMu.RUnlock()
+	if ok {
+		return service, nil
 	}
-	return service, nil
-}
 
-func (p *Partition) getReplica(ctx context.Context, serviceType ServiceType, serviceID ServiceID) (Replica, error) {
-	service, err := p.GetService(ctx, serviceType, serviceID)
+	p.servicesMu.Lock()
+	defer p.servicesMu.Unlock()
+	service, ok = p.services[serviceID]
+	if ok {
+		return service, nil
+	}
+
+	f, err := p.registry.GetServiceFunc(serviceType)
 	if err != nil {
 		return nil, err
 	}
-	return service.Replica(), nil
+	service, err = f(ctx, serviceID, p, p.clock)
+	if err != nil {
+		return nil, err
+	}
+	p.services[serviceID] = service
+	return service, nil
+}
+
+func (p *Partition) RegisterReplica(replica Replica) error {
+	p.replicasMu.Lock()
+	defer p.replicasMu.Unlock()
+	if _, ok := p.replicas[replica.ID()]; ok {
+		return errors.NewAlreadyExists("replica '%s' already exists", replica.ID())
+	}
+	p.replicas[replica.ID()] = replica
+	return nil
+}
+
+func (p *Partition) getReplica(ctx context.Context, serviceType ServiceType, serviceID ServiceID) (Replica, error) {
+	p.replicasMu.RLock()
+	replica, ok := p.replicas[serviceID]
+	p.replicasMu.RUnlock()
+	if !ok {
+		_, err := p.GetService(ctx, serviceType, serviceID)
+		if err != nil {
+			return nil, err
+		}
+		p.replicasMu.RLock()
+		replica, ok = p.replicas[serviceID]
+		p.replicasMu.RUnlock()
+		if !ok {
+			return nil, errors.NewNotFound("replica '%s' not found", serviceID)
+		}
+	}
+	if replica.Type() != serviceType {
+		return nil, errors.NewConflict("replica '%s' already exists with a different type '%s'", serviceID, serviceType)
+	}
+	return replica, nil
 }
 
 func (p *Partition) deleteReplica(serviceType ServiceType, serviceID ServiceID) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.servicesMu.Lock()
+	defer p.servicesMu.Unlock()
 	_, ok := p.services[serviceID]
 	if !ok {
 		return errors.NewNotFound("service '%s' not found", serviceID)

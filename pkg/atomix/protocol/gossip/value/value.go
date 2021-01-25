@@ -19,33 +19,36 @@ import (
 	valueapi "github.com/atomix/api/go/atomix/primitive/value"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/meta"
-	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/time"
 	"sync"
 )
 
 func init() {
-	registerService(func(replicas ReplicationClient) Service {
-		return &valueService{
-			replicas: replicas,
+	registerService(func(protocol GossipProtocol) (Service, error) {
+		service := &valueService{
+			protocol: protocol,
 			value: &valueapi.Value{
-				ObjectMeta: meta.NewTimestamped(replicas.Clock().Get()).AsTombstone().Proto(),
+				ObjectMeta: meta.NewTimestamped(protocol.Clock().Get()).AsTombstone().Proto(),
 			},
 		}
+		if err := protocol.Server().Register(&valueHandler{service}); err != nil {
+			return nil, err
+		}
+		return service, nil
 	})
 }
 
-type valueDelegate struct {
+type valueHandler struct {
 	service *valueService
 }
 
-func (s *valueDelegate) Read(ctx context.Context) (*valueapi.Value, error) {
+func (s *valueHandler) Read(ctx context.Context) (*valueapi.Value, error) {
 	s.service.mu.RLock()
 	defer s.service.mu.RUnlock()
 	return s.service.value, nil
 }
 
-func (s *valueDelegate) Update(ctx context.Context, value *valueapi.Value) error {
+func (s *valueHandler) Update(ctx context.Context, value *valueapi.Value) error {
 	s.service.mu.Lock()
 	defer s.service.mu.Unlock()
 	if meta.FromProto(value.ObjectMeta).After(meta.FromProto(s.service.value.ObjectMeta)) {
@@ -55,18 +58,10 @@ func (s *valueDelegate) Update(ctx context.Context, value *valueapi.Value) error
 }
 
 type valueService struct {
-	replicas ReplicationClient
+	protocol GossipProtocol
 	value    *valueapi.Value
 	streams  []chan<- valueapi.EventsResponse
 	mu       sync.RWMutex
-}
-
-func (s *valueService) Replica() gossip.Replica {
-	return newReplica(s)
-}
-
-func (s *valueService) Delegate() Delegate {
-	return &valueDelegate{s}
 }
 
 func (s *valueService) Set(ctx context.Context, request *valueapi.SetRequest) (*valueapi.SetResponse, error) {
@@ -86,7 +81,7 @@ func (s *valueService) Set(ctx context.Context, request *valueapi.SetRequest) (*
 	s.value = &request.Value
 	s.value.Timestamp = request.Headers.Timestamp
 
-	err = s.replicas.Update(ctx, &request.Value)
+	err = s.protocol.Group().Update(ctx, &request.Value)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +102,7 @@ func (s *valueService) Get(ctx context.Context, request *valueapi.GetRequest) (*
 	if s.value != nil {
 		value = s.value
 	}
-	value, err := s.replicas.Repair(ctx, value)
+	value, err := s.protocol.Group().Repair(ctx, value)
 	if err != nil {
 		return nil, err
 	}

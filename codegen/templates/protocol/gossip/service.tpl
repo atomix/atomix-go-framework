@@ -22,45 +22,28 @@ const {{ $serviceType }} gossip.ServiceType = {{ .Primitive.Name | quote }}
 // RegisterService registers the service on the given node
 func RegisterService(node *gossip.Node) {
 	node.RegisterService(ServiceType, func(ctx context.Context, serviceID gossip.ServiceID, partition *gossip.Partition, clock time.Clock) (gossip.Service, error) {
-		client, err := newClient(serviceID, partition, clock)
+		protocol, err := newGossipProtocol(serviceID, partition, clock)
 		if err != nil {
 			return nil, err
 		}
-		service := newService(client)
-		manager := newManager(client, service)
-		go manager.start()
+		service, err := newService(protocol)
+		if err != nil {
+			return nil, err
+		}
+		engine := newGossipEngine(protocol)
+		go engine.start()
 		return service, nil
 	})
 }
 
-var newService func(replicas ReplicationClient) Service
+var newService func(protocol GossipProtocol) (Service, error)
 
-func registerService(f func(replicas ReplicationClient) Service) {
+func registerService(f func(protocol GossipProtocol) (Service, error)) {
 	newService = f
-}
-
-type Delegate interface {
-    {{- if .Primitive.State.Value }}
-	Read(ctx context.Context) (*{{ template "type" .Primitive.State.Value.Type }}, error)
-	Update(ctx context.Context, value *{{ template "type" .Primitive.State.Value.Type }}) error
-    {{- else if .Primitive.State.Entry }}
-    {{- if .Primitive.State.Entry.Key }}
-    {{- if .Primitive.State.Entry.Key.Field.Type.IsScalar }}
-	Read(ctx context.Context, key {{ .Primitive.State.Entry.Key.Field.Type.Name }}) (*{{ template "type" .Primitive.State.Entry.Type }}, error)
-    {{- else }}
-	Read(ctx context.Context, key {{ template "type" .Primitive.State.Entry.Key.Field.Type }}) (*{{ template "type" .Primitive.State.Entry.Type }}, error)
-	{{- end }}
-    {{- else }}
-	Read(ctx context.Context) (*{{ template "type" .Primitive.State.Entry.Type }}, error)
-    {{- end }}
-    List(ctx context.Context, ch chan<- {{ template "type" .Primitive.State.Entry.Type }}) error
-	Update(ctx context.Context, entry *{{ template "type" .Primitive.State.Entry.Type }}) error
-    {{- end }}
 }
 
 type Service interface {
 	gossip.Service
-	Delegate() Delegate
     {{- range .Primitive.Methods }}
 
     {{- $comments := split .Comment "\n" }}
