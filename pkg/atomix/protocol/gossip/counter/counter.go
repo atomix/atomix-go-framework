@@ -52,7 +52,18 @@ func (s *counterHandler) Read(ctx context.Context) (*CounterState, error) {
 func (s *counterHandler) Update(ctx context.Context, state *CounterState) error {
 	s.service.mu.Lock()
 	defer s.service.mu.Unlock()
-	if meta.FromProto(state.ObjectMeta).After(meta.FromProto(s.service.state.ObjectMeta)) {
+	if meta.FromProto(state.ObjectMeta).Equal(meta.FromProto(s.service.state.ObjectMeta)) {
+		for memberID, delta := range state.Increments {
+			if delta > s.service.state.Increments[memberID] {
+				s.service.state.Increments[memberID] = delta
+			}
+		}
+		for memberID, delta := range state.Decrements {
+			if delta > s.service.state.Decrements[memberID] {
+				s.service.state.Decrements[memberID] = delta
+			}
+		}
+	} else if meta.FromProto(state.ObjectMeta).After(meta.FromProto(s.service.state.ObjectMeta)) {
 		s.service.state = state
 	}
 	return nil
