@@ -61,7 +61,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 
 		switch m := msg.Message.(type) {
 		case *GossipMessage_Advertise:
-			timestamp := s.manager.clock.Update(time.NewTimestamp(m.Advertise.Header.Timestamp))
+			s.manager.clock.Update(time.NewTimestamp(m.Advertise.Header.Timestamp))
 			object, err := replica.Read(stream.Context(), m.Advertise.Key)
 			if err != nil {
 				return err
@@ -71,7 +71,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 						Message: &GossipMessage_Update{
 							Update: &Update{
 								Header: GossipHeader{
-									Timestamp: s.manager.clock.Scheme().Codec().EncodeProto(timestamp),
+									Timestamp: s.manager.clock.Scheme().Codec().EncodeProto(s.manager.clock.Increment()),
 								},
 								Object: *object,
 							},
@@ -85,7 +85,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 						Message: &GossipMessage_Advertise{
 							Advertise: &Advertise{
 								Header: GossipHeader{
-									Timestamp: s.manager.clock.Scheme().Codec().EncodeProto(timestamp),
+									Timestamp: s.manager.clock.Scheme().Codec().EncodeProto(s.manager.clock.Increment()),
 								},
 								ObjectMeta: object.ObjectMeta,
 								Key:        object.Key,

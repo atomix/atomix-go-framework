@@ -61,11 +61,11 @@ func (p *Client) prepareTimestamp(timestamp *meta.Timestamp) *meta.Timestamp {
 }
 
 func (p *Client) PrepareRequest(headers *primitive.RequestHeaders) {
-	p.prepareTimestamp(headers.Timestamp)
+	headers.Timestamp = p.prepareTimestamp(headers.Timestamp)
 }
 
 func (p *Client) PrepareResponse(headers *primitive.ResponseHeaders) {
-	p.prepareTimestamp(headers.Timestamp)
+	headers.Timestamp = p.prepareTimestamp(headers.Timestamp)
 }
 
 func (p *Client) Partition(partitionID PartitionID) *Partition {

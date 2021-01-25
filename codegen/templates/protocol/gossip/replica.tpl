@@ -96,7 +96,7 @@ func (p *replicationClient) Bootstrap(ctx context.Context) (*{{ template "type" 
 		return nil, err
 	}
 
-    var value *{{ template "type" .Primitive.State.Value.Type }}
+    value := &{{ template "type" .Primitive.State.Value.Type }}{}
 	for _, object := range objects {
 		if meta.FromProto(object.ObjectMeta).After(meta.FromProto(value{{ template "field" .Primitive.State.Value.Digest }})) {
 			err = proto.Unmarshal(object.Value, value)

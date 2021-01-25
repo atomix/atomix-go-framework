@@ -11,7 +11,6 @@ func newManager(client ReplicationClient, service Service) *serviceManager {
 	return &serviceManager{
 		client:  client,
 		service: service,
-		ticker:  time.NewTicker(antiEntropyPeriod),
 	}
 }
 
@@ -19,14 +18,16 @@ type serviceManager struct {
 	client  ReplicationClient
 	service Service
 	ticker  *time.Ticker
+	cancel  context.CancelFunc
 }
 
-func (m *serviceManager) start(ctx context.Context) error {
+func (m *serviceManager) start() {
+	ctx, cancel := context.WithCancel(context.Background())
+	m.cancel = cancel
 	if err := m.bootstrap(ctx); err != nil {
-		return err
+		log.Errorf("Failed to bootstrap service: %v", err)
 	}
-	go m.runAntiEntropy()
-	return nil
+	m.runAntiEntropy(ctx)
 }
 
 func (m *serviceManager) bootstrap(ctx context.Context) error {
@@ -40,16 +41,17 @@ func (m *serviceManager) bootstrap(ctx context.Context) error {
 	return nil
 }
 
-func (m *serviceManager) runAntiEntropy() {
+func (m *serviceManager) runAntiEntropy(ctx context.Context) {
+	m.ticker = time.NewTicker(antiEntropyPeriod)
 	for range m.ticker.C {
-		if err := m.advertise(context.Background()); err != nil {
+		if err := m.advertise(ctx); err != nil {
 			log.Errorf("Anti-entropy protocol failed: %v", err)
 		}
 	}
 }
 
 func (m *serviceManager) advertise(ctx context.Context) error {
-	entry, err := m.service.Delegate().Read(context.Background())
+	entry, err := m.service.Delegate().Read(ctx)
 	if err != nil {
 		return err
 	}
@@ -61,4 +63,5 @@ func (m *serviceManager) advertise(ctx context.Context) error {
 
 func (m *serviceManager) stop() {
 	m.ticker.Stop()
+	m.cancel()
 }

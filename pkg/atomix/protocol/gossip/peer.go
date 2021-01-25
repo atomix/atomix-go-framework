@@ -100,7 +100,7 @@ func (p *Peer) connect() error {
 
 				switch m := msg.Message.(type) {
 				case *GossipMessage_Advertise:
-					timestamp := p.clock.Update(time.NewTimestamp(m.Advertise.Header.Timestamp))
+					p.clock.Update(time.NewTimestamp(m.Advertise.Header.Timestamp))
 					object, err := replica.Read(stream.Context(), m.Advertise.Key)
 					if err != nil {
 						log.Error(err)
@@ -111,7 +111,7 @@ func (p *Peer) connect() error {
 								Message: &GossipMessage_Update{
 									Update: &Update{
 										Header: GossipHeader{
-											Timestamp: p.clock.Scheme().Codec().EncodeProto(timestamp),
+											Timestamp: p.clock.Scheme().Codec().EncodeProto(p.clock.Increment()),
 										},
 										Object: *object,
 									},
@@ -126,7 +126,7 @@ func (p *Peer) connect() error {
 								Message: &GossipMessage_Advertise{
 									Advertise: &Advertise{
 										Header: GossipHeader{
-											Timestamp: p.clock.Scheme().Codec().EncodeProto(timestamp),
+											Timestamp: p.clock.Scheme().Codec().EncodeProto(p.clock.Increment()),
 										},
 										ObjectMeta: object.ObjectMeta,
 										Key:        object.Key,
@@ -157,6 +157,7 @@ func (p *Peer) connect() error {
 		for {
 			select {
 			case advertise := <-p.advertiseCh:
+				advertise.Header.Timestamp = p.clock.Scheme().Codec().EncodeProto(p.clock.Increment())
 				err := stream.Send(&GossipMessage{
 					Message: &GossipMessage_Advertise{
 						Advertise: &advertise,
@@ -166,6 +167,7 @@ func (p *Peer) connect() error {
 					return
 				}
 			case update := <-p.updateCh:
+				update.Header.Timestamp = p.clock.Scheme().Codec().EncodeProto(p.clock.Increment())
 				err := stream.Send(&GossipMessage{
 					Message: &GossipMessage_Update{
 						Update: &update,

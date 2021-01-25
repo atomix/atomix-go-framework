@@ -21,7 +21,8 @@ func RegisterService(node *gossip.Node) {
 		}
 		service := newService(client)
 		manager := newManager(client, service)
-		return service, manager.start(ctx)
+		go manager.start()
+		return service, nil
 	})
 }
 

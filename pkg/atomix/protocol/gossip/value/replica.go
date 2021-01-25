@@ -43,7 +43,7 @@ func (p *replicationClient) Bootstrap(ctx context.Context) (*value.Value, error)
 		return nil, err
 	}
 
-	var value *value.Value
+	value := &value.Value{}
 	for _, object := range objects {
 		if meta.FromProto(object.ObjectMeta).After(meta.FromProto(value.ObjectMeta)) {
 			err = proto.Unmarshal(object.Value, value)

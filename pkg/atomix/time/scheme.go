@@ -78,7 +78,7 @@ func (s logicalScheme) Codec() TimestampCodec {
 }
 
 func (s logicalScheme) NewClock() Clock {
-	return NewPhysicalClock()
+	return NewLogicalClock()
 }
 
 var EpochScheme = newEpochScheme()

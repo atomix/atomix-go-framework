@@ -69,38 +69,38 @@ func (s *valueService) Delegate() Delegate {
 	return &valueDelegate{s}
 }
 
-func (s *valueService) Set(ctx context.Context, input *valueapi.SetRequest) (*valueapi.SetResponse, error) {
+func (s *valueService) Set(ctx context.Context, request *valueapi.SetRequest) (*valueapi.SetResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !time.NewTimestamp(*input.Headers.Timestamp).After(time.NewTimestamp(*s.value.Timestamp)) {
+	if !time.NewTimestamp(*request.Headers.Timestamp).After(time.NewTimestamp(*s.value.Timestamp)) {
 		return &valueapi.SetResponse{
 			Value: *s.value,
 		}, nil
 	}
 
-	err := checkPreconditions(s.value, input.Preconditions)
+	err := checkPreconditions(s.value, request.Preconditions)
 	if err != nil {
 		return nil, err
 	}
 
-	s.value = &input.Value
-	s.value.Timestamp = input.Headers.Timestamp
+	s.value = &request.Value
+	s.value.Timestamp = request.Headers.Timestamp
 
-	err = s.replicas.Update(ctx, &input.Value)
+	err = s.replicas.Update(ctx, &request.Value)
 	if err != nil {
 		return nil, err
 	}
 
 	s.notify(valueapi.Event{
 		Type:  valueapi.Event_UPDATE,
-		Value: input.Value,
+		Value: request.Value,
 	})
 	return &valueapi.SetResponse{
-		Value: input.Value,
+		Value: request.Value,
 	}, nil
 }
 
-func (s *valueService) Get(ctx context.Context, input *valueapi.GetRequest) (*valueapi.GetResponse, error) {
+func (s *valueService) Get(ctx context.Context, request *valueapi.GetRequest) (*valueapi.GetResponse, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	var value *valueapi.Value

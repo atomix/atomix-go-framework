@@ -65,11 +65,11 @@ func (m *Manager) prepareTimestamp(timestamp *meta.Timestamp) *meta.Timestamp {
 }
 
 func (m *Manager) PrepareRequest(headers *primitive.RequestHeaders) {
-	m.prepareTimestamp(headers.Timestamp)
+	headers.Timestamp = m.prepareTimestamp(headers.Timestamp)
 }
 
 func (m *Manager) PrepareResponse(headers *primitive.ResponseHeaders) {
-	m.prepareTimestamp(headers.Timestamp)
+	headers.Timestamp = m.prepareTimestamp(headers.Timestamp)
 }
 
 func (m *Manager) PartitionFrom(ctx context.Context) (*Partition, error) {

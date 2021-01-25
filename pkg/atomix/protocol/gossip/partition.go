@@ -46,8 +46,8 @@ type Partition struct {
 }
 
 func (p *Partition) GetService(ctx context.Context, serviceType ServiceType, serviceID ServiceID) (Service, error) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	service, ok := p.services[serviceID]
 	if !ok {
 		f, err := p.registry.GetServiceFunc(serviceType)
