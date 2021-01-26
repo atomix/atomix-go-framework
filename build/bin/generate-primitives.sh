@@ -47,12 +47,15 @@ go_import_paths="${go_import_paths},Matomix/protocol/gossip/state.proto=github.c
 
 protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/go-framework/pkg/atomix/proxy/gossip/counter,plugin=proxy,protocol=gossip,output_path=atomix/proxy/gossip/counter:pkg atomix/primitive/counter/counter.proto
 protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/go-framework/pkg/atomix/proxy/gossip/map,plugin=proxy,protocol=gossip,output_path=atomix/proxy/gossip/map:pkg         atomix/primitive/map/map.proto
+protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/go-framework/pkg/atomix/proxy/gossip/set,plugin=proxy,protocol=gossip,output_path=atomix/proxy/gossip/set:pkg         atomix/primitive/set/set.proto
 protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/go-framework/pkg/atomix/proxy/gossip/value,plugin=proxy,protocol=gossip,output_path=atomix/proxy/gossip/value:pkg     atomix/primitive/value/value.proto
 
 go_import_paths="${go_import_paths},Matomix/protocol/gossip/counter/state.proto=github.com/atomix/go-framework/pkg/atomix/protocol/gossip/counter"
 go_import_paths="${go_import_paths},Matomix/protocol/gossip/map/state.proto=github.com/atomix/go-framework/pkg/atomix/protocol/gossip/map"
+go_import_paths="${go_import_paths},Matomix/protocol/gossip/set/state.proto=github.com/atomix/go-framework/pkg/atomix/protocol/gossip/set"
 go_import_paths="${go_import_paths},Matomix/protocol/gossip/value/state.proto=github.com/atomix/go-framework/pkg/atomix/protocol/gossip/value"
 
 protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/go-framework/pkg/atomix/protocol/gossip/counter,plugin=protocol,protocol=gossip,state=discrete,entry=.atomix.protocol.gossip.counter.CounterState,output_path=atomix/protocol/gossip/counter:pkg atomix/primitive/counter/counter.proto atomix/protocol/gossip/counter/state.proto
 protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/go-framework/pkg/atomix/protocol/gossip/map,plugin=protocol,protocol=gossip,state=continuous,entry=.atomix.protocol.gossip.map.MapEntry,output_path=atomix/protocol/gossip/map:pkg               atomix/primitive/map/map.proto         atomix/protocol/gossip/map/state.proto
+protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/go-framework/pkg/atomix/protocol/gossip/set,plugin=protocol,protocol=gossip,state=continuous,entry=.atomix.protocol.gossip.set.SetElement,output_path=atomix/protocol/gossip/set:pkg             atomix/primitive/set/set.proto         atomix/protocol/gossip/set/state.proto
 protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/go-framework/pkg/atomix/protocol/gossip/value,plugin=protocol,protocol=gossip,state=discrete,entry=.atomix.protocol.gossip.value.ValueState,output_path=atomix/protocol/gossip/value:pkg         atomix/primitive/value/value.proto     atomix/protocol/gossip/value/state.proto
