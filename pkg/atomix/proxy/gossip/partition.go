@@ -28,6 +28,7 @@ import (
 // NewPartition creates a new proxy partition
 func NewPartition(c *cluster.Cluster, p *cluster.Partition) *Partition {
 	return &Partition{
+		ID:        PartitionID(p.ID),
 		Partition: p,
 		cluster:   c,
 	}
