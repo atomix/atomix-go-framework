@@ -38,6 +38,8 @@ type GossipServer struct {
 }
 
 func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
+	member, _ := s.manager.Cluster.Member()
+	localID := MemberID(member.ID)
 	msg, err := stream.Recv()
 	if err == io.EOF {
 		return nil
@@ -46,8 +48,8 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 	}
 
 	init := msg.GetInitialize()
-	memberID := init.Header.MemberID
-	log.Debugf("Received GossipMessage %+v from peer %s", msg, memberID)
+	senderID := init.Header.MemberID
+	log.Debugf("Received GossipMessage %s->%s %+v", senderID, localID, msg)
 	replica, err := s.getReplica(stream.Context(), init.Header.PartitionID, init.Header.ServiceType, init.Header.ServiceID)
 	if err != nil {
 		return errors.Proto(err)
@@ -61,7 +63,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 			return err
 		}
 
-		log.Debugf("Received GossipMessage %+v from peer %s", msg, memberID)
+		log.Debugf("Received GossipMessage %s->%s %+v", senderID, localID, msg)
 		switch m := msg.Message.(type) {
 		case *GossipMessage_Advertise:
 			s.manager.clock.Update(time.NewTimestamp(m.Advertise.Header.Timestamp))
@@ -80,7 +82,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 							},
 						},
 					}
-					log.Debugf("Sending GossipMessage %+v to peer %s", msg, memberID)
+					log.Debugf("Sending GossipMessage %s->%s %+v", localID, senderID, msg)
 					err := stream.Send(msg)
 					if err != nil {
 						return err
@@ -97,7 +99,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 							},
 						},
 					}
-					log.Debugf("Sending GossipMessage %+v to peer %s", msg, memberID)
+					log.Debugf("Sending GossipMessage %s->%s %+v", localID, senderID, msg)
 					err := stream.Send(msg)
 					if err != nil {
 						return err
@@ -115,7 +117,8 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 }
 
 func (s *GossipServer) Read(ctx context.Context, request *ReadRequest) (*ReadResponse, error) {
-	log.Debugf("Received ReadRequest %+v from peer %s", request, request.Header.MemberID)
+	member, _ := s.manager.Cluster.Member()
+	log.Debugf("Received ReadRequest %s->%s %+v", request.Header.MemberID, member.ID, request)
 	timestamp := s.manager.clock.Update(time.NewTimestamp(request.Header.Timestamp))
 	replica, err := s.getReplica(ctx, request.Header.PartitionID, request.Header.ServiceType, request.Header.ServiceID)
 	if err != nil {
@@ -131,12 +134,13 @@ func (s *GossipServer) Read(ctx context.Context, request *ReadRequest) (*ReadRes
 		},
 		Object: object,
 	}
-	log.Debugf("Sending ReadResponse %+v to peer %s", response, request.Header.MemberID)
+	log.Debugf("Sending ReadResponse %s->%s %+v", member.ID, request.Header.MemberID, response)
 	return response, nil
 }
 
 func (s *GossipServer) ReadAll(request *ReadAllRequest, stream GossipProtocol_ReadAllServer) error {
-	log.Debugf("Received ReadAllRequest %+v from peer %s", request, request.Header.MemberID)
+	member, _ := s.manager.Cluster.Member()
+	log.Debugf("Received ReadAllRequest %s->%s %+v", request.Header.MemberID, member.ID, request)
 	timestamp := s.manager.clock.Update(time.NewTimestamp(request.Header.Timestamp))
 	replica, err := s.getReplica(stream.Context(), request.Header.PartitionID, request.Header.ServiceType, request.Header.ServiceID)
 	if err != nil {
@@ -163,7 +167,7 @@ func (s *GossipServer) ReadAll(request *ReadAllRequest, stream GossipProtocol_Re
 					},
 					Object: object,
 				}
-				log.Debugf("Sending ReadResponse %+v to peer %s", response, request.Header.MemberID)
+				log.Debugf("Sending ReadAllResponse %s->%s %+v", member.ID, request.Header.MemberID, response)
 				err := stream.Send(response)
 				if err != nil {
 					return errors.Proto(err)

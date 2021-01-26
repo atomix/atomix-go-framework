@@ -84,13 +84,13 @@ func (p *Peer) connect() error {
 					PartitionID: p.group.partition.ID,
 					ServiceType: p.group.serviceType,
 					ServiceID:   p.group.serviceID,
-					MemberID:    MemberID(p.ID),
+					MemberID:    p.group.memberID,
 					Timestamp:   p.clock.Scheme().Codec().EncodeProto(p.clock.Increment()),
 				},
 			},
 		},
 	}
-	log.Debugf("Sending GossipMessage %+v to peer %s", msg, p.ID)
+	log.Debugf("Sending GossipMessage %s->%s %+v", p.group.memberID, p.ID, msg)
 	err = stream.Send(msg)
 	if err != nil {
 		return err
@@ -105,7 +105,7 @@ func (p *Peer) connect() error {
 				log.Error(err)
 				return
 			} else {
-				log.Debugf("Received GossipMessage %+v", msg)
+				log.Debugf("Received GossipMessage %s->%s %+v", p.ID, p.group.memberID, msg)
 				replica, err := p.group.partition.getReplica(ctx, p.group.serviceType, p.group.serviceID)
 				if err != nil {
 					log.Error(err)
@@ -131,7 +131,7 @@ func (p *Peer) connect() error {
 									},
 								},
 							}
-							log.Debugf("Sending GossipMessage %+v to peer %s", msg, p.ID)
+							log.Debugf("Sending GossipMessage %s->%s %+v", p.group.memberID, p.ID, msg)
 							err := stream.Send(msg)
 							if err != nil {
 								log.Error(err)
@@ -149,7 +149,7 @@ func (p *Peer) connect() error {
 									},
 								},
 							}
-							log.Debugf("Sending GossipMessage %+v to peer %s", msg, p.ID)
+							log.Debugf("Sending GossipMessage %s->%s %+v", p.group.memberID, p.ID, msg)
 							err := stream.Send(msg)
 							if err != nil {
 								log.Error(err)
@@ -181,7 +181,7 @@ func (p *Peer) connect() error {
 						Advertise: &advertise,
 					},
 				}
-				log.Debugf("Sending GossipMessage %+v to peer %s", msg, p.ID)
+				log.Debugf("Sending GossipMessage %s->%s %+v", p.group.memberID, p.ID, msg)
 				err := stream.Send(msg)
 				if err != nil {
 					return
@@ -193,7 +193,7 @@ func (p *Peer) connect() error {
 						Update: &update,
 					},
 				}
-				log.Debugf("Sending GossipMessage %+v to peer %s", msg, p.ID)
+				log.Debugf("Sending GossipMessage %s->%s %+v", p.group.memberID, p.ID, msg)
 				err := stream.Send(msg)
 				if err != nil {
 					return
@@ -212,17 +212,17 @@ func (p *Peer) Read(ctx context.Context, key string) (*Object, error) {
 			PartitionID: p.group.partition.ID,
 			ServiceType: p.group.serviceType,
 			ServiceID:   p.group.serviceID,
-			MemberID:    MemberID(p.ID),
+			MemberID:    p.group.memberID,
 			Timestamp:   p.clock.Scheme().Codec().EncodeProto(p.clock.Get()),
 		},
 		Key: key,
 	}
-	log.Debugf("Sending ReadRequest %+v to peer %s", request, p.ID)
+	log.Debugf("Sending ReadRequest %s->%s %+v", p.group.memberID, p.ID, request)
 	response, err := p.client.Read(ctx, request)
 	if err != nil {
 		return nil, errors.From(err)
 	}
-	log.Debugf("Received ReadResponse %+v from peer %s", response, p.ID)
+	log.Debugf("Received ReadResponse %s-%s %+v", p.ID, p.group.memberID, response)
 	p.clock.Update(time.NewTimestamp(response.Header.Timestamp))
 	return response.Object, nil
 }
@@ -233,11 +233,11 @@ func (p *Peer) ReadAll(ctx context.Context, ch chan<- Object) error {
 			PartitionID: p.group.partition.ID,
 			ServiceType: p.group.serviceType,
 			ServiceID:   p.group.serviceID,
-			MemberID:    MemberID(p.ID),
+			MemberID:    p.group.memberID,
 			Timestamp:   p.clock.Scheme().Codec().EncodeProto(p.clock.Get()),
 		},
 	}
-	log.Debugf("Sending ReadAllRequest %+v to peer %s", request, p.ID)
+	log.Debugf("Sending ReadAllRequest %s->%s %+v", p.group.memberID, p.ID, request)
 	stream, err := p.client.ReadAll(ctx, request)
 	if err != nil {
 		return errors.From(err)
@@ -253,7 +253,7 @@ func (p *Peer) ReadAll(ctx context.Context, ch chan<- Object) error {
 				}
 				return
 			} else {
-				log.Debugf("Received ReadAllResponse %+v from peer %s", response, p.ID)
+				log.Debugf("Received ReadAllResponse %s-%s %+v", p.ID, p.group.memberID, response)
 				p.clock.Update(time.NewTimestamp(response.Header.Timestamp))
 				ch <- response.Object
 			}

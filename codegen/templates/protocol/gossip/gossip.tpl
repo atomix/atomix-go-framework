@@ -177,7 +177,9 @@ func newGossipGroup(group *gossip.PeerGroup) GossipGroup {
 		memberIDs[member.ID()] = member
 	}
 	return &gossipGroup{
-		group: group,
+		group:     group,
+		members:   members,
+		memberIDs: memberIDs,
 	}
 }
 

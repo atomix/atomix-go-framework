@@ -27,7 +27,7 @@ func init() {
 		service := &counterService{
 			protocol: protocol,
 			state: &CounterState{
-				ObjectMeta: meta.NewTimestamped(protocol.Clock().Get()).Proto(),
+				ObjectMeta: meta.NewTimestamped(protocol.Clock().Scheme().NewClock().Get()).Proto(),
 				Increments: make(map[string]int64),
 				Decrements: make(map[string]int64),
 			},
@@ -53,17 +53,21 @@ func (s *counterHandler) Update(ctx context.Context, state *CounterState) error 
 	s.service.mu.Lock()
 	defer s.service.mu.Unlock()
 	if meta.FromProto(state.ObjectMeta).Equal(meta.FromProto(s.service.state.ObjectMeta)) {
+		log.Debugf("Update %s", s.service.protocol.Group().MemberID())
 		for memberID, delta := range state.Increments {
 			if delta > s.service.state.Increments[memberID] {
+				log.Debugf("Update %s Increments[%s] = %d", s.service.protocol.Group().MemberID(), memberID, delta)
 				s.service.state.Increments[memberID] = delta
 			}
 		}
 		for memberID, delta := range state.Decrements {
 			if delta > s.service.state.Decrements[memberID] {
+				log.Debugf("Update %s Decrements[%s] = %d", s.service.protocol.Group().MemberID(), memberID, delta)
 				s.service.state.Decrements[memberID] = delta
 			}
 		}
 	} else if meta.FromProto(state.ObjectMeta).After(meta.FromProto(s.service.state.ObjectMeta)) {
+		log.Debugf("Update %s state=%+v", s.service.protocol.Group().MemberID(), state)
 		s.service.state = state
 	}
 	return nil
@@ -145,6 +149,7 @@ func (s *counterService) Increment(ctx context.Context, request *counter.Increme
 func (s *counterService) Decrement(ctx context.Context, request *counter.DecrementRequest) (*counter.DecrementResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	log.Infof("Decrement %s", s.protocol.Group().MemberID())
 	if request.Delta > 0 {
 		s.state.Decrements[s.protocol.Group().MemberID().String()] = s.state.Decrements[s.protocol.Group().MemberID().String()] + request.Delta
 	} else {

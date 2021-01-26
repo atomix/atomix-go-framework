@@ -113,7 +113,7 @@ func (m ObjectMeta) Equal(meta ObjectMeta) bool {
 }
 
 func (m ObjectMeta) Before(meta ObjectMeta) bool {
-	if m.Revision >= meta.Revision {
+	if m.Revision != 0 && meta.Revision != 0 && m.Revision >= meta.Revision {
 		return false
 	}
 	if m.Timestamp != nil && meta.Timestamp != nil && !m.Timestamp.Before(meta.Timestamp) {
@@ -123,7 +123,7 @@ func (m ObjectMeta) Before(meta ObjectMeta) bool {
 }
 
 func (m ObjectMeta) After(meta ObjectMeta) bool {
-	if m.Revision <= meta.Revision {
+	if m.Revision != 0 && meta.Revision != 0 && m.Revision <= meta.Revision {
 		return false
 	}
 	if m.Timestamp != nil && meta.Timestamp != nil && !m.Timestamp.After(meta.Timestamp) {
