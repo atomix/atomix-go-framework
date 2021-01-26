@@ -1,28 +1,26 @@
-
-
 package log
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/golang/protobuf/proto"
 	log "github.com/atomix/api/go/atomix/primitive/log"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
+	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
+	"github.com/golang/protobuf/proto"
 )
 
 const Type = "Log"
 
 const (
-    sizeOp = "Size"
-    appendOp = "Append"
-    getOp = "Get"
-    firstEntryOp = "FirstEntry"
-    lastEntryOp = "LastEntry"
-    prevEntryOp = "PrevEntry"
-    nextEntryOp = "NextEntry"
-    removeOp = "Remove"
-    clearOp = "Clear"
-    eventsOp = "Events"
-    entriesOp = "Entries"
+	sizeOp       = "Size"
+	appendOp     = "Append"
+	getOp        = "Get"
+	firstEntryOp = "FirstEntry"
+	lastEntryOp  = "LastEntry"
+	prevEntryOp  = "PrevEntry"
+	nextEntryOp  = "NextEntry"
+	removeOp     = "Remove"
+	clearOp      = "Clear"
+	eventsOp     = "Events"
+	entriesOp    = "Entries"
 )
 
 var newServiceFunc rsm.NewServiceFunc
@@ -67,262 +65,251 @@ func (s *ServiceAdaptor) init() {
 }
 
 func (s *ServiceAdaptor) SessionOpen(session rsm.Session) {
-    if sessionOpen, ok := s.rsm.(rsm.SessionOpenService); ok {
-        sessionOpen.SessionOpen(session)
-    }
+	if sessionOpen, ok := s.rsm.(rsm.SessionOpenService); ok {
+		sessionOpen.SessionOpen(session)
+	}
 }
 
 func (s *ServiceAdaptor) SessionExpired(session rsm.Session) {
-    if sessionExpired, ok := s.rsm.(rsm.SessionExpiredService); ok {
-        sessionExpired.SessionExpired(session)
-    }
+	if sessionExpired, ok := s.rsm.(rsm.SessionExpiredService); ok {
+		sessionExpired.SessionExpired(session)
+	}
 }
 
 func (s *ServiceAdaptor) SessionClosed(session rsm.Session) {
-    if sessionClosed, ok := s.rsm.(rsm.SessionClosedService); ok {
-        sessionClosed.SessionClosed(session)
-    }
+	if sessionClosed, ok := s.rsm.(rsm.SessionClosedService); ok {
+		sessionClosed.SessionClosed(session)
+	}
 }
 
 func (s *ServiceAdaptor) size(input []byte) ([]byte, error) {
-    request := &log.SizeRequest{}
+	request := &log.SizeRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.Size(request)
-	if err !=  nil {
-	    s.log.Error(err)
-    	return nil, err
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
-
 func (s *ServiceAdaptor) append(input []byte) ([]byte, error) {
-    request := &log.AppendRequest{}
+	request := &log.AppendRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.Append(request)
-	if err !=  nil {
-	    s.log.Error(err)
-    	return nil, err
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
-
 func (s *ServiceAdaptor) get(input []byte) ([]byte, error) {
-    request := &log.GetRequest{}
+	request := &log.GetRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.Get(request)
-	if err !=  nil {
-	    s.log.Error(err)
-    	return nil, err
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
-
 func (s *ServiceAdaptor) firstEntry(input []byte) ([]byte, error) {
-    request := &log.FirstEntryRequest{}
+	request := &log.FirstEntryRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.FirstEntry(request)
-	if err !=  nil {
-	    s.log.Error(err)
-    	return nil, err
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
-
 func (s *ServiceAdaptor) lastEntry(input []byte) ([]byte, error) {
-    request := &log.LastEntryRequest{}
+	request := &log.LastEntryRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.LastEntry(request)
-	if err !=  nil {
-	    s.log.Error(err)
-    	return nil, err
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
-
 func (s *ServiceAdaptor) prevEntry(input []byte) ([]byte, error) {
-    request := &log.PrevEntryRequest{}
+	request := &log.PrevEntryRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.PrevEntry(request)
-	if err !=  nil {
-	    s.log.Error(err)
-    	return nil, err
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
-
 func (s *ServiceAdaptor) nextEntry(input []byte) ([]byte, error) {
-    request := &log.NextEntryRequest{}
+	request := &log.NextEntryRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.NextEntry(request)
-	if err !=  nil {
-	    s.log.Error(err)
-    	return nil, err
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
-
 func (s *ServiceAdaptor) remove(input []byte) ([]byte, error) {
-    request := &log.RemoveRequest{}
+	request := &log.RemoveRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.Remove(request)
-	if err !=  nil {
-	    s.log.Error(err)
-    	return nil, err
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
-
 func (s *ServiceAdaptor) clear(input []byte) ([]byte, error) {
-    request := &log.ClearRequest{}
+	request := &log.ClearRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.Clear(request)
-	if err !=  nil {
-	    s.log.Error(err)
-    	return nil, err
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
-
 func (s *ServiceAdaptor) events(input []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
-    request := &log.EventsRequest{}
-    err := proto.Unmarshal(input, request)
-    if err != nil {
-        s.log.Error(err)
-        return nil, err
-    }
-    response := newServiceEventsStream(stream)
-    closer, err := s.rsm.Events(request, response)
-    if err != nil {
-        s.log.Error(err)
-        return nil, err
-    }
-    return closer, nil
+	request := &log.EventsRequest{}
+	err := proto.Unmarshal(input, request)
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
+	}
+	response := newServiceEventsStream(stream)
+	closer, err := s.rsm.Events(request, response)
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
+	}
+	return closer, nil
 }
-
 
 func (s *ServiceAdaptor) entries(input []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
-    request := &log.EntriesRequest{}
-    err := proto.Unmarshal(input, request)
-    if err != nil {
-        s.log.Error(err)
-        return nil, err
-    }
-    response := newServiceEntriesStream(stream)
-    closer, err := s.rsm.Entries(request, response)
-    if err != nil {
-        s.log.Error(err)
-        return nil, err
-    }
-    return closer, nil
+	request := &log.EntriesRequest{}
+	err := proto.Unmarshal(input, request)
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
+	}
+	response := newServiceEntriesStream(stream)
+	closer, err := s.rsm.Entries(request, response)
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
+	}
+	return closer, nil
 }
-
 
 var _ rsm.Service = &ServiceAdaptor{}

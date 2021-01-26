@@ -3,8 +3,8 @@ package counter
 import (
 	"context"
 	counter "github.com/atomix/api/go/atomix/primitive/counter"
-	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
+	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/time"
 )
 
@@ -37,12 +37,12 @@ func registerService(f func(protocol GossipProtocol) (Service, error)) {
 
 type Service interface {
 	gossip.Service
-    // Set sets the counter value
-    Set(context.Context, *counter.SetRequest) (*counter.SetResponse, error)
-    // Get gets the current counter value
-    Get(context.Context, *counter.GetRequest) (*counter.GetResponse, error)
-    // Increment increments the counter value
-    Increment(context.Context, *counter.IncrementRequest) (*counter.IncrementResponse, error)
-    // Decrement decrements the counter value
-    Decrement(context.Context, *counter.DecrementRequest) (*counter.DecrementResponse, error)
+	// Set sets the counter value
+	Set(context.Context, *counter.SetRequest) (*counter.SetResponse, error)
+	// Get gets the current counter value
+	Get(context.Context, *counter.GetRequest) (*counter.GetResponse, error)
+	// Increment increments the counter value
+	Increment(context.Context, *counter.IncrementRequest) (*counter.IncrementResponse, error)
+	// Decrement decrements the counter value
+	Decrement(context.Context, *counter.DecrementRequest) (*counter.DecrementResponse, error)
 }

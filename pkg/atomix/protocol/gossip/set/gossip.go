@@ -34,7 +34,7 @@ type GossipProtocol interface {
 
 type GossipHandler interface {
 	Read(ctx context.Context, key string) (*SetElement, error)
-    List(ctx context.Context, ch chan<- SetElement) error
+	List(ctx context.Context, ch chan<- SetElement) error
 	Update(ctx context.Context, entry *SetElement) error
 }
 
@@ -60,7 +60,7 @@ type GossipGroup interface {
 type GossipMemberID gossip.PeerID
 
 func (i GossipMemberID) String() string {
-    return string(i)
+	return string(i)
 }
 
 type GossipMember interface {
@@ -112,7 +112,7 @@ type gossipGroup struct {
 }
 
 func (p *gossipGroup) MemberID() GossipMemberID {
-    return GossipMemberID(p.group.MemberID())
+	return GossipMemberID(p.group.MemberID())
 }
 
 func (p *gossipGroup) Members() []GossipMember {
@@ -182,13 +182,13 @@ var _ GossipGroup = &gossipGroup{}
 
 func newGossipServer(serviceID gossip.ServiceID, partition *gossip.Partition) GossipServer {
 	return &gossipServer{
-        serviceID: serviceID,
+		serviceID: serviceID,
 		partition: partition,
 	}
 }
 
 type gossipServer struct {
-    serviceID     gossip.ServiceID
+	serviceID     gossip.ServiceID
 	partition     *gossip.Partition
 	gossipHandler GossipHandler
 }
@@ -247,11 +247,11 @@ func (p *gossipMember) Repair(ctx context.Context, state *SetElement) (*SetEleme
 	if err != nil {
 		return nil, err
 	}
-    if meta.FromProto(object.ObjectMeta).After(meta.FromProto(state.ObjectMeta)) {
-        err = proto.Unmarshal(object.Value, state)
-        if err != nil {
-            return nil, err
-        }
+	if meta.FromProto(object.ObjectMeta).After(meta.FromProto(state.ObjectMeta)) {
+		err = proto.Unmarshal(object.Value, state)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return state, nil
 }
@@ -278,14 +278,14 @@ var _ GossipMember = &gossipMember{}
 
 func newReplica(serviceID gossip.ServiceID, handler GossipHandler) gossip.Replica {
 	return &gossipReplica{
-        serviceID: serviceID,
+		serviceID: serviceID,
 		handler:   handler,
 	}
 }
 
 type gossipReplica struct {
-	serviceID      gossip.ServiceID
-	handler GossipHandler
+	serviceID gossip.ServiceID
+	handler   GossipHandler
 }
 
 func (s *gossipReplica) ID() gossip.ServiceID {
@@ -318,8 +318,8 @@ func (s *gossipReplica) Read(ctx context.Context, key string) (*gossip.Object, e
 		return nil, err
 	}
 	return &gossip.Object{
-        ObjectMeta: state.ObjectMeta,
-        Key:        state.Value,
+		ObjectMeta: state.ObjectMeta,
+		Key:        state.Value,
 		Value:      bytes,
 	}, nil
 }
@@ -343,7 +343,7 @@ func (s *gossipReplica) ReadAll(ctx context.Context, ch chan<- gossip.Object) er
 			}
 			object := gossip.Object{
 				ObjectMeta: state.ObjectMeta,
-				Key: state.Value,
+				Key:        state.Value,
 				Value:      bytes,
 			}
 			ch <- object

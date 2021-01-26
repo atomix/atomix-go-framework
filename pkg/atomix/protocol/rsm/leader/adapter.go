@@ -1,20 +1,18 @@
-
-
 package leader
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/golang/protobuf/proto"
 	leader "github.com/atomix/api/go/atomix/primitive/leader"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
+	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
+	"github.com/golang/protobuf/proto"
 )
 
 const Type = "LeaderLatch"
 
 const (
-    latchOp = "Latch"
-    getOp = "Get"
-    eventsOp = "Events"
+	latchOp  = "Latch"
+	getOp    = "Get"
+	eventsOp = "Events"
 )
 
 var newServiceFunc rsm.NewServiceFunc
@@ -51,84 +49,81 @@ func (s *ServiceAdaptor) init() {
 }
 
 func (s *ServiceAdaptor) SessionOpen(session rsm.Session) {
-    if sessionOpen, ok := s.rsm.(rsm.SessionOpenService); ok {
-        sessionOpen.SessionOpen(session)
-    }
+	if sessionOpen, ok := s.rsm.(rsm.SessionOpenService); ok {
+		sessionOpen.SessionOpen(session)
+	}
 }
 
 func (s *ServiceAdaptor) SessionExpired(session rsm.Session) {
-    if sessionExpired, ok := s.rsm.(rsm.SessionExpiredService); ok {
-        sessionExpired.SessionExpired(session)
-    }
+	if sessionExpired, ok := s.rsm.(rsm.SessionExpiredService); ok {
+		sessionExpired.SessionExpired(session)
+	}
 }
 
 func (s *ServiceAdaptor) SessionClosed(session rsm.Session) {
-    if sessionClosed, ok := s.rsm.(rsm.SessionClosedService); ok {
-        sessionClosed.SessionClosed(session)
-    }
+	if sessionClosed, ok := s.rsm.(rsm.SessionClosedService); ok {
+		sessionClosed.SessionClosed(session)
+	}
 }
 
 func (s *ServiceAdaptor) latch(input []byte) ([]byte, error) {
-    request := &leader.LatchRequest{}
+	request := &leader.LatchRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.Latch(request)
-	if err !=  nil {
-	    s.log.Error(err)
-    	return nil, err
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
-
 func (s *ServiceAdaptor) get(input []byte) ([]byte, error) {
-    request := &leader.GetRequest{}
+	request := &leader.GetRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.Get(request)
-	if err !=  nil {
-	    s.log.Error(err)
-    	return nil, err
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
-
 func (s *ServiceAdaptor) events(input []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
-    request := &leader.EventsRequest{}
-    err := proto.Unmarshal(input, request)
-    if err != nil {
-        s.log.Error(err)
-        return nil, err
-    }
-    response := newServiceEventsStream(stream)
-    closer, err := s.rsm.Events(request, response)
-    if err != nil {
-        s.log.Error(err)
-        return nil, err
-    }
-    return closer, nil
+	request := &leader.EventsRequest{}
+	err := proto.Unmarshal(input, request)
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
+	}
+	response := newServiceEventsStream(stream)
+	closer, err := s.rsm.Events(request, response)
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
+	}
+	return closer, nil
 }
-
 
 var _ rsm.Service = &ServiceAdaptor{}

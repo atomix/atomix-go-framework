@@ -3,8 +3,8 @@ package set
 import (
 	"context"
 	set "github.com/atomix/api/go/atomix/primitive/set"
-	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
+	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/time"
 )
 
@@ -37,18 +37,18 @@ func registerService(f func(protocol GossipProtocol) (Service, error)) {
 
 type Service interface {
 	gossip.Service
-    // Size gets the number of elements in the set
-    Size(context.Context, *set.SizeRequest) (*set.SizeResponse, error)
-    // Contains returns whether the set contains a value
-    Contains(context.Context, *set.ContainsRequest) (*set.ContainsResponse, error)
-    // Add adds a value to the set
-    Add(context.Context, *set.AddRequest) (*set.AddResponse, error)
-    // Remove removes a value from the set
-    Remove(context.Context, *set.RemoveRequest) (*set.RemoveResponse, error)
-    // Clear removes all values from the set
-    Clear(context.Context, *set.ClearRequest) (*set.ClearResponse, error)
-    // Events listens for set change events
-    Events(context.Context, *set.EventsRequest, chan<- set.EventsResponse) error
-    // Elements lists all elements in the set
-    Elements(context.Context, *set.ElementsRequest, chan<- set.ElementsResponse) error
+	// Size gets the number of elements in the set
+	Size(context.Context, *set.SizeRequest) (*set.SizeResponse, error)
+	// Contains returns whether the set contains a value
+	Contains(context.Context, *set.ContainsRequest) (*set.ContainsResponse, error)
+	// Add adds a value to the set
+	Add(context.Context, *set.AddRequest) (*set.AddResponse, error)
+	// Remove removes a value from the set
+	Remove(context.Context, *set.RemoveRequest) (*set.RemoveResponse, error)
+	// Clear removes all values from the set
+	Clear(context.Context, *set.ClearRequest) (*set.ClearResponse, error)
+	// Events listens for set change events
+	Events(context.Context, *set.EventsRequest, chan<- set.EventsResponse) error
+	// Elements lists all elements in the set
+	Elements(context.Context, *set.ElementsRequest, chan<- set.ElementsResponse) error
 }

@@ -3,8 +3,8 @@ package value
 import (
 	"context"
 	value "github.com/atomix/api/go/atomix/primitive/value"
-	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
+	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/time"
 )
 
@@ -37,10 +37,10 @@ func registerService(f func(protocol GossipProtocol) (Service, error)) {
 
 type Service interface {
 	gossip.Service
-    // Set sets the value
-    Set(context.Context, *value.SetRequest) (*value.SetResponse, error)
-    // Get gets the value
-    Get(context.Context, *value.GetRequest) (*value.GetResponse, error)
-    // Events listens for value change events
-    Events(context.Context, *value.EventsRequest, chan<- value.EventsResponse) error
+	// Set sets the value
+	Set(context.Context, *value.SetRequest) (*value.SetResponse, error)
+	// Get gets the value
+	Get(context.Context, *value.GetRequest) (*value.GetResponse, error)
+	// Events listens for value change events
+	Events(context.Context, *value.EventsRequest, chan<- value.EventsResponse) error
 }

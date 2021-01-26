@@ -1,20 +1,18 @@
-
-
 package lock
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/golang/protobuf/proto"
 	lock "github.com/atomix/api/go/atomix/primitive/lock"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
+	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
+	"github.com/golang/protobuf/proto"
 )
 
 const Type = "Lock"
 
 const (
-    lockOp = "Lock"
-    unlockOp = "Unlock"
-    getLockOp = "GetLock"
+	lockOp    = "Lock"
+	unlockOp  = "Unlock"
+	getLockOp = "GetLock"
 )
 
 var newServiceFunc rsm.NewServiceFunc
@@ -51,84 +49,81 @@ func (s *ServiceAdaptor) init() {
 }
 
 func (s *ServiceAdaptor) SessionOpen(session rsm.Session) {
-    if sessionOpen, ok := s.rsm.(rsm.SessionOpenService); ok {
-        sessionOpen.SessionOpen(session)
-    }
+	if sessionOpen, ok := s.rsm.(rsm.SessionOpenService); ok {
+		sessionOpen.SessionOpen(session)
+	}
 }
 
 func (s *ServiceAdaptor) SessionExpired(session rsm.Session) {
-    if sessionExpired, ok := s.rsm.(rsm.SessionExpiredService); ok {
-        sessionExpired.SessionExpired(session)
-    }
+	if sessionExpired, ok := s.rsm.(rsm.SessionExpiredService); ok {
+		sessionExpired.SessionExpired(session)
+	}
 }
 
 func (s *ServiceAdaptor) SessionClosed(session rsm.Session) {
-    if sessionClosed, ok := s.rsm.(rsm.SessionClosedService); ok {
-        sessionClosed.SessionClosed(session)
-    }
+	if sessionClosed, ok := s.rsm.(rsm.SessionClosedService); ok {
+		sessionClosed.SessionClosed(session)
+	}
 }
 
 func (s *ServiceAdaptor) lock(input []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
-    request := &lock.LockRequest{}
-    err := proto.Unmarshal(input, request)
-    if err != nil {
-        s.log.Error(err)
-        return nil, err
-    }
-    future, err := s.rsm.Lock(request)
-    if err != nil {
-        s.log.Error(err)
-        return nil, err
-    }
-    future.setStream(stream)
-    return nil, nil
-}
-
-
-func (s *ServiceAdaptor) unlock(input []byte) ([]byte, error) {
-    request := &lock.UnlockRequest{}
+	request := &lock.LockRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
+		return nil, err
+	}
+	future, err := s.rsm.Lock(request)
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
+	}
+	future.setStream(stream)
+	return nil, nil
+}
+
+func (s *ServiceAdaptor) unlock(input []byte) ([]byte, error) {
+	request := &lock.UnlockRequest{}
+	err := proto.Unmarshal(input, request)
+	if err != nil {
+		s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.Unlock(request)
-	if err !=  nil {
-	    s.log.Error(err)
-    	return nil, err
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
-
 func (s *ServiceAdaptor) getLock(input []byte) ([]byte, error) {
-    request := &lock.GetLockRequest{}
+	request := &lock.GetLockRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.GetLock(request)
-	if err !=  nil {
-	    s.log.Error(err)
-    	return nil, err
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
-
 
 var _ rsm.Service = &ServiceAdaptor{}
