@@ -83,7 +83,7 @@ func newGossipProtocol(serviceID gossip.ServiceID, partition *gossip.Partition, 
 	return &gossipProtocol{
 		clock:  clock,
 		group:  newGossipGroup(peers),
-		server: newGossipServer(partition),
+		server: newGossipServer(serviceID, partition),
 	}, nil
 }
 
@@ -291,20 +291,22 @@ func (p *gossipGroup) Update(ctx context.Context, state *{{ template "type" .Pri
 
 var _ GossipGroup = &gossipGroup{}
 
-func newGossipServer(partition *gossip.Partition) GossipServer {
+func newGossipServer(serviceID gossip.ServiceID, partition *gossip.Partition) GossipServer {
 	return &gossipServer{
+        serviceID: serviceID,
 		partition: partition,
 	}
 }
 
 type gossipServer struct {
+    serviceID     gossip.ServiceID
 	partition     *gossip.Partition
 	gossipHandler GossipHandler
 }
 
 func (s *gossipServer) Register(handler GossipHandler) error {
 	s.gossipHandler = handler
-	return s.partition.RegisterReplica(newReplica(handler))
+	return s.partition.RegisterReplica(newReplica(s.serviceID, handler))
 }
 
 func (s *gossipServer) handler() GossipHandler {
@@ -413,19 +415,20 @@ func (p *gossipMember) Update(ctx context.Context, state *{{ template "type" .Pr
 
 var _ GossipMember = &gossipMember{}
 
-func newReplica(handler GossipHandler) gossip.Replica {
+func newReplica(serviceID gossip.ServiceID, handler GossipHandler) gossip.Replica {
 	return &gossipReplica{
-		handler: handler,
+        serviceID: serviceID,
+		handler:   handler,
 	}
 }
 
 type gossipReplica struct {
-	id      gossip.ServiceID
+	serviceID      gossip.ServiceID
 	handler GossipHandler
 }
 
 func (s *gossipReplica) ID() gossip.ServiceID {
-	return s.id
+	return s.serviceID
 }
 
 func (s *gossipReplica) Type() gossip.ServiceType {

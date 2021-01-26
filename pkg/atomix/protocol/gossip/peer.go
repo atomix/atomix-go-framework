@@ -77,18 +77,21 @@ func (p *Peer) connect() error {
 		return err
 	}
 	p.cancel = cancel
-	err = stream.Send(&GossipMessage{
+	msg := &GossipMessage{
 		Message: &GossipMessage_Initialize{
 			Initialize: &Initialize{
 				Header: RequestHeader{
 					PartitionID: p.group.partition.ID,
 					ServiceType: p.group.serviceType,
 					ServiceID:   p.group.serviceID,
+					MemberID:    MemberID(p.ID),
 					Timestamp:   p.clock.Scheme().Codec().EncodeProto(p.clock.Increment()),
 				},
 			},
 		},
-	})
+	}
+	log.Debugf("Sending GossipMessage %+v to peer %s", msg, p.ID)
+	err = stream.Send(msg)
 	if err != nil {
 		return err
 	}
@@ -102,6 +105,7 @@ func (p *Peer) connect() error {
 				log.Error(err)
 				return
 			} else {
+				log.Debugf("Received GossipMessage %+v", msg)
 				replica, err := p.group.partition.getReplica(ctx, p.group.serviceType, p.group.serviceID)
 				if err != nil {
 					log.Error(err)
@@ -117,7 +121,7 @@ func (p *Peer) connect() error {
 						return
 					} else if object != nil {
 						if meta.FromProto(object.ObjectMeta).After(meta.FromProto(m.Advertise.ObjectMeta)) {
-							err := stream.Send(&GossipMessage{
+							msg := &GossipMessage{
 								Message: &GossipMessage_Update{
 									Update: &Update{
 										Header: GossipHeader{
@@ -126,13 +130,15 @@ func (p *Peer) connect() error {
 										Object: *object,
 									},
 								},
-							})
+							}
+							log.Debugf("Sending GossipMessage %+v to peer %s", msg, p.ID)
+							err := stream.Send(msg)
 							if err != nil {
 								log.Error(err)
 								return
 							}
 						} else if meta.FromProto(m.Advertise.ObjectMeta).After(meta.FromProto(object.ObjectMeta)) {
-							err := stream.Send(&GossipMessage{
+							msg := &GossipMessage{
 								Message: &GossipMessage_Advertise{
 									Advertise: &Advertise{
 										Header: GossipHeader{
@@ -142,7 +148,9 @@ func (p *Peer) connect() error {
 										Key:        object.Key,
 									},
 								},
-							})
+							}
+							log.Debugf("Sending GossipMessage %+v to peer %s", msg, p.ID)
+							err := stream.Send(msg)
 							if err != nil {
 								log.Error(err)
 								return
@@ -168,21 +176,25 @@ func (p *Peer) connect() error {
 			select {
 			case advertise := <-p.advertiseCh:
 				advertise.Header.Timestamp = p.clock.Scheme().Codec().EncodeProto(p.clock.Increment())
-				err := stream.Send(&GossipMessage{
+				msg := &GossipMessage{
 					Message: &GossipMessage_Advertise{
 						Advertise: &advertise,
 					},
-				})
+				}
+				log.Debugf("Sending GossipMessage %+v to peer %s", msg, p.ID)
+				err := stream.Send(msg)
 				if err != nil {
 					return
 				}
 			case update := <-p.updateCh:
 				update.Header.Timestamp = p.clock.Scheme().Codec().EncodeProto(p.clock.Increment())
-				err := stream.Send(&GossipMessage{
+				msg := &GossipMessage{
 					Message: &GossipMessage_Update{
 						Update: &update,
 					},
-				})
+				}
+				log.Debugf("Sending GossipMessage %+v to peer %s", msg, p.ID)
+				err := stream.Send(msg)
 				if err != nil {
 					return
 				}
@@ -200,14 +212,17 @@ func (p *Peer) Read(ctx context.Context, key string) (*Object, error) {
 			PartitionID: p.group.partition.ID,
 			ServiceType: p.group.serviceType,
 			ServiceID:   p.group.serviceID,
+			MemberID:    MemberID(p.ID),
 			Timestamp:   p.clock.Scheme().Codec().EncodeProto(p.clock.Get()),
 		},
 		Key: key,
 	}
+	log.Debugf("Sending ReadRequest %+v to peer %s", request, p.ID)
 	response, err := p.client.Read(ctx, request)
 	if err != nil {
 		return nil, errors.From(err)
 	}
+	log.Debugf("Received ReadResponse %+v from peer %s", response, p.ID)
 	p.clock.Update(time.NewTimestamp(response.Header.Timestamp))
 	return response.Object, nil
 }
@@ -218,9 +233,11 @@ func (p *Peer) ReadAll(ctx context.Context, ch chan<- Object) error {
 			PartitionID: p.group.partition.ID,
 			ServiceType: p.group.serviceType,
 			ServiceID:   p.group.serviceID,
+			MemberID:    MemberID(p.ID),
 			Timestamp:   p.clock.Scheme().Codec().EncodeProto(p.clock.Get()),
 		},
 	}
+	log.Debugf("Sending ReadAllRequest %+v to peer %s", request, p.ID)
 	stream, err := p.client.ReadAll(ctx, request)
 	if err != nil {
 		return errors.From(err)
@@ -236,6 +253,7 @@ func (p *Peer) ReadAll(ctx context.Context, ch chan<- Object) error {
 				}
 				return
 			} else {
+				log.Debugf("Received ReadAllResponse %+v from peer %s", response, p.ID)
 				p.clock.Update(time.NewTimestamp(response.Header.Timestamp))
 				ch <- response.Object
 			}

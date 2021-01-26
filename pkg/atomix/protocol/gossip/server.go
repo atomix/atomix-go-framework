@@ -46,6 +46,8 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 	}
 
 	init := msg.GetInitialize()
+	memberID := init.Header.MemberID
+	log.Debugf("Received GossipMessage %+v from peer %s", msg, memberID)
 	replica, err := s.getReplica(stream.Context(), init.Header.PartitionID, init.Header.ServiceType, init.Header.ServiceID)
 	if err != nil {
 		return errors.Proto(err)
@@ -59,6 +61,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 			return err
 		}
 
+		log.Debugf("Received GossipMessage %+v from peer %s", msg, memberID)
 		switch m := msg.Message.(type) {
 		case *GossipMessage_Advertise:
 			s.manager.clock.Update(time.NewTimestamp(m.Advertise.Header.Timestamp))
@@ -67,7 +70,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 				return err
 			} else if object != nil {
 				if meta.FromProto(object.ObjectMeta).After(meta.FromProto(m.Advertise.ObjectMeta)) {
-					err := stream.Send(&GossipMessage{
+					msg := &GossipMessage{
 						Message: &GossipMessage_Update{
 							Update: &Update{
 								Header: GossipHeader{
@@ -76,12 +79,14 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 								Object: *object,
 							},
 						},
-					})
+					}
+					log.Debugf("Sending GossipMessage %+v to peer %s", msg, memberID)
+					err := stream.Send(msg)
 					if err != nil {
 						return err
 					}
 				} else if meta.FromProto(m.Advertise.ObjectMeta).After(meta.FromProto(object.ObjectMeta)) {
-					err := stream.Send(&GossipMessage{
+					msg := &GossipMessage{
 						Message: &GossipMessage_Advertise{
 							Advertise: &Advertise{
 								Header: GossipHeader{
@@ -91,7 +96,9 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 								Key:        object.Key,
 							},
 						},
-					})
+					}
+					log.Debugf("Sending GossipMessage %+v to peer %s", msg, memberID)
+					err := stream.Send(msg)
 					if err != nil {
 						return err
 					}
@@ -108,6 +115,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 }
 
 func (s *GossipServer) Read(ctx context.Context, request *ReadRequest) (*ReadResponse, error) {
+	log.Debugf("Received ReadRequest %+v from peer %s", request, request.Header.MemberID)
 	timestamp := s.manager.clock.Update(time.NewTimestamp(request.Header.Timestamp))
 	replica, err := s.getReplica(ctx, request.Header.PartitionID, request.Header.ServiceType, request.Header.ServiceID)
 	if err != nil {
@@ -117,15 +125,18 @@ func (s *GossipServer) Read(ctx context.Context, request *ReadRequest) (*ReadRes
 	if err != nil {
 		return nil, errors.Proto(err)
 	}
-	return &ReadResponse{
+	response := &ReadResponse{
 		Header: ResponseHeader{
 			Timestamp: s.manager.clock.Scheme().Codec().EncodeProto(timestamp),
 		},
 		Object: object,
-	}, nil
+	}
+	log.Debugf("Sending ReadResponse %+v to peer %s", response, request.Header.MemberID)
+	return response, nil
 }
 
 func (s *GossipServer) ReadAll(request *ReadAllRequest, stream GossipProtocol_ReadAllServer) error {
+	log.Debugf("Received ReadAllRequest %+v from peer %s", request, request.Header.MemberID)
 	timestamp := s.manager.clock.Update(time.NewTimestamp(request.Header.Timestamp))
 	replica, err := s.getReplica(stream.Context(), request.Header.PartitionID, request.Header.ServiceType, request.Header.ServiceID)
 	if err != nil {
@@ -146,12 +157,14 @@ func (s *GossipServer) ReadAll(request *ReadAllRequest, stream GossipProtocol_Re
 		select {
 		case object, ok := <-objectCh:
 			if ok {
-				err := stream.Send(&ReadAllResponse{
+				response := &ReadAllResponse{
 					Header: ResponseHeader{
 						Timestamp: s.manager.clock.Scheme().Codec().EncodeProto(timestamp),
 					},
 					Object: object,
-				})
+				}
+				log.Debugf("Sending ReadResponse %+v to peer %s", response, request.Header.MemberID)
+				err := stream.Send(response)
 				if err != nil {
 					return errors.Proto(err)
 				}

@@ -26,7 +26,8 @@ message RequestHeader {
     uint32 partition_id = 1 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "PartitionID"];
     string service_type = 2 [(gogoproto.casttype) = "ServiceType"];
     string service_id = 3 [(gogoproto.customname) = "ServiceID", (gogoproto.casttype) = "ServiceID"];
-    atomix.primitive.meta.Timestamp timestamp = 4 [(gogoproto.nullable) = false];
+    string member_id = 4 [(gogoproto.customname) = "MemberID", (gogoproto.casttype) = "MemberID"];
+    atomix.primitive.meta.Timestamp timestamp = 5 [(gogoproto.nullable) = false];
 }
 
 message ResponseHeader {

@@ -102,6 +102,9 @@ func (s *counterService) Set(ctx context.Context, request *counter.SetRequest) (
 		} else {
 			s.state.Decrements[s.protocol.Group().MemberID().String()] = request.Value * -1
 		}
+		if err := s.protocol.Group().Update(ctx, s.state); err != nil {
+			return nil, err
+		}
 	}
 	return &counter.SetResponse{
 		Value: s.getValue(),
@@ -131,6 +134,9 @@ func (s *counterService) Increment(ctx context.Context, request *counter.Increme
 	} else {
 		s.state.Decrements[s.protocol.Group().MemberID().String()] = s.state.Decrements[s.protocol.Group().MemberID().String()] + request.Delta
 	}
+	if err := s.protocol.Group().Update(ctx, s.state); err != nil {
+		return nil, err
+	}
 	return &counter.IncrementResponse{
 		Value: s.getValue(),
 	}, nil
@@ -143,6 +149,9 @@ func (s *counterService) Decrement(ctx context.Context, request *counter.Decreme
 		s.state.Decrements[s.protocol.Group().MemberID().String()] = s.state.Decrements[s.protocol.Group().MemberID().String()] + request.Delta
 	} else {
 		s.state.Increments[s.protocol.Group().MemberID().String()] = s.state.Increments[s.protocol.Group().MemberID().String()] + request.Delta
+	}
+	if err := s.protocol.Group().Update(ctx, s.state); err != nil {
+		return nil, err
 	}
 	return &counter.DecrementResponse{
 		Value: s.getValue(),
