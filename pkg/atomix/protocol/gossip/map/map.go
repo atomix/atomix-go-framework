@@ -81,8 +81,8 @@ func newStateEntry(entry *mapapi.Entry) *MapEntry {
 	}
 	if entry.Value != nil {
 		state.Value = &MapValue{
-			Value: state.Value.Value,
-			TTL:   state.Value.TTL,
+			Value: entry.Value.Value,
+			TTL:   entry.Value.TTL,
 		}
 	}
 	return state
@@ -100,8 +100,8 @@ func newMapEntry(state *MapEntry) *mapapi.Entry {
 	}
 	if state.Value != nil {
 		entry.Value = &mapapi.Value{
-			Value: entry.Value.Value,
-			TTL:   entry.Value.TTL,
+			Value: state.Value.Value,
+			TTL:   state.Value.TTL,
 		}
 	}
 	return entry
@@ -138,6 +138,9 @@ func (s *mapService) Put(ctx context.Context, request *mapapi.PutRequest) (*mapa
 			Type:  mapapi.Event_INSERT,
 			Entry: *newEntry,
 		})
+		return &mapapi.PutResponse{
+			Entry: *newEntry,
+		}, nil
 	}
 
 	if err := checkPreconditions(oldEntry, request.Preconditions); err != nil {
