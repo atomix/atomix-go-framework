@@ -41,8 +41,8 @@ type Scheme interface {
 	// Name returns the scheme's name
 	Name() string
 
-	// TimestampCodec returns the scheme's codec
-	Codec() TimestampCodec
+	// Codec returns the scheme's codec
+	Codec() Codec
 
 	// NewClock creates a new clock
 	NewClock() Clock
@@ -60,10 +60,10 @@ type Clock interface {
 	Update(Timestamp) Timestamp
 }
 
-// TimestampCodec is a timestamp codec
-type TimestampCodec interface {
-	EncodeProto(Timestamp) metaapi.Timestamp
-	DecodeProto(metaapi.Timestamp) (Timestamp, error)
+// Codec is a time codec
+type Codec interface {
+	EncodeTimestamp(Timestamp) metaapi.Timestamp
+	DecodeTimestamp(metaapi.Timestamp) (Timestamp, error)
 }
 
 // Timestamp is a timestamp

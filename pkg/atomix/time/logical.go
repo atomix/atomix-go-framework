@@ -31,14 +31,14 @@ func newLogicalScheme() Scheme {
 }
 
 type logicalScheme struct {
-	codec TimestampCodec
+	codec Codec
 }
 
 func (s logicalScheme) Name() string {
 	return logicalSchemeName
 }
 
-func (s logicalScheme) Codec() TimestampCodec {
+func (s logicalScheme) Codec() Codec {
 	return s.codec
 }
 
@@ -149,7 +149,7 @@ func (t LogicalTimestamp) Equal(u Timestamp) bool {
 // LogicalTimestampCodec is a codec for logical timestamps
 type LogicalTimestampCodec struct{}
 
-func (c LogicalTimestampCodec) EncodeProto(timestamp Timestamp) metaapi.Timestamp {
+func (c LogicalTimestampCodec) EncodeTimestamp(timestamp Timestamp) metaapi.Timestamp {
 	t, ok := timestamp.(LogicalTimestamp)
 	if !ok {
 		panic("expected LogicalTimestamp")
@@ -163,6 +163,6 @@ func (c LogicalTimestampCodec) EncodeProto(timestamp Timestamp) metaapi.Timestam
 	}
 }
 
-func (c LogicalTimestampCodec) DecodeProto(timestamp metaapi.Timestamp) (Timestamp, error) {
+func (c LogicalTimestampCodec) DecodeTimestamp(timestamp metaapi.Timestamp) (Timestamp, error) {
 	return NewLogicalTimestamp(LogicalTime(timestamp.GetLogicalTimestamp().Time)), nil
 }

@@ -32,14 +32,14 @@ func newPhysicalScheme() Scheme {
 }
 
 type physicalScheme struct {
-	codec TimestampCodec
+	codec Codec
 }
 
 func (s physicalScheme) Name() string {
 	return physicalSchemeName
 }
 
-func (s physicalScheme) Codec() TimestampCodec {
+func (s physicalScheme) Codec() Codec {
 	return s.codec
 }
 
@@ -136,7 +136,7 @@ func (t PhysicalTimestamp) Equal(u Timestamp) bool {
 // PhysicalTimestampCodec is a codec for physical timestamps
 type PhysicalTimestampCodec struct{}
 
-func (c PhysicalTimestampCodec) EncodeProto(timestamp Timestamp) metaapi.Timestamp {
+func (c PhysicalTimestampCodec) EncodeTimestamp(timestamp Timestamp) metaapi.Timestamp {
 	t, ok := timestamp.(PhysicalTimestamp)
 	if !ok {
 		panic("expected PhysicalTimestamp")
@@ -150,6 +150,6 @@ func (c PhysicalTimestampCodec) EncodeProto(timestamp Timestamp) metaapi.Timesta
 	}
 }
 
-func (c PhysicalTimestampCodec) DecodeProto(timestamp metaapi.Timestamp) (Timestamp, error) {
+func (c PhysicalTimestampCodec) DecodeTimestamp(timestamp metaapi.Timestamp) (Timestamp, error) {
 	return NewPhysicalTimestamp(PhysicalTime(timestamp.GetPhysicalTimestamp().Time)), nil
 }

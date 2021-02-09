@@ -23,7 +23,7 @@ const compositeSchemeName = "Composite"
 
 // newCompositeScheme creates a new composite scheme
 func newCompositeScheme(schemes ...Scheme) Scheme {
-	codecs := make([]TimestampCodec, len(schemes))
+	codecs := make([]Codec, len(schemes))
 	for i, scheme := range schemes {
 		codecs[i] = scheme.Codec()
 	}
@@ -35,14 +35,14 @@ func newCompositeScheme(schemes ...Scheme) Scheme {
 
 type compositeScheme struct {
 	schemes []Scheme
-	codec   TimestampCodec
+	codec   Codec
 }
 
 func (s compositeScheme) Name() string {
 	return compositeSchemeName
 }
 
-func (s compositeScheme) Codec() TimestampCodec {
+func (s compositeScheme) Codec() Codec {
 	return s.codec
 }
 
@@ -208,17 +208,17 @@ func (t CompositeTimestamp) Equal(u Timestamp) bool {
 
 // CompositeTimestampCodec is a codec for Composite timestamps
 type CompositeTimestampCodec struct {
-	codecs []TimestampCodec
+	codecs []Codec
 }
 
-func (c CompositeTimestampCodec) EncodeProto(timestamp Timestamp) metaapi.Timestamp {
+func (c CompositeTimestampCodec) EncodeTimestamp(timestamp Timestamp) metaapi.Timestamp {
 	t, ok := timestamp.(CompositeTimestamp)
 	if !ok {
 		panic("expected CompositeTimestamp")
 	}
 	timestamps := make([]metaapi.Timestamp, 0, len(t.Timestamps))
 	for _, timestamp := range t.Timestamps {
-		timestamps = append(timestamps, timestamp.Scheme().Codec().EncodeProto(timestamp))
+		timestamps = append(timestamps, timestamp.Scheme().Codec().EncodeTimestamp(timestamp))
 	}
 	return metaapi.Timestamp{
 		Timestamp: &metaapi.Timestamp_CompositeTimestamp{
@@ -229,7 +229,7 @@ func (c CompositeTimestampCodec) EncodeProto(timestamp Timestamp) metaapi.Timest
 	}
 }
 
-func (c CompositeTimestampCodec) DecodeProto(timestamp metaapi.Timestamp) (Timestamp, error) {
+func (c CompositeTimestampCodec) DecodeTimestamp(timestamp metaapi.Timestamp) (Timestamp, error) {
 	timestamps := make([]Timestamp, 0, len(timestamp.GetCompositeTimestamp().Timestamps))
 	for _, timestamp := range timestamp.GetCompositeTimestamp().Timestamps {
 		timestamps = append(timestamps, NewTimestamp(timestamp))

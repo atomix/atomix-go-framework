@@ -31,14 +31,14 @@ func newEpochScheme() Scheme {
 }
 
 type epochScheme struct {
-	codec TimestampCodec
+	codec Codec
 }
 
 func (s epochScheme) Name() string {
 	return epochSchemeName
 }
 
-func (s epochScheme) Codec() TimestampCodec {
+func (s epochScheme) Codec() Codec {
 	return s.codec
 }
 
@@ -142,7 +142,7 @@ func (t EpochTimestamp) Equal(u Timestamp) bool {
 // EpochTimestampCodec is a codec for epoch timestamps
 type EpochTimestampCodec struct{}
 
-func (c EpochTimestampCodec) EncodeProto(timestamp Timestamp) metaapi.Timestamp {
+func (c EpochTimestampCodec) EncodeTimestamp(timestamp Timestamp) metaapi.Timestamp {
 	t, ok := timestamp.(EpochTimestamp)
 	if !ok {
 		panic("expected EpochTimestamp")
@@ -161,7 +161,7 @@ func (c EpochTimestampCodec) EncodeProto(timestamp Timestamp) metaapi.Timestamp 
 	}
 }
 
-func (c EpochTimestampCodec) DecodeProto(timestamp metaapi.Timestamp) (Timestamp, error) {
+func (c EpochTimestampCodec) DecodeTimestamp(timestamp metaapi.Timestamp) (Timestamp, error) {
 	return NewEpochTimestamp(Epoch(timestamp.GetEpochTimestamp().Epoch.Num), LogicalTime(timestamp.GetEpochTimestamp().Sequence.Num)), nil
 }
 
