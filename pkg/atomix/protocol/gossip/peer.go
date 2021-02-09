@@ -85,7 +85,7 @@ func (p *Peer) connect() error {
 					ServiceType: p.group.serviceType,
 					ServiceID:   p.group.serviceID,
 					MemberID:    p.group.memberID,
-					Timestamp:   p.clock.Scheme().Codec().EncodeProto(p.clock.Increment()),
+					Timestamp:   p.clock.Scheme().Codec().EncodeTimestamp(p.clock.Increment()),
 				},
 			},
 		},
@@ -125,7 +125,7 @@ func (p *Peer) connect() error {
 								Message: &GossipMessage_Update{
 									Update: &Update{
 										Header: GossipHeader{
-											Timestamp: p.clock.Scheme().Codec().EncodeProto(p.clock.Increment()),
+											Timestamp: p.clock.Scheme().Codec().EncodeTimestamp(p.clock.Increment()),
 										},
 										Object: *object,
 									},
@@ -142,7 +142,7 @@ func (p *Peer) connect() error {
 								Message: &GossipMessage_Advertise{
 									Advertise: &Advertise{
 										Header: GossipHeader{
-											Timestamp: p.clock.Scheme().Codec().EncodeProto(p.clock.Increment()),
+											Timestamp: p.clock.Scheme().Codec().EncodeTimestamp(p.clock.Increment()),
 										},
 										ObjectMeta: object.ObjectMeta,
 										Key:        object.Key,
@@ -175,7 +175,7 @@ func (p *Peer) connect() error {
 		for {
 			select {
 			case advertise := <-p.advertiseCh:
-				advertise.Header.Timestamp = p.clock.Scheme().Codec().EncodeProto(p.clock.Increment())
+				advertise.Header.Timestamp = p.clock.Scheme().Codec().EncodeTimestamp(p.clock.Increment())
 				msg := &GossipMessage{
 					Message: &GossipMessage_Advertise{
 						Advertise: &advertise,
@@ -187,7 +187,7 @@ func (p *Peer) connect() error {
 					return
 				}
 			case update := <-p.updateCh:
-				update.Header.Timestamp = p.clock.Scheme().Codec().EncodeProto(p.clock.Increment())
+				update.Header.Timestamp = p.clock.Scheme().Codec().EncodeTimestamp(p.clock.Increment())
 				msg := &GossipMessage{
 					Message: &GossipMessage_Update{
 						Update: &update,
@@ -213,7 +213,7 @@ func (p *Peer) Read(ctx context.Context, key string) (*Object, error) {
 			ServiceType: p.group.serviceType,
 			ServiceID:   p.group.serviceID,
 			MemberID:    p.group.memberID,
-			Timestamp:   p.clock.Scheme().Codec().EncodeProto(p.clock.Get()),
+			Timestamp:   p.clock.Scheme().Codec().EncodeTimestamp(p.clock.Get()),
 		},
 		Key: key,
 	}
@@ -234,7 +234,7 @@ func (p *Peer) ReadAll(ctx context.Context, ch chan<- Object) error {
 			ServiceType: p.group.serviceType,
 			ServiceID:   p.group.serviceID,
 			MemberID:    p.group.memberID,
-			Timestamp:   p.clock.Scheme().Codec().EncodeProto(p.clock.Get()),
+			Timestamp:   p.clock.Scheme().Codec().EncodeTimestamp(p.clock.Get()),
 		},
 	}
 	log.Debugf("Sending ReadAllRequest %s->%s %+v", p.group.memberID, p.ID, request)

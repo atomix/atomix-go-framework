@@ -56,7 +56,7 @@ func (p *Client) prepareTimestamp(timestamp *meta.Timestamp) *meta.Timestamp {
 	} else {
 		t = p.clock.Increment()
 	}
-	proto := p.clock.Scheme().Codec().EncodeProto(t)
+	proto := p.clock.Scheme().Codec().EncodeTimestamp(t)
 	return &proto
 }
 

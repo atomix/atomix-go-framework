@@ -76,7 +76,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 						Message: &GossipMessage_Update{
 							Update: &Update{
 								Header: GossipHeader{
-									Timestamp: s.manager.clock.Scheme().Codec().EncodeProto(s.manager.clock.Increment()),
+									Timestamp: s.manager.clock.Scheme().Codec().EncodeTimestamp(s.manager.clock.Increment()),
 								},
 								Object: *object,
 							},
@@ -92,7 +92,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 						Message: &GossipMessage_Advertise{
 							Advertise: &Advertise{
 								Header: GossipHeader{
-									Timestamp: s.manager.clock.Scheme().Codec().EncodeProto(s.manager.clock.Increment()),
+									Timestamp: s.manager.clock.Scheme().Codec().EncodeTimestamp(s.manager.clock.Increment()),
 								},
 								ObjectMeta: object.ObjectMeta,
 								Key:        object.Key,
@@ -130,7 +130,7 @@ func (s *GossipServer) Read(ctx context.Context, request *ReadRequest) (*ReadRes
 	}
 	response := &ReadResponse{
 		Header: ResponseHeader{
-			Timestamp: s.manager.clock.Scheme().Codec().EncodeProto(timestamp),
+			Timestamp: s.manager.clock.Scheme().Codec().EncodeTimestamp(timestamp),
 		},
 		Object: object,
 	}
@@ -163,7 +163,7 @@ func (s *GossipServer) ReadAll(request *ReadAllRequest, stream GossipProtocol_Re
 			if ok {
 				response := &ReadAllResponse{
 					Header: ResponseHeader{
-						Timestamp: s.manager.clock.Scheme().Codec().EncodeProto(timestamp),
+						Timestamp: s.manager.clock.Scheme().Codec().EncodeTimestamp(timestamp),
 					},
 					Object: object,
 				}

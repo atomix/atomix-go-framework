@@ -60,7 +60,7 @@ func (m *Manager) prepareTimestamp(timestamp *meta.Timestamp) *meta.Timestamp {
 	} else {
 		t = m.clock.Increment()
 	}
-	proto := m.clock.Scheme().Codec().EncodeProto(t)
+	proto := m.clock.Scheme().Codec().EncodeTimestamp(t)
 	return &proto
 }
 
