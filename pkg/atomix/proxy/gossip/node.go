@@ -40,7 +40,7 @@ func NewNode(cluster cluster.Cluster, scheme time.Scheme) *Node {
 type Node struct {
 	Cluster  cluster.Cluster
 	client   *Client
-	registry Registry
+	registry *Registry
 }
 
 // RegisterService registers a primitive service

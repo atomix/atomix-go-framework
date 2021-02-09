@@ -21,33 +21,24 @@ import (
 // RegisterProxyFunc is a function for registering a proxy
 type RegisterProxyFunc func(server *grpc.Server, client *Client)
 
-// Registry is a primitive registry
-type Registry interface {
-	// RegisterProxy registers a primitive proxy
-	RegisterProxy(f RegisterProxyFunc)
-
-	// GetProxies gets a list of primitives
-	GetProxies() []RegisterProxyFunc
+// NewRegistry creates a new primitive registry
+func NewRegistry() *Registry {
+	return &Registry{}
 }
 
-// primitiveRegistry is the default primitive registry
-type primitiveRegistry struct {
+// Registry is the default primitive registry
+type Registry struct {
 	proxies []RegisterProxyFunc
 }
 
-func (r *primitiveRegistry) RegisterProxy(primitive RegisterProxyFunc) {
+func (r *Registry) RegisterProxy(primitive RegisterProxyFunc) {
 	r.proxies = append(r.proxies, primitive)
 }
 
-func (r *primitiveRegistry) GetProxies() []RegisterProxyFunc {
+func (r *Registry) GetProxies() []RegisterProxyFunc {
 	proxies := make([]RegisterProxyFunc, 0, len(r.proxies))
 	for _, proxy := range r.proxies {
 		proxies = append(proxies, proxy)
 	}
 	return proxies
-}
-
-// NewRegistry creates a new primitive registry
-func NewRegistry() Registry {
-	return &primitiveRegistry{}
 }

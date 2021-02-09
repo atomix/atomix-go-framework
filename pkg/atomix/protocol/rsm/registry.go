@@ -17,28 +17,16 @@ package rsm
 // NewServiceFunc is a function for creating a primitive service
 type NewServiceFunc func(scheduler Scheduler, context ServiceContext) Service
 
-// Registry is a primitive registry
-type Registry interface {
-	// Register registers a primitive
-	Register(primitiveType string, f NewServiceFunc)
-
-	// GetServices gets a list of primitives
-	GetServices() []NewServiceFunc
-
-	// GetService gets a primitive by type
-	GetService(primitiveType string) NewServiceFunc
-}
-
-// primitiveRegistry is the default primitive registry
-type primitiveRegistry struct {
+// Registry is the default primitive registry
+type Registry struct {
 	services map[string]NewServiceFunc
 }
 
-func (r *primitiveRegistry) Register(primitiveType string, primitive NewServiceFunc) {
+func (r *Registry) Register(primitiveType string, primitive NewServiceFunc) {
 	r.services[primitiveType] = primitive
 }
 
-func (r *primitiveRegistry) GetServices() []NewServiceFunc {
+func (r *Registry) GetServices() []NewServiceFunc {
 	services := make([]NewServiceFunc, 0, len(r.services))
 	for _, service := range r.services {
 		services = append(services, service)
@@ -46,13 +34,13 @@ func (r *primitiveRegistry) GetServices() []NewServiceFunc {
 	return services
 }
 
-func (r *primitiveRegistry) GetService(primitiveType string) NewServiceFunc {
+func (r *Registry) GetService(primitiveType string) NewServiceFunc {
 	return r.services[primitiveType]
 }
 
 // NewRegistry creates a new primitive registry
-func NewRegistry() Registry {
-	return &primitiveRegistry{
+func NewRegistry() *Registry {
+	return &Registry{
 		services: make(map[string]NewServiceFunc),
 	}
 }

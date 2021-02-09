@@ -27,7 +27,7 @@ type Protocol interface {
 	Partitions() []Partition
 
 	// Start starts the protocol
-	Start(cluster cluster.Cluster, registry Registry) error
+	Start(cluster cluster.Cluster, registry *Registry) error
 
 	// Stop stops the protocol
 	Stop() error

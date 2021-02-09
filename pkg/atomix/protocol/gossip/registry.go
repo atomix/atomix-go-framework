@@ -27,47 +27,29 @@ type RegisterServerFunc func(server *grpc.Server, manager *Manager)
 // NewServiceFunc is a function for creating a replica
 type NewServiceFunc func(ctx context.Context, serviceID ServiceID, partition *Partition, clock time.Clock) (Service, error)
 
-// Registry is a primitive registry
-type Registry interface {
-	// RegisterServer registers a server
-	RegisterServer(f RegisterServerFunc)
-
-	// GetServers gets a list of servers
-	GetServers() []RegisterServerFunc
-
-	// RegisterService registers a service
-	RegisterService(t ServiceType, f NewServiceFunc)
-
-	// GetServiceFuncs gets a list of services
-	GetServiceFuncs() map[ServiceType]NewServiceFunc
-
-	// GetServiceFunc gets a service by type
-	GetServiceFunc(t ServiceType) (NewServiceFunc, error)
-}
-
-// primitiveRegistry is the default primitive registry
-type primitiveRegistry struct {
+// Registry is the default primitive registry
+type Registry struct {
 	servers  []RegisterServerFunc
 	services map[ServiceType]NewServiceFunc
 }
 
-func (r *primitiveRegistry) RegisterServer(f RegisterServerFunc) {
+func (r *Registry) RegisterServer(f RegisterServerFunc) {
 	r.servers = append(r.servers, f)
 }
 
-func (r *primitiveRegistry) GetServers() []RegisterServerFunc {
+func (r *Registry) GetServers() []RegisterServerFunc {
 	return r.servers
 }
 
-func (r *primitiveRegistry) RegisterService(t ServiceType, f NewServiceFunc) {
+func (r *Registry) RegisterService(t ServiceType, f NewServiceFunc) {
 	r.services[t] = f
 }
 
-func (r *primitiveRegistry) GetServiceFuncs() map[ServiceType]NewServiceFunc {
+func (r *Registry) GetServiceFuncs() map[ServiceType]NewServiceFunc {
 	return r.services
 }
 
-func (r *primitiveRegistry) GetServiceFunc(t ServiceType) (NewServiceFunc, error) {
+func (r *Registry) GetServiceFunc(t ServiceType) (NewServiceFunc, error) {
 	service, ok := r.services[t]
 	if !ok {
 		return nil, errors.NewUnknown("unknown service type '%s'", t)
@@ -76,8 +58,8 @@ func (r *primitiveRegistry) GetServiceFunc(t ServiceType) (NewServiceFunc, error
 }
 
 // NewRegistry creates a new primitive registry
-func NewRegistry() Registry {
-	return &primitiveRegistry{
+func NewRegistry() *Registry {
+	return &Registry{
 		services: make(map[ServiceType]NewServiceFunc),
 	}
 }

@@ -39,7 +39,7 @@ func NewNode(cluster cluster.Cluster) *Node {
 type Node struct {
 	Cluster  cluster.Cluster
 	client   *Client
-	registry Registry
+	registry *Registry
 }
 
 // RegisterServer registers a primitive server

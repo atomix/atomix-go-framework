@@ -23,7 +23,7 @@ import (
 )
 
 // NewPartition creates a new proxy partition
-func NewPartition(p cluster.Partition, clock time.Clock, registry Registry) *Partition {
+func NewPartition(p cluster.Partition, clock time.Clock, registry *Registry) *Partition {
 	return &Partition{
 		ID:        PartitionID(p.ID()),
 		Partition: p,
@@ -41,7 +41,7 @@ type PartitionID int
 type Partition struct {
 	cluster.Partition
 	clock      time.Clock
-	registry   Registry
+	registry   *Registry
 	ID         PartitionID
 	services   map[ServiceID]Service
 	servicesMu sync.RWMutex

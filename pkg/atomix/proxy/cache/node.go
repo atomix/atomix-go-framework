@@ -39,7 +39,7 @@ func NewNode(cluster cluster.Cluster) *Node {
 type Node struct {
 	Cluster  cluster.Cluster
 	client   *Client
-	registry Registry
+	registry *Registry
 }
 
 // RegisterService registers a primitive service
@@ -61,7 +61,6 @@ func (n *Node) Start() error {
 	for _, proxyFunc := range proxies {
 		services = append(services, newProxyService(proxyFunc))
 	}
-	services = append(services, newProxyService(RegisterPrimitiveServer))
 	services = append(services, func(s *grpc.Server) {
 		proxyapi.RegisterProxyConfigServiceServer(s, proxy.NewServer(n.Cluster))
 	})

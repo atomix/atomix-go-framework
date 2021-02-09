@@ -43,6 +43,8 @@ type Partition interface {
 	Replica(id ReplicaID) (*Replica, bool)
 	// Replicas returns the set of all replicas in the partition
 	Replicas() ReplicaSet
+	// Watch watches the partition for changes
+	Watch(ctx context.Context, ch chan<- ReplicaSet) error
 }
 
 // ConfigurablePartition is an interface for configurable Partitions

@@ -38,7 +38,7 @@ func NewNode(cluster cluster.Cluster, scheme time.Scheme) *Node {
 type Node struct {
 	Cluster  cluster.Cluster
 	scheme   time.Scheme
-	registry Registry
+	registry *Registry
 }
 
 // RegisterServer registers a server
