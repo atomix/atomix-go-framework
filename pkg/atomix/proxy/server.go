@@ -15,33 +15,51 @@
 package proxy
 
 import (
-	"context"
-	"github.com/atomix/api/go/atomix/proxy"
+	proxyapi "github.com/atomix/api/go/atomix/proxy"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
+	"github.com/atomix/go-framework/pkg/atomix/primitives"
+	"github.com/atomix/go-framework/pkg/atomix/server"
+	"google.golang.org/grpc"
 )
 
-// NewServer creates a new proxy server
-func NewServer(cluster cluster.Cluster) *Server {
+var log = logging.GetLogger("atomix", "proxy")
+
+// Node is an interface for proxy nodes
+type Node interface {
+	server.Node
+	Primitives() *primitives.Registry
+	PrimitiveTypes() *PrimitiveTypeRegistry
+}
+
+// NewNode creates a new proxy server
+func NewNode(cluster cluster.Cluster) Node {
 	return &Server{
-		cluster: cluster,
+		Server:         server.NewServer(cluster),
+		primitives:     primitives.NewRegistry(),
+		primitiveTypes: NewPrimitiveTypeRegistry(),
 	}
 }
 
-// Server is a proxy configuration server
+// Server is a proxy server
 type Server struct {
-	cluster cluster.Cluster
+	*server.Server
+	primitives     *primitives.Registry
+	primitiveTypes *PrimitiveTypeRegistry
 }
 
-func (s *Server) UpdateConfig(ctx context.Context, request *proxy.UpdateConfigRequest) (*proxy.UpdateConfigResponse, error) {
-	cluster, ok := s.cluster.(cluster.ConfigurableCluster)
-	if !ok {
-		return nil, errors.NewNotSupported("protocol does not support configuration changes")
-	}
-	if err := cluster.Update(request.Config.Protocol); err != nil {
-		return nil, err
-	}
-	return &proxy.UpdateConfigResponse{}, nil
+func (s *Server) Primitives() *primitives.Registry {
+	return s.primitives
 }
 
-var _ proxy.ProxyConfigServiceServer = &Server{}
+func (s *Server) PrimitiveTypes() *PrimitiveTypeRegistry {
+	return s.primitiveTypes
+}
+
+// Start starts the node
+func (s *Server) Start() error {
+	s.RegisterService(func(server *grpc.Server) {
+		proxyapi.RegisterProxyConfigServiceServer(server, newConfigServer(s.Cluster))
+	})
+	return s.Server.Start()
+}

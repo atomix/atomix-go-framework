@@ -12,60 +12,62 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cache
+package server
 
 import (
-	proxyapi "github.com/atomix/api/go/atomix/proxy"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/atomix/go-framework/pkg/atomix/proxy"
+	"github.com/atomix/go-framework/pkg/atomix/node"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"google.golang.org/grpc"
 )
 
-var log = logging.GetLogger("atomix", "proxy")
+var log = logging.GetLogger("atomix", "server")
 
-// NewNode creates a new server node
-func NewNode(cluster cluster.Cluster) *Node {
-	return &Node{
+// Node is an interface for proxy nodes
+type Node interface {
+	node.Node
+	Services() *ServiceRegistry
+}
+
+// NewServer creates a new server
+func NewServer(cluster cluster.Cluster) *Server {
+	return &Server{
 		Cluster:  cluster,
-		client:   NewClient(cluster),
-		registry: NewRegistry(),
+		services: NewServiceRegistry(),
 	}
 }
 
-// Node is an Atomix node
-type Node struct {
+// Server is a base server
+type Server struct {
 	Cluster  cluster.Cluster
-	client   *Client
-	registry *Registry
+	services *ServiceRegistry
 }
 
-// RegisterService registers a primitive service
-func (n *Node) RegisterProxy(proxy RegisterProxyFunc) {
-	n.registry.RegisterProxy(proxy)
+// Services returns the service registry
+func (s *Server) Services() *ServiceRegistry {
+	return s.services
+}
+
+// RegisterService registers a service
+func (s *Server) RegisterService(service RegisterServiceFunc) {
+	s.services.RegisterService(service)
 }
 
 // Start starts the node
-func (n *Node) Start() error {
-	log.Info("Starting protocol")
+func (s *Server) Start() error {
+	log.Info("Starting server")
 
-	var newProxyService = func(f RegisterProxyFunc) cluster.Service {
-		return func(s *grpc.Server) {
-			f(s, n.client)
+	servers := s.services.GetServices()
+	services := make([]cluster.Service, len(servers))
+	for i, f := range servers {
+		services[i] = func(s *grpc.Server) {
+			f(s)
 		}
 	}
-	proxies := n.registry.GetProxies()
-	services := make([]cluster.Service, 0, len(proxies)+2)
-	for _, proxyFunc := range proxies {
-		services = append(services, newProxyService(proxyFunc))
-	}
-	services = append(services, func(s *grpc.Server) {
-		proxyapi.RegisterProxyConfigServiceServer(s, proxy.NewServer(n.Cluster))
-	})
 
-	member, ok := n.Cluster.Member()
+	member, ok := s.Cluster.Member()
 	if !ok {
 		return errors.NewUnavailable("not a member of the cluster")
 	}
@@ -81,9 +83,6 @@ func (n *Node) Start() error {
 }
 
 // Stop stops the node
-func (n *Node) Stop() error {
-	if err := n.client.Close(); err != nil {
-		return err
-	}
-	return n.Cluster.Close()
+func (s *Server) Stop() error {
+	return s.Cluster.Close()
 }

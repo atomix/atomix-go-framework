@@ -21,35 +21,26 @@ import (
 // RegisterServiceFunc is a function for registering a service
 type RegisterServiceFunc func(server *grpc.Server)
 
-// Registry is a primitive registry
-type Registry interface {
-	// Register registers a service
-	Register(service RegisterServiceFunc)
-
-	// GetPrimitives gets a list of primitives
-	GetServices() []RegisterServiceFunc
+// NewServiceRegistry creates a new service registry
+func NewServiceRegistry() *ServiceRegistry {
+	return &ServiceRegistry{
+		services: make([]RegisterServiceFunc, 0),
+	}
 }
 
-// primitiveRegistry is the default primitive registry
-type primitiveRegistry struct {
+// ServiceRegistry is a registry of services
+type ServiceRegistry struct {
 	services []RegisterServiceFunc
 }
 
-func (r *primitiveRegistry) Register(service RegisterServiceFunc) {
+func (r *ServiceRegistry) RegisterService(service RegisterServiceFunc) {
 	r.services = append(r.services, service)
 }
 
-func (r *primitiveRegistry) GetServices() []RegisterServiceFunc {
+func (r *ServiceRegistry) GetServices() []RegisterServiceFunc {
 	primitives := make([]RegisterServiceFunc, 0, len(r.services))
 	for _, primitive := range r.services {
 		primitives = append(primitives, primitive)
 	}
 	return primitives
-}
-
-// NewRegistry creates a new primitive registry
-func NewRegistry() Registry {
-	return &primitiveRegistry{
-		services: make([]RegisterServiceFunc, 0),
-	}
 }

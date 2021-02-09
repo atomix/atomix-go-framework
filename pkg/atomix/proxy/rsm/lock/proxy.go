@@ -7,7 +7,6 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
 	"github.com/golang/protobuf/proto"
-	"google.golang.org/grpc"
 )
 
 const Type = "Lock"
@@ -20,11 +19,11 @@ const (
 
 // RegisterProxy registers the primitive on the given node
 func RegisterProxy(node *rsm.Node) {
-	node.RegisterServer(Type, func(server *grpc.Server, client *rsm.Client) {
-		lock.RegisterLockServiceServer(server, &Proxy{
-			Proxy: rsm.NewProxy(client),
+	node.PrimitiveTypes().RegisterProxyFunc(Type, func() (interface{}, error) {
+		return &Proxy{
+			Proxy: rsm.NewProxy(node.Client),
 			log:   logging.GetLogger("atomix", "lock"),
-		})
+		}, nil
 	})
 }
 

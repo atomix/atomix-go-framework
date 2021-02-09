@@ -8,7 +8,6 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
-	"google.golang.org/grpc"
 )
 
 const Type = "Value"
@@ -21,11 +20,11 @@ const (
 
 // RegisterProxy registers the primitive on the given node
 func RegisterProxy(node *rsm.Node) {
-	node.RegisterServer(Type, func(server *grpc.Server, client *rsm.Client) {
-		value.RegisterValueServiceServer(server, &Proxy{
-			Proxy: rsm.NewProxy(client),
+	node.PrimitiveTypes().RegisterProxyFunc(Type, func() (interface{}, error) {
+		return &Proxy{
+			Proxy: rsm.NewProxy(node.Client),
 			log:   logging.GetLogger("atomix", "value"),
-		})
+		}, nil
 	})
 }
 

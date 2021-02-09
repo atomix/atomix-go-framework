@@ -6,7 +6,6 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/gossip"
-	"google.golang.org/grpc"
 	io "io"
 )
 
@@ -14,11 +13,11 @@ const Type = "Value"
 
 // RegisterProxy registers the primitive on the given node
 func RegisterProxy(node *gossip.Node) {
-	node.RegisterProxy(func(server *grpc.Server, client *gossip.Client) {
-		value.RegisterValueServiceServer(server, &Proxy{
-			Proxy: gossip.NewProxy(client),
+	node.PrimitiveTypes().RegisterProxyFunc(Type, func() (interface{}, error) {
+		return &Proxy{
+			Proxy: gossip.NewProxy(node.Client),
 			log:   logging.GetLogger("atomix", "value"),
-		})
+		}, nil
 	})
 }
 

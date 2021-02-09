@@ -21,6 +21,17 @@ go_import_paths="${go_import_paths},Matomix/primitive/map/map.proto=github.com/a
 go_import_paths="${go_import_paths},Matomix/primitive/set/set.proto=github.com/atomix/api/go/atomix/primitive/set"
 go_import_paths="${go_import_paths},Matomix/primitive/value/value.proto=github.com/atomix/api/go/atomix/primitive/value"
 
+protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/go-framework/pkg/atomix/proxy/server/counter,plugin=proxy,protocol=server,output_path=atomix/proxy/server/counter:pkg       atomix/primitive/counter/counter.proto
+protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/go-framework/pkg/atomix/proxy/server/election,plugin=proxy,protocol=server,output_path=atomix/proxy/server/election:pkg     atomix/primitive/election/election.proto
+protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/go-framework/pkg/atomix/proxy/server/indexedmap,plugin=proxy,protocol=server,output_path=atomix/proxy/server/indexedmap:pkg atomix/primitive/indexedmap/indexedmap.proto
+protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/go-framework/pkg/atomix/proxy/server/leader,plugin=proxy,protocol=server,output_path=atomix/proxy/server/leader:pkg         atomix/primitive/leader/latch.proto
+protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/go-framework/pkg/atomix/proxy/server/list,plugin=proxy,protocol=server,output_path=atomix/proxy/server/list:pkg             atomix/primitive/list/list.proto
+protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/go-framework/pkg/atomix/proxy/server/lock,plugin=proxy,protocol=server,output_path=atomix/proxy/server/lock:pkg             atomix/primitive/lock/lock.proto
+protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/go-framework/pkg/atomix/proxy/server/log,plugin=proxy,protocol=server,output_path=atomix/proxy/server/log:pkg               atomix/primitive/log/log.proto
+protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/go-framework/pkg/atomix/proxy/server/map,plugin=proxy,protocol=server,output_path=atomix/proxy/server/map:pkg               atomix/primitive/map/map.proto
+protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/go-framework/pkg/atomix/proxy/server/set,plugin=proxy,protocol=server,output_path=atomix/proxy/server/set:pkg               atomix/primitive/set/set.proto
+protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/go-framework/pkg/atomix/proxy/server/value,plugin=proxy,protocol=server,output_path=atomix/proxy/server/value:pkg           atomix/primitive/value/value.proto
+
 protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/go-framework/pkg/atomix/proxy/rsm/counter,plugin=proxy,protocol=rsm,output_path=atomix/proxy/rsm/counter:pkg       atomix/primitive/counter/counter.proto
 protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/go-framework/pkg/atomix/proxy/rsm/election,plugin=proxy,protocol=rsm,output_path=atomix/proxy/rsm/election:pkg     atomix/primitive/election/election.proto
 protoc -I=$proto_path --atomix_out=$go_import_paths,import_path=github.com/atomix/go-framework/pkg/atomix/proxy/rsm/indexedmap,plugin=proxy,protocol=rsm,output_path=atomix/proxy/rsm/indexedmap:pkg atomix/primitive/indexedmap/indexedmap.proto

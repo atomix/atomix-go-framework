@@ -15,12 +15,9 @@
 package rsm
 
 import (
-	proxyapi "github.com/atomix/api/go/atomix/proxy"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy"
-	"github.com/atomix/go-framework/pkg/atomix/util"
 	"google.golang.org/grpc"
 )
 
@@ -29,67 +26,37 @@ var log = logging.GetLogger("atomix", "proxy")
 // NewNode creates a new server node
 func NewNode(cluster cluster.Cluster) *Node {
 	return &Node{
-		Cluster:  cluster,
-		client:   NewClient(cluster),
-		registry: NewRegistry(),
+		Node:    proxy.NewNode(cluster),
+		Cluster: cluster,
+		Client:  NewClient(cluster),
 	}
 }
 
 // Node is an Atomix node
 type Node struct {
-	Cluster  cluster.Cluster
-	client   *Client
-	registry *Registry
-}
-
-// RegisterServer registers a primitive server
-func (n *Node) RegisterServer(t string, proxy RegisterProxyFunc) {
-	n.registry.Register(t, proxy)
+	proxy.Node
+	Cluster cluster.Cluster
+	Client  *Client
 }
 
 // Start starts the node
 func (n *Node) Start() error {
-	log.Info("Starting protocol")
-
-	var newProxyService = func(f RegisterProxyFunc) cluster.Service {
-		return func(s *grpc.Server) {
-			f(s, n.client)
-		}
-	}
-	proxies := n.registry.GetProxies()
-	services := make([]cluster.Service, 0, len(proxies)+2)
-	for _, proxyFunc := range proxies {
-		services = append(services, newProxyService(proxyFunc))
-	}
-	services = append(services, newProxyService(RegisterPrimitiveServer))
-	services = append(services, func(s *grpc.Server) {
-		proxyapi.RegisterProxyConfigServiceServer(s, proxy.NewServer(n.Cluster))
+	n.Services().RegisterService(func(server *grpc.Server) {
+		RegisterPrimitiveServer(server, n.Client)
 	})
-
-	member, ok := n.Cluster.Member()
-	if !ok {
-		return errors.NewUnavailable("not a member of the cluster")
-	}
-	err := member.Serve(cluster.WithServices(services...))
-	if err != nil {
+	if err := n.Node.Start(); err != nil {
 		return err
 	}
-
-	err = n.client.Connect()
-	if err != nil {
+	if err := n.Client.Connect(); err != nil {
 		return err
 	}
-
-	// Set the ready file to indicate startup of the protocol is complete.
-	ready := util.NewFileReady()
-	_ = ready.Set()
 	return nil
 }
 
 // Stop stops the node
 func (n *Node) Stop() error {
-	if err := n.client.Close(); err != nil {
+	if err := n.Client.Close(); err != nil {
 		return err
 	}
-	return n.Cluster.Close()
+	return n.Node.Stop()
 }

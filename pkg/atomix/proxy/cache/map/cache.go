@@ -20,18 +20,24 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/meta"
+	"github.com/atomix/go-framework/pkg/atomix/proxy"
 	"github.com/atomix/go-framework/pkg/atomix/time"
 	"sync"
 )
 
-var log = logging.GetLogger("atomix", "proxy", "cache", "map")
+const Type = "Map"
 
-func newCachedMap(server _map.MapServiceServer) _map.MapServiceServer {
-	return &CachedMap{
-		server:  server,
-		entries: make(map[string]*_map.Entry),
-	}
+// RegisterCache registers the cache on the given server
+func RegisterCache(node proxy.Node) {
+	node.PrimitiveTypes().RegisterCacheDecoratorFunc(Type, func(s interface{}) interface{} {
+		return &CachedMap{
+			server:  s.(_map.MapServiceServer),
+			entries: make(map[string]*_map.Entry),
+		}
+	})
 }
+
+var log = logging.GetLogger("atomix", "map")
 
 type CachedMap struct {
 	server       _map.MapServiceServer

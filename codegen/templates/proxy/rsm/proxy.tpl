@@ -7,7 +7,6 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/golang/protobuf/proto"
-	"google.golang.org/grpc"
 	{{- $package := .Package }}
 	{{- range .Imports }}
 	{{ .Alias }} {{ .Path | quote }}
@@ -35,11 +34,11 @@ const (
 
 // Register{{ $proxy }} registers the primitive on the given node
 func Register{{ $proxy }}(node *rsm.Node) {
-	node.RegisterServer({{ printf "%sType" .Generator.Prefix }}, func(server *grpc.Server, client *rsm.Client) {
-		{{ .Primitive.Type.Package.Alias }}.Register{{ .Primitive.Type.Name }}Server(server, &{{ $proxy }}{
-			Proxy: rsm.NewProxy(client),
-			log: logging.GetLogger("atomix", {{ .Primitive.Name | lower | quote }}),
-		})
+	node.PrimitiveTypes().RegisterProxyFunc(Type, func() (interface{}, error) {
+		return &{{ $proxy }}{
+            Proxy: rsm.NewProxy(node.Client),
+            log: logging.GetLogger("atomix", {{ .Primitive.Name | lower | quote }}),
+        }, nil
 	})
 }
 
