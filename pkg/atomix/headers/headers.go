@@ -25,12 +25,7 @@ import (
 type Header string
 
 const (
-	PrimitiveType Header = "Atomix-Primitive-Type"
-	PrimitiveName Header = "Atomix-Primitive-Name"
-	ServiceType   Header = "Atomix-Service-Type"
-	ServiceID     Header = "Atomix-Service-Id"
 	PartitionID   Header = "Atomix-Partition-Id"
-	Timestamp     Header = "Atomix-Timestamp"
 )
 
 func (h Header) Set(md metadata.MD, value interface{}) {
