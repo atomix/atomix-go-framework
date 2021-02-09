@@ -25,25 +25,46 @@ import (
 type PartitionID uint32
 
 // NewPartition returns a new replica
-func NewPartition(config protocolapi.ProtocolPartition, cluster *Cluster) *Partition {
-	return &Partition{
-		ID:       PartitionID(config.PartitionID),
+func NewPartition(config protocolapi.ProtocolPartition, cluster Cluster) Partition {
+	return &partition{
+		id:       PartitionID(config.PartitionID),
 		cluster:  cluster,
 		replicas: make(map[ReplicaID]*Replica),
 	}
 }
 
 // Partition is a cluster partition
-type Partition struct {
-	ID       PartitionID
-	cluster  *Cluster
+type Partition interface {
+	// ID returns the partition identifier
+	ID() PartitionID
+	// Member returns the local partition member
+	Member() (*Member, bool)
+	// Replica looks up a replica in the partition
+	Replica(id ReplicaID) (*Replica, bool)
+	// Replicas returns the set of all replicas in the partition
+	Replicas() ReplicaSet
+}
+
+// ConfigurablePartition is an interface for configurable Partitions
+type ConfigurablePartition interface {
+	Update(protocolapi.ProtocolPartition) error
+}
+
+// partition is a cluster partition
+type partition struct {
+	id       PartitionID
+	cluster  Cluster
 	replicas map[ReplicaID]*Replica
 	watchers []chan<- ReplicaSet
 	mu       sync.RWMutex
 }
 
+func (p *partition) ID() PartitionID {
+	return p.id
+}
+
 // Member returns the local partition member
-func (p *Partition) Member() (*Member, bool) {
+func (p *partition) Member() (*Member, bool) {
 	member, ok := p.cluster.Member()
 	if !ok {
 		return nil, false
@@ -56,13 +77,13 @@ func (p *Partition) Member() (*Member, bool) {
 }
 
 // Replica returns a replica by ID
-func (p *Partition) Replica(id ReplicaID) (*Replica, bool) {
+func (p *partition) Replica(id ReplicaID) (*Replica, bool) {
 	replica, ok := p.replicas[id]
 	return replica, ok
 }
 
 // Replicas returns the current replicas
-func (p *Partition) Replicas() ReplicaSet {
+func (p *partition) Replicas() ReplicaSet {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	copy := make(ReplicaSet)
@@ -73,18 +94,18 @@ func (p *Partition) Replicas() ReplicaSet {
 }
 
 // Update updates the partition configuration
-func (p *Partition) Update(config protocolapi.ProtocolPartition) error {
-	p.mu.Lock()
-
+func (p *partition) Update(config protocolapi.ProtocolPartition) error {
 	replicas := make(map[ReplicaID]*Replica)
 	for _, id := range config.Replicas {
 		replicaID := ReplicaID(id)
-		replica, ok := p.cluster.replicas[replicaID]
+		replica, ok := p.cluster.Replica(replicaID)
 		if !ok {
 			return errors.NewNotFound("replica '%s' not a member of the cluster", replicaID)
 		}
 		replicas[ReplicaID(replicaID)] = replica
 	}
+
+	p.mu.Lock()
 
 	for id := range p.replicas {
 		if _, ok := replicas[id]; !ok {
@@ -108,7 +129,7 @@ func (p *Partition) Update(config protocolapi.ProtocolPartition) error {
 }
 
 // Watch watches the partition for changes
-func (p *Partition) Watch(ctx context.Context, ch chan<- ReplicaSet) error {
+func (p *partition) Watch(ctx context.Context, ch chan<- ReplicaSet) error {
 	p.mu.Lock()
 	watcher := make(chan ReplicaSet)
 	replicas := p.replicas
@@ -141,3 +162,6 @@ func (p *Partition) Watch(ctx context.Context, ch chan<- ReplicaSet) error {
 	p.mu.Unlock()
 	return nil
 }
+
+var _ Partition = &partition{}
+var _ ConfigurablePartition = &partition{}

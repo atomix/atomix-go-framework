@@ -27,7 +27,7 @@ import (
 var log = logging.GetLogger("atomix", "protocol")
 
 // NewNode creates a new node running the given protocol
-func NewNode(cluster *cluster.Cluster, protocol Protocol) *Node {
+func NewNode(cluster cluster.Cluster, protocol Protocol) *Node {
 	return &Node{
 		Cluster:  cluster,
 		protocol: protocol,
@@ -37,7 +37,7 @@ func NewNode(cluster *cluster.Cluster, protocol Protocol) *Node {
 
 // Node is an Atomix node
 type Node struct {
-	Cluster  *cluster.Cluster
+	Cluster  cluster.Cluster
 	protocol Protocol
 	registry Registry
 }

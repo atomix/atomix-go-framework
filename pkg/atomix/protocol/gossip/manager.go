@@ -27,7 +27,7 @@ import (
 )
 
 // newManager creates a new CRDT manager
-func newManager(cluster *cluster.Cluster, scheme time.Scheme, registry Registry) *Manager {
+func newManager(cluster cluster.Cluster, scheme time.Scheme, registry Registry) *Manager {
 	clock := scheme.NewClock()
 	partitions := cluster.Partitions()
 	proxyPartitions := make([]*Partition, 0, len(partitions))
@@ -47,7 +47,7 @@ func newManager(cluster *cluster.Cluster, scheme time.Scheme, registry Registry)
 
 // Manager is a manager for CRDT primitives
 type Manager struct {
-	Cluster        *cluster.Cluster
+	Cluster        cluster.Cluster
 	partitions     []*Partition
 	partitionsByID map[PartitionID]*Partition
 	clock          time.Clock

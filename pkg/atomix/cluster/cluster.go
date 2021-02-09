@@ -17,11 +17,12 @@ package cluster
 import (
 	"context"
 	protocolapi "github.com/atomix/api/go/atomix/protocol"
+	"io"
 	"sync"
 )
 
 // NewCluster creates a new cluster
-func NewCluster(config protocolapi.ProtocolConfig, opts ...Option) *Cluster {
+func NewCluster(config protocolapi.ProtocolConfig, opts ...Option) Cluster {
 	options := applyOptions(opts...)
 
 	var member *Member
@@ -55,19 +56,39 @@ func NewCluster(config protocolapi.ProtocolConfig, opts ...Option) *Cluster {
 		member = NewMember(*replica)
 	}
 
-	cluster := &Cluster{
+	c := &cluster{
 		member:     member,
 		replicas:   make(ReplicaSet),
 		partitions: make(PartitionSet),
 		options:    *options,
 		watchers:   make([]chan<- PartitionSet, 0),
 	}
-	_ = cluster.Update(config)
-	return cluster
+	_ = c.Update(config)
+	return c
 }
 
 // Cluster manages the peer group for a client
-type Cluster struct {
+type Cluster interface {
+	io.Closer
+	// Member returns the local cluster member
+	Member() (*Member, bool)
+	// Replica looks up a replica by ID
+	Replica(id ReplicaID) (*Replica, bool)
+	// Replicas returns the set of all replicas in the cluster
+	Replicas() ReplicaSet
+	// Partition looks up a partition by ID
+	Partition(id PartitionID) (Partition, bool)
+	// Partitions returns the set of all partitions in the cluster
+	Partitions() PartitionSet
+}
+
+// ConfigurableCluster is an interface for configurable clusters
+type ConfigurableCluster interface {
+	Update(config protocolapi.ProtocolConfig) error
+}
+
+// cluster manages the peer group for a client
+type cluster struct {
 	member     *Member
 	options    options
 	replicas   ReplicaSet
@@ -77,7 +98,7 @@ type Cluster struct {
 }
 
 // Member returns the local group member
-func (c *Cluster) Member() (*Member, bool) {
+func (c *cluster) Member() (*Member, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	if c.member == nil {
@@ -87,7 +108,7 @@ func (c *Cluster) Member() (*Member, bool) {
 }
 
 // Replica returns a replica by ID
-func (c *Cluster) Replica(id ReplicaID) (*Replica, bool) {
+func (c *cluster) Replica(id ReplicaID) (*Replica, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	replica, ok := c.replicas[id]
@@ -95,7 +116,7 @@ func (c *Cluster) Replica(id ReplicaID) (*Replica, bool) {
 }
 
 // Replicas returns the current replicas
-func (c *Cluster) Replicas() ReplicaSet {
+func (c *cluster) Replicas() ReplicaSet {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	copy := make(ReplicaSet)
@@ -106,7 +127,7 @@ func (c *Cluster) Replicas() ReplicaSet {
 }
 
 // Partition returns the given partition
-func (c *Cluster) Partition(id PartitionID) (*Partition, bool) {
+func (c *cluster) Partition(id PartitionID) (Partition, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	partition, ok := c.partitions[id]
@@ -114,7 +135,7 @@ func (c *Cluster) Partition(id PartitionID) (*Partition, bool) {
 }
 
 // Partitions returns the current partitions
-func (c *Cluster) Partitions() PartitionSet {
+func (c *cluster) Partitions() PartitionSet {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	copy := make(PartitionSet)
@@ -125,7 +146,7 @@ func (c *Cluster) Partitions() PartitionSet {
 }
 
 // Update updates the cluster configuration
-func (c *Cluster) Update(config protocolapi.ProtocolConfig) error {
+func (c *cluster) Update(config protocolapi.ProtocolConfig) error {
 	c.mu.Lock()
 
 	replicaConfigs := make(map[ReplicaID]protocolapi.ProtocolReplica)
@@ -162,9 +183,11 @@ func (c *Cluster) Update(config protocolapi.ProtocolConfig) error {
 			partition = NewPartition(partitionConfig, c)
 			c.partitions[id] = partition
 		}
-		if err := partition.Update(partitionConfig); err != nil {
-			c.mu.Unlock()
-			return err
+		if update, ok := partition.(ConfigurablePartition); ok {
+			if err := update.Update(partitionConfig); err != nil {
+				c.mu.Unlock()
+				return err
+			}
 		}
 	}
 
@@ -180,7 +203,7 @@ func (c *Cluster) Update(config protocolapi.ProtocolConfig) error {
 }
 
 // Watch watches the partitions for changes
-func (c *Cluster) Watch(ctx context.Context, ch chan<- PartitionSet) error {
+func (c *cluster) Watch(ctx context.Context, ch chan<- PartitionSet) error {
 	c.mu.Lock()
 	watcher := make(chan PartitionSet)
 	partitions := c.partitions
@@ -215,12 +238,15 @@ func (c *Cluster) Watch(ctx context.Context, ch chan<- PartitionSet) error {
 }
 
 // Close closes the cluster
-func (c *Cluster) Close() error {
+func (c *cluster) Close() error {
 	if c.member != nil {
 		return c.member.Stop()
 	}
 	return nil
 }
+
+var _ Cluster = &cluster{}
+var _ ConfigurableCluster = &cluster{}
 
 // NodeID is a host node identifier
 type NodeID string
@@ -229,4 +255,4 @@ type NodeID string
 type ReplicaSet map[ReplicaID]*Replica
 
 // PartitionSet is a set of partitions
-type PartitionSet map[PartitionID]*Partition
+type PartitionSet map[PartitionID]Partition

@@ -48,7 +48,7 @@ type Session interface {
 }
 
 // newSessionManager creates a new session manager
-func newSessionManager(cluster *cluster.Cluster, ctx PartitionContext, clientID ClientID, timeout *time.Duration) *sessionManager {
+func newSessionManager(cluster cluster.Cluster, ctx PartitionContext, clientID ClientID, timeout *time.Duration) *sessionManager {
 	if timeout == nil {
 		defaultTimeout := 30 * time.Second
 		timeout = &defaultTimeout
@@ -77,7 +77,7 @@ func newSessionManager(cluster *cluster.Cluster, ctx PartitionContext, clientID 
 
 // sessionManager manages the ordering of request and response streams for a single client
 type sessionManager struct {
-	cluster          *cluster.Cluster
+	cluster          cluster.Cluster
 	member           *cluster.Member
 	log              logging.Logger
 	id               SessionID

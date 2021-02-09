@@ -23,9 +23,9 @@ import (
 )
 
 // NewPartition creates a new proxy partition
-func NewPartition(p *cluster.Partition, clock time.Clock, registry Registry) *Partition {
+func NewPartition(p cluster.Partition, clock time.Clock, registry Registry) *Partition {
 	return &Partition{
-		ID:        PartitionID(p.ID),
+		ID:        PartitionID(p.ID()),
 		Partition: p,
 		clock:     clock,
 		registry:  registry,
@@ -39,7 +39,7 @@ type PartitionID int
 
 // Partition is a proxy partition
 type Partition struct {
-	*cluster.Partition
+	cluster.Partition
 	clock      time.Clock
 	registry   Registry
 	ID         PartitionID

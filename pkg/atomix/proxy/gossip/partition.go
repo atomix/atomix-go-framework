@@ -26,9 +26,9 @@ import (
 )
 
 // NewPartition creates a new proxy partition
-func NewPartition(c *cluster.Cluster, p *cluster.Partition) *Partition {
+func NewPartition(c cluster.Cluster, p cluster.Partition) *Partition {
 	return &Partition{
-		ID:        PartitionID(p.ID),
+		ID:        PartitionID(p.ID()),
 		Partition: p,
 		cluster:   c,
 	}
@@ -39,8 +39,8 @@ type PartitionID int
 
 // Partition is a proxy partition
 type Partition struct {
-	*cluster.Partition
-	cluster *cluster.Cluster
+	cluster.Partition
+	cluster cluster.Cluster
 	ID      PartitionID
 	conn    *grpc.ClientConn
 	mu      sync.RWMutex

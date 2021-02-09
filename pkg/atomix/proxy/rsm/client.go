@@ -29,7 +29,7 @@ const (
 )
 
 // NewClient creates a new proxy client
-func NewClient(cluster *cluster.Cluster) *Client {
+func NewClient(cluster cluster.Cluster) *Client {
 	partitions := cluster.Partitions()
 	proxyPartitions := make([]*Partition, 0, len(partitions))
 	proxyPartitionsByID := make(map[PartitionID]*Partition)
@@ -46,7 +46,7 @@ func NewClient(cluster *cluster.Cluster) *Client {
 
 // Client is a client for communicating with the storage layer
 type Client struct {
-	cluster        *cluster.Cluster
+	cluster        cluster.Cluster
 	partitions     []*Partition
 	partitionsByID map[PartitionID]*Partition
 }

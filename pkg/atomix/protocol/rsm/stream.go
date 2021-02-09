@@ -107,7 +107,7 @@ type queryStream struct {
 // sessionStream manages a single stream for a session
 type sessionStream struct {
 	*opStream
-	cluster    *cluster.Cluster
+	cluster    cluster.Cluster
 	member     *cluster.Member
 	responseID uint64
 	completeID uint64

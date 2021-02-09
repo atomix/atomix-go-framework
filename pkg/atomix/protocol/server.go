@@ -18,10 +18,11 @@ import (
 	"context"
 	protocolapi "github.com/atomix/api/go/atomix/protocol"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 )
 
 // NewServer creates a new proxy server
-func NewServer(cluster *cluster.Cluster) *Server {
+func NewServer(cluster cluster.Cluster) *Server {
 	return &Server{
 		cluster: cluster,
 	}
@@ -29,11 +30,15 @@ func NewServer(cluster *cluster.Cluster) *Server {
 
 // Server is a server for updating the storage configuration
 type Server struct {
-	cluster *cluster.Cluster
+	cluster cluster.Cluster
 }
 
 func (s *Server) UpdateConfig(ctx context.Context, request *protocolapi.UpdateConfigRequest) (*protocolapi.UpdateConfigResponse, error) {
-	if err := s.cluster.Update(request.Config); err != nil {
+	cluster, ok := s.cluster.(cluster.ConfigurableCluster)
+	if !ok {
+		return nil, errors.NewNotSupported("protocol does not support configuration changes")
+	}
+	if err := cluster.Update(request.Config); err != nil {
 		return nil, err
 	}
 	return &protocolapi.UpdateConfigResponse{}, nil

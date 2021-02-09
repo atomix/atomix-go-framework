@@ -27,10 +27,10 @@ import (
 )
 
 // NewPartition creates a new proxy partition
-func NewPartition(p *cluster.Partition) *Partition {
+func NewPartition(p cluster.Partition) *Partition {
 	partition := &Partition{
 		Partition: p,
-		ID:        PartitionID(p.ID),
+		ID:        PartitionID(p.ID()),
 	}
 	partition.Session = NewSession(partition)
 	return partition
@@ -41,7 +41,7 @@ type PartitionID int
 
 // Partition is a proxy partition
 type Partition struct {
-	*cluster.Partition
+	cluster.Partition
 	*Session
 	ID     PartitionID
 	conn   *grpc.ClientConn

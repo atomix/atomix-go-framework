@@ -25,7 +25,7 @@ import (
 var log = logging.GetLogger("atomix", "server")
 
 // NewNode creates a new server node
-func NewNode(cluster *cluster.Cluster) *Node {
+func NewNode(cluster cluster.Cluster) *Node {
 	return &Node{
 		Cluster:  cluster,
 		registry: NewRegistry(),
@@ -34,7 +34,7 @@ func NewNode(cluster *cluster.Cluster) *Node {
 
 // Node is an Atomix node
 type Node struct {
-	Cluster  *cluster.Cluster
+	Cluster  cluster.Cluster
 	registry Registry
 }
 

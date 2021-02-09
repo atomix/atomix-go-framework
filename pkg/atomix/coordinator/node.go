@@ -26,7 +26,7 @@ import (
 )
 
 // NewNode creates a new coordinator node
-func NewNode(cluster *cluster.Cluster) *Node {
+func NewNode(cluster cluster.Cluster) *Node {
 	return &Node{
 		node:    server.NewNode(cluster),
 		drivers: drivers.NewRegistry(),

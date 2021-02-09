@@ -12,23 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package rsm
+package cache
 
-import (
-	"github.com/atomix/go-framework/pkg/atomix/cluster"
-)
+// NewProxy creates a new proxy server
+func NewProxy(client *Client) *Proxy {
+	return &Proxy{
+		Client: client,
+	}
+}
 
-// Protocol is the interface to be implemented by replication protocols
-type Protocol interface {
-	// Partition returns a partition
-	Partition(partitionID PartitionID) Partition
-
-	// Partitions returns the protocol partitions
-	Partitions() []Partition
-
-	// Start starts the protocol
-	Start(cluster cluster.Cluster, registry Registry) error
-
-	// Stop stops the protocol
-	Stop() error
+// Server is a base server for servers that support sessions
+type Proxy struct {
+	*Client
 }
