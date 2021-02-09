@@ -28,7 +28,7 @@ import (
 )
 
 // NewManager returns an initialized Manager
-func NewManager(cluster cluster.Cluster, registry Registry, context PartitionContext) *Manager {
+func NewManager(cluster cluster.Cluster, registry *Registry, context PartitionContext) *Manager {
 	member, _ := cluster.Member()
 	return &Manager{
 		cluster:   cluster,
@@ -45,7 +45,7 @@ func NewManager(cluster cluster.Cluster, registry Registry, context PartitionCon
 type Manager struct {
 	cluster   cluster.Cluster
 	member    *cluster.Member
-	registry  Registry
+	registry  *Registry
 	context   PartitionContext
 	sessions  map[SessionID]*sessionManager
 	services  map[ServiceID]Service
