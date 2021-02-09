@@ -33,7 +33,7 @@ type Server struct {
 }
 
 func (s *Server) UpdateConfig(ctx context.Context, request *proxy.UpdateConfigRequest) (*proxy.UpdateConfigResponse, error) {
-	if err := s.cluster.Update(request.Config); err != nil {
+	if err := s.cluster.Update(request.Config.Protocol); err != nil {
 		return nil, err
 	}
 	return &proxy.UpdateConfigResponse{}, nil
