@@ -25,9 +25,9 @@ import (
 var log = logging.GetLogger("atomix", "proxy")
 
 // NewNode creates a new server node
-func NewNode(cluster cluster.Cluster, scheme time.Scheme) *Node {
+func NewNode(coordinator *cluster.Replica, cluster cluster.Cluster, scheme time.Scheme) *Node {
 	return &Node{
-		Node:    proxy.NewNode(cluster),
+		Node:    proxy.NewNode(coordinator, cluster),
 		Cluster: cluster,
 		Client:  NewClient(cluster, scheme),
 	}

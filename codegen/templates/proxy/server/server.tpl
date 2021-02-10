@@ -73,7 +73,7 @@ type {{ $server }} struct {
 	log        logging.Logger
 }
 
-func (s *{{ $server }}) getInstance(name string) ({{ $service }}, error) {
+func (s *{{ $server }}) getInstance(ctx context.Context, name string) ({{ $service }}, error) {
 	s.mu.RLock()
 	instance, ok := s.instances[name]
 	s.mu.RUnlock()
@@ -93,7 +93,7 @@ func (s *{{ $server }}) getInstance(name string) ({{ $service }}, error) {
 		return nil, err
 	}
 
-	primitiveMeta, err := s.node.Primitives().GetPrimitive(name)
+	primitiveMeta, err := s.node.Primitives().GetPrimitive(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +128,7 @@ func (s *{{ $server }}) getInstance(name string) ({{ $service }}, error) {
 {{- $method := . }}
 {{ if and .Request.IsDiscrete .Response.IsDiscrete }}
 func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "type" .Request.Type }}) (*{{ template "type" .Response.Type }}, error) {
-	instance, err := s.getInstance(request{{ template "field" .Request.Headers }}.PrimitiveID)
+	instance, err := s.getInstance(ctx, request{{ template "field" .Request.Headers }}.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("{{ .Request.Type.Name }} %+v failed: %v", request, err)
 		return nil, err
@@ -137,7 +137,7 @@ func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "t
 }
 {{ else if .Response.IsStream }}
 func (s *{{ $server }}) {{ .Name }}(request *{{ template "type" .Request.Type }}, srv {{ template "type" $primitive.Type }}_{{ .Name }}Server) error {
-	instance, err := s.getInstance(request{{ template "field" .Request.Headers }}.PrimitiveID)
+	instance, err := s.getInstance(srv.Context(), request{{ template "field" .Request.Headers }}.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("{{ .Request.Type.Name }} %+v failed: %v", request, err)
 		return err

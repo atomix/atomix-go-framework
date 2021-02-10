@@ -29,7 +29,7 @@ type Server struct {
 	log       logging.Logger
 }
 
-func (s *Server) getInstance(name string) (log.LogServiceServer, error) {
+func (s *Server) getInstance(ctx context.Context, name string) (log.LogServiceServer, error) {
 	s.mu.RLock()
 	instance, ok := s.instances[name]
 	s.mu.RUnlock()
@@ -49,7 +49,7 @@ func (s *Server) getInstance(name string) (log.LogServiceServer, error) {
 		return nil, err
 	}
 
-	primitiveMeta, err := s.node.Primitives().GetPrimitive(name)
+	primitiveMeta, err := s.node.Primitives().GetPrimitive(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (s *Server) getInstance(name string) (log.LogServiceServer, error) {
 }
 
 func (s *Server) Size(ctx context.Context, request *log.SizeRequest) (*log.SizeResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("SizeRequest %+v failed: %v", request, err)
 		return nil, err
@@ -90,7 +90,7 @@ func (s *Server) Size(ctx context.Context, request *log.SizeRequest) (*log.SizeR
 }
 
 func (s *Server) Append(ctx context.Context, request *log.AppendRequest) (*log.AppendResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("AppendRequest %+v failed: %v", request, err)
 		return nil, err
@@ -99,7 +99,7 @@ func (s *Server) Append(ctx context.Context, request *log.AppendRequest) (*log.A
 }
 
 func (s *Server) Get(ctx context.Context, request *log.GetRequest) (*log.GetResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("GetRequest %+v failed: %v", request, err)
 		return nil, err
@@ -108,7 +108,7 @@ func (s *Server) Get(ctx context.Context, request *log.GetRequest) (*log.GetResp
 }
 
 func (s *Server) FirstEntry(ctx context.Context, request *log.FirstEntryRequest) (*log.FirstEntryResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("FirstEntryRequest %+v failed: %v", request, err)
 		return nil, err
@@ -117,7 +117,7 @@ func (s *Server) FirstEntry(ctx context.Context, request *log.FirstEntryRequest)
 }
 
 func (s *Server) LastEntry(ctx context.Context, request *log.LastEntryRequest) (*log.LastEntryResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("LastEntryRequest %+v failed: %v", request, err)
 		return nil, err
@@ -126,7 +126,7 @@ func (s *Server) LastEntry(ctx context.Context, request *log.LastEntryRequest) (
 }
 
 func (s *Server) PrevEntry(ctx context.Context, request *log.PrevEntryRequest) (*log.PrevEntryResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("PrevEntryRequest %+v failed: %v", request, err)
 		return nil, err
@@ -135,7 +135,7 @@ func (s *Server) PrevEntry(ctx context.Context, request *log.PrevEntryRequest) (
 }
 
 func (s *Server) NextEntry(ctx context.Context, request *log.NextEntryRequest) (*log.NextEntryResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("NextEntryRequest %+v failed: %v", request, err)
 		return nil, err
@@ -144,7 +144,7 @@ func (s *Server) NextEntry(ctx context.Context, request *log.NextEntryRequest) (
 }
 
 func (s *Server) Remove(ctx context.Context, request *log.RemoveRequest) (*log.RemoveResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("RemoveRequest %+v failed: %v", request, err)
 		return nil, err
@@ -153,7 +153,7 @@ func (s *Server) Remove(ctx context.Context, request *log.RemoveRequest) (*log.R
 }
 
 func (s *Server) Clear(ctx context.Context, request *log.ClearRequest) (*log.ClearResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("ClearRequest %+v failed: %v", request, err)
 		return nil, err
@@ -162,7 +162,7 @@ func (s *Server) Clear(ctx context.Context, request *log.ClearRequest) (*log.Cle
 }
 
 func (s *Server) Events(request *log.EventsRequest, srv log.LogService_EventsServer) error {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(srv.Context(), request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("EventsRequest %+v failed: %v", request, err)
 		return err
@@ -171,7 +171,7 @@ func (s *Server) Events(request *log.EventsRequest, srv log.LogService_EventsSer
 }
 
 func (s *Server) Entries(request *log.EntriesRequest, srv log.LogService_EntriesServer) error {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(srv.Context(), request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("EntriesRequest %+v failed: %v", request, err)
 		return err

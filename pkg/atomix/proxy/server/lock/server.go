@@ -29,7 +29,7 @@ type Server struct {
 	log       logging.Logger
 }
 
-func (s *Server) getInstance(name string) (lock.LockServiceServer, error) {
+func (s *Server) getInstance(ctx context.Context, name string) (lock.LockServiceServer, error) {
 	s.mu.RLock()
 	instance, ok := s.instances[name]
 	s.mu.RUnlock()
@@ -49,7 +49,7 @@ func (s *Server) getInstance(name string) (lock.LockServiceServer, error) {
 		return nil, err
 	}
 
-	primitiveMeta, err := s.node.Primitives().GetPrimitive(name)
+	primitiveMeta, err := s.node.Primitives().GetPrimitive(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (s *Server) getInstance(name string) (lock.LockServiceServer, error) {
 }
 
 func (s *Server) Lock(ctx context.Context, request *lock.LockRequest) (*lock.LockResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("LockRequest %+v failed: %v", request, err)
 		return nil, err
@@ -90,7 +90,7 @@ func (s *Server) Lock(ctx context.Context, request *lock.LockRequest) (*lock.Loc
 }
 
 func (s *Server) Unlock(ctx context.Context, request *lock.UnlockRequest) (*lock.UnlockResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("UnlockRequest %+v failed: %v", request, err)
 		return nil, err
@@ -99,7 +99,7 @@ func (s *Server) Unlock(ctx context.Context, request *lock.UnlockRequest) (*lock
 }
 
 func (s *Server) GetLock(ctx context.Context, request *lock.GetLockRequest) (*lock.GetLockResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("GetLockRequest %+v failed: %v", request, err)
 		return nil, err

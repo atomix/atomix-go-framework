@@ -29,7 +29,7 @@ type Server struct {
 	log       logging.Logger
 }
 
-func (s *Server) getInstance(name string) (list.ListServiceServer, error) {
+func (s *Server) getInstance(ctx context.Context, name string) (list.ListServiceServer, error) {
 	s.mu.RLock()
 	instance, ok := s.instances[name]
 	s.mu.RUnlock()
@@ -49,7 +49,7 @@ func (s *Server) getInstance(name string) (list.ListServiceServer, error) {
 		return nil, err
 	}
 
-	primitiveMeta, err := s.node.Primitives().GetPrimitive(name)
+	primitiveMeta, err := s.node.Primitives().GetPrimitive(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (s *Server) getInstance(name string) (list.ListServiceServer, error) {
 }
 
 func (s *Server) Size(ctx context.Context, request *list.SizeRequest) (*list.SizeResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("SizeRequest %+v failed: %v", request, err)
 		return nil, err
@@ -90,7 +90,7 @@ func (s *Server) Size(ctx context.Context, request *list.SizeRequest) (*list.Siz
 }
 
 func (s *Server) Append(ctx context.Context, request *list.AppendRequest) (*list.AppendResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("AppendRequest %+v failed: %v", request, err)
 		return nil, err
@@ -99,7 +99,7 @@ func (s *Server) Append(ctx context.Context, request *list.AppendRequest) (*list
 }
 
 func (s *Server) Insert(ctx context.Context, request *list.InsertRequest) (*list.InsertResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("InsertRequest %+v failed: %v", request, err)
 		return nil, err
@@ -108,7 +108,7 @@ func (s *Server) Insert(ctx context.Context, request *list.InsertRequest) (*list
 }
 
 func (s *Server) Get(ctx context.Context, request *list.GetRequest) (*list.GetResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("GetRequest %+v failed: %v", request, err)
 		return nil, err
@@ -117,7 +117,7 @@ func (s *Server) Get(ctx context.Context, request *list.GetRequest) (*list.GetRe
 }
 
 func (s *Server) Set(ctx context.Context, request *list.SetRequest) (*list.SetResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("SetRequest %+v failed: %v", request, err)
 		return nil, err
@@ -126,7 +126,7 @@ func (s *Server) Set(ctx context.Context, request *list.SetRequest) (*list.SetRe
 }
 
 func (s *Server) Remove(ctx context.Context, request *list.RemoveRequest) (*list.RemoveResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("RemoveRequest %+v failed: %v", request, err)
 		return nil, err
@@ -135,7 +135,7 @@ func (s *Server) Remove(ctx context.Context, request *list.RemoveRequest) (*list
 }
 
 func (s *Server) Clear(ctx context.Context, request *list.ClearRequest) (*list.ClearResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("ClearRequest %+v failed: %v", request, err)
 		return nil, err
@@ -144,7 +144,7 @@ func (s *Server) Clear(ctx context.Context, request *list.ClearRequest) (*list.C
 }
 
 func (s *Server) Events(request *list.EventsRequest, srv list.ListService_EventsServer) error {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(srv.Context(), request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("EventsRequest %+v failed: %v", request, err)
 		return err
@@ -153,7 +153,7 @@ func (s *Server) Events(request *list.EventsRequest, srv list.ListService_Events
 }
 
 func (s *Server) Elements(request *list.ElementsRequest, srv list.ListService_ElementsServer) error {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(srv.Context(), request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("ElementsRequest %+v failed: %v", request, err)
 		return err

@@ -29,7 +29,7 @@ type Server struct {
 	log       logging.Logger
 }
 
-func (s *Server) getInstance(name string) (leader.LeaderLatchServiceServer, error) {
+func (s *Server) getInstance(ctx context.Context, name string) (leader.LeaderLatchServiceServer, error) {
 	s.mu.RLock()
 	instance, ok := s.instances[name]
 	s.mu.RUnlock()
@@ -49,7 +49,7 @@ func (s *Server) getInstance(name string) (leader.LeaderLatchServiceServer, erro
 		return nil, err
 	}
 
-	primitiveMeta, err := s.node.Primitives().GetPrimitive(name)
+	primitiveMeta, err := s.node.Primitives().GetPrimitive(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (s *Server) getInstance(name string) (leader.LeaderLatchServiceServer, erro
 }
 
 func (s *Server) Latch(ctx context.Context, request *leader.LatchRequest) (*leader.LatchResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("LatchRequest %+v failed: %v", request, err)
 		return nil, err
@@ -90,7 +90,7 @@ func (s *Server) Latch(ctx context.Context, request *leader.LatchRequest) (*lead
 }
 
 func (s *Server) Get(ctx context.Context, request *leader.GetRequest) (*leader.GetResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("GetRequest %+v failed: %v", request, err)
 		return nil, err
@@ -99,7 +99,7 @@ func (s *Server) Get(ctx context.Context, request *leader.GetRequest) (*leader.G
 }
 
 func (s *Server) Events(request *leader.EventsRequest, srv leader.LeaderLatchService_EventsServer) error {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(srv.Context(), request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("EventsRequest %+v failed: %v", request, err)
 		return err

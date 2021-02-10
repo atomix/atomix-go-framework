@@ -33,41 +33,41 @@ type Registry struct {
 	mu         sync.RWMutex
 }
 
-func (r *Registry) AddPrimitive(primitive primitiveapi.PrimitiveMeta) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, ok := r.primitives[primitive.Name]; ok {
+func (m *Registry) AddPrimitive(primitive primitiveapi.PrimitiveMeta) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.primitives[primitive.Name]; ok {
 		return errors.NewAlreadyExists("primitive '%s' already exists", primitive.Name)
 	}
-	r.primitives[primitive.Name] = primitive
+	m.primitives[primitive.Name] = primitive
 	return nil
 }
 
-func (r *Registry) RemovePrimitive(name string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, ok := r.primitives[name]; !ok {
+func (m *Registry) RemovePrimitive(name string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.primitives[name]; !ok {
 		return errors.NewNotFound("primitive '%s' not found", name)
 	}
-	delete(r.primitives, name)
+	delete(m.primitives, name)
 	return nil
 }
 
-func (r *Registry) GetPrimitive(name string) (primitiveapi.PrimitiveMeta, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	proxy, ok := r.primitives[name]
+func (m *Registry) GetPrimitive(name string) (primitiveapi.PrimitiveMeta, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	proxy, ok := m.primitives[name]
 	if !ok {
 		return primitiveapi.PrimitiveMeta{}, errors.NewNotFound("primitive '%s' not found", name)
 	}
 	return proxy, nil
 }
 
-func (r *Registry) ListPrimitives() ([]primitiveapi.PrimitiveMeta, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	primitives := make([]primitiveapi.PrimitiveMeta, 0, len(r.primitives))
-	for _, primitive := range r.primitives {
+func (m *Registry) ListPrimitives() ([]primitiveapi.PrimitiveMeta, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	primitives := make([]primitiveapi.PrimitiveMeta, 0, len(m.primitives))
+	for _, primitive := range m.primitives {
 		primitives = append(primitives, primitive)
 	}
 	return primitives, nil

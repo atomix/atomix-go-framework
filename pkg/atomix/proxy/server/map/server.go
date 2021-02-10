@@ -29,7 +29,7 @@ type Server struct {
 	log       logging.Logger
 }
 
-func (s *Server) getInstance(name string) (_map.MapServiceServer, error) {
+func (s *Server) getInstance(ctx context.Context, name string) (_map.MapServiceServer, error) {
 	s.mu.RLock()
 	instance, ok := s.instances[name]
 	s.mu.RUnlock()
@@ -49,7 +49,7 @@ func (s *Server) getInstance(name string) (_map.MapServiceServer, error) {
 		return nil, err
 	}
 
-	primitiveMeta, err := s.node.Primitives().GetPrimitive(name)
+	primitiveMeta, err := s.node.Primitives().GetPrimitive(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (s *Server) getInstance(name string) (_map.MapServiceServer, error) {
 }
 
 func (s *Server) Size(ctx context.Context, request *_map.SizeRequest) (*_map.SizeResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("SizeRequest %+v failed: %v", request, err)
 		return nil, err
@@ -90,7 +90,7 @@ func (s *Server) Size(ctx context.Context, request *_map.SizeRequest) (*_map.Siz
 }
 
 func (s *Server) Put(ctx context.Context, request *_map.PutRequest) (*_map.PutResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("PutRequest %+v failed: %v", request, err)
 		return nil, err
@@ -99,7 +99,7 @@ func (s *Server) Put(ctx context.Context, request *_map.PutRequest) (*_map.PutRe
 }
 
 func (s *Server) Get(ctx context.Context, request *_map.GetRequest) (*_map.GetResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("GetRequest %+v failed: %v", request, err)
 		return nil, err
@@ -108,7 +108,7 @@ func (s *Server) Get(ctx context.Context, request *_map.GetRequest) (*_map.GetRe
 }
 
 func (s *Server) Remove(ctx context.Context, request *_map.RemoveRequest) (*_map.RemoveResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("RemoveRequest %+v failed: %v", request, err)
 		return nil, err
@@ -117,7 +117,7 @@ func (s *Server) Remove(ctx context.Context, request *_map.RemoveRequest) (*_map
 }
 
 func (s *Server) Clear(ctx context.Context, request *_map.ClearRequest) (*_map.ClearResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("ClearRequest %+v failed: %v", request, err)
 		return nil, err
@@ -126,7 +126,7 @@ func (s *Server) Clear(ctx context.Context, request *_map.ClearRequest) (*_map.C
 }
 
 func (s *Server) Events(request *_map.EventsRequest, srv _map.MapService_EventsServer) error {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(srv.Context(), request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("EventsRequest %+v failed: %v", request, err)
 		return err
@@ -135,7 +135,7 @@ func (s *Server) Events(request *_map.EventsRequest, srv _map.MapService_EventsS
 }
 
 func (s *Server) Entries(request *_map.EntriesRequest, srv _map.MapService_EntriesServer) error {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(srv.Context(), request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("EntriesRequest %+v failed: %v", request, err)
 		return err

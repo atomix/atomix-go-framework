@@ -29,7 +29,7 @@ type Server struct {
 	log       logging.Logger
 }
 
-func (s *Server) getInstance(name string) (indexedmap.IndexedMapServiceServer, error) {
+func (s *Server) getInstance(ctx context.Context, name string) (indexedmap.IndexedMapServiceServer, error) {
 	s.mu.RLock()
 	instance, ok := s.instances[name]
 	s.mu.RUnlock()
@@ -49,7 +49,7 @@ func (s *Server) getInstance(name string) (indexedmap.IndexedMapServiceServer, e
 		return nil, err
 	}
 
-	primitiveMeta, err := s.node.Primitives().GetPrimitive(name)
+	primitiveMeta, err := s.node.Primitives().GetPrimitive(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (s *Server) getInstance(name string) (indexedmap.IndexedMapServiceServer, e
 }
 
 func (s *Server) Size(ctx context.Context, request *indexedmap.SizeRequest) (*indexedmap.SizeResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("SizeRequest %+v failed: %v", request, err)
 		return nil, err
@@ -90,7 +90,7 @@ func (s *Server) Size(ctx context.Context, request *indexedmap.SizeRequest) (*in
 }
 
 func (s *Server) Put(ctx context.Context, request *indexedmap.PutRequest) (*indexedmap.PutResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("PutRequest %+v failed: %v", request, err)
 		return nil, err
@@ -99,7 +99,7 @@ func (s *Server) Put(ctx context.Context, request *indexedmap.PutRequest) (*inde
 }
 
 func (s *Server) Get(ctx context.Context, request *indexedmap.GetRequest) (*indexedmap.GetResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("GetRequest %+v failed: %v", request, err)
 		return nil, err
@@ -108,7 +108,7 @@ func (s *Server) Get(ctx context.Context, request *indexedmap.GetRequest) (*inde
 }
 
 func (s *Server) FirstEntry(ctx context.Context, request *indexedmap.FirstEntryRequest) (*indexedmap.FirstEntryResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("FirstEntryRequest %+v failed: %v", request, err)
 		return nil, err
@@ -117,7 +117,7 @@ func (s *Server) FirstEntry(ctx context.Context, request *indexedmap.FirstEntryR
 }
 
 func (s *Server) LastEntry(ctx context.Context, request *indexedmap.LastEntryRequest) (*indexedmap.LastEntryResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("LastEntryRequest %+v failed: %v", request, err)
 		return nil, err
@@ -126,7 +126,7 @@ func (s *Server) LastEntry(ctx context.Context, request *indexedmap.LastEntryReq
 }
 
 func (s *Server) PrevEntry(ctx context.Context, request *indexedmap.PrevEntryRequest) (*indexedmap.PrevEntryResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("PrevEntryRequest %+v failed: %v", request, err)
 		return nil, err
@@ -135,7 +135,7 @@ func (s *Server) PrevEntry(ctx context.Context, request *indexedmap.PrevEntryReq
 }
 
 func (s *Server) NextEntry(ctx context.Context, request *indexedmap.NextEntryRequest) (*indexedmap.NextEntryResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("NextEntryRequest %+v failed: %v", request, err)
 		return nil, err
@@ -144,7 +144,7 @@ func (s *Server) NextEntry(ctx context.Context, request *indexedmap.NextEntryReq
 }
 
 func (s *Server) Remove(ctx context.Context, request *indexedmap.RemoveRequest) (*indexedmap.RemoveResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("RemoveRequest %+v failed: %v", request, err)
 		return nil, err
@@ -153,7 +153,7 @@ func (s *Server) Remove(ctx context.Context, request *indexedmap.RemoveRequest) 
 }
 
 func (s *Server) Clear(ctx context.Context, request *indexedmap.ClearRequest) (*indexedmap.ClearResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("ClearRequest %+v failed: %v", request, err)
 		return nil, err
@@ -162,7 +162,7 @@ func (s *Server) Clear(ctx context.Context, request *indexedmap.ClearRequest) (*
 }
 
 func (s *Server) Events(request *indexedmap.EventsRequest, srv indexedmap.IndexedMapService_EventsServer) error {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(srv.Context(), request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("EventsRequest %+v failed: %v", request, err)
 		return err
@@ -171,7 +171,7 @@ func (s *Server) Events(request *indexedmap.EventsRequest, srv indexedmap.Indexe
 }
 
 func (s *Server) Entries(request *indexedmap.EntriesRequest, srv indexedmap.IndexedMapService_EntriesServer) error {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(srv.Context(), request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("EntriesRequest %+v failed: %v", request, err)
 		return err

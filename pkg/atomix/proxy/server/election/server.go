@@ -29,7 +29,7 @@ type Server struct {
 	log       logging.Logger
 }
 
-func (s *Server) getInstance(name string) (election.LeaderElectionServiceServer, error) {
+func (s *Server) getInstance(ctx context.Context, name string) (election.LeaderElectionServiceServer, error) {
 	s.mu.RLock()
 	instance, ok := s.instances[name]
 	s.mu.RUnlock()
@@ -49,7 +49,7 @@ func (s *Server) getInstance(name string) (election.LeaderElectionServiceServer,
 		return nil, err
 	}
 
-	primitiveMeta, err := s.node.Primitives().GetPrimitive(name)
+	primitiveMeta, err := s.node.Primitives().GetPrimitive(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (s *Server) getInstance(name string) (election.LeaderElectionServiceServer,
 }
 
 func (s *Server) Enter(ctx context.Context, request *election.EnterRequest) (*election.EnterResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("EnterRequest %+v failed: %v", request, err)
 		return nil, err
@@ -90,7 +90,7 @@ func (s *Server) Enter(ctx context.Context, request *election.EnterRequest) (*el
 }
 
 func (s *Server) Withdraw(ctx context.Context, request *election.WithdrawRequest) (*election.WithdrawResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("WithdrawRequest %+v failed: %v", request, err)
 		return nil, err
@@ -99,7 +99,7 @@ func (s *Server) Withdraw(ctx context.Context, request *election.WithdrawRequest
 }
 
 func (s *Server) Anoint(ctx context.Context, request *election.AnointRequest) (*election.AnointResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("AnointRequest %+v failed: %v", request, err)
 		return nil, err
@@ -108,7 +108,7 @@ func (s *Server) Anoint(ctx context.Context, request *election.AnointRequest) (*
 }
 
 func (s *Server) Promote(ctx context.Context, request *election.PromoteRequest) (*election.PromoteResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("PromoteRequest %+v failed: %v", request, err)
 		return nil, err
@@ -117,7 +117,7 @@ func (s *Server) Promote(ctx context.Context, request *election.PromoteRequest) 
 }
 
 func (s *Server) Evict(ctx context.Context, request *election.EvictRequest) (*election.EvictResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("EvictRequest %+v failed: %v", request, err)
 		return nil, err
@@ -126,7 +126,7 @@ func (s *Server) Evict(ctx context.Context, request *election.EvictRequest) (*el
 }
 
 func (s *Server) GetTerm(ctx context.Context, request *election.GetTermRequest) (*election.GetTermResponse, error) {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(ctx, request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("GetTermRequest %+v failed: %v", request, err)
 		return nil, err
@@ -135,7 +135,7 @@ func (s *Server) GetTerm(ctx context.Context, request *election.GetTermRequest) 
 }
 
 func (s *Server) Events(request *election.EventsRequest, srv election.LeaderElectionService_EventsServer) error {
-	instance, err := s.getInstance(request.Headers.PrimitiveID)
+	instance, err := s.getInstance(srv.Context(), request.Headers.PrimitiveID)
 	if err != nil {
 		s.log.Warnf("EventsRequest %+v failed: %v", request, err)
 		return err
