@@ -62,9 +62,11 @@ func (s *Server) Start() error {
 	servers := s.services.GetServices()
 	services := make([]cluster.Service, len(servers))
 	for i, f := range servers {
-		services[i] = func(s *grpc.Server) {
-			f(s)
-		}
+		services[i] = func(f RegisterServiceFunc) func(s *grpc.Server) {
+			return func(s *grpc.Server) {
+				f(s)
+			}
+		}(f)
 	}
 
 	member, ok := s.Cluster.Member()

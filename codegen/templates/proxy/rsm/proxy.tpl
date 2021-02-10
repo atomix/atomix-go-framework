@@ -4,6 +4,7 @@ package {{ .Package.Name }}
 import (
 	"context"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
+	protocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/golang/protobuf/proto"
@@ -111,7 +112,6 @@ Query
 {{- end -}}
 {{- end }}
 
-{{- $root := . }}
 {{- range .Primitive.Methods }}
 {{- $name := ((printf "%s%sOp" $root.Generator.Prefix .Name) | toLowerCamel) }}
 {{- $method := . }}
@@ -141,7 +141,11 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
     }
 	{{- end }}
 
-	output, err := partition.Do{{ template "optype" . }}(ctx, {{ $name }}, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request{{ template "field" .Request.Headers }}.PrimitiveID,
+	}
+	output, err := partition.Do{{ template "optype" . }}(ctx, service, {{ $name }}, input)
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
@@ -160,8 +164,12 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
     {{- $aggregates = true }}
     {{- end }}
 
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request{{ template "field" .Request.Headers }}.PrimitiveID,
+	}
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
-		return partitions[i].Do{{ template "optype" . }}(ctx, {{ $name }}, input)
+		return partitions[i].Do{{ template "optype" . }}(ctx, service, {{ $name }}, input)
 	})
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
@@ -224,11 +232,19 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
     }
 	{{- end }}
 
-	err = partition.Do{{ template "optype" . }}Stream(srv.Context(), {{ $name }}, input, stream)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request{{ template "field" .Request.Headers }}.PrimitiveID,
+	}
+	err = partition.Do{{ template "optype" . }}Stream(srv.Context(), service, {{ $name }}, input, stream)
 	{{- else if .Scope.IsGlobal }}
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request{{ template "field" .Request.Headers }}.PrimitiveID,
+	}
 	partitions := s.Partitions()
 	err = async.IterAsync(len(partitions), func(i int) error {
-		return partitions[i].Do{{ template "optype" . }}Stream(srv.Context(), {{ $name }}, input, stream)
+		return partitions[i].Do{{ template "optype" . }}Stream(srv.Context(), service, {{ $name }}, input, stream)
 	})
 	{{- end }}
 	if err != nil {

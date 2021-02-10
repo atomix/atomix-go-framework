@@ -94,13 +94,14 @@ type cluster struct {
 	replicas   ReplicaSet
 	partitions PartitionSet
 	watchers   []chan<- PartitionSet
-	mu         sync.RWMutex
+	configMu   sync.RWMutex
+	updateMu   sync.Mutex
 }
 
 // Member returns the local group member
 func (c *cluster) Member() (*Member, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.configMu.RLock()
+	defer c.configMu.RUnlock()
 	if c.member == nil {
 		return nil, false
 	}
@@ -109,16 +110,16 @@ func (c *cluster) Member() (*Member, bool) {
 
 // Replica returns a replica by ID
 func (c *cluster) Replica(id ReplicaID) (*Replica, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.configMu.RLock()
+	defer c.configMu.RUnlock()
 	replica, ok := c.replicas[id]
 	return replica, ok
 }
 
 // Replicas returns the current replicas
 func (c *cluster) Replicas() ReplicaSet {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.configMu.RLock()
+	defer c.configMu.RUnlock()
 	copy := make(ReplicaSet)
 	for id, replica := range c.replicas {
 		copy[id] = replica
@@ -128,16 +129,16 @@ func (c *cluster) Replicas() ReplicaSet {
 
 // Partition returns the given partition
 func (c *cluster) Partition(id PartitionID) (Partition, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.configMu.RLock()
+	defer c.configMu.RUnlock()
 	partition, ok := c.partitions[id]
 	return partition, ok
 }
 
 // Partitions returns the current partitions
 func (c *cluster) Partitions() PartitionSet {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.configMu.RLock()
+	defer c.configMu.RUnlock()
 	copy := make(PartitionSet)
 	for id, partition := range c.partitions {
 		copy[id] = partition
@@ -147,13 +148,15 @@ func (c *cluster) Partitions() PartitionSet {
 
 // Update updates the cluster configuration
 func (c *cluster) Update(config protocolapi.ProtocolConfig) error {
-	c.mu.Lock()
+	c.updateMu.Lock()
+	defer c.updateMu.Unlock()
 
 	replicaConfigs := make(map[ReplicaID]protocolapi.ProtocolReplica)
 	for _, replicaConfig := range config.Replicas {
 		replicaConfigs[ReplicaID(replicaConfig.ID)] = replicaConfig
 	}
 
+	c.configMu.Lock()
 	for id := range c.replicas {
 		if _, ok := replicaConfigs[id]; !ok {
 			delete(c.replicas, id)
@@ -177,34 +180,38 @@ func (c *cluster) Update(config protocolapi.ProtocolConfig) error {
 		}
 	}
 
+	partitions := make([]Partition, 0, len(partitionConfigs))
 	for id, partitionConfig := range partitionConfigs {
 		partition, ok := c.partitions[id]
 		if !ok {
 			partition = NewPartition(partitionConfig, c)
 			c.partitions[id] = partition
 		}
-		if update, ok := partition.(ConfigurablePartition); ok {
-			if err := update.Update(partitionConfig); err != nil {
-				c.mu.Unlock()
-				return err
+		partitions = append(partitions, partition)
+	}
+	c.configMu.Unlock()
+
+	for _, partition := range partitions {
+		if config, ok := partitionConfigs[partition.ID()]; ok {
+			if update, ok := partition.(ConfigurablePartition); ok {
+				if err := update.Update(config); err != nil {
+					return err
+				}
 			}
 		}
 	}
 
-	partitions := c.partitions
-	c.mu.Unlock()
-
-	c.mu.RLock()
+	c.configMu.RLock()
 	for _, watcher := range c.watchers {
-		watcher <- partitions
+		watcher <- c.partitions
 	}
-	c.mu.RUnlock()
+	c.configMu.RUnlock()
 	return nil
 }
 
 // Watch watches the partitions for changes
 func (c *cluster) Watch(ctx context.Context, ch chan<- PartitionSet) error {
-	c.mu.Lock()
+	c.configMu.Lock()
 	watcher := make(chan PartitionSet)
 	partitions := c.partitions
 	go func() {
@@ -219,7 +226,7 @@ func (c *cluster) Watch(ctx context.Context, ch chan<- PartitionSet) error {
 				}
 				ch <- partitions
 			case <-ctx.Done():
-				c.mu.Lock()
+				c.configMu.Lock()
 				watchers := make([]chan<- PartitionSet, 0)
 				for _, ch := range c.watchers {
 					if ch != watcher {
@@ -227,13 +234,13 @@ func (c *cluster) Watch(ctx context.Context, ch chan<- PartitionSet) error {
 					}
 				}
 				c.watchers = watchers
-				c.mu.Unlock()
+				c.configMu.Unlock()
 				close(watcher)
 			}
 		}
 	}()
 	c.watchers = append(c.watchers, watcher)
-	c.mu.Unlock()
+	c.configMu.Unlock()
 	return nil
 }
 

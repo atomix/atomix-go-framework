@@ -5,6 +5,7 @@ import (
 	log "github.com/atomix/api/go/atomix/primitive/log"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
+	protocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
@@ -53,7 +54,11 @@ func (s *Proxy) Size(ctx context.Context, request *log.SizeRequest) (*log.SizeRe
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoQuery(ctx, sizeOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoQuery(ctx, service, sizeOp, input)
 	if err != nil {
 		s.log.Errorf("Request SizeRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -81,7 +86,11 @@ func (s *Proxy) Append(ctx context.Context, request *log.AppendRequest) (*log.Ap
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoCommand(ctx, appendOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, appendOp, input)
 	if err != nil {
 		s.log.Errorf("Request AppendRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -109,7 +118,11 @@ func (s *Proxy) Get(ctx context.Context, request *log.GetRequest) (*log.GetRespo
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoQuery(ctx, getOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoQuery(ctx, service, getOp, input)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -137,7 +150,11 @@ func (s *Proxy) FirstEntry(ctx context.Context, request *log.FirstEntryRequest) 
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoQuery(ctx, firstEntryOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoQuery(ctx, service, firstEntryOp, input)
 	if err != nil {
 		s.log.Errorf("Request FirstEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -165,7 +182,11 @@ func (s *Proxy) LastEntry(ctx context.Context, request *log.LastEntryRequest) (*
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoQuery(ctx, lastEntryOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoQuery(ctx, service, lastEntryOp, input)
 	if err != nil {
 		s.log.Errorf("Request LastEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -193,7 +214,11 @@ func (s *Proxy) PrevEntry(ctx context.Context, request *log.PrevEntryRequest) (*
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoQuery(ctx, prevEntryOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoQuery(ctx, service, prevEntryOp, input)
 	if err != nil {
 		s.log.Errorf("Request PrevEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -221,7 +246,11 @@ func (s *Proxy) NextEntry(ctx context.Context, request *log.NextEntryRequest) (*
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoQuery(ctx, nextEntryOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoQuery(ctx, service, nextEntryOp, input)
 	if err != nil {
 		s.log.Errorf("Request NextEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -249,7 +278,11 @@ func (s *Proxy) Remove(ctx context.Context, request *log.RemoveRequest) (*log.Re
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoCommand(ctx, removeOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, removeOp, input)
 	if err != nil {
 		s.log.Errorf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -277,7 +310,11 @@ func (s *Proxy) Clear(ctx context.Context, request *log.ClearRequest) (*log.Clea
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoCommand(ctx, clearOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, clearOp, input)
 	if err != nil {
 		s.log.Errorf("Request ClearRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -307,7 +344,11 @@ func (s *Proxy) Events(request *log.EventsRequest, srv log.LogService_EventsServ
 		return errors.Proto(err)
 	}
 
-	err = partition.DoCommandStream(srv.Context(), eventsOp, input, stream)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	err = partition.DoCommandStream(srv.Context(), service, eventsOp, input, stream)
 	if err != nil {
 		s.log.Errorf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
@@ -355,7 +396,11 @@ func (s *Proxy) Entries(request *log.EntriesRequest, srv log.LogService_EntriesS
 		return errors.Proto(err)
 	}
 
-	err = partition.DoQueryStream(srv.Context(), entriesOp, input, stream)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	err = partition.DoQueryStream(srv.Context(), service, entriesOp, input, stream)
 	if err != nil {
 		s.log.Errorf("Request EntriesRequest failed: %v", err)
 		return errors.Proto(err)

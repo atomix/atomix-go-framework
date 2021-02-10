@@ -27,8 +27,8 @@ import (
 
 const Type = "Map"
 
-// RegisterCache registers the cache on the given server
-func RegisterCache(node proxy.Node) {
+// RegisterCachedMapDecorator registers the cache on the given server
+func RegisterCachedMapDecorator(node proxy.Node) {
 	node.PrimitiveTypes().RegisterCacheDecoratorFunc(Type, func(s interface{}) interface{} {
 		return &CachedMap{
 			server:  s.(_map.MapServiceServer),

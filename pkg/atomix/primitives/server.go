@@ -70,7 +70,7 @@ func (s *Server) LookupPrimitive(ctx context.Context, request *primitiveapi.Look
 		log.Warnf("LookupPrimitiveRequest %+v failed: %v", request, err)
 		return nil, err
 	}
-	driver, err := s.drivers.GetDriver(primitive.Name)
+	driver, err := s.drivers.GetDriver(primitive.Driver)
 	if err != nil {
 		log.Warnf("LookupPrimitiveRequest %+v failed: %v", request, err)
 		return nil, err

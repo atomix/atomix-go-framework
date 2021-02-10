@@ -5,6 +5,7 @@ import (
 	counter "github.com/atomix/api/go/atomix/primitive/counter"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
+	protocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
 	"github.com/golang/protobuf/proto"
 )
@@ -45,7 +46,11 @@ func (s *Proxy) Set(ctx context.Context, request *counter.SetRequest) (*counter.
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoCommand(ctx, setOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, setOp, input)
 	if err != nil {
 		s.log.Errorf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -73,7 +78,11 @@ func (s *Proxy) Get(ctx context.Context, request *counter.GetRequest) (*counter.
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoQuery(ctx, getOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoQuery(ctx, service, getOp, input)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -101,7 +110,11 @@ func (s *Proxy) Increment(ctx context.Context, request *counter.IncrementRequest
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoCommand(ctx, incrementOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, incrementOp, input)
 	if err != nil {
 		s.log.Errorf("Request IncrementRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -129,7 +142,11 @@ func (s *Proxy) Decrement(ctx context.Context, request *counter.DecrementRequest
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoCommand(ctx, decrementOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, decrementOp, input)
 	if err != nil {
 		s.log.Errorf("Request DecrementRequest failed: %v", err)
 		return nil, errors.Proto(err)

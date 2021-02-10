@@ -58,7 +58,8 @@ type partition struct {
 	cluster  Cluster
 	replicas map[ReplicaID]*Replica
 	watchers []chan<- ReplicaSet
-	mu       sync.RWMutex
+	configMu sync.RWMutex
+	updateMu sync.Mutex
 }
 
 func (p *partition) ID() PartitionID {
@@ -86,8 +87,8 @@ func (p *partition) Replica(id ReplicaID) (*Replica, bool) {
 
 // Replicas returns the current replicas
 func (p *partition) Replicas() ReplicaSet {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
+	p.configMu.RLock()
+	defer p.configMu.RUnlock()
 	copy := make(ReplicaSet)
 	for id, replica := range p.replicas {
 		copy[id] = replica
@@ -97,6 +98,10 @@ func (p *partition) Replicas() ReplicaSet {
 
 // Update updates the partition configuration
 func (p *partition) Update(config protocolapi.ProtocolPartition) error {
+	p.updateMu.Lock()
+	defer p.updateMu.Unlock()
+	p.configMu.Lock()
+
 	replicas := make(map[ReplicaID]*Replica)
 	for _, id := range config.Replicas {
 		replicaID := ReplicaID(id)
@@ -106,8 +111,6 @@ func (p *partition) Update(config protocolapi.ProtocolPartition) error {
 		}
 		replicas[ReplicaID(replicaID)] = replica
 	}
-
-	p.mu.Lock()
 
 	for id := range p.replicas {
 		if _, ok := replicas[id]; !ok {
@@ -120,19 +123,19 @@ func (p *partition) Update(config protocolapi.ProtocolPartition) error {
 			p.replicas[id] = replica
 		}
 	}
-	p.mu.Unlock()
+	p.configMu.Unlock()
 
-	p.mu.RLock()
+	p.configMu.RLock()
 	for _, watcher := range p.watchers {
 		watcher <- replicas
 	}
-	p.mu.RUnlock()
+	p.configMu.RUnlock()
 	return nil
 }
 
 // Watch watches the partition for changes
 func (p *partition) Watch(ctx context.Context, ch chan<- ReplicaSet) error {
-	p.mu.Lock()
+	p.configMu.Lock()
 	watcher := make(chan ReplicaSet)
 	replicas := p.replicas
 	go func() {
@@ -147,7 +150,7 @@ func (p *partition) Watch(ctx context.Context, ch chan<- ReplicaSet) error {
 				}
 				ch <- replicas
 			case <-ctx.Done():
-				p.mu.Lock()
+				p.configMu.Lock()
 				watchers := make([]chan<- ReplicaSet, 0)
 				for _, ch := range p.watchers {
 					if ch != watcher {
@@ -155,13 +158,13 @@ func (p *partition) Watch(ctx context.Context, ch chan<- ReplicaSet) error {
 					}
 				}
 				p.watchers = watchers
-				p.mu.Unlock()
+				p.configMu.Unlock()
 				close(watcher)
 			}
 		}
 	}()
 	p.watchers = append(p.watchers, watcher)
-	p.mu.Unlock()
+	p.configMu.Unlock()
 	return nil
 }
 

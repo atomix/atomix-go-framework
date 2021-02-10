@@ -5,6 +5,7 @@ import (
 	value "github.com/atomix/api/go/atomix/primitive/value"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
+	protocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
@@ -45,7 +46,11 @@ func (s *Proxy) Set(ctx context.Context, request *value.SetRequest) (*value.SetR
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoCommand(ctx, setOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, setOp, input)
 	if err != nil {
 		s.log.Errorf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -73,7 +78,11 @@ func (s *Proxy) Get(ctx context.Context, request *value.GetRequest) (*value.GetR
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoQuery(ctx, getOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoQuery(ctx, service, getOp, input)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -103,7 +112,11 @@ func (s *Proxy) Events(request *value.EventsRequest, srv value.ValueService_Even
 		return errors.Proto(err)
 	}
 
-	err = partition.DoCommandStream(srv.Context(), eventsOp, input, stream)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	err = partition.DoCommandStream(srv.Context(), service, eventsOp, input, stream)
 	if err != nil {
 		s.log.Errorf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)

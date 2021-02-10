@@ -5,6 +5,7 @@ import (
 	indexedmap "github.com/atomix/api/go/atomix/primitive/indexedmap"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
+	protocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
@@ -53,7 +54,11 @@ func (s *Proxy) Size(ctx context.Context, request *indexedmap.SizeRequest) (*ind
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoQuery(ctx, sizeOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoQuery(ctx, service, sizeOp, input)
 	if err != nil {
 		s.log.Errorf("Request SizeRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -81,7 +86,11 @@ func (s *Proxy) Put(ctx context.Context, request *indexedmap.PutRequest) (*index
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoCommand(ctx, putOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, putOp, input)
 	if err != nil {
 		s.log.Errorf("Request PutRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -109,7 +118,11 @@ func (s *Proxy) Get(ctx context.Context, request *indexedmap.GetRequest) (*index
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoQuery(ctx, getOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoQuery(ctx, service, getOp, input)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -137,7 +150,11 @@ func (s *Proxy) FirstEntry(ctx context.Context, request *indexedmap.FirstEntryRe
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoQuery(ctx, firstEntryOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoQuery(ctx, service, firstEntryOp, input)
 	if err != nil {
 		s.log.Errorf("Request FirstEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -165,7 +182,11 @@ func (s *Proxy) LastEntry(ctx context.Context, request *indexedmap.LastEntryRequ
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoQuery(ctx, lastEntryOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoQuery(ctx, service, lastEntryOp, input)
 	if err != nil {
 		s.log.Errorf("Request LastEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -193,7 +214,11 @@ func (s *Proxy) PrevEntry(ctx context.Context, request *indexedmap.PrevEntryRequ
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoQuery(ctx, prevEntryOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoQuery(ctx, service, prevEntryOp, input)
 	if err != nil {
 		s.log.Errorf("Request PrevEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -221,7 +246,11 @@ func (s *Proxy) NextEntry(ctx context.Context, request *indexedmap.NextEntryRequ
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoQuery(ctx, nextEntryOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoQuery(ctx, service, nextEntryOp, input)
 	if err != nil {
 		s.log.Errorf("Request NextEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -249,7 +278,11 @@ func (s *Proxy) Remove(ctx context.Context, request *indexedmap.RemoveRequest) (
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoCommand(ctx, removeOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, removeOp, input)
 	if err != nil {
 		s.log.Errorf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -277,7 +310,11 @@ func (s *Proxy) Clear(ctx context.Context, request *indexedmap.ClearRequest) (*i
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoCommand(ctx, clearOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, clearOp, input)
 	if err != nil {
 		s.log.Errorf("Request ClearRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -307,7 +344,11 @@ func (s *Proxy) Events(request *indexedmap.EventsRequest, srv indexedmap.Indexed
 		return errors.Proto(err)
 	}
 
-	err = partition.DoCommandStream(srv.Context(), eventsOp, input, stream)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	err = partition.DoCommandStream(srv.Context(), service, eventsOp, input, stream)
 	if err != nil {
 		s.log.Errorf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
@@ -355,7 +396,11 @@ func (s *Proxy) Entries(request *indexedmap.EntriesRequest, srv indexedmap.Index
 		return errors.Proto(err)
 	}
 
-	err = partition.DoQueryStream(srv.Context(), entriesOp, input, stream)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	err = partition.DoQueryStream(srv.Context(), service, entriesOp, input, stream)
 	if err != nil {
 		s.log.Errorf("Request EntriesRequest failed: %v", err)
 		return errors.Proto(err)

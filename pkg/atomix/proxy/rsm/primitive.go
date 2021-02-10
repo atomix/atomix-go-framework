@@ -18,6 +18,7 @@ import (
 	"context"
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
+	protocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/util/async"
 	"google.golang.org/grpc"
 )
@@ -39,25 +40,33 @@ type PrimitiveServer struct {
 }
 
 func (s *PrimitiveServer) Create(ctx context.Context, request *primitiveapi.CreateRequest) (*primitiveapi.CreateResponse, error) {
-	s.log.Debugf("Received OpenRequest %+v", request)
+	s.log.Debugf("Received CreateRequest %+v", request)
 	partitions := s.Partitions()
+	service := protocol.ServiceId{
+		Type: request.Type,
+		Name: request.Name,
+	}
 	err := async.IterAsync(len(partitions), func(i int) error {
-		return partitions[i].DoCreateService(ctx)
+		return partitions[i].DoCreateService(ctx, service)
 	})
 	if err != nil {
-		s.log.Errorf("Request OpenRequest failed: %v", err)
+		s.log.Errorf("Request CreateRequest failed: %v", err)
 		return nil, err
 	}
 	response := &primitiveapi.CreateResponse{}
-	s.log.Debugf("Sending OpenResponse %+v", response)
+	s.log.Debugf("Sending CreateResponse %+v", response)
 	return response, nil
 }
 
 func (s *PrimitiveServer) Close(ctx context.Context, request *primitiveapi.CloseRequest) (*primitiveapi.CloseResponse, error) {
 	s.log.Debugf("Received CloseRequest %+v", request)
 	partitions := s.Partitions()
+	service := protocol.ServiceId{
+		Type: request.Type,
+		Name: request.Name,
+	}
 	err := async.IterAsync(len(partitions), func(i int) error {
-		return partitions[i].DoCloseService(ctx)
+		return partitions[i].DoCloseService(ctx, service)
 	})
 	if err != nil {
 		s.log.Errorf("Request CloseRequest failed: %v", err)
@@ -71,8 +80,12 @@ func (s *PrimitiveServer) Close(ctx context.Context, request *primitiveapi.Close
 func (s *PrimitiveServer) Delete(ctx context.Context, request *primitiveapi.DeleteRequest) (*primitiveapi.DeleteResponse, error) {
 	s.log.Debugf("Received DeleteRequest %+v", request)
 	partitions := s.Partitions()
+	service := protocol.ServiceId{
+		Type: request.Type,
+		Name: request.Name,
+	}
 	err := async.IterAsync(len(partitions), func(i int) error {
-		return partitions[i].DoDeleteService(ctx)
+		return partitions[i].DoDeleteService(ctx, service)
 	})
 	if err != nil {
 		s.log.Errorf("Request DeleteRequest failed: %v", err)

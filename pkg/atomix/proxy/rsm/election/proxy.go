@@ -5,6 +5,7 @@ import (
 	election "github.com/atomix/api/go/atomix/primitive/election"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
+	protocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
@@ -49,7 +50,11 @@ func (s *Proxy) Enter(ctx context.Context, request *election.EnterRequest) (*ele
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoCommand(ctx, enterOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, enterOp, input)
 	if err != nil {
 		s.log.Errorf("Request EnterRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -77,7 +82,11 @@ func (s *Proxy) Withdraw(ctx context.Context, request *election.WithdrawRequest)
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoCommand(ctx, withdrawOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, withdrawOp, input)
 	if err != nil {
 		s.log.Errorf("Request WithdrawRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -105,7 +114,11 @@ func (s *Proxy) Anoint(ctx context.Context, request *election.AnointRequest) (*e
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoCommand(ctx, anointOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, anointOp, input)
 	if err != nil {
 		s.log.Errorf("Request AnointRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -133,7 +146,11 @@ func (s *Proxy) Promote(ctx context.Context, request *election.PromoteRequest) (
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoCommand(ctx, promoteOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, promoteOp, input)
 	if err != nil {
 		s.log.Errorf("Request PromoteRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -161,7 +178,11 @@ func (s *Proxy) Evict(ctx context.Context, request *election.EvictRequest) (*ele
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoCommand(ctx, evictOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, evictOp, input)
 	if err != nil {
 		s.log.Errorf("Request EvictRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -189,7 +210,11 @@ func (s *Proxy) GetTerm(ctx context.Context, request *election.GetTermRequest) (
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoQuery(ctx, getTermOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoQuery(ctx, service, getTermOp, input)
 	if err != nil {
 		s.log.Errorf("Request GetTermRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -219,7 +244,11 @@ func (s *Proxy) Events(request *election.EventsRequest, srv election.LeaderElect
 		return errors.Proto(err)
 	}
 
-	err = partition.DoCommandStream(srv.Context(), eventsOp, input, stream)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	err = partition.DoCommandStream(srv.Context(), service, eventsOp, input, stream)
 	if err != nil {
 		s.log.Errorf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)

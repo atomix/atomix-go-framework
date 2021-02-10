@@ -5,6 +5,7 @@ import (
 	lock "github.com/atomix/api/go/atomix/primitive/lock"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
+	protocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
 	"github.com/golang/protobuf/proto"
 )
@@ -44,7 +45,11 @@ func (s *Proxy) Lock(ctx context.Context, request *lock.LockRequest) (*lock.Lock
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoCommand(ctx, lockOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, lockOp, input)
 	if err != nil {
 		s.log.Errorf("Request LockRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -72,7 +77,11 @@ func (s *Proxy) Unlock(ctx context.Context, request *lock.UnlockRequest) (*lock.
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoCommand(ctx, unlockOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, unlockOp, input)
 	if err != nil {
 		s.log.Errorf("Request UnlockRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -100,7 +109,11 @@ func (s *Proxy) GetLock(ctx context.Context, request *lock.GetLockRequest) (*loc
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoQuery(ctx, getLockOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoQuery(ctx, service, getLockOp, input)
 	if err != nil {
 		s.log.Errorf("Request GetLockRequest failed: %v", err)
 		return nil, errors.Proto(err)

@@ -16,11 +16,9 @@ package rsm
 
 import (
 	"context"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/google/uuid"
-	"google.golang.org/grpc/metadata"
 	"sync"
 	"time"
 )
@@ -82,11 +80,7 @@ type Session struct {
 }
 
 // DoCommand submits a command to the service
-func (s *Session) DoCommand(ctx context.Context, name string, input []byte) ([]byte, error) {
-	service, err := getService(ctx)
-	if err != nil {
-		return nil, err
-	}
+func (s *Session) DoCommand(ctx context.Context, service rsm.ServiceId, name string, input []byte) ([]byte, error) {
 	requestContext := s.nextCommandContext()
 	response, responseStatus, responseContext, err := s.Partition.doCommand(ctx, name, input, service, requestContext)
 	if err != nil {
@@ -100,15 +94,11 @@ func (s *Session) DoCommand(ctx context.Context, name string, input []byte) ([]b
 }
 
 // DoCommandStream submits a streaming command to the service
-func (s *Session) DoCommandStream(ctx context.Context, name string, input []byte, outStream streams.WriteStream) error {
-	service, err := getService(ctx)
-	if err != nil {
-		return err
-	}
+func (s *Session) DoCommandStream(ctx context.Context, service rsm.ServiceId, name string, input []byte, outStream streams.WriteStream) error {
 	streamState, requestContext := s.nextStream()
 	ch := make(chan streams.Result)
 	inStream := streams.NewChannelStream(ch)
-	err = s.Partition.doCommandStream(context.Background(), name, input, service, requestContext, inStream)
+	err := s.Partition.doCommandStream(context.Background(), name, input, service, requestContext, inStream)
 	if err != nil {
 		return err
 	}
@@ -152,11 +142,7 @@ func (s *Session) DoCommandStream(ctx context.Context, name string, input []byte
 }
 
 // DoQuery submits a query to the service
-func (s *Session) DoQuery(ctx context.Context, name string, input []byte) ([]byte, error) {
-	service, err := getService(ctx)
-	if err != nil {
-		return nil, err
-	}
+func (s *Session) DoQuery(ctx context.Context, service rsm.ServiceId, name string, input []byte) ([]byte, error) {
 	requestContext := s.getQueryContext()
 	response, responseStatus, responseContext, err := s.Partition.doQuery(ctx, name, input, service, requestContext)
 	if err != nil {
@@ -170,11 +156,7 @@ func (s *Session) DoQuery(ctx context.Context, name string, input []byte) ([]byt
 }
 
 // DoQueryStream submits a streaming query to the service
-func (s *Session) DoQueryStream(ctx context.Context, name string, input []byte, stream streams.WriteStream) error {
-	service, err := getService(ctx)
-	if err != nil {
-		return err
-	}
+func (s *Session) DoQueryStream(ctx context.Context, service rsm.ServiceId, name string, input []byte, stream streams.WriteStream) error {
 	requestContext := s.getQueryContext()
 	stream = streams.NewDecodingStream(stream, func(value interface{}, err error) (interface{}, error) {
 		if err != nil {
@@ -193,11 +175,7 @@ func (s *Session) DoQueryStream(ctx context.Context, name string, input []byte, 
 }
 
 // DoCreateService creates the service
-func (s *Session) DoCreateService(ctx context.Context) error {
-	service, err := getService(ctx)
-	if err != nil {
-		return err
-	}
+func (s *Session) DoCreateService(ctx context.Context, service rsm.ServiceId) error {
 	requestContext := s.nextCommandContext()
 	responseStatus, responseContext, err := s.Partition.doCreateService(ctx, service, requestContext)
 	if err != nil {
@@ -211,11 +189,7 @@ func (s *Session) DoCreateService(ctx context.Context) error {
 }
 
 // DoCloseService closes the service
-func (s *Session) DoCloseService(ctx context.Context) error {
-	service, err := getService(ctx)
-	if err != nil {
-		return err
-	}
+func (s *Session) DoCloseService(ctx context.Context, service rsm.ServiceId) error {
 	requestContext := s.nextCommandContext()
 	responseStatus, responseContext, err := s.Partition.doCloseService(ctx, service, requestContext)
 	if err != nil {
@@ -229,11 +203,7 @@ func (s *Session) DoCloseService(ctx context.Context) error {
 }
 
 // DoDeleteService deletes the service
-func (s *Session) DoDeleteService(ctx context.Context) error {
-	service, err := getService(ctx)
-	if err != nil {
-		return err
-	}
+func (s *Session) DoDeleteService(ctx context.Context, service rsm.ServiceId) error {
 	requestContext := s.nextCommandContext()
 	responseStatus, responseContext, err := s.Partition.doDeleteService(ctx, service, requestContext)
 	if err != nil {
@@ -455,21 +425,4 @@ func (s *StreamState) Close() {
 // SessionOutput is a result for session-supporting servers containing session header information
 type SessionOutput struct {
 	streams.Result
-}
-
-// getService returns the service ID for the given primitive
-func getService(ctx context.Context) (rsm.ServiceId, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return rsm.ServiceId{}, errors.NewInvalid("service metadata not found")
-	}
-	types := md.Get(primitiveTypeKey)
-	names := md.Get(primitiveNameKey)
-	if len(types) == 0 || len(names) == 0 {
-		return rsm.ServiceId{}, errors.NewInvalid("service metadata not found")
-	}
-	return rsm.ServiceId{
-		Type: types[0],
-		Name: names[0],
-	}, nil
 }

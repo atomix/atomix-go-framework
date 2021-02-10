@@ -5,6 +5,7 @@ import (
 	_map "github.com/atomix/api/go/atomix/primitive/map"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
+	protocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
 	async "github.com/atomix/go-framework/pkg/atomix/util/async"
 	"github.com/golang/protobuf/proto"
@@ -48,8 +49,12 @@ func (s *Proxy) Size(ctx context.Context, request *_map.SizeRequest) (*_map.Size
 	}
 	partitions := s.Partitions()
 
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
-		return partitions[i].DoQuery(ctx, sizeOp, input)
+		return partitions[i].DoQuery(ctx, service, sizeOp, input)
 	})
 	if err != nil {
 		s.log.Errorf("Request SizeRequest failed: %v", err)
@@ -85,7 +90,11 @@ func (s *Proxy) Put(ctx context.Context, request *_map.PutRequest) (*_map.PutRes
 	partitionKey := request.Entry.Key.Key
 	partition := s.PartitionBy([]byte(partitionKey))
 
-	output, err := partition.DoCommand(ctx, putOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, putOp, input)
 	if err != nil {
 		s.log.Errorf("Request PutRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -111,7 +120,11 @@ func (s *Proxy) Get(ctx context.Context, request *_map.GetRequest) (*_map.GetRes
 	partitionKey := request.Key
 	partition := s.PartitionBy([]byte(partitionKey))
 
-	output, err := partition.DoQuery(ctx, getOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoQuery(ctx, service, getOp, input)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -137,7 +150,11 @@ func (s *Proxy) Remove(ctx context.Context, request *_map.RemoveRequest) (*_map.
 	partitionKey := request.Key.Key
 	partition := s.PartitionBy([]byte(partitionKey))
 
-	output, err := partition.DoCommand(ctx, removeOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, removeOp, input)
 	if err != nil {
 		s.log.Errorf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -162,8 +179,12 @@ func (s *Proxy) Clear(ctx context.Context, request *_map.ClearRequest) (*_map.Cl
 	}
 	partitions := s.Partitions()
 
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
-		return partitions[i].DoCommand(ctx, clearOp, input)
+		return partitions[i].DoCommand(ctx, service, clearOp, input)
 	})
 	if err != nil {
 		s.log.Errorf("Request ClearRequest failed: %v", err)
@@ -195,9 +216,13 @@ func (s *Proxy) Events(request *_map.EventsRequest, srv _map.MapService_EventsSe
 	}
 
 	stream := streams.NewBufferedStream()
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
 	partitions := s.Partitions()
 	err = async.IterAsync(len(partitions), func(i int) error {
-		return partitions[i].DoCommandStream(srv.Context(), eventsOp, input, stream)
+		return partitions[i].DoCommandStream(srv.Context(), service, eventsOp, input, stream)
 	})
 	if err != nil {
 		s.log.Errorf("Request EventsRequest failed: %v", err)
@@ -241,9 +266,13 @@ func (s *Proxy) Entries(request *_map.EntriesRequest, srv _map.MapService_Entrie
 	}
 
 	stream := streams.NewBufferedStream()
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
 	partitions := s.Partitions()
 	err = async.IterAsync(len(partitions), func(i int) error {
-		return partitions[i].DoQueryStream(srv.Context(), entriesOp, input, stream)
+		return partitions[i].DoQueryStream(srv.Context(), service, entriesOp, input, stream)
 	})
 	if err != nil {
 		s.log.Errorf("Request EntriesRequest failed: %v", err)

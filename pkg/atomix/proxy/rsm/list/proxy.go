@@ -5,6 +5,7 @@ import (
 	list "github.com/atomix/api/go/atomix/primitive/list"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
+	protocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
@@ -51,7 +52,11 @@ func (s *Proxy) Size(ctx context.Context, request *list.SizeRequest) (*list.Size
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoQuery(ctx, sizeOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoQuery(ctx, service, sizeOp, input)
 	if err != nil {
 		s.log.Errorf("Request SizeRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -79,7 +84,11 @@ func (s *Proxy) Append(ctx context.Context, request *list.AppendRequest) (*list.
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoCommand(ctx, appendOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, appendOp, input)
 	if err != nil {
 		s.log.Errorf("Request AppendRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -107,7 +116,11 @@ func (s *Proxy) Insert(ctx context.Context, request *list.InsertRequest) (*list.
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoCommand(ctx, insertOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, insertOp, input)
 	if err != nil {
 		s.log.Errorf("Request InsertRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -135,7 +148,11 @@ func (s *Proxy) Get(ctx context.Context, request *list.GetRequest) (*list.GetRes
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoQuery(ctx, getOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoQuery(ctx, service, getOp, input)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -163,7 +180,11 @@ func (s *Proxy) Set(ctx context.Context, request *list.SetRequest) (*list.SetRes
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoCommand(ctx, setOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, setOp, input)
 	if err != nil {
 		s.log.Errorf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -191,7 +212,11 @@ func (s *Proxy) Remove(ctx context.Context, request *list.RemoveRequest) (*list.
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoCommand(ctx, removeOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, removeOp, input)
 	if err != nil {
 		s.log.Errorf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -219,7 +244,11 @@ func (s *Proxy) Clear(ctx context.Context, request *list.ClearRequest) (*list.Cl
 		return nil, errors.Proto(err)
 	}
 
-	output, err := partition.DoCommand(ctx, clearOp, input)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	output, err := partition.DoCommand(ctx, service, clearOp, input)
 	if err != nil {
 		s.log.Errorf("Request ClearRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -249,7 +278,11 @@ func (s *Proxy) Events(request *list.EventsRequest, srv list.ListService_EventsS
 		return errors.Proto(err)
 	}
 
-	err = partition.DoCommandStream(srv.Context(), eventsOp, input, stream)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	err = partition.DoCommandStream(srv.Context(), service, eventsOp, input, stream)
 	if err != nil {
 		s.log.Errorf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
@@ -297,7 +330,11 @@ func (s *Proxy) Elements(request *list.ElementsRequest, srv list.ListService_Ele
 		return errors.Proto(err)
 	}
 
-	err = partition.DoQueryStream(srv.Context(), elementsOp, input, stream)
+	service := protocol.ServiceId{
+		Type: Type,
+		Name: request.Headers.PrimitiveID,
+	}
+	err = partition.DoQueryStream(srv.Context(), service, elementsOp, input, stream)
 	if err != nil {
 		s.log.Errorf("Request ElementsRequest failed: %v", err)
 		return errors.Proto(err)

@@ -59,9 +59,11 @@ func (n *Node) Start() error {
 	servers := n.registry.GetServers()
 	services := make([]cluster.Service, len(servers))
 	for i, f := range servers {
-		services[i] = func(s *grpc.Server) {
-			f(s, manager)
-		}
+		services[i] = func(f RegisterServerFunc) func(s *grpc.Server) {
+			return func(s *grpc.Server) {
+				f(s, manager)
+			}
+		}(f)
 	}
 	services = append(services, RegisterPrimitiveServer)
 	services = append(services, func(server *grpc.Server) {
