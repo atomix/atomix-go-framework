@@ -211,21 +211,17 @@ func (m *Manager) installServices(reader io.Reader) error {
 			primitive := m.registry.GetPrimitive(primitive.PrimitiveType(serviceID.Type))
 			service := primitive.NewService(m.scheduler, newServiceContext(m.context, ServiceID(serviceID)))
 			services[ServiceID(serviceID)] = service
+			for _, sessionMgr := range m.sessions {
+				if session, ok := sessionMgr.services[ServiceID(serviceID)]; ok {
+					service.addSession(session)
+				}
+			}
 			if err := service.Restore(reader); err != nil {
 				return err
 			}
 		}
 	}
 	m.services = services
-
-	for _, sessionManager := range m.sessions {
-		for serviceID, session := range sessionManager.services {
-			service, ok := m.services[serviceID]
-			if ok {
-				service.addSession(session)
-			}
-		}
-	}
 	return nil
 }
 
