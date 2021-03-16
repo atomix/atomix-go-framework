@@ -63,12 +63,18 @@ type LinkedMapEntryValue struct {
 func (m *Service) Backup(writer io.Writer) error {
 	listeners := make([]*Listener, 0)
 	for sessionID, sessionListeners := range m.listeners {
-		for streamID, sessionListener := range sessionListeners {
-			listeners = append(listeners, &Listener{
-				SessionId: uint64(sessionID),
-				StreamId:  uint64(streamID),
-				Key:       sessionListener.key,
-			})
+		session := m.Session(sessionID)
+		if session != nil {
+			for streamID, sessionListener := range sessionListeners {
+				stream := session.Stream(streamID)
+				if stream != nil {
+					listeners = append(listeners, &Listener{
+						SessionId: uint64(sessionID),
+						StreamId:  uint64(streamID),
+						Key:       sessionListener.key,
+					})
+				}
+			}
 		}
 	}
 
