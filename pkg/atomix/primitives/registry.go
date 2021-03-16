@@ -15,6 +15,7 @@
 package primitives
 
 import (
+	"context"
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"sync"
@@ -24,12 +25,19 @@ import (
 func NewRegistry() *Registry {
 	return &Registry{
 		primitives: make(map[string]primitiveapi.PrimitiveMeta),
+		waiters:    make(map[string][]chan<- primitiveapi.PrimitiveMeta),
 	}
+}
+
+// Resolver is a primitive resolver
+type Resolver interface {
+	ResolvePrimitive(ctx context.Context, name string) (primitiveapi.PrimitiveMeta, error)
 }
 
 // Registry is a primitives registry
 type Registry struct {
 	primitives map[string]primitiveapi.PrimitiveMeta
+	waiters    map[string][]chan<- primitiveapi.PrimitiveMeta
 	mu         sync.RWMutex
 }
 
@@ -40,6 +48,14 @@ func (m *Registry) AddPrimitive(primitive primitiveapi.PrimitiveMeta) error {
 		return errors.NewAlreadyExists("primitive '%s' already exists", primitive.Name)
 	}
 	m.primitives[primitive.Name] = primitive
+	waiters, ok := m.waiters[primitive.Name]
+	if ok {
+		for _, waiter := range waiters {
+			waiter <- primitive
+			close(waiter)
+		}
+		delete(m.waiters, primitive.Name)
+	}
 	return nil
 }
 
@@ -51,6 +67,20 @@ func (m *Registry) RemovePrimitive(name string) error {
 	}
 	delete(m.primitives, name)
 	return nil
+}
+
+func (m *Registry) ResolvePrimitive(ctx context.Context, name string) (primitiveapi.PrimitiveMeta, error) {
+	waiter := make(chan primitiveapi.PrimitiveMeta, 1)
+	m.mu.Lock()
+	m.waiters[name] = append(m.waiters[name], waiter)
+	m.mu.Unlock()
+
+	select {
+	case primMeta := <-waiter:
+		return primMeta, nil
+	case <-ctx.Done():
+		return primitiveapi.PrimitiveMeta{}, ctx.Err()
+	}
 }
 
 func (m *Registry) GetPrimitive(name string) (primitiveapi.PrimitiveMeta, error) {
@@ -72,3 +102,5 @@ func (m *Registry) ListPrimitives() ([]primitiveapi.PrimitiveMeta, error) {
 	}
 	return primitives, nil
 }
+
+var _ Resolver = &Registry{}

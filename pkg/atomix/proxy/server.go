@@ -28,7 +28,7 @@ var log = logging.GetLogger("atomix", "proxy")
 // Node is an interface for proxy nodes
 type Node interface {
 	server.Node
-	Primitives() *primitives.Resolver
+	Primitives() primitives.Resolver
 	PrimitiveTypes() *PrimitiveTypeRegistry
 }
 
@@ -37,7 +37,7 @@ func NewNode(coordinator *cluster.Replica, cluster cluster.Cluster) Node {
 	return &Server{
 		Server:         server.NewServer(cluster),
 		coordinator:    coordinator,
-		primitives:     primitives.NewResolver(coordinator),
+		primitives:     primitives.NewRegistry(),
 		primitiveTypes: NewPrimitiveTypeRegistry(),
 	}
 }
@@ -46,11 +46,11 @@ func NewNode(coordinator *cluster.Replica, cluster cluster.Cluster) Node {
 type Server struct {
 	*server.Server
 	coordinator    *cluster.Replica
-	primitives     *primitives.Resolver
+	primitives     *primitives.Registry
 	primitiveTypes *PrimitiveTypeRegistry
 }
 
-func (s *Server) Primitives() *primitives.Resolver {
+func (s *Server) Primitives() primitives.Resolver {
 	return s.primitives
 }
 
