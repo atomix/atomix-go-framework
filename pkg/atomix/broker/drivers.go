@@ -12,30 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package coordinator
+package broker
 
 import (
-	coordinatorapi "github.com/atomix/api/go/atomix/management/coordinator"
+	brokerapi "github.com/atomix/api/go/atomix/management/broker"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"sync"
 )
 
 // newDriverRegistry creates a new driver registry
 func newDriverRegistry() *DriverRegistry {
 	return &DriverRegistry{
-		drivers: make(map[coordinatorapi.DriverId]coordinatorapi.DriverConfig),
+		drivers: make(map[brokerapi.DriverId]brokerapi.DriverConfig),
 	}
 }
 
 // DriverRegistry is a driver registry
+// The registry is not thread safe!
 type DriverRegistry struct {
-	drivers map[coordinatorapi.DriverId]coordinatorapi.DriverConfig
-	mu      sync.RWMutex
+	drivers map[brokerapi.DriverId]brokerapi.DriverConfig
 }
 
-func (r *DriverRegistry) AddDriver(driver coordinatorapi.DriverConfig) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+func (r *DriverRegistry) AddDriver(driver brokerapi.DriverConfig) error {
 	if _, ok := r.drivers[driver.ID]; ok {
 		return errors.NewAlreadyExists("driver '%s' already exists", driver.ID)
 	}
@@ -43,9 +40,15 @@ func (r *DriverRegistry) AddDriver(driver coordinatorapi.DriverConfig) error {
 	return nil
 }
 
-func (r *DriverRegistry) RemoveDriver(id coordinatorapi.DriverId) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+func (r *DriverRegistry) UpdateDriver(driver brokerapi.DriverConfig) error {
+	if _, ok := r.drivers[driver.ID]; ok {
+		return errors.NewNotFound("driver '%s' not found", driver.ID)
+	}
+	r.drivers[driver.ID] = driver
+	return nil
+}
+
+func (r *DriverRegistry) RemoveDriver(id brokerapi.DriverId) error {
 	if _, ok := r.drivers[id]; ok {
 		return errors.NewNotFound("driver '%s' not found", id)
 	}
@@ -53,20 +56,16 @@ func (r *DriverRegistry) RemoveDriver(id coordinatorapi.DriverId) error {
 	return nil
 }
 
-func (r *DriverRegistry) GetDriver(id coordinatorapi.DriverId) (coordinatorapi.DriverConfig, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+func (r *DriverRegistry) GetDriver(id brokerapi.DriverId) (brokerapi.DriverConfig, error) {
 	driver, ok := r.drivers[id]
 	if !ok {
-		return coordinatorapi.DriverConfig{}, errors.NewNotFound("driver '%s' not found", id)
+		return brokerapi.DriverConfig{}, errors.NewNotFound("driver '%s' not found", id)
 	}
 	return driver, nil
 }
 
-func (r *DriverRegistry) ListDrivers() ([]coordinatorapi.DriverConfig, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	drivers := make([]coordinatorapi.DriverConfig, 0, len(r.drivers))
+func (r *DriverRegistry) ListDrivers() ([]brokerapi.DriverConfig, error) {
+	drivers := make([]brokerapi.DriverConfig, 0, len(r.drivers))
 	for _, driver := range r.drivers {
 		drivers = append(drivers, driver)
 	}
