@@ -16,15 +16,11 @@ package coordinator
 
 import (
 	"context"
+	coordinatorapi "github.com/atomix/api/go/atomix/management/coordinator"
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
-	"github.com/atomix/go-framework/pkg/atomix/drivers"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/atomix/go-framework/pkg/atomix/primitives"
 )
 
-var log = logging.GetLogger("atomix", "coordinator")
-
-func NewServer(drivers *drivers.Registry, primitives *primitives.Registry) *Server {
+func NewServer(drivers *DriverRegistry, primitives *PrimitiveRegistry) *Server {
 	return &Server{
 		drivers:    drivers,
 		primitives: primitives,
@@ -32,41 +28,71 @@ func NewServer(drivers *drivers.Registry, primitives *primitives.Registry) *Serv
 }
 
 type Server struct {
-	drivers    *drivers.Registry
-	primitives *primitives.Registry
+	drivers    *DriverRegistry
+	primitives *PrimitiveRegistry
 }
 
-func (s *Server) GetPrimitive(ctx context.Context, request *primitiveapi.GetPrimitiveRequest) (*primitiveapi.GetPrimitiveResponse, error) {
-	log.Debugf("Received GetPrimitiveRequest %+v", request)
-	primitive, err := s.primitives.GetPrimitive(request.Name)
-	if err != nil {
-		log.Warnf("GetPrimitiveRequest %+v failed: %v", request, err)
+func (s *Server) AddDriver(ctx context.Context, request *coordinatorapi.AddDriverRequest) (*coordinatorapi.AddDriverResponse, error) {
+	log.Debugf("Received AddDriverRequest %+v", request)
+	if _, err := s.drivers.GetDriver(request.Driver.ID); err != nil {
+		log.Warnf("AddDriverRequest %+v failed: %v", request, err)
 		return nil, err
 	}
-	response := &primitiveapi.GetPrimitiveResponse{
-		Primitive: primitive,
+	if err := s.drivers.AddDriver(request.Driver); err != nil {
+		log.Warnf("AddDriverRequest %+v failed: %v", request, err)
+		return nil, err
 	}
-	log.Debugf("Sending GetPrimitiveResponse %+v", response)
+	response := &coordinatorapi.AddDriverResponse{}
+	log.Debugf("Sending AddDriverResponse %+v", response)
 	return response, nil
 }
 
-func (s *Server) ListPrimitives(ctx context.Context, request *primitiveapi.ListPrimitivesRequest) (*primitiveapi.ListPrimitivesResponse, error) {
-	log.Debugf("Received ListPrimitivesRequest %+v", request)
-	primitives, err := s.primitives.ListPrimitives()
+func (s *Server) RemoveDriver(ctx context.Context, request *coordinatorapi.RemoveDriverRequest) (*coordinatorapi.RemoveDriverResponse, error) {
+	log.Debugf("Received RemoveDriverRequest %+v", request)
+	err := s.drivers.RemoveDriver(request.DriverID)
 	if err != nil {
-		log.Warnf("ListPrimitivesRequest %+v failed: %v", request, err)
+		log.Warnf("RemoveDriverRequest %+v failed: %v", request, err)
 		return nil, err
 	}
-	response := &primitiveapi.ListPrimitivesResponse{
-		Primitives: primitives,
+	response := &coordinatorapi.RemoveDriverResponse{}
+	log.Debugf("Sending RemoveDriverResponse %+v", response)
+	return response, nil
+}
+
+func (s *Server) AddPrimitive(ctx context.Context, request *coordinatorapi.AddPrimitiveRequest) (*coordinatorapi.AddPrimitiveResponse, error) {
+	log.Debugf("Received AddPrimitiveRequest %+v", request)
+	if _, err := s.drivers.GetDriver(request.Primitive.Driver); err != nil {
+		log.Warnf("AddPrimitiveRequest %+v failed: %v", request, err)
+		return nil, err
 	}
-	log.Debugf("Sending ListPrimitivesResponse %+v", response)
+	if err := s.primitives.AddPrimitive(request.Primitive); err != nil {
+		log.Warnf("AddPrimitiveRequest %+v failed: %v", request, err)
+		return nil, err
+	}
+	response := &coordinatorapi.AddPrimitiveResponse{}
+	log.Debugf("Sending AddPrimitiveResponse %+v", response)
+	return response, nil
+}
+
+func (s *Server) RemovePrimitive(ctx context.Context, request *coordinatorapi.RemovePrimitiveRequest) (*coordinatorapi.RemovePrimitiveResponse, error) {
+	log.Debugf("Received RemovePrimitiveRequest %+v", request)
+	err := s.primitives.RemovePrimitive(request.PrimitiveID)
+	if err != nil {
+		log.Warnf("RemovePrimitiveRequest %+v failed: %v", request, err)
+		return nil, err
+	}
+	response := &coordinatorapi.RemovePrimitiveResponse{}
+	log.Debugf("Sending RemovePrimitiveResponse %+v", response)
 	return response, nil
 }
 
 func (s *Server) LookupPrimitive(ctx context.Context, request *primitiveapi.LookupPrimitiveRequest) (*primitiveapi.LookupPrimitiveResponse, error) {
 	log.Debugf("Received LookupPrimitiveRequest %+v", request)
-	primitive, err := s.primitives.GetPrimitive(request.Name)
+	primitive, err := s.primitives.GetPrimitive(coordinatorapi.PrimitiveId{
+		Type:      request.PrimitiveID.Type,
+		Namespace: request.PrimitiveID.Namespace,
+		Name:      request.PrimitiveID.Name,
+	})
 	if err != nil {
 		log.Warnf("LookupPrimitiveRequest %+v failed: %v", request, err)
 		return nil, err
@@ -77,38 +103,16 @@ func (s *Server) LookupPrimitive(ctx context.Context, request *primitiveapi.Look
 		return nil, err
 	}
 	response := &primitiveapi.LookupPrimitiveResponse{
-		Proxy: driver.Proxy,
+		Primitive: primitiveapi.PrimitiveMeta{
+			ID:   request.PrimitiveID,
+			Host: driver.Host,
+			Port: driver.Port,
+		},
 	}
 	log.Debugf("Sending LookupPrimitiveResponse %+v", response)
 	return response, nil
 }
 
-func (s *Server) AddPrimitive(ctx context.Context, request *primitiveapi.AddPrimitiveRequest) (*primitiveapi.AddPrimitiveResponse, error) {
-	log.Debugf("Received AddPrimitiveRequest %+v", request)
-	if _, err := s.drivers.GetDriver(request.Primitive.Driver); err != nil {
-		log.Warnf("AddPrimitiveRequest %+v failed: %v", request, err)
-		return nil, err
-	}
-	if err := s.primitives.AddPrimitive(request.Primitive); err != nil {
-		log.Warnf("AddPrimitiveRequest %+v failed: %v", request, err)
-		return nil, err
-	}
-	response := &primitiveapi.AddPrimitiveResponse{}
-	log.Debugf("Sending AddPrimitiveResponse %+v", response)
-	return response, nil
-}
-
-func (s *Server) RemovePrimitive(ctx context.Context, request *primitiveapi.RemovePrimitiveRequest) (*primitiveapi.RemovePrimitiveResponse, error) {
-	log.Debugf("Received RemovePrimitiveRequest %+v", request)
-	err := s.primitives.RemovePrimitive(request.Name)
-	if err != nil {
-		log.Warnf("RemovePrimitiveRequest %+v failed: %v", request, err)
-		return nil, err
-	}
-	response := &primitiveapi.RemovePrimitiveResponse{}
-	log.Debugf("Sending RemovePrimitiveResponse %+v", response)
-	return response, nil
-}
-
-var _ primitiveapi.PrimitiveRegistryServiceServer = &Server{}
-var _ primitiveapi.PrimitiveManagementServiceServer = &Server{}
+var _ coordinatorapi.PrimitiveManagementServiceServer = &Server{}
+var _ coordinatorapi.DriverManagementServiceServer = &Server{}
+var _ primitiveapi.PrimitiveDiscoveryServiceServer = &Server{}

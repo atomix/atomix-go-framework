@@ -15,14 +15,16 @@
 package coordinator
 
 import (
-	driverapi "github.com/atomix/api/go/atomix/driver"
+	coordinatorapi "github.com/atomix/api/go/atomix/management/coordinator"
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/drivers"
-	"github.com/atomix/go-framework/pkg/atomix/primitives"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/server"
 	"google.golang.org/grpc"
 )
+
+var log = logging.GetLogger("atomix", "coordinator")
 
 // NewNode creates a new coordinator node
 func NewNode(cluster cluster.Cluster) *Node {
@@ -38,21 +40,13 @@ type Node struct {
 	drivers *drivers.Registry
 }
 
-// RegisterDriver registers a driver proxy
-func (n *Node) RegisterDriver(driver driverapi.DriverMeta) error {
-	return n.drivers.RegisterDriver(driver)
-}
-
 // Start starts the node
 func (n *Node) Start() error {
 	n.RegisterService(func(s *grpc.Server) {
-		server := drivers.NewServer(n.drivers)
-		driverapi.RegisterDriverServiceServer(s, server)
-	})
-	n.RegisterService(func(s *grpc.Server) {
-		server := primitives.NewServer(n.drivers, primitives.NewRegistry())
-		primitiveapi.RegisterPrimitiveRegistryServiceServer(s, server)
-		primitiveapi.RegisterPrimitiveManagementServiceServer(s, server)
+		server := NewServer(newDriverRegistry(), newPrimitiveRegistry())
+		coordinatorapi.RegisterPrimitiveManagementServiceServer(s, server)
+		coordinatorapi.RegisterDriverManagementServiceServer(s, server)
+		primitiveapi.RegisterPrimitiveDiscoveryServiceServer(s, server)
 	})
 	return n.Server.Start()
 }
