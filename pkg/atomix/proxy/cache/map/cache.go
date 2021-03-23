@@ -16,41 +16,36 @@ package _map
 
 import (
 	"context"
-	_map "github.com/atomix/api/go/atomix/primitive/map"
+	mapapi "github.com/atomix/api/go/atomix/primitive/map"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/meta"
-	"github.com/atomix/go-framework/pkg/atomix/proxy"
 	"github.com/atomix/go-framework/pkg/atomix/time"
 	"sync"
 )
 
-const Type = "Map"
-
-// RegisterCachedMapDecorator registers the cache on the given server
-func RegisterCachedMapDecorator(node proxy.Node) {
-	node.PrimitiveTypes().RegisterCacheDecoratorFunc(Type, func(s interface{}) interface{} {
-		return &CachedMap{
-			server:  s.(_map.MapServiceServer),
-			entries: make(map[string]*_map.Entry),
-		}
-	})
-}
-
 var log = logging.GetLogger("atomix", "map")
 
-type CachedMap struct {
-	server       _map.MapServiceServer
-	entries      map[string]*_map.Entry
+// NewReadOnlyMapServer creates a new read-only map server
+func NewReadOnlyMapServer(s mapapi.MapServiceServer) mapapi.MapServiceServer {
+	return &CachedMapServer{
+		server:  s,
+		entries: make(map[string]*mapapi.Entry),
+	}
+}
+
+type CachedMapServer struct {
+	server       mapapi.MapServiceServer
+	entries      map[string]*mapapi.Entry
 	maxTimestamp time.Timestamp
 	mu           sync.RWMutex
 }
 
-func (s *CachedMap) Size(ctx context.Context, request *_map.SizeRequest) (*_map.SizeResponse, error) {
+func (s *CachedMapServer) Size(ctx context.Context, request *mapapi.SizeRequest) (*mapapi.SizeResponse, error) {
 	return s.server.Size(ctx, request)
 }
 
-func (s *CachedMap) Put(ctx context.Context, request *_map.PutRequest) (*_map.PutResponse, error) {
+func (s *CachedMapServer) Put(ctx context.Context, request *mapapi.PutRequest) (*mapapi.PutResponse, error) {
 	response, err := s.server.Put(ctx, request)
 	if err != nil {
 		return nil, errors.Proto(err)
@@ -72,12 +67,12 @@ func (s *CachedMap) Put(ctx context.Context, request *_map.PutRequest) (*_map.Pu
 	return response, nil
 }
 
-func (s *CachedMap) Get(ctx context.Context, request *_map.GetRequest) (*_map.GetResponse, error) {
+func (s *CachedMapServer) Get(ctx context.Context, request *mapapi.GetRequest) (*mapapi.GetResponse, error) {
 	s.mu.RLock()
 	entry, ok := s.entries[request.Key]
 	s.mu.RUnlock()
 	if ok {
-		return &_map.GetResponse{
+		return &mapapi.GetResponse{
 			Entry: *entry,
 		}, nil
 	}
@@ -103,7 +98,7 @@ func (s *CachedMap) Get(ctx context.Context, request *_map.GetRequest) (*_map.Ge
 	return response, nil
 }
 
-func (s *CachedMap) Remove(ctx context.Context, request *_map.RemoveRequest) (*_map.RemoveResponse, error) {
+func (s *CachedMapServer) Remove(ctx context.Context, request *mapapi.RemoveRequest) (*mapapi.RemoveResponse, error) {
 	response, err := s.server.Remove(ctx, request)
 	if err != nil {
 		return nil, errors.Proto(err)
@@ -124,22 +119,22 @@ func (s *CachedMap) Remove(ctx context.Context, request *_map.RemoveRequest) (*_
 	return response, nil
 }
 
-func (s *CachedMap) Clear(ctx context.Context, request *_map.ClearRequest) (*_map.ClearResponse, error) {
+func (s *CachedMapServer) Clear(ctx context.Context, request *mapapi.ClearRequest) (*mapapi.ClearResponse, error) {
 	response, err := s.server.Clear(ctx, request)
 	if err != nil {
 		return nil, errors.Proto(err)
 	}
 	s.mu.Lock()
-	s.entries = make(map[string]*_map.Entry)
+	s.entries = make(map[string]*mapapi.Entry)
 	s.mu.Unlock()
 	log.Debugf("Cleared entries")
 	return response, nil
 }
 
-func (s *CachedMap) Events(request *_map.EventsRequest, server _map.MapService_EventsServer) error {
+func (s *CachedMapServer) Events(request *mapapi.EventsRequest, server mapapi.MapService_EventsServer) error {
 	return s.server.Events(request, server)
 }
 
-func (s *CachedMap) Entries(request *_map.EntriesRequest, server _map.MapService_EntriesServer) error {
+func (s *CachedMapServer) Entries(request *mapapi.EntriesRequest, server mapapi.MapService_EntriesServer) error {
 	return s.server.Entries(request, server)
 }

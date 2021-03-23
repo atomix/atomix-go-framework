@@ -43,8 +43,9 @@ func (s *PrimitiveServer) Create(ctx context.Context, request *primitiveapi.Crea
 	s.log.Debugf("Received CreateRequest %+v", request)
 	partitions := s.Partitions()
 	service := protocol.ServiceId{
-		Type: request.Type,
-		Name: request.Name,
+		Type:      request.PrimitiveID.Type,
+		Namespace: request.PrimitiveID.Namespace,
+		Name:      request.PrimitiveID.Name,
 	}
 	err := async.IterAsync(len(partitions), func(i int) error {
 		return partitions[i].DoCreateService(ctx, service)
@@ -62,8 +63,9 @@ func (s *PrimitiveServer) Close(ctx context.Context, request *primitiveapi.Close
 	s.log.Debugf("Received CloseRequest %+v", request)
 	partitions := s.Partitions()
 	service := protocol.ServiceId{
-		Type: request.Type,
-		Name: request.Name,
+		Type:      request.PrimitiveID.Type,
+		Namespace: request.PrimitiveID.Namespace,
+		Name:      request.PrimitiveID.Name,
 	}
 	err := async.IterAsync(len(partitions), func(i int) error {
 		return partitions[i].DoCloseService(ctx, service)
@@ -81,8 +83,9 @@ func (s *PrimitiveServer) Delete(ctx context.Context, request *primitiveapi.Dele
 	s.log.Debugf("Received DeleteRequest %+v", request)
 	partitions := s.Partitions()
 	service := protocol.ServiceId{
-		Type: request.Type,
-		Name: request.Name,
+		Type:      request.PrimitiveID.Type,
+		Namespace: request.PrimitiveID.Namespace,
+		Name:      request.PrimitiveID.Name,
 	}
 	err := async.IterAsync(len(partitions), func(i int) error {
 		return partitions[i].DoDeleteService(ctx, service)

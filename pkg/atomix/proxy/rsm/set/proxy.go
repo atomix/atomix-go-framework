@@ -3,6 +3,7 @@ package set
 import (
 	"context"
 	set "github.com/atomix/api/go/atomix/primitive/set"
+	driver "github.com/atomix/go-framework/pkg/atomix/driver/protocol/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	protocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
@@ -25,22 +26,20 @@ const (
 	elementsOp = "Elements"
 )
 
-// RegisterProxy registers the primitive on the given node
-func RegisterProxy(node *rsm.Node) {
-	node.PrimitiveTypes().RegisterProxyFunc(Type, func() (interface{}, error) {
-		return &Proxy{
-			Proxy: rsm.NewProxy(node.Client),
-			log:   logging.GetLogger("atomix", "set"),
-		}, nil
-	})
+// NewSetProxyServer creates a new SetProxyServer
+func NewSetProxyServer(node *driver.Node) set.SetServiceServer {
+	return &SetProxyServer{
+		Proxy: rsm.NewProxy(node.Client),
+		log:   logging.GetLogger("atomix", "counter"),
+	}
 }
 
-type Proxy struct {
+type SetProxyServer struct {
 	*rsm.Proxy
 	log logging.Logger
 }
 
-func (s *Proxy) Size(ctx context.Context, request *set.SizeRequest) (*set.SizeResponse, error) {
+func (s *SetProxyServer) Size(ctx context.Context, request *set.SizeRequest) (*set.SizeResponse, error) {
 	s.log.Debugf("Received SizeRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -50,8 +49,9 @@ func (s *Proxy) Size(ctx context.Context, request *set.SizeRequest) (*set.SizeRe
 	partitions := s.Partitions()
 
 	service := protocol.ServiceId{
-		Type: Type,
-		Name: request.Headers.PrimitiveID,
+		Type:      Type,
+		Namespace: request.Headers.PrimitiveID.Namespace,
+		Name:      request.Headers.PrimitiveID.Name,
 	}
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
 		return partitions[i].DoQuery(ctx, service, sizeOp, input)
@@ -80,7 +80,7 @@ func (s *Proxy) Size(ctx context.Context, request *set.SizeRequest) (*set.SizeRe
 	return response, nil
 }
 
-func (s *Proxy) Contains(ctx context.Context, request *set.ContainsRequest) (*set.ContainsResponse, error) {
+func (s *SetProxyServer) Contains(ctx context.Context, request *set.ContainsRequest) (*set.ContainsResponse, error) {
 	s.log.Debugf("Received ContainsRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -91,8 +91,9 @@ func (s *Proxy) Contains(ctx context.Context, request *set.ContainsRequest) (*se
 	partition := s.PartitionBy([]byte(partitionKey))
 
 	service := protocol.ServiceId{
-		Type: Type,
-		Name: request.Headers.PrimitiveID,
+		Type:      Type,
+		Namespace: request.Headers.PrimitiveID.Namespace,
+		Name:      request.Headers.PrimitiveID.Name,
 	}
 	output, err := partition.DoQuery(ctx, service, containsOp, input)
 	if err != nil {
@@ -110,7 +111,7 @@ func (s *Proxy) Contains(ctx context.Context, request *set.ContainsRequest) (*se
 	return response, nil
 }
 
-func (s *Proxy) Add(ctx context.Context, request *set.AddRequest) (*set.AddResponse, error) {
+func (s *SetProxyServer) Add(ctx context.Context, request *set.AddRequest) (*set.AddResponse, error) {
 	s.log.Debugf("Received AddRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -121,8 +122,9 @@ func (s *Proxy) Add(ctx context.Context, request *set.AddRequest) (*set.AddRespo
 	partition := s.PartitionBy([]byte(partitionKey))
 
 	service := protocol.ServiceId{
-		Type: Type,
-		Name: request.Headers.PrimitiveID,
+		Type:      Type,
+		Namespace: request.Headers.PrimitiveID.Namespace,
+		Name:      request.Headers.PrimitiveID.Name,
 	}
 	output, err := partition.DoCommand(ctx, service, addOp, input)
 	if err != nil {
@@ -140,7 +142,7 @@ func (s *Proxy) Add(ctx context.Context, request *set.AddRequest) (*set.AddRespo
 	return response, nil
 }
 
-func (s *Proxy) Remove(ctx context.Context, request *set.RemoveRequest) (*set.RemoveResponse, error) {
+func (s *SetProxyServer) Remove(ctx context.Context, request *set.RemoveRequest) (*set.RemoveResponse, error) {
 	s.log.Debugf("Received RemoveRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -151,8 +153,9 @@ func (s *Proxy) Remove(ctx context.Context, request *set.RemoveRequest) (*set.Re
 	partition := s.PartitionBy([]byte(partitionKey))
 
 	service := protocol.ServiceId{
-		Type: Type,
-		Name: request.Headers.PrimitiveID,
+		Type:      Type,
+		Namespace: request.Headers.PrimitiveID.Namespace,
+		Name:      request.Headers.PrimitiveID.Name,
 	}
 	output, err := partition.DoCommand(ctx, service, removeOp, input)
 	if err != nil {
@@ -170,7 +173,7 @@ func (s *Proxy) Remove(ctx context.Context, request *set.RemoveRequest) (*set.Re
 	return response, nil
 }
 
-func (s *Proxy) Clear(ctx context.Context, request *set.ClearRequest) (*set.ClearResponse, error) {
+func (s *SetProxyServer) Clear(ctx context.Context, request *set.ClearRequest) (*set.ClearResponse, error) {
 	s.log.Debugf("Received ClearRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -180,8 +183,9 @@ func (s *Proxy) Clear(ctx context.Context, request *set.ClearRequest) (*set.Clea
 	partitions := s.Partitions()
 
 	service := protocol.ServiceId{
-		Type: Type,
-		Name: request.Headers.PrimitiveID,
+		Type:      Type,
+		Namespace: request.Headers.PrimitiveID.Namespace,
+		Name:      request.Headers.PrimitiveID.Name,
 	}
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
 		return partitions[i].DoCommand(ctx, service, clearOp, input)
@@ -207,7 +211,7 @@ func (s *Proxy) Clear(ctx context.Context, request *set.ClearRequest) (*set.Clea
 	return response, nil
 }
 
-func (s *Proxy) Events(request *set.EventsRequest, srv set.SetService_EventsServer) error {
+func (s *SetProxyServer) Events(request *set.EventsRequest, srv set.SetService_EventsServer) error {
 	s.log.Debugf("Received EventsRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -217,8 +221,9 @@ func (s *Proxy) Events(request *set.EventsRequest, srv set.SetService_EventsServ
 
 	stream := streams.NewBufferedStream()
 	service := protocol.ServiceId{
-		Type: Type,
-		Name: request.Headers.PrimitiveID,
+		Type:      Type,
+		Namespace: request.Headers.PrimitiveID.Namespace,
+		Name:      request.Headers.PrimitiveID.Name,
 	}
 	partitions := s.Partitions()
 	err = async.IterAsync(len(partitions), func(i int) error {
@@ -257,7 +262,7 @@ func (s *Proxy) Events(request *set.EventsRequest, srv set.SetService_EventsServ
 	return nil
 }
 
-func (s *Proxy) Elements(request *set.ElementsRequest, srv set.SetService_ElementsServer) error {
+func (s *SetProxyServer) Elements(request *set.ElementsRequest, srv set.SetService_ElementsServer) error {
 	s.log.Debugf("Received ElementsRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -267,8 +272,9 @@ func (s *Proxy) Elements(request *set.ElementsRequest, srv set.SetService_Elemen
 
 	stream := streams.NewBufferedStream()
 	service := protocol.ServiceId{
-		Type: Type,
-		Name: request.Headers.PrimitiveID,
+		Type:      Type,
+		Namespace: request.Headers.PrimitiveID.Namespace,
+		Name:      request.Headers.PrimitiveID.Name,
 	}
 	partitions := s.Partitions()
 	err = async.IterAsync(len(partitions), func(i int) error {

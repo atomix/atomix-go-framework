@@ -1,8 +1,10 @@
-{{- $proxy := printf "%sProxy" .Generator.Prefix }}
+{{- $proxy := printf "%sProxyServer" .Primitive.Name }}
+{{- $service := printf "%s.%sServer" .Primitive.Type.Package.Alias .Primitive.Type.Name }}
 package {{ .Package.Name }}
 
 import (
 	"context"
+	driver "github.com/atomix/go-framework/pkg/atomix/driver/protocol/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
@@ -23,17 +25,14 @@ import (
 	{{- end }}
 )
 
-const {{ printf "%sType" .Generator.Prefix }} = {{ .Primitive.Name | quote }}
 {{ $root := . }}
 
-// Register{{ $proxy }} registers the primitive on the given node
-func Register{{ $proxy }}(node *gossip.Node) {
-	node.PrimitiveTypes().RegisterProxyFunc(Type, func() (interface{}, error) {
-		return &{{ $proxy }}{
-            Proxy: gossip.NewProxy(node.Client),
-            log: logging.GetLogger("atomix", {{ .Primitive.Name | lower | quote }}),
-        }, nil
-	})
+// New{{ $proxy }} creates a new {{ $proxy }}
+func New{{ $proxy }}(node *driver.Node) {{ $service }} {
+	return &{{ $proxy }}{
+        Proxy: gossip.NewProxy(node.Client),
+        log: logging.GetLogger("atomix", {{ .Primitive.Name | lower | quote }}),
+    }
 }
 
 {{- $primitive := .Primitive }}
@@ -106,12 +105,12 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	{{- if and .Request.PartitionKey.Field.Type.IsBytes (not .Request.PartitionKey.Field.Type.IsCast) }}
 	partition := s.PartitionBy(partitionKey)
 	{{- else }}
-	partition := s.PartitionBy([]byte(partitionKey))
+	partition := s.PartitionBy([]byte(partitionKey.String()))
 	{{- end }}
 	{{- else if .Request.PartitionRange }}
 	partitionRange := {{ template "val" .Request.PartitionRange }}request{{ template "field" .Request.PartitionRange }}
 	{{- else }}
-    partition := s.PartitionBy([]byte(request{{ template "field" .Request.Headers }}.PrimitiveID))
+    partition := s.PartitionBy([]byte(request{{ template "field" .Request.Headers }}.PrimitiveID.String()))
 	{{- end }}
 
 	conn, err := partition.Connect()
@@ -178,12 +177,12 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	{{- if and .Request.PartitionKey.Field.Type.IsBytes (not .Request.PartitionKey.Field.Type.IsCast) }}
 	partition := s.PartitionBy(partitionKey)
 	{{- else }}
-	partition := s.PartitionBy([]byte(partitionKey))
+	partition := s.PartitionBy([]byte(partitionKey.String()))
 	{{- end }}
 	{{- else if .Request.PartitionRange }}
 	partitionRange := {{ template "val" .Request.PartitionRange }}request{{ template "field" .Request.PartitionRange }}
 	{{- else }}
-    partition := s.PartitionBy([]byte(request{{ template "field" .Request.Headers }}.PrimitiveID))
+    partition := s.PartitionBy([]byte(request{{ template "field" .Request.Headers }}.PrimitiveID.String()))
 	{{- end }}
 
 	conn, err := partition.Connect()

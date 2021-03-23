@@ -3,32 +3,29 @@ package value
 import (
 	"context"
 	value "github.com/atomix/api/go/atomix/primitive/value"
+	driver "github.com/atomix/go-framework/pkg/atomix/driver/protocol/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/gossip"
 	io "io"
 )
 
-const Type = "Value"
-
-// RegisterProxy registers the primitive on the given node
-func RegisterProxy(node *gossip.Node) {
-	node.PrimitiveTypes().RegisterProxyFunc(Type, func() (interface{}, error) {
-		return &Proxy{
-			Proxy: gossip.NewProxy(node.Client),
-			log:   logging.GetLogger("atomix", "value"),
-		}, nil
-	})
+// NewValueProxyServer creates a new ValueProxyServer
+func NewValueProxyServer(node *driver.Node) value.ValueServiceServer {
+	return &ValueProxyServer{
+		Proxy: gossip.NewProxy(node.Client),
+		log:   logging.GetLogger("atomix", "value"),
+	}
 }
 
-type Proxy struct {
+type ValueProxyServer struct {
 	*gossip.Proxy
 	log logging.Logger
 }
 
-func (s *Proxy) Set(ctx context.Context, request *value.SetRequest) (*value.SetResponse, error) {
+func (s *ValueProxyServer) Set(ctx context.Context, request *value.SetRequest) (*value.SetResponse, error) {
 	s.log.Debugf("Received SetRequest %+v", request)
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID))
+	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 
 	conn, err := partition.Connect()
 	if err != nil {
@@ -48,9 +45,9 @@ func (s *Proxy) Set(ctx context.Context, request *value.SetRequest) (*value.SetR
 	return response, nil
 }
 
-func (s *Proxy) Get(ctx context.Context, request *value.GetRequest) (*value.GetResponse, error) {
+func (s *ValueProxyServer) Get(ctx context.Context, request *value.GetRequest) (*value.GetResponse, error) {
 	s.log.Debugf("Received GetRequest %+v", request)
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID))
+	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 
 	conn, err := partition.Connect()
 	if err != nil {
@@ -70,9 +67,9 @@ func (s *Proxy) Get(ctx context.Context, request *value.GetRequest) (*value.GetR
 	return response, nil
 }
 
-func (s *Proxy) Events(request *value.EventsRequest, srv value.ValueService_EventsServer) error {
+func (s *ValueProxyServer) Events(request *value.EventsRequest, srv value.ValueService_EventsServer) error {
 	s.log.Debugf("Received EventsRequest %+v", request)
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID))
+	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 
 	conn, err := partition.Connect()
 	if err != nil {

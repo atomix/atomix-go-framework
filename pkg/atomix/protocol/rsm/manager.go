@@ -498,7 +498,7 @@ func (m *Manager) applyServiceCommandDelete(request ServiceCommandRequest, conte
 			Type: SessionResponseType_RESPONSE,
 			Status: SessionResponseStatus{
 				Code:    SessionResponseCode_NOT_FOUND,
-				Message: fmt.Sprintf("unknown service '%s'", serviceID.Name),
+				Message: fmt.Sprintf("unknown service '%s'", serviceID),
 			},
 			Response: &SessionResponse_Command{
 				Command: &SessionCommandResponse{
@@ -838,8 +838,9 @@ func (m *Manager) applyServiceQueryMetadata(request ServiceQueryRequest, context
 	for name, service := range m.services {
 		if serviceType == "" || service.ServiceType() == serviceType {
 			services = append(services, &ServiceId{
-				Type: service.ServiceType(),
-				Name: name.Name,
+				Type:      service.ServiceType(),
+				Namespace: name.Namespace,
+				Name:      name.Name,
 			})
 		}
 	}

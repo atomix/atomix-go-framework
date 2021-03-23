@@ -3,6 +3,7 @@ package election
 import (
 	"context"
 	election "github.com/atomix/api/go/atomix/primitive/election"
+	driver "github.com/atomix/go-framework/pkg/atomix/driver/protocol/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	protocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
@@ -23,22 +24,20 @@ const (
 	eventsOp   = "Events"
 )
 
-// RegisterProxy registers the primitive on the given node
-func RegisterProxy(node *rsm.Node) {
-	node.PrimitiveTypes().RegisterProxyFunc(Type, func() (interface{}, error) {
-		return &Proxy{
-			Proxy: rsm.NewProxy(node.Client),
-			log:   logging.GetLogger("atomix", "election"),
-		}, nil
-	})
+// NewElectionProxyServer creates a new ElectionProxyServer
+func NewElectionProxyServer(node *driver.Node) election.LeaderElectionServiceServer {
+	return &ElectionProxyServer{
+		Proxy: rsm.NewProxy(node.Client),
+		log:   logging.GetLogger("atomix", "counter"),
+	}
 }
 
-type Proxy struct {
+type ElectionProxyServer struct {
 	*rsm.Proxy
 	log logging.Logger
 }
 
-func (s *Proxy) Enter(ctx context.Context, request *election.EnterRequest) (*election.EnterResponse, error) {
+func (s *ElectionProxyServer) Enter(ctx context.Context, request *election.EnterRequest) (*election.EnterResponse, error) {
 	s.log.Debugf("Received EnterRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -51,8 +50,9 @@ func (s *Proxy) Enter(ctx context.Context, request *election.EnterRequest) (*ele
 	}
 
 	service := protocol.ServiceId{
-		Type: Type,
-		Name: request.Headers.PrimitiveID,
+		Type:      Type,
+		Namespace: request.Headers.PrimitiveID.Namespace,
+		Name:      request.Headers.PrimitiveID.Name,
 	}
 	output, err := partition.DoCommand(ctx, service, enterOp, input)
 	if err != nil {
@@ -70,7 +70,7 @@ func (s *Proxy) Enter(ctx context.Context, request *election.EnterRequest) (*ele
 	return response, nil
 }
 
-func (s *Proxy) Withdraw(ctx context.Context, request *election.WithdrawRequest) (*election.WithdrawResponse, error) {
+func (s *ElectionProxyServer) Withdraw(ctx context.Context, request *election.WithdrawRequest) (*election.WithdrawResponse, error) {
 	s.log.Debugf("Received WithdrawRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -83,8 +83,9 @@ func (s *Proxy) Withdraw(ctx context.Context, request *election.WithdrawRequest)
 	}
 
 	service := protocol.ServiceId{
-		Type: Type,
-		Name: request.Headers.PrimitiveID,
+		Type:      Type,
+		Namespace: request.Headers.PrimitiveID.Namespace,
+		Name:      request.Headers.PrimitiveID.Name,
 	}
 	output, err := partition.DoCommand(ctx, service, withdrawOp, input)
 	if err != nil {
@@ -102,7 +103,7 @@ func (s *Proxy) Withdraw(ctx context.Context, request *election.WithdrawRequest)
 	return response, nil
 }
 
-func (s *Proxy) Anoint(ctx context.Context, request *election.AnointRequest) (*election.AnointResponse, error) {
+func (s *ElectionProxyServer) Anoint(ctx context.Context, request *election.AnointRequest) (*election.AnointResponse, error) {
 	s.log.Debugf("Received AnointRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -115,8 +116,9 @@ func (s *Proxy) Anoint(ctx context.Context, request *election.AnointRequest) (*e
 	}
 
 	service := protocol.ServiceId{
-		Type: Type,
-		Name: request.Headers.PrimitiveID,
+		Type:      Type,
+		Namespace: request.Headers.PrimitiveID.Namespace,
+		Name:      request.Headers.PrimitiveID.Name,
 	}
 	output, err := partition.DoCommand(ctx, service, anointOp, input)
 	if err != nil {
@@ -134,7 +136,7 @@ func (s *Proxy) Anoint(ctx context.Context, request *election.AnointRequest) (*e
 	return response, nil
 }
 
-func (s *Proxy) Promote(ctx context.Context, request *election.PromoteRequest) (*election.PromoteResponse, error) {
+func (s *ElectionProxyServer) Promote(ctx context.Context, request *election.PromoteRequest) (*election.PromoteResponse, error) {
 	s.log.Debugf("Received PromoteRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -147,8 +149,9 @@ func (s *Proxy) Promote(ctx context.Context, request *election.PromoteRequest) (
 	}
 
 	service := protocol.ServiceId{
-		Type: Type,
-		Name: request.Headers.PrimitiveID,
+		Type:      Type,
+		Namespace: request.Headers.PrimitiveID.Namespace,
+		Name:      request.Headers.PrimitiveID.Name,
 	}
 	output, err := partition.DoCommand(ctx, service, promoteOp, input)
 	if err != nil {
@@ -166,7 +169,7 @@ func (s *Proxy) Promote(ctx context.Context, request *election.PromoteRequest) (
 	return response, nil
 }
 
-func (s *Proxy) Evict(ctx context.Context, request *election.EvictRequest) (*election.EvictResponse, error) {
+func (s *ElectionProxyServer) Evict(ctx context.Context, request *election.EvictRequest) (*election.EvictResponse, error) {
 	s.log.Debugf("Received EvictRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -179,8 +182,9 @@ func (s *Proxy) Evict(ctx context.Context, request *election.EvictRequest) (*ele
 	}
 
 	service := protocol.ServiceId{
-		Type: Type,
-		Name: request.Headers.PrimitiveID,
+		Type:      Type,
+		Namespace: request.Headers.PrimitiveID.Namespace,
+		Name:      request.Headers.PrimitiveID.Name,
 	}
 	output, err := partition.DoCommand(ctx, service, evictOp, input)
 	if err != nil {
@@ -198,7 +202,7 @@ func (s *Proxy) Evict(ctx context.Context, request *election.EvictRequest) (*ele
 	return response, nil
 }
 
-func (s *Proxy) GetTerm(ctx context.Context, request *election.GetTermRequest) (*election.GetTermResponse, error) {
+func (s *ElectionProxyServer) GetTerm(ctx context.Context, request *election.GetTermRequest) (*election.GetTermResponse, error) {
 	s.log.Debugf("Received GetTermRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -211,8 +215,9 @@ func (s *Proxy) GetTerm(ctx context.Context, request *election.GetTermRequest) (
 	}
 
 	service := protocol.ServiceId{
-		Type: Type,
-		Name: request.Headers.PrimitiveID,
+		Type:      Type,
+		Namespace: request.Headers.PrimitiveID.Namespace,
+		Name:      request.Headers.PrimitiveID.Name,
 	}
 	output, err := partition.DoQuery(ctx, service, getTermOp, input)
 	if err != nil {
@@ -230,7 +235,7 @@ func (s *Proxy) GetTerm(ctx context.Context, request *election.GetTermRequest) (
 	return response, nil
 }
 
-func (s *Proxy) Events(request *election.EventsRequest, srv election.LeaderElectionService_EventsServer) error {
+func (s *ElectionProxyServer) Events(request *election.EventsRequest, srv election.LeaderElectionService_EventsServer) error {
 	s.log.Debugf("Received EventsRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -245,8 +250,9 @@ func (s *Proxy) Events(request *election.EventsRequest, srv election.LeaderElect
 	}
 
 	service := protocol.ServiceId{
-		Type: Type,
-		Name: request.Headers.PrimitiveID,
+		Type:      Type,
+		Namespace: request.Headers.PrimitiveID.Namespace,
+		Name:      request.Headers.PrimitiveID.Name,
 	}
 	err = partition.DoCommandStream(srv.Context(), service, eventsOp, input, stream)
 	if err != nil {

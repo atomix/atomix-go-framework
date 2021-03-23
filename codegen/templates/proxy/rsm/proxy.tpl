@@ -1,55 +1,9 @@
-{{- $proxy := printf "%sProxy" .Generator.Prefix }}
-package {{ .Package.Name }}
-
-import (
-	"context"
-	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
-	protocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/golang/protobuf/proto"
-	{{- $package := .Package }}
-	{{- range .Imports }}
-	{{ .Alias }} {{ .Path | quote }}
-	{{- end }}
-	{{- range .Primitive.Methods }}
-	{{- if .Scope.IsGlobal }}
-	{{ import "github.com/atomix/go-framework/pkg/atomix/util/async" }}
-	{{- end }}
-	{{- if .Request.IsStream }}
-	{{ import "io" }}
-	{{- end }}
-	{{- if .Response.IsStream }}
-	{{ import "streams" "github.com/atomix/go-framework/pkg/atomix/stream" }}
-	{{- end }}
-	{{- end }}
-)
-
-const {{ printf "%sType" .Generator.Prefix }} = {{ .Primitive.Name | quote }}
-{{ $root := . }}
-const (
-    {{- range .Primitive.Methods }}
-    {{ (printf "%s%sOp" $root.Generator.Prefix .Name) | toLowerCamel }} = {{ .Name | quote }}
-    {{- end }}
-)
-
-// Register{{ $proxy }} registers the primitive on the given node
-func Register{{ $proxy }}(node *rsm.Node) {
-	node.PrimitiveTypes().RegisterProxyFunc(Type, func() (interface{}, error) {
-		return &{{ $proxy }}{
-            Proxy: rsm.NewProxy(node.Client),
-            log: logging.GetLogger("atomix", {{ .Primitive.Name | lower | quote }}),
-        }, nil
-	})
-}
-
 {{- $primitive := .Primitive }}
-type {{ $proxy }} struct {
-	*rsm.Proxy
-	log logging.Logger
-}
 
 {{- define "type" }}{{ printf "%s.%s" .Package.Alias .Name }}{{ end }}
+
+{{- $proxy := printf "%sProxyServer" .Primitive.Name }}
+{{- $service := printf "%s.%sServer" .Primitive.Type.Package.Alias .Primitive.Type.Name }}
 
 {{- define "field" }}
 {{- $path := .Field.Path }}
@@ -111,6 +65,53 @@ Command
 Query
 {{- end -}}
 {{- end }}
+package {{ .Package.Name }}
+
+import (
+	"context"
+	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
+	driver "github.com/atomix/go-framework/pkg/atomix/driver/protocol/rsm"
+	protocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
+	"github.com/golang/protobuf/proto"
+	{{- $package := .Package }}
+	{{- range .Imports }}
+	{{ .Alias }} {{ .Path | quote }}
+	{{- end }}
+	{{- range .Primitive.Methods }}
+	{{- if .Scope.IsGlobal }}
+	{{ import "github.com/atomix/go-framework/pkg/atomix/util/async" }}
+	{{- end }}
+	{{- if .Request.IsStream }}
+	{{ import "io" }}
+	{{- end }}
+	{{- if .Response.IsStream }}
+	{{ import "streams" "github.com/atomix/go-framework/pkg/atomix/stream" }}
+	{{- end }}
+	{{- end }}
+)
+
+const {{ printf "%sType" .Generator.Prefix }} = {{ .Primitive.Name | quote }}
+{{ $root := . }}
+const (
+    {{- range .Primitive.Methods }}
+    {{ (printf "%s%sOp" $root.Generator.Prefix .Name) | toLowerCamel }} = {{ .Name | quote }}
+    {{- end }}
+)
+
+// New{{ $proxy }} creates a new {{ $proxy }}
+func New{{ $proxy }}(node *driver.Node) {{ $service }} {
+	return &{{ $proxy }}{
+		Proxy: rsm.NewProxy(node.Client),
+		log:   logging.GetLogger("atomix", "counter"),
+	}
+}
+
+type {{ $proxy }} struct {
+	*rsm.Proxy
+	log logging.Logger
+}
 
 {{- range .Primitive.Methods }}
 {{- $name := ((printf "%s%sOp" $root.Generator.Prefix .Name) | toLowerCamel) }}
@@ -142,8 +143,9 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	{{- end }}
 
 	service := protocol.ServiceId{
-		Type: Type,
-		Name: request{{ template "field" .Request.Headers }}.PrimitiveID,
+		Type:      Type,
+		Namespace: request{{ template "field" .Request.Headers }}.PrimitiveID.Namespace,
+		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
 	output, err := partition.Do{{ template "optype" . }}(ctx, service, {{ $name }}, input)
 	if err != nil {
@@ -165,8 +167,9 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
     {{- end }}
 
 	service := protocol.ServiceId{
-		Type: Type,
-		Name: request{{ template "field" .Request.Headers }}.PrimitiveID,
+		Type:      Type,
+		Namespace: request{{ template "field" .Request.Headers }}.PrimitiveID.Namespace,
+		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
 		return partitions[i].Do{{ template "optype" . }}(ctx, service, {{ $name }}, input)
@@ -233,14 +236,16 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	{{- end }}
 
 	service := protocol.ServiceId{
-		Type: Type,
-		Name: request{{ template "field" .Request.Headers }}.PrimitiveID,
+		Type:      Type,
+		Namespace: request{{ template "field" .Request.Headers }}.PrimitiveID.Namespace,
+		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
 	err = partition.Do{{ template "optype" . }}Stream(srv.Context(), service, {{ $name }}, input, stream)
 	{{- else if .Scope.IsGlobal }}
 	service := protocol.ServiceId{
-		Type: Type,
-		Name: request{{ template "field" .Request.Headers }}.PrimitiveID,
+		Type:      Type,
+		Namespace: request{{ template "field" .Request.Headers }}.PrimitiveID.Namespace,
+		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
 	partitions := s.Partitions()
 	err = async.IterAsync(len(partitions), func(i int) error {

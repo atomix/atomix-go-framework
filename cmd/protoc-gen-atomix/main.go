@@ -22,8 +22,9 @@ import (
 
 func main() {
 	pgs.Init(pgs.DebugMode()).
-		RegisterModule(codegen.NewModule("proxy", "server", map[string]string{
-			"server.go": "/etc/atomix/templates/proxy/server/server.tpl",
+		RegisterModule(codegen.NewModule("driver", "primitive", map[string]string{
+			"server.go":   "/etc/atomix/templates/driver/primitive/server.tpl",
+			"registry.go": "/etc/atomix/templates/driver/primitive/registry.tpl",
 		})).
 		RegisterModule(codegen.NewModule("proxy", "rsm", map[string]string{
 			"proxy.go": "/etc/atomix/templates/proxy/rsm/proxy.tpl",

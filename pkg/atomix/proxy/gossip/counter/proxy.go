@@ -3,31 +3,28 @@ package counter
 import (
 	"context"
 	counter "github.com/atomix/api/go/atomix/primitive/counter"
+	driver "github.com/atomix/go-framework/pkg/atomix/driver/protocol/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/gossip"
 )
 
-const Type = "Counter"
-
-// RegisterProxy registers the primitive on the given node
-func RegisterProxy(node *gossip.Node) {
-	node.PrimitiveTypes().RegisterProxyFunc(Type, func() (interface{}, error) {
-		return &Proxy{
-			Proxy: gossip.NewProxy(node.Client),
-			log:   logging.GetLogger("atomix", "counter"),
-		}, nil
-	})
+// NewCounterProxyServer creates a new CounterProxyServer
+func NewCounterProxyServer(node *driver.Node) counter.CounterServiceServer {
+	return &CounterProxyServer{
+		Proxy: gossip.NewProxy(node.Client),
+		log:   logging.GetLogger("atomix", "counter"),
+	}
 }
 
-type Proxy struct {
+type CounterProxyServer struct {
 	*gossip.Proxy
 	log logging.Logger
 }
 
-func (s *Proxy) Set(ctx context.Context, request *counter.SetRequest) (*counter.SetResponse, error) {
+func (s *CounterProxyServer) Set(ctx context.Context, request *counter.SetRequest) (*counter.SetResponse, error) {
 	s.log.Debugf("Received SetRequest %+v", request)
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID))
+	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 
 	conn, err := partition.Connect()
 	if err != nil {
@@ -47,9 +44,9 @@ func (s *Proxy) Set(ctx context.Context, request *counter.SetRequest) (*counter.
 	return response, nil
 }
 
-func (s *Proxy) Get(ctx context.Context, request *counter.GetRequest) (*counter.GetResponse, error) {
+func (s *CounterProxyServer) Get(ctx context.Context, request *counter.GetRequest) (*counter.GetResponse, error) {
 	s.log.Debugf("Received GetRequest %+v", request)
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID))
+	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 
 	conn, err := partition.Connect()
 	if err != nil {
@@ -69,9 +66,9 @@ func (s *Proxy) Get(ctx context.Context, request *counter.GetRequest) (*counter.
 	return response, nil
 }
 
-func (s *Proxy) Increment(ctx context.Context, request *counter.IncrementRequest) (*counter.IncrementResponse, error) {
+func (s *CounterProxyServer) Increment(ctx context.Context, request *counter.IncrementRequest) (*counter.IncrementResponse, error) {
 	s.log.Debugf("Received IncrementRequest %+v", request)
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID))
+	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 
 	conn, err := partition.Connect()
 	if err != nil {
@@ -91,9 +88,9 @@ func (s *Proxy) Increment(ctx context.Context, request *counter.IncrementRequest
 	return response, nil
 }
 
-func (s *Proxy) Decrement(ctx context.Context, request *counter.DecrementRequest) (*counter.DecrementResponse, error) {
+func (s *CounterProxyServer) Decrement(ctx context.Context, request *counter.DecrementRequest) (*counter.DecrementResponse, error) {
 	s.log.Debugf("Received DecrementRequest %+v", request)
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID))
+	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 
 	conn, err := partition.Connect()
 	if err != nil {
