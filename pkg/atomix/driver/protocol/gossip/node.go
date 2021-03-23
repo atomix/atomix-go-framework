@@ -15,8 +15,10 @@
 package gossip
 
 import (
+	"fmt"
 	driverapi "github.com/atomix/api/go/atomix/management/driver"
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
+	protocolapi "github.com/atomix/api/go/atomix/protocol"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/driver/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
@@ -24,25 +26,58 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/server"
 	"github.com/atomix/go-framework/pkg/atomix/time"
 	"google.golang.org/grpc"
+	"os"
+	"strconv"
+	"strings"
 )
 
-var log = logging.GetLogger("atomix", "driver", "gossip")
+const (
+	driverTypeEnv      = "ATOMIX_DRIVER_TYPE"
+	driverNodeEnv      = "ATOMIX_DRIVER_NODE"
+	driverNamespaceEnv = "ATOMIX_DRIVER_NAMESPACE"
+	driverNameEnv      = "ATOMIX_DRIVER_NAME"
+	driverPortEnv      = "ATOMIX_DRIVER_PORT"
+	driverSchemeEnv    = "ATOMIX_DRIVER_TIME_SCHEME"
+)
 
 // NewNode creates a new server node
-func NewNode(cluster cluster.Cluster, timeScheme time.Scheme) *Node {
+func NewNode() *Node {
+	driver := os.Getenv(driverTypeEnv)
+	memberID := fmt.Sprintf("%s.%s", os.Getenv(driverNameEnv), os.Getenv(driverNamespaceEnv))
+	nodeID := os.Getenv(driverNodeEnv)
+	port, err := strconv.Atoi(os.Getenv(driverPortEnv))
+	if err != nil {
+		panic(err)
+	}
+
+	scheme := time.LogicalScheme
+	schemeName := os.Getenv(driverSchemeEnv)
+	if schemeName == time.LogicalScheme.Name() {
+		scheme = time.LogicalScheme
+	} else if schemeName == time.PhysicalScheme.Name() {
+		scheme = time.PhysicalScheme
+	} else if schemeName == time.EpochScheme.Name() {
+		scheme = time.EpochScheme
+	}
+
+	cluster := cluster.NewCluster(
+		protocolapi.ProtocolConfig{},
+		cluster.WithMemberID(memberID),
+		cluster.WithNodeID(nodeID),
+		cluster.WithPort(port))
 	return &Node{
-		Server:  server.NewServer(cluster),
-		Cluster: cluster,
-		Client:  proxy.NewClient(cluster, timeScheme),
+		Server: server.NewServer(cluster),
+		Client: proxy.NewClient(cluster, scheme),
+		log:    logging.GetLogger("atomix", "driver", strings.ToLower(driver)),
 	}
 }
 
 // Node is an Atomix node
 type Node struct {
 	*server.Server
-	Cluster    cluster.Cluster
 	Client     *proxy.Client
 	primitives *primitive.PrimitiveTypeRegistry
+	log        logging.Logger
 }
 
 // RegisterPrimitiveType registers a primitive type

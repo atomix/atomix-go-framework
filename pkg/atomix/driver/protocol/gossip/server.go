@@ -33,41 +33,41 @@ type Server struct {
 }
 
 func (s *Server) AddProxy(ctx context.Context, request *driverapi.AddProxyRequest) (*driverapi.AddProxyResponse, error) {
-	log.Debugf("Received AddProxyRequest %+v", request)
+	s.node.log.Debugf("Received AddProxyRequest %+v", request)
 	primitiveType, err := s.node.primitives.GetPrimitiveType(request.Proxy.ID.Type)
 	if err != nil {
-		log.Warnf("AddProxyRequest %+v failed: %s", request, err)
+		s.node.log.Warnf("AddProxyRequest %+v failed: %s", request, err)
 		return nil, errors.Proto(err)
 	}
 	err = primitiveType.AddProxy(request.Proxy)
 	if err != nil {
-		log.Warnf("AddProxyRequest %+v failed: %s", request, err)
+		s.node.log.Warnf("AddProxyRequest %+v failed: %s", request, err)
 		return nil, errors.Proto(err)
 	}
 	response := &driverapi.AddProxyResponse{}
-	log.Debugf("Sending AddProxyResponse %+v", response)
+	s.node.log.Debugf("Sending AddProxyResponse %+v", response)
 	return response, nil
 }
 
 func (s *Server) RemoveProxy(ctx context.Context, request *driverapi.RemoveProxyRequest) (*driverapi.RemoveProxyResponse, error) {
-	log.Debugf("Received RemoveProxyRequest %+v", request)
+	s.node.log.Debugf("Received RemoveProxyRequest %+v", request)
 	primitiveType, err := s.node.primitives.GetPrimitiveType(request.ProxyID.Type)
 	if err != nil {
-		log.Warnf("RemoveProxyRequest %+v failed: %s", request, err)
+		s.node.log.Warnf("RemoveProxyRequest %+v failed: %s", request, err)
 		return nil, errors.Proto(err)
 	}
 	err = primitiveType.RemoveProxy(request.ProxyID)
 	if err != nil {
-		log.Warnf("RemoveProxyRequest %+v failed: %s", request, err)
+		s.node.log.Warnf("RemoveProxyRequest %+v failed: %s", request, err)
 		return nil, errors.Proto(err)
 	}
 	response := &driverapi.RemoveProxyResponse{}
-	log.Debugf("Sending RemoveProxyResponse %+v", response)
+	s.node.log.Debugf("Sending RemoveProxyResponse %+v", response)
 	return response, nil
 }
 
 func (s *Server) ConfigureDriver(ctx context.Context, request *driverapi.ConfigureDriverRequest) (*driverapi.ConfigureDriverResponse, error) {
-	log.Debugf("Received ConfigureDriverRequest %+v", request)
+	s.node.log.Debugf("Received ConfigureDriverRequest %+v", request)
 	cluster, ok := s.node.Cluster.(cluster.ConfigurableCluster)
 	if !ok {
 		return nil, errors.Proto(errors.NewNotSupported("protocol does not support configuration changes"))
@@ -97,7 +97,7 @@ func (s *Server) ConfigureDriver(ctx context.Context, request *driverapi.Configu
 		return nil, err
 	}
 	response := &driverapi.ConfigureDriverResponse{}
-	log.Debugf("Sending ConfigureDriverResponse %+v", response)
+	s.node.log.Debugf("Sending ConfigureDriverResponse %+v", response)
 	return response, nil
 }
 
