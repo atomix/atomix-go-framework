@@ -82,7 +82,6 @@ func (p *Peer) connect() error {
 			Initialize: &Initialize{
 				Header: RequestHeader{
 					PartitionID: p.group.partition.ID,
-					ServiceType: p.group.serviceType,
 					ServiceID:   p.group.serviceID,
 					MemberID:    p.group.memberID,
 					Timestamp:   p.clock.Scheme().Codec().EncodeTimestamp(p.clock.Increment()),
@@ -106,7 +105,7 @@ func (p *Peer) connect() error {
 				return
 			} else {
 				log.Debugf("Received GossipMessage %s->%s %+v", p.ID, p.group.memberID, msg)
-				replica, err := p.group.partition.getReplica(ctx, p.group.serviceType, p.group.serviceID)
+				replica, err := p.group.partition.getReplica(ctx, p.group.serviceID)
 				if err != nil {
 					log.Error(err)
 					return
@@ -210,7 +209,6 @@ func (p *Peer) Read(ctx context.Context, key string) (*Object, error) {
 	request := &ReadRequest{
 		Header: RequestHeader{
 			PartitionID: p.group.partition.ID,
-			ServiceType: p.group.serviceType,
 			ServiceID:   p.group.serviceID,
 			MemberID:    p.group.memberID,
 			Timestamp:   p.clock.Scheme().Codec().EncodeTimestamp(p.clock.Get()),
@@ -231,7 +229,6 @@ func (p *Peer) ReadAll(ctx context.Context, ch chan<- Object) error {
 	request := &ReadAllRequest{
 		Header: RequestHeader{
 			PartitionID: p.group.partition.ID,
-			ServiceType: p.group.serviceType,
 			ServiceID:   p.group.serviceID,
 			MemberID:    p.group.memberID,
 			Timestamp:   p.clock.Scheme().Codec().EncodeTimestamp(p.clock.Get()),

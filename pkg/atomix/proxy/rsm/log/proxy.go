@@ -1,37 +1,38 @@
+
 package log
 
 import (
 	"context"
-	log "github.com/atomix/api/go/atomix/primitive/log"
-	driver "github.com/atomix/go-framework/pkg/atomix/driver/protocol/rsm"
+	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
+	protocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
-	protocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
-	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
+	log "github.com/atomix/api/go/atomix/primitive/log"
+	streams "github.com/atomix/go-framework/pkg/atomix/stream"
+	
 )
 
 const Type = "Log"
 
 const (
-	sizeOp       = "Size"
-	appendOp     = "Append"
-	getOp        = "Get"
-	firstEntryOp = "FirstEntry"
-	lastEntryOp  = "LastEntry"
-	prevEntryOp  = "PrevEntry"
-	nextEntryOp  = "NextEntry"
-	removeOp     = "Remove"
-	clearOp      = "Clear"
-	eventsOp     = "Events"
-	entriesOp    = "Entries"
+    sizeOp = "Size"
+    appendOp = "Append"
+    getOp = "Get"
+    firstEntryOp = "FirstEntry"
+    lastEntryOp = "LastEntry"
+    prevEntryOp = "PrevEntry"
+    nextEntryOp = "NextEntry"
+    removeOp = "Remove"
+    clearOp = "Clear"
+    eventsOp = "Events"
+    entriesOp = "Entries"
 )
 
 // NewLogProxyServer creates a new LogProxyServer
-func NewLogProxyServer(node *driver.Node) log.LogServiceServer {
+func NewLogProxyServer(client *rsm.Client) log.LogServiceServer {
 	return &LogProxyServer{
-		Proxy: rsm.NewProxy(node.Client),
+		Proxy: rsm.NewProxy(client),
 		log:   logging.GetLogger("atomix", "counter"),
 	}
 }
@@ -45,13 +46,13 @@ func (s *LogProxyServer) Size(ctx context.Context, request *log.SizeRequest) (*l
 	s.log.Debugf("Received SizeRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		s.log.Errorf("Request SizeRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request SizeRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
-	partition, err := s.PartitionFrom(ctx)
-	if err != nil {
-		return nil, errors.Proto(err)
-	}
+    partition, err := s.PartitionFrom(ctx)
+    if err != nil {
+        return nil, errors.Proto(err)
+    }
 
 	service := protocol.ServiceId{
 		Type:      Type,
@@ -60,31 +61,32 @@ func (s *LogProxyServer) Size(ctx context.Context, request *log.SizeRequest) (*l
 	}
 	output, err := partition.DoQuery(ctx, service, sizeOp, input)
 	if err != nil {
-		s.log.Errorf("Request SizeRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request SizeRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
 
 	response := &log.SizeResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		s.log.Errorf("Request SizeRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request SizeRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending SizeResponse %+v", response)
 	return response, nil
 }
 
+
 func (s *LogProxyServer) Append(ctx context.Context, request *log.AppendRequest) (*log.AppendResponse, error) {
 	s.log.Debugf("Received AppendRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		s.log.Errorf("Request AppendRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request AppendRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
-	partition, err := s.PartitionFrom(ctx)
-	if err != nil {
-		return nil, errors.Proto(err)
-	}
+    partition, err := s.PartitionFrom(ctx)
+    if err != nil {
+        return nil, errors.Proto(err)
+    }
 
 	service := protocol.ServiceId{
 		Type:      Type,
@@ -93,31 +95,32 @@ func (s *LogProxyServer) Append(ctx context.Context, request *log.AppendRequest)
 	}
 	output, err := partition.DoCommand(ctx, service, appendOp, input)
 	if err != nil {
-		s.log.Errorf("Request AppendRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request AppendRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
 
 	response := &log.AppendResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		s.log.Errorf("Request AppendRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request AppendRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending AppendResponse %+v", response)
 	return response, nil
 }
 
+
 func (s *LogProxyServer) Get(ctx context.Context, request *log.GetRequest) (*log.GetResponse, error) {
 	s.log.Debugf("Received GetRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		s.log.Errorf("Request GetRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request GetRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
-	partition, err := s.PartitionFrom(ctx)
-	if err != nil {
-		return nil, errors.Proto(err)
-	}
+    partition, err := s.PartitionFrom(ctx)
+    if err != nil {
+        return nil, errors.Proto(err)
+    }
 
 	service := protocol.ServiceId{
 		Type:      Type,
@@ -126,31 +129,32 @@ func (s *LogProxyServer) Get(ctx context.Context, request *log.GetRequest) (*log
 	}
 	output, err := partition.DoQuery(ctx, service, getOp, input)
 	if err != nil {
-		s.log.Errorf("Request GetRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request GetRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
 
 	response := &log.GetResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		s.log.Errorf("Request GetRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request GetRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending GetResponse %+v", response)
 	return response, nil
 }
 
+
 func (s *LogProxyServer) FirstEntry(ctx context.Context, request *log.FirstEntryRequest) (*log.FirstEntryResponse, error) {
 	s.log.Debugf("Received FirstEntryRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		s.log.Errorf("Request FirstEntryRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request FirstEntryRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
-	partition, err := s.PartitionFrom(ctx)
-	if err != nil {
-		return nil, errors.Proto(err)
-	}
+    partition, err := s.PartitionFrom(ctx)
+    if err != nil {
+        return nil, errors.Proto(err)
+    }
 
 	service := protocol.ServiceId{
 		Type:      Type,
@@ -159,31 +163,32 @@ func (s *LogProxyServer) FirstEntry(ctx context.Context, request *log.FirstEntry
 	}
 	output, err := partition.DoQuery(ctx, service, firstEntryOp, input)
 	if err != nil {
-		s.log.Errorf("Request FirstEntryRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request FirstEntryRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
 
 	response := &log.FirstEntryResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		s.log.Errorf("Request FirstEntryRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request FirstEntryRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending FirstEntryResponse %+v", response)
 	return response, nil
 }
 
+
 func (s *LogProxyServer) LastEntry(ctx context.Context, request *log.LastEntryRequest) (*log.LastEntryResponse, error) {
 	s.log.Debugf("Received LastEntryRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		s.log.Errorf("Request LastEntryRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request LastEntryRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
-	partition, err := s.PartitionFrom(ctx)
-	if err != nil {
-		return nil, errors.Proto(err)
-	}
+    partition, err := s.PartitionFrom(ctx)
+    if err != nil {
+        return nil, errors.Proto(err)
+    }
 
 	service := protocol.ServiceId{
 		Type:      Type,
@@ -192,31 +197,32 @@ func (s *LogProxyServer) LastEntry(ctx context.Context, request *log.LastEntryRe
 	}
 	output, err := partition.DoQuery(ctx, service, lastEntryOp, input)
 	if err != nil {
-		s.log.Errorf("Request LastEntryRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request LastEntryRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
 
 	response := &log.LastEntryResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		s.log.Errorf("Request LastEntryRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request LastEntryRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending LastEntryResponse %+v", response)
 	return response, nil
 }
 
+
 func (s *LogProxyServer) PrevEntry(ctx context.Context, request *log.PrevEntryRequest) (*log.PrevEntryResponse, error) {
 	s.log.Debugf("Received PrevEntryRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		s.log.Errorf("Request PrevEntryRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request PrevEntryRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
-	partition, err := s.PartitionFrom(ctx)
-	if err != nil {
-		return nil, errors.Proto(err)
-	}
+    partition, err := s.PartitionFrom(ctx)
+    if err != nil {
+        return nil, errors.Proto(err)
+    }
 
 	service := protocol.ServiceId{
 		Type:      Type,
@@ -225,31 +231,32 @@ func (s *LogProxyServer) PrevEntry(ctx context.Context, request *log.PrevEntryRe
 	}
 	output, err := partition.DoQuery(ctx, service, prevEntryOp, input)
 	if err != nil {
-		s.log.Errorf("Request PrevEntryRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request PrevEntryRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
 
 	response := &log.PrevEntryResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		s.log.Errorf("Request PrevEntryRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request PrevEntryRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending PrevEntryResponse %+v", response)
 	return response, nil
 }
 
+
 func (s *LogProxyServer) NextEntry(ctx context.Context, request *log.NextEntryRequest) (*log.NextEntryResponse, error) {
 	s.log.Debugf("Received NextEntryRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		s.log.Errorf("Request NextEntryRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request NextEntryRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
-	partition, err := s.PartitionFrom(ctx)
-	if err != nil {
-		return nil, errors.Proto(err)
-	}
+    partition, err := s.PartitionFrom(ctx)
+    if err != nil {
+        return nil, errors.Proto(err)
+    }
 
 	service := protocol.ServiceId{
 		Type:      Type,
@@ -258,31 +265,32 @@ func (s *LogProxyServer) NextEntry(ctx context.Context, request *log.NextEntryRe
 	}
 	output, err := partition.DoQuery(ctx, service, nextEntryOp, input)
 	if err != nil {
-		s.log.Errorf("Request NextEntryRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request NextEntryRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
 
 	response := &log.NextEntryResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		s.log.Errorf("Request NextEntryRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request NextEntryRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending NextEntryResponse %+v", response)
 	return response, nil
 }
 
+
 func (s *LogProxyServer) Remove(ctx context.Context, request *log.RemoveRequest) (*log.RemoveResponse, error) {
 	s.log.Debugf("Received RemoveRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		s.log.Errorf("Request RemoveRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request RemoveRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
-	partition, err := s.PartitionFrom(ctx)
-	if err != nil {
-		return nil, errors.Proto(err)
-	}
+    partition, err := s.PartitionFrom(ctx)
+    if err != nil {
+        return nil, errors.Proto(err)
+    }
 
 	service := protocol.ServiceId{
 		Type:      Type,
@@ -291,31 +299,32 @@ func (s *LogProxyServer) Remove(ctx context.Context, request *log.RemoveRequest)
 	}
 	output, err := partition.DoCommand(ctx, service, removeOp, input)
 	if err != nil {
-		s.log.Errorf("Request RemoveRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request RemoveRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
 
 	response := &log.RemoveResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		s.log.Errorf("Request RemoveRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request RemoveRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending RemoveResponse %+v", response)
 	return response, nil
 }
 
+
 func (s *LogProxyServer) Clear(ctx context.Context, request *log.ClearRequest) (*log.ClearResponse, error) {
 	s.log.Debugf("Received ClearRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		s.log.Errorf("Request ClearRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request ClearRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
-	partition, err := s.PartitionFrom(ctx)
-	if err != nil {
-		return nil, errors.Proto(err)
-	}
+    partition, err := s.PartitionFrom(ctx)
+    if err != nil {
+        return nil, errors.Proto(err)
+    }
 
 	service := protocol.ServiceId{
 		Type:      Type,
@@ -324,33 +333,34 @@ func (s *LogProxyServer) Clear(ctx context.Context, request *log.ClearRequest) (
 	}
 	output, err := partition.DoCommand(ctx, service, clearOp, input)
 	if err != nil {
-		s.log.Errorf("Request ClearRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request ClearRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
 
 	response := &log.ClearResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		s.log.Errorf("Request ClearRequest failed: %v", err)
-		return nil, errors.Proto(err)
+        s.log.Errorf("Request ClearRequest failed: %v", err)
+	    return nil, errors.Proto(err)
 	}
 	s.log.Debugf("Sending ClearResponse %+v", response)
 	return response, nil
 }
 
+
 func (s *LogProxyServer) Events(request *log.EventsRequest, srv log.LogService_EventsServer) error {
-	s.log.Debugf("Received EventsRequest %+v", request)
+    s.log.Debugf("Received EventsRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		s.log.Errorf("Request EventsRequest failed: %v", err)
-		return errors.Proto(err)
+        s.log.Errorf("Request EventsRequest failed: %v", err)
+        return errors.Proto(err)
 	}
 
 	stream := streams.NewBufferedStream()
-	partition, err := s.PartitionFrom(srv.Context())
-	if err != nil {
-		return errors.Proto(err)
-	}
+    partition, err := s.PartitionFrom(srv.Context())
+    if err != nil {
+        return errors.Proto(err)
+    }
 
 	service := protocol.ServiceId{
 		Type:      Type,
@@ -359,8 +369,8 @@ func (s *LogProxyServer) Events(request *log.EventsRequest, srv log.LogService_E
 	}
 	err = partition.DoCommandStream(srv.Context(), service, eventsOp, input, stream)
 	if err != nil {
-		s.log.Errorf("Request EventsRequest failed: %v", err)
-		return errors.Proto(err)
+        s.log.Errorf("Request EventsRequest failed: %v", err)
+	    return errors.Proto(err)
 	}
 
 	for {
@@ -375,15 +385,15 @@ func (s *LogProxyServer) Events(request *log.EventsRequest, srv log.LogService_E
 		}
 
 		response := &log.EventsResponse{}
-		err = proto.Unmarshal(result.Value.([]byte), response)
-		if err != nil {
-			s.log.Errorf("Request EventsRequest failed: %v", err)
-			return errors.Proto(err)
-		}
+        err = proto.Unmarshal(result.Value.([]byte), response)
+        if err != nil {
+            s.log.Errorf("Request EventsRequest failed: %v", err)
+            return errors.Proto(err)
+        }
 
 		s.log.Debugf("Sending EventsResponse %+v", response)
 		if err = srv.Send(response); err != nil {
-			s.log.Errorf("Response EventsResponse failed: %v", err)
+            s.log.Errorf("Response EventsResponse failed: %v", err)
 			return errors.Proto(err)
 		}
 	}
@@ -391,19 +401,20 @@ func (s *LogProxyServer) Events(request *log.EventsRequest, srv log.LogService_E
 	return nil
 }
 
+
 func (s *LogProxyServer) Entries(request *log.EntriesRequest, srv log.LogService_EntriesServer) error {
-	s.log.Debugf("Received EntriesRequest %+v", request)
+    s.log.Debugf("Received EntriesRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		s.log.Errorf("Request EntriesRequest failed: %v", err)
-		return errors.Proto(err)
+        s.log.Errorf("Request EntriesRequest failed: %v", err)
+        return errors.Proto(err)
 	}
 
 	stream := streams.NewBufferedStream()
-	partition, err := s.PartitionFrom(srv.Context())
-	if err != nil {
-		return errors.Proto(err)
-	}
+    partition, err := s.PartitionFrom(srv.Context())
+    if err != nil {
+        return errors.Proto(err)
+    }
 
 	service := protocol.ServiceId{
 		Type:      Type,
@@ -412,8 +423,8 @@ func (s *LogProxyServer) Entries(request *log.EntriesRequest, srv log.LogService
 	}
 	err = partition.DoQueryStream(srv.Context(), service, entriesOp, input, stream)
 	if err != nil {
-		s.log.Errorf("Request EntriesRequest failed: %v", err)
-		return errors.Proto(err)
+        s.log.Errorf("Request EntriesRequest failed: %v", err)
+	    return errors.Proto(err)
 	}
 
 	for {
@@ -428,18 +439,19 @@ func (s *LogProxyServer) Entries(request *log.EntriesRequest, srv log.LogService
 		}
 
 		response := &log.EntriesResponse{}
-		err = proto.Unmarshal(result.Value.([]byte), response)
-		if err != nil {
-			s.log.Errorf("Request EntriesRequest failed: %v", err)
-			return errors.Proto(err)
-		}
+        err = proto.Unmarshal(result.Value.([]byte), response)
+        if err != nil {
+            s.log.Errorf("Request EntriesRequest failed: %v", err)
+            return errors.Proto(err)
+        }
 
 		s.log.Debugf("Sending EntriesResponse %+v", response)
 		if err = srv.Send(response); err != nil {
-			s.log.Errorf("Response EntriesResponse failed: %v", err)
+            s.log.Errorf("Response EntriesResponse failed: %v", err)
 			return errors.Proto(err)
 		}
 	}
 	s.log.Debugf("Finished EntriesRequest %+v", request)
 	return nil
 }
+

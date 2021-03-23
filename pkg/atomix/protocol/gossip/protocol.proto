@@ -22,12 +22,17 @@ import "atomix/primitive/meta/object.proto";
 import "atomix/primitive/meta/timestamp.proto";
 import "gogoproto/gogo.proto";
 
+message ServiceId {
+    string type = 1 [(gogoproto.casttype) = "ServiceType"];
+    string namespace = 2;
+    string name = 3;
+}
+
 message RequestHeader {
     uint32 partition_id = 1 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "PartitionID"];
-    string service_type = 2 [(gogoproto.casttype) = "ServiceType"];
-    string service_id = 3 [(gogoproto.customname) = "ServiceID", (gogoproto.casttype) = "ServiceID"];
-    string member_id = 4 [(gogoproto.customname) = "MemberID", (gogoproto.casttype) = "MemberID"];
-    atomix.primitive.meta.Timestamp timestamp = 5 [(gogoproto.nullable) = false];
+    ServiceId service_id = 2 [(gogoproto.customname) = "ServiceID", (gogoproto.nullable) = false];
+    string member_id = 3 [(gogoproto.customname) = "MemberID", (gogoproto.casttype) = "MemberID"];
+    atomix.primitive.meta.Timestamp timestamp = 4 [(gogoproto.nullable) = false];
 }
 
 message ResponseHeader {

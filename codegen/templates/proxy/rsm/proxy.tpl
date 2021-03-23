@@ -70,7 +70,6 @@ package {{ .Package.Name }}
 import (
 	"context"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
-	driver "github.com/atomix/go-framework/pkg/atomix/driver/protocol/rsm"
 	protocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
@@ -101,9 +100,9 @@ const (
 )
 
 // New{{ $proxy }} creates a new {{ $proxy }}
-func New{{ $proxy }}(node *driver.Node) {{ $service }} {
+func New{{ $proxy }}(client *rsm.Client) {{ $service }} {
 	return &{{ $proxy }}{
-		Proxy: rsm.NewProxy(node.Client),
+		Proxy: rsm.NewProxy(client),
 		log:   logging.GetLogger("atomix", "counter"),
 	}
 }

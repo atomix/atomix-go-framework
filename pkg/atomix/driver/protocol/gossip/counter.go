@@ -51,7 +51,7 @@ func (p *counterType) RegisterServer(s *grpc.Server) {
 }
 
 func (p *counterType) AddProxy(config driverapi.ProxyConfig) error {
-	server := counterproxy.NewCounterProxyServer(p.node)
+	server := counterproxy.NewCounterProxyServer(p.node.Client)
 	if !config.Write {
 		server = counterro.NewReadOnlyCounterServer(server)
 	}

@@ -1,10 +1,11 @@
+
 package set
 
 import (
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
-	set "github.com/atomix/api/go/atomix/primitive/set"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"sync"
+	set "github.com/atomix/api/go/atomix/primitive/set"
 )
 
 // NewSetProxyRegistry creates a new SetProxyRegistry

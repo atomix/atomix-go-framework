@@ -51,7 +51,7 @@ func (p *electionType) RegisterServer(s *grpc.Server) {
 }
 
 func (p *electionType) AddProxy(config driverapi.ProxyConfig) error {
-	server := electionproxy.NewElectionProxyServer(p.node)
+	server := electionproxy.NewElectionProxyServer(p.node.Client)
 	if !config.Write {
 		server = electionro.NewReadOnlyLeaderElectionServer(server)
 	}

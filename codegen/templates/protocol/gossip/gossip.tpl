@@ -75,8 +75,8 @@ import (
 
 const antiEntropyPeriod = time.Second
 
-func newGossipProtocol(serviceID gossip.ServiceID, partition *gossip.Partition, clock atime.Clock) (GossipProtocol, error) {
-	peers, err := gossip.NewPeerGroup(partition, ServiceType, serviceID)
+func newGossipProtocol(serviceID gossip.ServiceId, partition *gossip.Partition, clock atime.Clock) (GossipProtocol, error) {
+	peers, err := gossip.NewPeerGroup(partition, serviceID)
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +293,7 @@ func (p *gossipGroup) Update(ctx context.Context, state *{{ template "type" .Pri
 
 var _ GossipGroup = &gossipGroup{}
 
-func newGossipServer(serviceID gossip.ServiceID, partition *gossip.Partition) GossipServer {
+func newGossipServer(serviceID gossip.ServiceId, partition *gossip.Partition) GossipServer {
 	return &gossipServer{
         serviceID: serviceID,
 		partition: partition,
@@ -301,7 +301,7 @@ func newGossipServer(serviceID gossip.ServiceID, partition *gossip.Partition) Go
 }
 
 type gossipServer struct {
-    serviceID     gossip.ServiceID
+    serviceID     gossip.ServiceId
 	partition     *gossip.Partition
 	gossipHandler GossipHandler
 }
@@ -417,7 +417,7 @@ func (p *gossipMember) Update(ctx context.Context, state *{{ template "type" .Pr
 
 var _ GossipMember = &gossipMember{}
 
-func newReplica(serviceID gossip.ServiceID, handler GossipHandler) gossip.Replica {
+func newReplica(serviceID gossip.ServiceId, handler GossipHandler) gossip.Replica {
 	return &gossipReplica{
         serviceID: serviceID,
 		handler:   handler,
@@ -425,11 +425,11 @@ func newReplica(serviceID gossip.ServiceID, handler GossipHandler) gossip.Replic
 }
 
 type gossipReplica struct {
-	serviceID      gossip.ServiceID
+	serviceID      gossip.ServiceId
 	handler GossipHandler
 }
 
-func (s *gossipReplica) ID() gossip.ServiceID {
+func (s *gossipReplica) ID() gossip.ServiceId {
 	return s.serviceID
 }
 

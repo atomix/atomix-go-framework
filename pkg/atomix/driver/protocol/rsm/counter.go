@@ -17,6 +17,7 @@ package rsm
 import (
 	driverapi "github.com/atomix/api/go/atomix/management/driver"
 	counterapi "github.com/atomix/api/go/atomix/primitive/counter"
+	"github.com/atomix/go-framework/pkg/atomix/driver/primitive"
 	counterdriver "github.com/atomix/go-framework/pkg/atomix/driver/primitive/counter"
 	counterro "github.com/atomix/go-framework/pkg/atomix/proxy/ro/counter"
 	counterproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/counter"
@@ -29,7 +30,7 @@ func RegisterCounterProxy(node *Node) {
 
 const CounterType = "Counter"
 
-func newCounterType(node *Node) PrimitiveType {
+func newCounterType(node *Node) primitive.PrimitiveType {
 	return &counterType{
 		node:     node,
 		registry: counterdriver.NewCounterProxyRegistry(),
@@ -50,7 +51,7 @@ func (p *counterType) RegisterServer(s *grpc.Server) {
 }
 
 func (p *counterType) AddProxy(config driverapi.ProxyConfig) error {
-	server := counterproxy.NewCounterProxyServer(p.node)
+	server := counterproxy.NewCounterProxyServer(p.node.Client)
 	if !config.Write {
 		server = counterro.NewReadOnlyCounterServer(server)
 	}
@@ -61,4 +62,4 @@ func (p *counterType) RemoveProxy(id driverapi.ProxyId) error {
 	return p.registry.RemoveProxy(getPrimitiveId(id))
 }
 
-var _ PrimitiveType = &counterType{}
+var _ primitive.PrimitiveType = &counterType{}

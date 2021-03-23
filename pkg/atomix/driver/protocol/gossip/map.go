@@ -51,7 +51,7 @@ func (p *mapType) RegisterServer(s *grpc.Server) {
 }
 
 func (p *mapType) AddProxy(config driverapi.ProxyConfig) error {
-	server := mapproxy.NewMapProxyServer(p.node)
+	server := mapproxy.NewMapProxyServer(p.node.Client)
 	if !config.Write {
 		server = mapro.NewReadOnlyMapServer(server)
 	}

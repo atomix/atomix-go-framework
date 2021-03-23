@@ -17,6 +17,7 @@ package rsm
 import (
 	driverapi "github.com/atomix/api/go/atomix/management/driver"
 	"github.com/atomix/api/go/atomix/primitive/map"
+	"github.com/atomix/go-framework/pkg/atomix/driver/primitive"
 	mapdriver "github.com/atomix/go-framework/pkg/atomix/driver/primitive/map"
 	mapro "github.com/atomix/go-framework/pkg/atomix/proxy/ro/map"
 	mapproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/map"
@@ -29,7 +30,7 @@ func RegisterMapProxy(node *Node) {
 
 const MapType = "Map"
 
-func newMapType(node *Node) PrimitiveType {
+func newMapType(node *Node) primitive.PrimitiveType {
 	return &mapType{
 		node:     node,
 		registry: mapdriver.NewMapProxyRegistry(),
@@ -50,7 +51,7 @@ func (p *mapType) RegisterServer(s *grpc.Server) {
 }
 
 func (p *mapType) AddProxy(config driverapi.ProxyConfig) error {
-	server := mapproxy.NewMapProxyServer(p.node)
+	server := mapproxy.NewMapProxyServer(p.node.Client)
 	if !config.Write {
 		server = mapro.NewReadOnlyMapServer(server)
 	}
@@ -61,4 +62,4 @@ func (p *mapType) RemoveProxy(id driverapi.ProxyId) error {
 	return p.registry.RemoveProxy(getPrimitiveId(id))
 }
 
-var _ PrimitiveType = &mapType{}
+var _ primitive.PrimitiveType = &mapType{}

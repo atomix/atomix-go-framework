@@ -51,7 +51,7 @@ func (p *valueType) RegisterServer(s *grpc.Server) {
 }
 
 func (p *valueType) AddProxy(config driverapi.ProxyConfig) error {
-	server := valueproxy.NewValueProxyServer(p.node)
+	server := valueproxy.NewValueProxyServer(p.node.Client)
 	if !config.Write {
 		server = valuero.NewReadOnlyValueServer(server)
 	}

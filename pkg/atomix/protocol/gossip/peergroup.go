@@ -23,17 +23,16 @@ import (
 	"sync"
 )
 
-func NewPeerGroup(partition *Partition, serviceType ServiceType, serviceID ServiceID) (*PeerGroup, error) {
+func NewPeerGroup(partition *Partition, serviceID ServiceId) (*PeerGroup, error) {
 	var localMemberID MemberID
 	member, ok := partition.Partition.Member()
 	if ok {
 		localMemberID = MemberID(member.ID)
 	}
 	group := &PeerGroup{
-		memberID:    localMemberID,
-		partition:   partition,
-		serviceType: serviceType,
-		serviceID:   serviceID,
+		memberID:  localMemberID,
+		partition: partition,
+		serviceID: serviceID,
 	}
 	if err := group.start(); err != nil {
 		return nil, err
@@ -42,14 +41,13 @@ func NewPeerGroup(partition *Partition, serviceType ServiceType, serviceID Servi
 }
 
 type PeerGroup struct {
-	memberID    MemberID
-	partition   *Partition
-	serviceType ServiceType
-	serviceID   ServiceID
-	peersByID   map[PeerID]*Peer
-	peers       []*Peer
-	peersMu     sync.RWMutex
-	cancel      context.CancelFunc
+	memberID  MemberID
+	partition *Partition
+	serviceID ServiceId
+	peersByID map[PeerID]*Peer
+	peers     []*Peer
+	peersMu   sync.RWMutex
+	cancel    context.CancelFunc
 }
 
 func (g *PeerGroup) start() error {

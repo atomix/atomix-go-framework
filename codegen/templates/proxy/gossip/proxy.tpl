@@ -4,7 +4,6 @@ package {{ .Package.Name }}
 
 import (
 	"context"
-	driver "github.com/atomix/go-framework/pkg/atomix/driver/protocol/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/proxy/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
@@ -28,10 +27,10 @@ import (
 {{ $root := . }}
 
 // New{{ $proxy }} creates a new {{ $proxy }}
-func New{{ $proxy }}(node *driver.Node) {{ $service }} {
+func New{{ $proxy }}(client *gossip.Client) {{ $service }} {
 	return &{{ $proxy }}{
-        Proxy: gossip.NewProxy(node.Client),
-        log: logging.GetLogger("atomix", {{ .Primitive.Name | lower | quote }}),
+        Proxy: gossip.NewProxy(client),
+        log:   logging.GetLogger("atomix", {{ .Primitive.Name | lower | quote }}),
     }
 }
 
@@ -105,7 +104,11 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	{{- if and .Request.PartitionKey.Field.Type.IsBytes (not .Request.PartitionKey.Field.Type.IsCast) }}
 	partition := s.PartitionBy(partitionKey)
 	{{- else }}
-	partition := s.PartitionBy([]byte(partitionKey.String()))
+	{{- if .Request.PartitionKey.Field.Type.IsString }}
+    partition := s.PartitionBy([]byte(partitionKey))
+    {{- else }}
+    partition := s.PartitionBy([]byte(partitionKey.String()))
+    {{- end }}
 	{{- end }}
 	{{- else if .Request.PartitionRange }}
 	partitionRange := {{ template "val" .Request.PartitionRange }}request{{ template "field" .Request.PartitionRange }}
@@ -177,7 +180,11 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	{{- if and .Request.PartitionKey.Field.Type.IsBytes (not .Request.PartitionKey.Field.Type.IsCast) }}
 	partition := s.PartitionBy(partitionKey)
 	{{- else }}
-	partition := s.PartitionBy([]byte(partitionKey.String()))
+	{{- if .Request.PartitionKey.Type.IsString }}
+    partition := s.PartitionBy([]byte(partitionKey))
+    {{- else }}
+    partition := s.PartitionBy([]byte(partitionKey.String()))
+    {{- end }}
 	{{- end }}
 	{{- else if .Request.PartitionRange }}
 	partitionRange := {{ template "val" .Request.PartitionRange }}request{{ template "field" .Request.PartitionRange }}

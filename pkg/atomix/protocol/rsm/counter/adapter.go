@@ -1,19 +1,21 @@
+
+
 package counter
 
 import (
-	counter "github.com/atomix/api/go/atomix/primitive/counter"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/golang/protobuf/proto"
+	counter "github.com/atomix/api/go/atomix/primitive/counter"
 )
 
 const Type = "Counter"
 
 const (
-	setOp       = "Set"
-	getOp       = "Get"
-	incrementOp = "Increment"
-	decrementOp = "Decrement"
+    setOp = "Set"
+    getOp = "Get"
+    incrementOp = "Increment"
+    decrementOp = "Decrement"
 )
 
 var newServiceFunc rsm.NewServiceFunc
@@ -51,109 +53,113 @@ func (s *ServiceAdaptor) init() {
 }
 
 func (s *ServiceAdaptor) SessionOpen(session rsm.Session) {
-	if sessionOpen, ok := s.rsm.(rsm.SessionOpenService); ok {
-		sessionOpen.SessionOpen(session)
-	}
+    if sessionOpen, ok := s.rsm.(rsm.SessionOpenService); ok {
+        sessionOpen.SessionOpen(session)
+    }
 }
 
 func (s *ServiceAdaptor) SessionExpired(session rsm.Session) {
-	if sessionExpired, ok := s.rsm.(rsm.SessionExpiredService); ok {
-		sessionExpired.SessionExpired(session)
-	}
+    if sessionExpired, ok := s.rsm.(rsm.SessionExpiredService); ok {
+        sessionExpired.SessionExpired(session)
+    }
 }
 
 func (s *ServiceAdaptor) SessionClosed(session rsm.Session) {
-	if sessionClosed, ok := s.rsm.(rsm.SessionClosedService); ok {
-		sessionClosed.SessionClosed(session)
-	}
+    if sessionClosed, ok := s.rsm.(rsm.SessionClosedService); ok {
+        sessionClosed.SessionClosed(session)
+    }
 }
 
 func (s *ServiceAdaptor) set(input []byte) ([]byte, error) {
-	request := &counter.SetRequest{}
+    request := &counter.SetRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.Set(request)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
+	if err !=  nil {
+	    s.log.Error(err)
+    	return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
+
 func (s *ServiceAdaptor) get(input []byte) ([]byte, error) {
-	request := &counter.GetRequest{}
+    request := &counter.GetRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.Get(request)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
+	if err !=  nil {
+	    s.log.Error(err)
+    	return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
+
 func (s *ServiceAdaptor) increment(input []byte) ([]byte, error) {
-	request := &counter.IncrementRequest{}
+    request := &counter.IncrementRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.Increment(request)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
+	if err !=  nil {
+	    s.log.Error(err)
+    	return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
+
 func (s *ServiceAdaptor) decrement(input []byte) ([]byte, error) {
-	request := &counter.DecrementRequest{}
+    request := &counter.DecrementRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.Decrement(request)
-	if err != nil {
-		s.log.Error(err)
-		return nil, err
+	if err !=  nil {
+	    s.log.Error(err)
+    	return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-		s.log.Error(err)
+	    s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
+
 
 var _ rsm.Service = &ServiceAdaptor{}

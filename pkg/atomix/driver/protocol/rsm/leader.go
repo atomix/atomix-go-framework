@@ -51,7 +51,7 @@ func (p *leaderType) RegisterServer(s *grpc.Server) {
 }
 
 func (p *leaderType) AddProxy(config driverapi.ProxyConfig) error {
-	server := leaderproxy.NewLeaderLatchProxyServer(p.node)
+	server := leaderproxy.NewLeaderLatchProxyServer(p.node.Client)
 	if !config.Write {
 		server = leaderro.NewReadOnlyLeaderLatchServer(server)
 	}

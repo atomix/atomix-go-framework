@@ -51,7 +51,7 @@ func (p *listType) RegisterServer(s *grpc.Server) {
 }
 
 func (p *listType) AddProxy(config driverapi.ProxyConfig) error {
-	server := listproxy.NewListProxyServer(p.node)
+	server := listproxy.NewListProxyServer(p.node.Client)
 	if !config.Write {
 		server = listro.NewReadOnlyListServer(server)
 	}

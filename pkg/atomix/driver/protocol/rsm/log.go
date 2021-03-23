@@ -51,7 +51,7 @@ func (p *logType) RegisterServer(s *grpc.Server) {
 }
 
 func (p *logType) AddProxy(config driverapi.ProxyConfig) error {
-	server := logproxy.NewLogProxyServer(p.node)
+	server := logproxy.NewLogProxyServer(p.node.Client)
 	if !config.Write {
 		server = logro.NewReadOnlyLogServer(server)
 	}

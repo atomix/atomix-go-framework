@@ -51,7 +51,7 @@ func (p *lockType) RegisterServer(s *grpc.Server) {
 }
 
 func (p *lockType) AddProxy(config driverapi.ProxyConfig) error {
-	server := lockproxy.NewLockProxyServer(p.node)
+	server := lockproxy.NewLockProxyServer(p.node.Client)
 	if !config.Write {
 		server = lockro.NewReadOnlyLockServer(server)
 	}

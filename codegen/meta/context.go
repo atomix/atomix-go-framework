@@ -19,7 +19,7 @@ import (
 	"github.com/atomix/api/go/atomix/primitive/extensions/operation"
 	"github.com/atomix/api/go/atomix/primitive/extensions/partition"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
+	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip/primitive"
 	"github.com/golang/protobuf/proto"
 	"github.com/lyft/protoc-gen-star"
 	"github.com/lyft/protoc-gen-star/lang/go"
@@ -499,12 +499,12 @@ func (c *Context) GetHeadersFieldMeta(message pgs.Message) (*FieldRefMeta, error
 
 // GetStateKeyFieldMeta extracts the metadata for the state key field in the given message
 func (c *Context) GetStateKeyFieldMeta(message pgs.Message) (*FieldRefMeta, error) {
-	return c.findAnnotatedField(message, gossip.E_Key)
+	return c.findAnnotatedField(message, primitive.E_Key)
 }
 
 // GetStateDigestFieldMeta extracts the metadata for the state digest field in the given message
 func (c *Context) GetStateDigestFieldMeta(message pgs.Message) (*FieldRefMeta, error) {
-	return c.findAnnotatedField(message, gossip.E_Digest)
+	return c.findAnnotatedField(message, primitive.E_Digest)
 }
 
 // GetPartitionKeyField extracts the metadata for the partitionkey field in the given message

@@ -51,7 +51,7 @@ func (p *setType) RegisterServer(s *grpc.Server) {
 }
 
 func (p *setType) AddProxy(config driverapi.ProxyConfig) error {
-	server := setproxy.NewSetProxyServer(p.node)
+	server := setproxy.NewSetProxyServer(p.node.Client)
 	if !config.Write {
 		server = setro.NewReadOnlySetServer(server)
 	}

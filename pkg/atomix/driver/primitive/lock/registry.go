@@ -1,10 +1,11 @@
+
 package lock
 
 import (
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
-	lock "github.com/atomix/api/go/atomix/primitive/lock"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"sync"
+	lock "github.com/atomix/api/go/atomix/primitive/lock"
 )
 
 // NewLockProxyRegistry creates a new LockProxyRegistry

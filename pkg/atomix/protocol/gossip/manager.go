@@ -119,8 +119,8 @@ func (m *Manager) PartitionBy(partitionKey []byte) (*Partition, error) {
 	return m.partitions[i], nil
 }
 
-func (m *Manager) PartitionFor(serviceID ServiceID) (*Partition, error) {
-	return m.PartitionBy([]byte(serviceID))
+func (m *Manager) PartitionFor(serviceID ServiceId) (*Partition, error) {
+	return m.PartitionBy([]byte(serviceID.String()))
 }
 
 func (m *Manager) getPartitionIfMember(partition *Partition) (*Partition, error) {

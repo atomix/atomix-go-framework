@@ -21,16 +21,12 @@ import (
 // ServiceType is a gossip service type name
 type ServiceType string
 
-// ServiceID is a gossip service identifier
-type ServiceID string
-
 // Service is a gossip service
 type Service interface{}
 
 // Replica is a service replica interface
 type Replica interface {
-	ID() ServiceID
-	Type() ServiceType
+	ID() ServiceId
 	Read(ctx context.Context, key string) (*Object, error)
 	ReadAll(ctx context.Context, ch chan<- Object) error
 	Update(ctx context.Context, object *Object) error

@@ -1,10 +1,11 @@
+
 package counter
 
 import (
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
-	counter "github.com/atomix/api/go/atomix/primitive/counter"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"sync"
+	counter "github.com/atomix/api/go/atomix/primitive/counter"
 )
 
 // NewCounterProxyRegistry creates a new CounterProxyRegistry

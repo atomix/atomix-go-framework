@@ -1,10 +1,11 @@
+
 package _map
 
 import (
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
-	_map "github.com/atomix/api/go/atomix/primitive/map"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"sync"
+	_map "github.com/atomix/api/go/atomix/primitive/map"
 )
 
 // NewMapProxyRegistry creates a new MapProxyRegistry

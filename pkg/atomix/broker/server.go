@@ -167,7 +167,6 @@ func (s *Server) AddPrimitive(ctx context.Context, request *brokerapi.AddPrimiti
 			},
 			Read:  request.Primitive.Proxy.Read,
 			Write: request.Primitive.Proxy.Write,
-			Cache: request.Primitive.Proxy.Cache,
 		},
 	}
 	if _, err := proxyClient.AddProxy(ctx, addProxyRequest); err != nil {

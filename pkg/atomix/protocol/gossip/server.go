@@ -50,7 +50,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 	init := msg.GetInitialize()
 	senderID := init.Header.MemberID
 	log.Debugf("Received GossipMessage %s->%s %+v", senderID, localID, msg)
-	replica, err := s.getReplica(stream.Context(), init.Header.PartitionID, init.Header.ServiceType, init.Header.ServiceID)
+	replica, err := s.getReplica(stream.Context(), init.Header.PartitionID, init.Header.ServiceID)
 	if err != nil {
 		return errors.Proto(err)
 	}
@@ -120,7 +120,7 @@ func (s *GossipServer) Read(ctx context.Context, request *ReadRequest) (*ReadRes
 	member, _ := s.manager.Cluster.Member()
 	log.Debugf("Received ReadRequest %s->%s %+v", request.Header.MemberID, member.ID, request)
 	timestamp := s.manager.clock.Update(time.NewTimestamp(request.Header.Timestamp))
-	replica, err := s.getReplica(ctx, request.Header.PartitionID, request.Header.ServiceType, request.Header.ServiceID)
+	replica, err := s.getReplica(ctx, request.Header.PartitionID, request.Header.ServiceID)
 	if err != nil {
 		return nil, errors.Proto(err)
 	}
@@ -142,7 +142,7 @@ func (s *GossipServer) ReadAll(request *ReadAllRequest, stream GossipProtocol_Re
 	member, _ := s.manager.Cluster.Member()
 	log.Debugf("Received ReadAllRequest %s->%s %+v", request.Header.MemberID, member.ID, request)
 	timestamp := s.manager.clock.Update(time.NewTimestamp(request.Header.Timestamp))
-	replica, err := s.getReplica(stream.Context(), request.Header.PartitionID, request.Header.ServiceType, request.Header.ServiceID)
+	replica, err := s.getReplica(stream.Context(), request.Header.PartitionID, request.Header.ServiceID)
 	if err != nil {
 		return errors.Proto(err)
 	}
@@ -189,10 +189,10 @@ func (s *GossipServer) ReadAll(request *ReadAllRequest, stream GossipProtocol_Re
 	}
 }
 
-func (s *GossipServer) getReplica(ctx context.Context, partitionID PartitionID, serviceType ServiceType, serviceID ServiceID) (Replica, error) {
+func (s *GossipServer) getReplica(ctx context.Context, partitionID PartitionID, serviceID ServiceId) (Replica, error) {
 	partition, err := s.manager.Partition(partitionID)
 	if err != nil {
 		return nil, err
 	}
-	return partition.getReplica(ctx, serviceType, serviceID)
+	return partition.getReplica(ctx, serviceID)
 }

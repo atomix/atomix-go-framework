@@ -1,10 +1,11 @@
+
 package value
 
 import (
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
-	value "github.com/atomix/api/go/atomix/primitive/value"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"sync"
+	value "github.com/atomix/api/go/atomix/primitive/value"
 )
 
 // NewValueProxyRegistry creates a new ValueProxyRegistry
