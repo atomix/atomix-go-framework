@@ -41,7 +41,7 @@ func (r *DriverRegistry) AddDriver(driver brokerapi.DriverConfig) error {
 }
 
 func (r *DriverRegistry) UpdateDriver(driver brokerapi.DriverConfig) error {
-	if _, ok := r.drivers[driver.ID]; ok {
+	if _, ok := r.drivers[driver.ID]; !ok {
 		return errors.NewNotFound("driver '%s' not found", driver.ID)
 	}
 	r.drivers[driver.ID] = driver

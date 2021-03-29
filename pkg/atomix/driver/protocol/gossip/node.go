@@ -66,9 +66,10 @@ func NewNode() *Node {
 		cluster.WithNodeID(nodeID),
 		cluster.WithPort(port))
 	return &Node{
-		Server: server.NewServer(cluster),
-		Client: proxy.NewClient(cluster, scheme),
-		log:    logging.GetLogger("atomix", "driver", strings.ToLower(driver)),
+		Server:     server.NewServer(cluster),
+		Client:     proxy.NewClient(cluster, scheme),
+		primitives: primitive.NewPrimitiveTypeRegistry(),
+		log:        logging.GetLogger("atomix", "driver", strings.ToLower(driver)),
 	}
 }
 

@@ -27,22 +27,33 @@ type ReplicaID string
 
 // NewReplica returns a new replica
 func NewReplica(config protocolapi.ProtocolReplica) *Replica {
+	extraPorts := make(map[string]int)
+	for name, port := range config.ExtraPorts {
+		extraPorts[name] = int(port)
+	}
 	return &Replica{
-		ID:     ReplicaID(config.ID),
-		NodeID: NodeID(config.NodeID),
-		Host:   config.Host,
-		Port:   int(config.APIPort),
+		ID:         ReplicaID(config.ID),
+		NodeID:     NodeID(config.NodeID),
+		Host:       config.Host,
+		Port:       int(config.APIPort),
+		extraPorts: extraPorts,
 	}
 }
 
 // Replica is a replicas group peer
 type Replica struct {
-	ID     ReplicaID
-	NodeID NodeID
-	Host   string
-	Port   int
-	conn   *grpc.ClientConn
-	mu     sync.RWMutex
+	ID         ReplicaID
+	NodeID     NodeID
+	Host       string
+	Port       int
+	extraPorts map[string]int
+	conn       *grpc.ClientConn
+	mu         sync.RWMutex
+}
+
+// GetPort gets a named port
+func (m *Replica) GetPort(name string) int {
+	return m.extraPorts[name]
 }
 
 // Connect connects to the replica

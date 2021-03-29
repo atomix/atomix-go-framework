@@ -17,6 +17,7 @@ package broker
 import (
 	coordinatorapi "github.com/atomix/api/go/atomix/management/broker"
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
+	protocolapi "github.com/atomix/api/go/atomix/protocol"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/server"
@@ -25,25 +26,57 @@ import (
 
 var log = logging.GetLogger("atomix", "broker")
 
+const (
+	controllerPort = 5151
+	primitivePort  = 5678
+)
+
 // NewNode creates a new broker node
-func NewNode(cluster cluster.Cluster) *Node {
+func NewNode() *Node {
 	return &Node{
-		Server: server.NewServer(cluster),
+		controllerServer: server.NewServer(cluster.NewCluster(
+			protocolapi.ProtocolConfig{},
+			cluster.WithMemberID("broker"),
+			cluster.WithPort(controllerPort))),
+		primitiveServer:  server.NewServer(cluster.NewCluster(
+			protocolapi.ProtocolConfig{},
+			cluster.WithMemberID("broker"),
+			cluster.WithPort(primitivePort))),
 	}
 }
 
 // Node is a broker node
 type Node struct {
-	*server.Server
+	controllerServer *server.Server
+	primitiveServer  *server.Server
 }
 
 // Start starts the node
 func (n *Node) Start() error {
-	n.RegisterService(func(s *grpc.Server) {
-		server := NewServer(newDriverRegistry(), newPrimitiveRegistry())
+	server := NewServer(newDriverRegistry(), newPrimitiveRegistry())
+	n.controllerServer.RegisterService(func(s *grpc.Server) {
 		coordinatorapi.RegisterPrimitiveManagementServiceServer(s, server)
 		coordinatorapi.RegisterDriverManagementServiceServer(s, server)
+	})
+	n.primitiveServer.RegisterService(func(s *grpc.Server) {
 		primitiveapi.RegisterPrimitiveDiscoveryServiceServer(s, server)
 	})
-	return n.Server.Start()
+	if err := n.controllerServer.Start(); err != nil {
+		return err
+	}
+	if err := n.primitiveServer.Start(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Stop stops the node
+func (n *Node) Stop() error {
+	if err := n.controllerServer.Stop(); err != nil {
+		return err
+	}
+	if err := n.primitiveServer.Stop(); err != nil {
+		return err
+	}
+	return nil
 }

@@ -67,7 +67,7 @@ func (s *Server) AddDriver(ctx context.Context, request *brokerapi.AddDriverRequ
 	}
 	if _, err := driverClient.ConfigureDriver(ctx, driverRequest); err != nil {
 		log.Warnf("AddDriverRequest %+v failed: %v", request, err)
-		return nil, errors.Proto(err)
+		return nil, err
 	}
 
 	response := &brokerapi.AddDriverResponse{}
@@ -104,7 +104,7 @@ func (s *Server) UpdateDriver(ctx context.Context, request *brokerapi.UpdateDriv
 	}
 	if _, err := driverClient.ConfigureDriver(ctx, driverRequest); err != nil {
 		log.Warnf("UpdateDriverRequest %+v failed: %v", request, err)
-		return nil, errors.Proto(err)
+		return nil, err
 	}
 
 	response := &brokerapi.UpdateDriverResponse{}
@@ -170,8 +170,8 @@ func (s *Server) AddPrimitive(ctx context.Context, request *brokerapi.AddPrimiti
 		},
 	}
 	if _, err := proxyClient.AddProxy(ctx, addProxyRequest); err != nil {
-		log.Warnf("AddDriverRequest %+v failed: %v", request, err)
-		return nil, errors.Proto(err)
+		log.Warnf("AddPrimitiveRequest %+v failed: %v", request, err)
+		return nil, err
 	}
 
 	response := &brokerapi.AddPrimitiveResponse{}
@@ -235,7 +235,7 @@ func (s *Server) RemovePrimitive(ctx context.Context, request *brokerapi.RemoveP
 	}
 	if _, err := proxyClient.RemoveProxy(ctx, removeProxyRequest); err != nil {
 		log.Warnf("RemovePrimitiveRequest %+v failed: %v", request, err)
-		return nil, errors.Proto(err)
+		return nil, err
 	}
 
 	// Once the proxy has been removed, remove the primitive from the registry

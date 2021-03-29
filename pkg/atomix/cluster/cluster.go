@@ -46,11 +46,11 @@ func NewCluster(config protocolapi.ProtocolConfig, opts ...Option) Cluster {
 
 		if replica == nil {
 			replica = &protocolapi.ProtocolReplica{
-				ID:           options.memberID,
-				NodeID:       options.nodeID,
-				Host:         peerHost,
-				APIPort:      int32(peerPort),
-				ProtocolPort: int32(peerPort),
+				ID:         options.memberID,
+				NodeID:     options.nodeID,
+				Host:       peerHost,
+				APIPort:    int32(peerPort),
+				ExtraPorts: map[string]int32{},
 			}
 		}
 		member = NewMember(*replica)

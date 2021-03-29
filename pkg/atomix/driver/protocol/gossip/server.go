@@ -17,7 +17,6 @@ package gossip
 import (
 	"context"
 	driverapi "github.com/atomix/api/go/atomix/management/driver"
-	protocolapi "github.com/atomix/api/go/atomix/protocol"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 )
@@ -72,28 +71,7 @@ func (s *Server) ConfigureDriver(ctx context.Context, request *driverapi.Configu
 	if !ok {
 		return nil, errors.Proto(errors.NewNotSupported("protocol does not support configuration changes"))
 	}
-	replicas := make([]protocolapi.ProtocolReplica, len(request.Driver.Protocol.Replicas))
-	for i, replica := range request.Driver.Protocol.Replicas {
-		replicas[i] = protocolapi.ProtocolReplica{
-			ID:           replica.ID,
-			NodeID:       replica.NodeID,
-			Host:         replica.Host,
-			APIPort:      replica.APIPort,
-			ProtocolPort: replica.ProtocolPort,
-		}
-	}
-	partitions := make([]protocolapi.ProtocolPartition, len(request.Driver.Protocol.Partitions))
-	for i, partition := range request.Driver.Protocol.Partitions {
-		partitions[i] = protocolapi.ProtocolPartition{
-			PartitionID: partition.PartitionID,
-			Replicas:    partition.Replicas,
-		}
-	}
-	config := protocolapi.ProtocolConfig{
-		Replicas:   replicas,
-		Partitions: partitions,
-	}
-	if err := cluster.Update(config); err != nil {
+	if err := cluster.Update(*request.Driver.Protocol); err != nil {
 		return nil, err
 	}
 	response := &driverapi.ConfigureDriverResponse{}
