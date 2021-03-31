@@ -15,49 +15,25 @@
 package rsm
 
 import (
-	"fmt"
 	driverapi "github.com/atomix/api/go/atomix/management/driver"
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
-	protocolapi "github.com/atomix/api/go/atomix/protocol"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/driver/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	proxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/server"
 	"google.golang.org/grpc"
-	"os"
-	"strconv"
 	"strings"
 )
 
-const (
-	driverTypeEnv      = "ATOMIX_DRIVER_TYPE"
-	driverNodeEnv      = "ATOMIX_DRIVER_NODE"
-	driverNamespaceEnv = "ATOMIX_DRIVER_NAMESPACE"
-	driverNameEnv      = "ATOMIX_DRIVER_NAME"
-	driverPortEnv      = "ATOMIX_DRIVER_PORT"
-)
-
 // NewNode creates a new server node
-func NewNode() *Node {
-	driver := os.Getenv(driverTypeEnv)
-	memberID := fmt.Sprintf("%s.%s", os.Getenv(driverNameEnv), os.Getenv(driverNamespaceEnv))
-	nodeID := os.Getenv(driverNodeEnv)
-	port, err := strconv.Atoi(os.Getenv(driverPortEnv))
-	if err != nil {
-		panic(err)
-	}
-
-	cluster := cluster.NewCluster(
-		protocolapi.ProtocolConfig{},
-		cluster.WithMemberID(memberID),
-		cluster.WithNodeID(nodeID),
-		cluster.WithPort(port))
+func NewNode(cluster cluster.Cluster) *Node {
+	member, _ := cluster.Member()
 	return &Node{
 		Server:     server.NewServer(cluster),
 		Client:     proxy.NewClient(cluster),
 		primitives: primitive.NewPrimitiveTypeRegistry(),
-		log:        logging.GetLogger("atomix", "driver", strings.ToLower(driver)),
+		log:        logging.GetLogger("atomix", "driver", strings.ToLower(string(member.ID))),
 	}
 }
 

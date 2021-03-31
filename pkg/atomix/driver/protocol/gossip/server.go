@@ -67,12 +67,14 @@ func (s *Server) RemoveProxy(ctx context.Context, request *driverapi.RemoveProxy
 
 func (s *Server) ConfigureDriver(ctx context.Context, request *driverapi.ConfigureDriverRequest) (*driverapi.ConfigureDriverResponse, error) {
 	s.node.log.Debugf("Received ConfigureDriverRequest %+v", request)
-	cluster, ok := s.node.Cluster.(cluster.ConfigurableCluster)
-	if !ok {
-		return nil, errors.Proto(errors.NewNotSupported("protocol does not support configuration changes"))
-	}
-	if err := cluster.Update(*request.Driver.Protocol); err != nil {
-		return nil, err
+	if request.Driver.Protocol != nil {
+		cluster, ok := s.node.Cluster.(cluster.ConfigurableCluster)
+		if !ok {
+			return nil, errors.Proto(errors.NewNotSupported("protocol does not support configuration changes"))
+		}
+		if err := cluster.Update(*request.Driver.Protocol); err != nil {
+			return nil, err
+		}
 	}
 	response := &driverapi.ConfigureDriverResponse{}
 	s.node.log.Debugf("Sending ConfigureDriverResponse %+v", response)
