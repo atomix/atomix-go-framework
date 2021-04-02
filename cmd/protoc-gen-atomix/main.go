@@ -25,20 +25,20 @@ func main() {
 			"server.go":   "/etc/atomix/templates/driver/primitive/server.tpl",
 			"registry.go": "/etc/atomix/templates/driver/primitive/registry.tpl",
 		})).
-		RegisterModule(codegen.NewModule("proxy", "rsm", map[string]string{
-			"proxy.go": "/etc/atomix/templates/proxy/rsm/proxy.tpl",
-		})).
 		RegisterModule(codegen.NewModule("protocol", "rsm", map[string]string{
-			"interface.go": "/etc/atomix/templates/protocol/rsm/interface.tpl",
-			"adapter.go":   "/etc/atomix/templates/protocol/rsm/adapter.tpl",
+			"proxy.go": "/etc/atomix/templates/driver/protocol/rsm/proxy.tpl",
 		})).
-		RegisterModule(codegen.NewModule("proxy", "gossip", map[string]string{
-			"proxy.go": "/etc/atomix/templates/proxy/gossip/proxy.tpl",
+		RegisterModule(codegen.NewModule("storage", "rsm", map[string]string{
+			"interface.go": "/etc/atomix/templates/storage/protocol/rsm/interface.tpl",
+			"adapter.go":   "/etc/atomix/templates/storage/protocol/rsm/adapter.tpl",
 		})).
 		RegisterModule(codegen.NewModule("protocol", "gossip", map[string]string{
-			"gossip.go":  "/etc/atomix/templates/protocol/gossip/gossip.tpl",
-			"server.go":  "/etc/atomix/templates/protocol/gossip/server.tpl",
-			"service.go": "/etc/atomix/templates/protocol/gossip/service.tpl",
+			"proxy.go": "/etc/atomix/templates/driver/protocol/gossip/proxy.tpl",
+		})).
+		RegisterModule(codegen.NewModule("storage", "gossip", map[string]string{
+			"gossip.go":  "/etc/atomix/templates/storage/protocol/gossip/gossip.tpl",
+			"server.go":  "/etc/atomix/templates/storage/protocol/gossip/server.tpl",
+			"service.go": "/etc/atomix/templates/storage/protocol/gossip/service.tpl",
 		})).
 		//RegisterPostProcessor(pgsgo.GoFmt()).
 		Render()

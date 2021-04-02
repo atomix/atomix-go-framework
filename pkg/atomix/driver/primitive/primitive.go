@@ -15,9 +15,7 @@
 package primitive
 
 import (
-	"github.com/atomix/api/go/atomix/management/driver"
 	driverapi "github.com/atomix/api/go/atomix/management/driver"
-	primitiveapi "github.com/atomix/api/go/atomix/primitive"
 	"google.golang.org/grpc"
 )
 
@@ -35,15 +33,7 @@ type PrimitiveType interface {
 	// Register registers the primitive server
 	RegisterServer(server *grpc.Server)
 	// AddProxy adds a proxy to the primitive server
-	AddProxy(proxy driver.ProxyConfig) error
+	AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error
 	// RemoveProxy removes a proxy from the primitive server
-	RemoveProxy(id driver.ProxyId) error
-}
-
-func getPrimitiveId(proxyID driverapi.ProxyId) primitiveapi.PrimitiveId {
-	return primitiveapi.PrimitiveId{
-		Type:      proxyID.Type,
-		Namespace: proxyID.Namespace,
-		Name:      proxyID.Name,
-	}
+	RemoveProxy(id driverapi.ProxyId) error
 }

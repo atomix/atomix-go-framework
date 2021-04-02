@@ -1,0 +1,63 @@
+// Copyright 2019-present Open Networking Foundation.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package _map
+
+import (
+	driverapi "github.com/atomix/api/go/atomix/management/driver"
+	mapapi "github.com/atomix/api/go/atomix/primitive/map"
+	"github.com/atomix/go-framework/pkg/atomix/driver/primitive"
+	mapdriver "github.com/atomix/go-framework/pkg/atomix/driver/primitive/map"
+	mapro "github.com/atomix/go-framework/pkg/atomix/driver/proxy/ro/map"
+	"github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm"
+	"google.golang.org/grpc"
+)
+
+func RegisterMapProxy(protocol *rsm.Protocol) {
+	protocol.Primitives().RegisterPrimitiveType(newMapType(protocol))
+}
+
+func newMapType(protocol *rsm.Protocol) primitive.PrimitiveType {
+	return &mapType{
+		protocol: protocol,
+		registry: mapdriver.NewMapProxyRegistry(),
+	}
+}
+
+type mapType struct {
+	protocol *rsm.Protocol
+	registry *mapdriver.MapProxyRegistry
+}
+
+func (p *mapType) Name() string {
+	return Type
+}
+
+func (p *mapType) RegisterServer(s *grpc.Server) {
+	mapapi.RegisterMapServiceServer(s, mapdriver.NewMapProxyServer(p.registry))
+}
+
+func (p *mapType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
+	server := NewMapProxyServer(p.protocol.Client)
+	if !options.Write {
+		server = mapro.NewReadOnlyMapServer(server)
+	}
+	return p.registry.AddProxy(id.PrimitiveId, server)
+}
+
+func (p *mapType) RemoveProxy(id driverapi.ProxyId) error {
+	return p.registry.RemoveProxy(id.PrimitiveId)
+}
+
+var _ primitive.PrimitiveType = &mapType{}

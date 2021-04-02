@@ -22,21 +22,21 @@ import (
 // newPrimitiveRegistry creates a new primitive registry
 func newPrimitiveRegistry() *PrimitiveRegistry {
 	return &PrimitiveRegistry{
-		primitives: make(map[brokerapi.PrimitiveId]brokerapi.PrimitiveConfig),
+		primitives: make(map[brokerapi.PrimitiveId]brokerapi.PrimitiveAddress),
 	}
 }
 
 // PrimitiveRegistry is a primitive registry
 // The registry is not thread safe!
 type PrimitiveRegistry struct {
-	primitives map[brokerapi.PrimitiveId]brokerapi.PrimitiveConfig
+	primitives map[brokerapi.PrimitiveId]brokerapi.PrimitiveAddress
 }
 
-func (r *PrimitiveRegistry) AddPrimitive(primitive brokerapi.PrimitiveConfig) error {
-	if _, ok := r.primitives[primitive.ID]; ok {
-		return errors.NewAlreadyExists("primitive '%s' already exists", primitive.ID)
+func (r *PrimitiveRegistry) AddPrimitive(id brokerapi.PrimitiveId, primitive brokerapi.PrimitiveAddress) error {
+	if _, ok := r.primitives[id]; ok {
+		return errors.NewAlreadyExists("primitive '%s' already exists", id)
 	}
-	r.primitives[primitive.ID] = primitive
+	r.primitives[id] = primitive
 	return nil
 }
 
@@ -48,18 +48,10 @@ func (r *PrimitiveRegistry) RemovePrimitive(id brokerapi.PrimitiveId) error {
 	return nil
 }
 
-func (r *PrimitiveRegistry) GetPrimitive(id brokerapi.PrimitiveId) (brokerapi.PrimitiveConfig, error) {
+func (r *PrimitiveRegistry) LookupPrimitive(id brokerapi.PrimitiveId) (brokerapi.PrimitiveAddress, error) {
 	primitive, ok := r.primitives[id]
 	if !ok {
-		return brokerapi.PrimitiveConfig{}, errors.NewNotFound("primitive '%s' not found", id)
+		return brokerapi.PrimitiveAddress{}, errors.NewNotFound("primitive '%s' not found", id)
 	}
 	return primitive, nil
-}
-
-func (r *PrimitiveRegistry) ListPrimitives() ([]brokerapi.PrimitiveConfig, error) {
-	primitives := make([]brokerapi.PrimitiveConfig, 0, len(r.primitives))
-	for _, primitive := range r.primitives {
-		primitives = append(primitives, primitive)
-	}
-	return primitives, nil
 }
