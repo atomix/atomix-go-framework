@@ -3,7 +3,7 @@ package value
 
 import (
 	"context"
-	"github.com/atomix/go-framework/pkg/atomix/proxy/gossip"
+	"github.com/atomix/go-framework/pkg/atomix/driver/proxy/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	value "github.com/atomix/api/go/atomix/primitive/value"
@@ -12,19 +12,19 @@ import (
 
 
 
-// NewValueProxyServer creates a new ValueProxyServer
-func NewValueProxyServer(client *gossip.Client) value.ValueServiceServer {
-	return &ValueProxyServer{
-        Proxy: gossip.NewProxy(client),
-        log:   logging.GetLogger("atomix", "value"),
+// NewProxyServer creates a new ProxyServer
+func NewProxyServer(client *gossip.Client) value.ValueServiceServer {
+	return &ProxyServer{
+        Client: client,
+        log:    logging.GetLogger("atomix", "value"),
     }
 }
-type ValueProxyServer struct {
-	*gossip.Proxy
+type ProxyServer struct {
+	*gossip.Client
 	log logging.Logger
 }
 
-func (s *ValueProxyServer) Set(ctx context.Context, request *value.SetRequest) (*value.SetResponse, error) {
+func (s *ProxyServer) Set(ctx context.Context, request *value.SetRequest) (*value.SetResponse, error) {
 	s.log.Debugf("Received SetRequest %+v", request)
     partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 
@@ -47,7 +47,7 @@ func (s *ValueProxyServer) Set(ctx context.Context, request *value.SetRequest) (
 }
 
 
-func (s *ValueProxyServer) Get(ctx context.Context, request *value.GetRequest) (*value.GetResponse, error) {
+func (s *ProxyServer) Get(ctx context.Context, request *value.GetRequest) (*value.GetResponse, error) {
 	s.log.Debugf("Received GetRequest %+v", request)
     partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 
@@ -70,7 +70,7 @@ func (s *ValueProxyServer) Get(ctx context.Context, request *value.GetRequest) (
 }
 
 
-func (s *ValueProxyServer) Events(request *value.EventsRequest, srv value.ValueService_EventsServer) error {
+func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueService_EventsServer) error {
     s.log.Debugf("Received EventsRequest %+v", request)
     partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 

@@ -8,19 +8,19 @@ import (
 	counter "github.com/atomix/api/go/atomix/primitive/counter"
 )
 
-// NewCounterProxyServer creates a new CounterProxyServer
-func NewCounterProxyServer(registry *CounterProxyRegistry) counter.CounterServiceServer {
-	return &CounterProxyServer{
+// NewProxyServer creates a new ProxyServer
+func NewProxyServer(registry *ProxyRegistry) counter.CounterServiceServer {
+	return &ProxyServer{
 		registry: registry,
 		log:      logging.GetLogger("atomix", "counter"),
 	}
 }
-type CounterProxyServer struct {
-	registry *CounterProxyRegistry
+type ProxyServer struct {
+	registry *ProxyRegistry
 	log      logging.Logger
 }
 
-func (s *CounterProxyServer) Set(ctx context.Context, request *counter.SetRequest) (*counter.SetResponse, error) {
+func (s *ProxyServer) Set(ctx context.Context, request *counter.SetRequest) (*counter.SetResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("SetRequest %+v failed: %v", request, err)
@@ -30,7 +30,7 @@ func (s *CounterProxyServer) Set(ctx context.Context, request *counter.SetReques
 }
 
 
-func (s *CounterProxyServer) Get(ctx context.Context, request *counter.GetRequest) (*counter.GetResponse, error) {
+func (s *ProxyServer) Get(ctx context.Context, request *counter.GetRequest) (*counter.GetResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("GetRequest %+v failed: %v", request, err)
@@ -40,7 +40,7 @@ func (s *CounterProxyServer) Get(ctx context.Context, request *counter.GetReques
 }
 
 
-func (s *CounterProxyServer) Increment(ctx context.Context, request *counter.IncrementRequest) (*counter.IncrementResponse, error) {
+func (s *ProxyServer) Increment(ctx context.Context, request *counter.IncrementRequest) (*counter.IncrementResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("IncrementRequest %+v failed: %v", request, err)
@@ -50,7 +50,7 @@ func (s *CounterProxyServer) Increment(ctx context.Context, request *counter.Inc
 }
 
 
-func (s *CounterProxyServer) Decrement(ctx context.Context, request *counter.DecrementRequest) (*counter.DecrementResponse, error) {
+func (s *ProxyServer) Decrement(ctx context.Context, request *counter.DecrementRequest) (*counter.DecrementResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("DecrementRequest %+v failed: %v", request, err)

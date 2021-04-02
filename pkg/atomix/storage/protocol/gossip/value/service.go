@@ -3,7 +3,7 @@ package value
 import (
 	"context"
 	value "github.com/atomix/api/go/atomix/primitive/value"
-	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
+	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/time"
 )

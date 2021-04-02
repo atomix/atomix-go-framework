@@ -1,5 +1,5 @@
 {{- $service := printf "%s.%sServer" .Primitive.Type.Package.Alias .Primitive.Type.Name }}
-{{- $registry := printf "%sProxyRegistry" .Primitive.Name }}
+{{- $registry := printf "%sProxyRegistry" .Generator.Prefix }}
 package {{ .Package.Name }}
 
 import (

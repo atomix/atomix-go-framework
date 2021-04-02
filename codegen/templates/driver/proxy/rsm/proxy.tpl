@@ -2,7 +2,7 @@
 
 {{- define "type" }}{{ printf "%s.%s" .Package.Alias .Name }}{{ end }}
 
-{{- $proxy := printf "%sProxyServer" .Primitive.Name }}
+{{- $proxy := printf "%sProxyServer" .Generator.Prefix }}
 {{- $service := printf "%s.%sServer" .Primitive.Type.Package.Alias .Primitive.Type.Name }}
 
 {{- define "field" }}

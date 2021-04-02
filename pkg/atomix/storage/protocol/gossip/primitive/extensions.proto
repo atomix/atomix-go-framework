@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package atomix.protocol.gossip;
+package atomix.storage.protocol.gossip;
 
 import "google/protobuf/descriptor.proto";
 

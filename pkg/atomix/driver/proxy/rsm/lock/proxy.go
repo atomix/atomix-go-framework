@@ -3,8 +3,8 @@ package lock
 
 import (
 	"context"
-	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
-	protocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
+	"github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm"
+	storage "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/golang/protobuf/proto"
@@ -19,32 +19,29 @@ const (
     getLockOp = "GetLock"
 )
 
-// NewLockProxyServer creates a new LockProxyServer
-func NewLockProxyServer(client *rsm.Client) lock.LockServiceServer {
-	return &LockProxyServer{
-		Proxy: rsm.NewProxy(client),
-		log:   logging.GetLogger("atomix", "counter"),
+// NewProxyServer creates a new ProxyServer
+func NewProxyServer(client *rsm.Client) lock.LockServiceServer {
+	return &ProxyServer{
+		Client: client,
+		log:    logging.GetLogger("atomix", "counter"),
 	}
 }
 
-type LockProxyServer struct {
-	*rsm.Proxy
+type ProxyServer struct {
+	*rsm.Client
 	log logging.Logger
 }
 
-func (s *LockProxyServer) Lock(ctx context.Context, request *lock.LockRequest) (*lock.LockResponse, error) {
+func (s *ProxyServer) Lock(ctx context.Context, request *lock.LockRequest) (*lock.LockResponse, error) {
 	s.log.Debugf("Received LockRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
         s.log.Errorf("Request LockRequest failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
-    partition, err := s.PartitionFrom(ctx)
-    if err != nil {
-        return nil, errors.Proto(err)
-    }
+    partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 
-	service := protocol.ServiceId{
+	service := storage.ServiceId{
 		Type:      Type,
 		Namespace: request.Headers.PrimitiveID.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
@@ -66,19 +63,16 @@ func (s *LockProxyServer) Lock(ctx context.Context, request *lock.LockRequest) (
 }
 
 
-func (s *LockProxyServer) Unlock(ctx context.Context, request *lock.UnlockRequest) (*lock.UnlockResponse, error) {
+func (s *ProxyServer) Unlock(ctx context.Context, request *lock.UnlockRequest) (*lock.UnlockResponse, error) {
 	s.log.Debugf("Received UnlockRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
         s.log.Errorf("Request UnlockRequest failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
-    partition, err := s.PartitionFrom(ctx)
-    if err != nil {
-        return nil, errors.Proto(err)
-    }
+    partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 
-	service := protocol.ServiceId{
+	service := storage.ServiceId{
 		Type:      Type,
 		Namespace: request.Headers.PrimitiveID.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
@@ -100,19 +94,16 @@ func (s *LockProxyServer) Unlock(ctx context.Context, request *lock.UnlockReques
 }
 
 
-func (s *LockProxyServer) GetLock(ctx context.Context, request *lock.GetLockRequest) (*lock.GetLockResponse, error) {
+func (s *ProxyServer) GetLock(ctx context.Context, request *lock.GetLockRequest) (*lock.GetLockResponse, error) {
 	s.log.Debugf("Received GetLockRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
         s.log.Errorf("Request GetLockRequest failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
-    partition, err := s.PartitionFrom(ctx)
-    if err != nil {
-        return nil, errors.Proto(err)
-    }
+    partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 
-	service := protocol.ServiceId{
+	service := storage.ServiceId{
 		Type:      Type,
 		Namespace: request.Headers.PrimitiveID.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,

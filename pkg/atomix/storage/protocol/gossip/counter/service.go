@@ -3,7 +3,7 @@ package counter
 import (
 	"context"
 	counter "github.com/atomix/api/go/atomix/primitive/counter"
-	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
+	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/time"
 )

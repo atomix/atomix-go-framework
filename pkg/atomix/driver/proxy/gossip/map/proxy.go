@@ -3,7 +3,7 @@ package _map
 
 import (
 	"context"
-	"github.com/atomix/go-framework/pkg/atomix/proxy/gossip"
+	"github.com/atomix/go-framework/pkg/atomix/driver/proxy/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	_map "github.com/atomix/api/go/atomix/primitive/map"
@@ -19,19 +19,19 @@ import (
 
 
 
-// NewMapProxyServer creates a new MapProxyServer
-func NewMapProxyServer(client *gossip.Client) _map.MapServiceServer {
-	return &MapProxyServer{
-        Proxy: gossip.NewProxy(client),
-        log:   logging.GetLogger("atomix", "map"),
+// NewProxyServer creates a new ProxyServer
+func NewProxyServer(client *gossip.Client) _map.MapServiceServer {
+	return &ProxyServer{
+        Client: client,
+        log:    logging.GetLogger("atomix", "map"),
     }
 }
-type MapProxyServer struct {
-	*gossip.Proxy
+type ProxyServer struct {
+	*gossip.Client
 	log logging.Logger
 }
 
-func (s *MapProxyServer) Size(ctx context.Context, request *_map.SizeRequest) (*_map.SizeResponse, error) {
+func (s *ProxyServer) Size(ctx context.Context, request *_map.SizeRequest) (*_map.SizeResponse, error) {
 	s.log.Debugf("Received SizeRequest %+v", request)
 	partitions := s.Partitions()
 	responses, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
@@ -64,7 +64,7 @@ func (s *MapProxyServer) Size(ctx context.Context, request *_map.SizeRequest) (*
 }
 
 
-func (s *MapProxyServer) Put(ctx context.Context, request *_map.PutRequest) (*_map.PutResponse, error) {
+func (s *ProxyServer) Put(ctx context.Context, request *_map.PutRequest) (*_map.PutResponse, error) {
 	s.log.Debugf("Received PutRequest %+v", request)
 	partitionKey := request.Entry.Key.Key
     partition := s.PartitionBy([]byte(partitionKey))
@@ -88,7 +88,7 @@ func (s *MapProxyServer) Put(ctx context.Context, request *_map.PutRequest) (*_m
 }
 
 
-func (s *MapProxyServer) Get(ctx context.Context, request *_map.GetRequest) (*_map.GetResponse, error) {
+func (s *ProxyServer) Get(ctx context.Context, request *_map.GetRequest) (*_map.GetResponse, error) {
 	s.log.Debugf("Received GetRequest %+v", request)
 	partitionKey := request.Key
     partition := s.PartitionBy([]byte(partitionKey))
@@ -112,7 +112,7 @@ func (s *MapProxyServer) Get(ctx context.Context, request *_map.GetRequest) (*_m
 }
 
 
-func (s *MapProxyServer) Remove(ctx context.Context, request *_map.RemoveRequest) (*_map.RemoveResponse, error) {
+func (s *ProxyServer) Remove(ctx context.Context, request *_map.RemoveRequest) (*_map.RemoveResponse, error) {
 	s.log.Debugf("Received RemoveRequest %+v", request)
 	partitionKey := request.Key.Key
     partition := s.PartitionBy([]byte(partitionKey))
@@ -136,7 +136,7 @@ func (s *MapProxyServer) Remove(ctx context.Context, request *_map.RemoveRequest
 }
 
 
-func (s *MapProxyServer) Clear(ctx context.Context, request *_map.ClearRequest) (*_map.ClearResponse, error) {
+func (s *ProxyServer) Clear(ctx context.Context, request *_map.ClearRequest) (*_map.ClearResponse, error) {
 	s.log.Debugf("Received ClearRequest %+v", request)
 	partitions := s.Partitions()
 	responses, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
@@ -166,7 +166,7 @@ func (s *MapProxyServer) Clear(ctx context.Context, request *_map.ClearRequest) 
 }
 
 
-func (s *MapProxyServer) Events(request *_map.EventsRequest, srv _map.MapService_EventsServer) error {
+func (s *ProxyServer) Events(request *_map.EventsRequest, srv _map.MapService_EventsServer) error {
     s.log.Debugf("Received EventsRequest %+v", request)
 	partitions := s.Partitions()
     wg := &sync.WaitGroup{}
@@ -237,7 +237,7 @@ func (s *MapProxyServer) Events(request *_map.EventsRequest, srv _map.MapService
 }
 
 
-func (s *MapProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_EntriesServer) error {
+func (s *ProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_EntriesServer) error {
     s.log.Debugf("Received EntriesRequest %+v", request)
 	partitions := s.Partitions()
     wg := &sync.WaitGroup{}

@@ -8,19 +8,19 @@ import (
 	leader "github.com/atomix/api/go/atomix/primitive/leader"
 )
 
-// NewLeaderLatchProxyServer creates a new LeaderLatchProxyServer
-func NewLeaderLatchProxyServer(registry *LeaderLatchProxyRegistry) leader.LeaderLatchServiceServer {
-	return &LeaderLatchProxyServer{
+// NewProxyServer creates a new ProxyServer
+func NewProxyServer(registry *ProxyRegistry) leader.LeaderLatchServiceServer {
+	return &ProxyServer{
 		registry: registry,
 		log:      logging.GetLogger("atomix", "leaderlatch"),
 	}
 }
-type LeaderLatchProxyServer struct {
-	registry *LeaderLatchProxyRegistry
+type ProxyServer struct {
+	registry *ProxyRegistry
 	log      logging.Logger
 }
 
-func (s *LeaderLatchProxyServer) Latch(ctx context.Context, request *leader.LatchRequest) (*leader.LatchResponse, error) {
+func (s *ProxyServer) Latch(ctx context.Context, request *leader.LatchRequest) (*leader.LatchResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("LatchRequest %+v failed: %v", request, err)
@@ -30,7 +30,7 @@ func (s *LeaderLatchProxyServer) Latch(ctx context.Context, request *leader.Latc
 }
 
 
-func (s *LeaderLatchProxyServer) Get(ctx context.Context, request *leader.GetRequest) (*leader.GetResponse, error) {
+func (s *ProxyServer) Get(ctx context.Context, request *leader.GetRequest) (*leader.GetResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("GetRequest %+v failed: %v", request, err)
@@ -40,7 +40,7 @@ func (s *LeaderLatchProxyServer) Get(ctx context.Context, request *leader.GetReq
 }
 
 
-func (s *LeaderLatchProxyServer) Events(request *leader.EventsRequest, srv leader.LeaderLatchService_EventsServer) error {
+func (s *ProxyServer) Events(request *leader.EventsRequest, srv leader.LeaderLatchService_EventsServer) error {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("EventsRequest %+v failed: %v", request, err)

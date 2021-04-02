@@ -4,7 +4,7 @@ package election
 
 import (
 	election "github.com/atomix/api/go/atomix/primitive/election"
-	rsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
+	rsm "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
 	proto "github.com/golang/protobuf/proto"
 )
 type ServiceEventsStream interface {

@@ -3,7 +3,7 @@
 package leader
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
+	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/golang/protobuf/proto"
 	leader "github.com/atomix/api/go/atomix/primitive/leader"

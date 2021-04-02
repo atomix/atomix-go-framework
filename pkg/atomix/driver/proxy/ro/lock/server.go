@@ -23,27 +23,27 @@ import (
 
 var log = logging.GetLogger("atomix", "lock")
 
-// NewReadOnlyLockServer creates a new read-only lock server
-func NewReadOnlyLockServer(s lockapi.LockServiceServer) lockapi.LockServiceServer {
-	return &ReadOnlyLockServer{
+// NewProxyServer creates a new read-only lock server
+func NewProxyServer(s lockapi.LockServiceServer) lockapi.LockServiceServer {
+	return &ProxyServer{
 		server: s,
 	}
 }
 
-type ReadOnlyLockServer struct {
+type ProxyServer struct {
 	server lockapi.LockServiceServer
 }
 
-func (s *ReadOnlyLockServer) Lock(ctx context.Context, request *lockapi.LockRequest) (*lockapi.LockResponse, error) {
+func (s *ProxyServer) Lock(ctx context.Context, request *lockapi.LockRequest) (*lockapi.LockResponse, error) {
 	return nil, errors.NewUnauthorized("Lock operation is not permitted")
 }
 
-func (s *ReadOnlyLockServer) Unlock(ctx context.Context, request *lockapi.UnlockRequest) (*lockapi.UnlockResponse, error) {
+func (s *ProxyServer) Unlock(ctx context.Context, request *lockapi.UnlockRequest) (*lockapi.UnlockResponse, error) {
 	return nil, errors.NewUnauthorized("Unlock operation is not permitted")
 }
 
-func (s *ReadOnlyLockServer) GetLock(ctx context.Context, request *lockapi.GetLockRequest) (*lockapi.GetLockResponse, error) {
+func (s *ProxyServer) GetLock(ctx context.Context, request *lockapi.GetLockRequest) (*lockapi.GetLockResponse, error) {
 	return s.server.GetLock(ctx, request)
 }
 
-var _ lockapi.LockServiceServer = &ReadOnlyLockServer{}
+var _ lockapi.LockServiceServer = &ProxyServer{}

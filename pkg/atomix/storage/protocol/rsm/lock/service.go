@@ -17,7 +17,7 @@ package lock
 import (
 	"container/list"
 	"github.com/atomix/api/go/atomix/primitive/lock"
-	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
+	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
 )
 
 func init() {

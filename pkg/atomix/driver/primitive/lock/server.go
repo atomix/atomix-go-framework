@@ -8,19 +8,19 @@ import (
 	lock "github.com/atomix/api/go/atomix/primitive/lock"
 )
 
-// NewLockProxyServer creates a new LockProxyServer
-func NewLockProxyServer(registry *LockProxyRegistry) lock.LockServiceServer {
-	return &LockProxyServer{
+// NewProxyServer creates a new ProxyServer
+func NewProxyServer(registry *ProxyRegistry) lock.LockServiceServer {
+	return &ProxyServer{
 		registry: registry,
 		log:      logging.GetLogger("atomix", "lock"),
 	}
 }
-type LockProxyServer struct {
-	registry *LockProxyRegistry
+type ProxyServer struct {
+	registry *ProxyRegistry
 	log      logging.Logger
 }
 
-func (s *LockProxyServer) Lock(ctx context.Context, request *lock.LockRequest) (*lock.LockResponse, error) {
+func (s *ProxyServer) Lock(ctx context.Context, request *lock.LockRequest) (*lock.LockResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("LockRequest %+v failed: %v", request, err)
@@ -30,7 +30,7 @@ func (s *LockProxyServer) Lock(ctx context.Context, request *lock.LockRequest) (
 }
 
 
-func (s *LockProxyServer) Unlock(ctx context.Context, request *lock.UnlockRequest) (*lock.UnlockResponse, error) {
+func (s *ProxyServer) Unlock(ctx context.Context, request *lock.UnlockRequest) (*lock.UnlockResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("UnlockRequest %+v failed: %v", request, err)
@@ -40,7 +40,7 @@ func (s *LockProxyServer) Unlock(ctx context.Context, request *lock.UnlockReques
 }
 
 
-func (s *LockProxyServer) GetLock(ctx context.Context, request *lock.GetLockRequest) (*lock.GetLockResponse, error) {
+func (s *ProxyServer) GetLock(ctx context.Context, request *lock.GetLockRequest) (*lock.GetLockResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("GetLockRequest %+v failed: %v", request, err)

@@ -22,10 +22,10 @@ import (
 )
 
 func RegisterPrimitiveServer(server *grpc.Server) {
-	primitiveapi.RegisterPrimitiveServiceServer(server, newPrimitiveServer())
+	primitiveapi.RegisterPrimitiveServer(server, newPrimitiveServer())
 }
 
-func newPrimitiveServer() primitiveapi.PrimitiveServiceServer {
+func newPrimitiveServer() primitiveapi.PrimitiveServer {
 	return &PrimitiveServer{
 		log: logging.GetLogger("atomix", "primitive"),
 	}

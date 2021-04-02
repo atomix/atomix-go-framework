@@ -8,19 +8,19 @@ import (
 	log "github.com/atomix/api/go/atomix/primitive/log"
 )
 
-// NewLogProxyServer creates a new LogProxyServer
-func NewLogProxyServer(registry *LogProxyRegistry) log.LogServiceServer {
-	return &LogProxyServer{
+// NewProxyServer creates a new ProxyServer
+func NewProxyServer(registry *ProxyRegistry) log.LogServiceServer {
+	return &ProxyServer{
 		registry: registry,
 		log:      logging.GetLogger("atomix", "log"),
 	}
 }
-type LogProxyServer struct {
-	registry *LogProxyRegistry
+type ProxyServer struct {
+	registry *ProxyRegistry
 	log      logging.Logger
 }
 
-func (s *LogProxyServer) Size(ctx context.Context, request *log.SizeRequest) (*log.SizeResponse, error) {
+func (s *ProxyServer) Size(ctx context.Context, request *log.SizeRequest) (*log.SizeResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("SizeRequest %+v failed: %v", request, err)
@@ -30,7 +30,7 @@ func (s *LogProxyServer) Size(ctx context.Context, request *log.SizeRequest) (*l
 }
 
 
-func (s *LogProxyServer) Append(ctx context.Context, request *log.AppendRequest) (*log.AppendResponse, error) {
+func (s *ProxyServer) Append(ctx context.Context, request *log.AppendRequest) (*log.AppendResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("AppendRequest %+v failed: %v", request, err)
@@ -40,7 +40,7 @@ func (s *LogProxyServer) Append(ctx context.Context, request *log.AppendRequest)
 }
 
 
-func (s *LogProxyServer) Get(ctx context.Context, request *log.GetRequest) (*log.GetResponse, error) {
+func (s *ProxyServer) Get(ctx context.Context, request *log.GetRequest) (*log.GetResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("GetRequest %+v failed: %v", request, err)
@@ -50,7 +50,7 @@ func (s *LogProxyServer) Get(ctx context.Context, request *log.GetRequest) (*log
 }
 
 
-func (s *LogProxyServer) FirstEntry(ctx context.Context, request *log.FirstEntryRequest) (*log.FirstEntryResponse, error) {
+func (s *ProxyServer) FirstEntry(ctx context.Context, request *log.FirstEntryRequest) (*log.FirstEntryResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("FirstEntryRequest %+v failed: %v", request, err)
@@ -60,7 +60,7 @@ func (s *LogProxyServer) FirstEntry(ctx context.Context, request *log.FirstEntry
 }
 
 
-func (s *LogProxyServer) LastEntry(ctx context.Context, request *log.LastEntryRequest) (*log.LastEntryResponse, error) {
+func (s *ProxyServer) LastEntry(ctx context.Context, request *log.LastEntryRequest) (*log.LastEntryResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("LastEntryRequest %+v failed: %v", request, err)
@@ -70,7 +70,7 @@ func (s *LogProxyServer) LastEntry(ctx context.Context, request *log.LastEntryRe
 }
 
 
-func (s *LogProxyServer) PrevEntry(ctx context.Context, request *log.PrevEntryRequest) (*log.PrevEntryResponse, error) {
+func (s *ProxyServer) PrevEntry(ctx context.Context, request *log.PrevEntryRequest) (*log.PrevEntryResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("PrevEntryRequest %+v failed: %v", request, err)
@@ -80,7 +80,7 @@ func (s *LogProxyServer) PrevEntry(ctx context.Context, request *log.PrevEntryRe
 }
 
 
-func (s *LogProxyServer) NextEntry(ctx context.Context, request *log.NextEntryRequest) (*log.NextEntryResponse, error) {
+func (s *ProxyServer) NextEntry(ctx context.Context, request *log.NextEntryRequest) (*log.NextEntryResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("NextEntryRequest %+v failed: %v", request, err)
@@ -90,7 +90,7 @@ func (s *LogProxyServer) NextEntry(ctx context.Context, request *log.NextEntryRe
 }
 
 
-func (s *LogProxyServer) Remove(ctx context.Context, request *log.RemoveRequest) (*log.RemoveResponse, error) {
+func (s *ProxyServer) Remove(ctx context.Context, request *log.RemoveRequest) (*log.RemoveResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("RemoveRequest %+v failed: %v", request, err)
@@ -100,7 +100,7 @@ func (s *LogProxyServer) Remove(ctx context.Context, request *log.RemoveRequest)
 }
 
 
-func (s *LogProxyServer) Clear(ctx context.Context, request *log.ClearRequest) (*log.ClearResponse, error) {
+func (s *ProxyServer) Clear(ctx context.Context, request *log.ClearRequest) (*log.ClearResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("ClearRequest %+v failed: %v", request, err)
@@ -110,7 +110,7 @@ func (s *LogProxyServer) Clear(ctx context.Context, request *log.ClearRequest) (
 }
 
 
-func (s *LogProxyServer) Events(request *log.EventsRequest, srv log.LogService_EventsServer) error {
+func (s *ProxyServer) Events(request *log.EventsRequest, srv log.LogService_EventsServer) error {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("EventsRequest %+v failed: %v", request, err)
@@ -120,7 +120,7 @@ func (s *LogProxyServer) Events(request *log.EventsRequest, srv log.LogService_E
 }
 
 
-func (s *LogProxyServer) Entries(request *log.EntriesRequest, srv log.LogService_EntriesServer) error {
+func (s *ProxyServer) Entries(request *log.EntriesRequest, srv log.LogService_EntriesServer) error {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("EntriesRequest %+v failed: %v", request, err)

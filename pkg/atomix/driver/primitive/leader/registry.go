@@ -8,19 +8,19 @@ import (
 	leader "github.com/atomix/api/go/atomix/primitive/leader"
 )
 
-// NewLeaderLatchProxyRegistry creates a new LeaderLatchProxyRegistry
-func NewLeaderLatchProxyRegistry() *LeaderLatchProxyRegistry {
-	return &LeaderLatchProxyRegistry{
+// NewProxyRegistry creates a new ProxyRegistry
+func NewProxyRegistry() *ProxyRegistry {
+	return &ProxyRegistry{
 		proxies: make(map[primitiveapi.PrimitiveId]leader.LeaderLatchServiceServer),
 	}
 }
 
-type LeaderLatchProxyRegistry struct {
+type ProxyRegistry struct {
 	proxies map[primitiveapi.PrimitiveId]leader.LeaderLatchServiceServer
 	mu      sync.RWMutex
 }
 
-func (r *LeaderLatchProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server leader.LeaderLatchServiceServer) error {
+func (r *ProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server leader.LeaderLatchServiceServer) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.proxies[id]; ok {
@@ -30,7 +30,7 @@ func (r *LeaderLatchProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server 
 	return nil
 }
 
-func (r *LeaderLatchProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error {
+func (r *ProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.proxies[id]; !ok {
@@ -40,7 +40,7 @@ func (r *LeaderLatchProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) erro
 	return nil
 }
 
-func (r *LeaderLatchProxyRegistry) GetProxy(id primitiveapi.PrimitiveId) (leader.LeaderLatchServiceServer, error) {
+func (r *ProxyRegistry) GetProxy(id primitiveapi.PrimitiveId) (leader.LeaderLatchServiceServer, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	proxy, ok := r.proxies[id]

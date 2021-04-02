@@ -23,43 +23,43 @@ import (
 
 var log = logging.GetLogger("atomix", "set")
 
-// NewReadOnlySetServer creates a new read-only set server
-func NewReadOnlySetServer(s setapi.SetServiceServer) setapi.SetServiceServer {
-	return &ReadOnlySetServer{
+// NewProxyServer creates a new read-only set server
+func NewProxyServer(s setapi.SetServiceServer) setapi.SetServiceServer {
+	return &ProxyServer{
 		server: s,
 	}
 }
 
-type ReadOnlySetServer struct {
+type ProxyServer struct {
 	server setapi.SetServiceServer
 }
 
-func (s *ReadOnlySetServer) Size(ctx context.Context, request *setapi.SizeRequest) (*setapi.SizeResponse, error) {
+func (s *ProxyServer) Size(ctx context.Context, request *setapi.SizeRequest) (*setapi.SizeResponse, error) {
 	return s.server.Size(ctx, request)
 }
 
-func (s *ReadOnlySetServer) Contains(ctx context.Context, request *setapi.ContainsRequest) (*setapi.ContainsResponse, error) {
+func (s *ProxyServer) Contains(ctx context.Context, request *setapi.ContainsRequest) (*setapi.ContainsResponse, error) {
 	return s.server.Contains(ctx, request)
 }
 
-func (s *ReadOnlySetServer) Add(ctx context.Context, request *setapi.AddRequest) (*setapi.AddResponse, error) {
+func (s *ProxyServer) Add(ctx context.Context, request *setapi.AddRequest) (*setapi.AddResponse, error) {
 	return nil, errors.NewUnauthorized("Add operation is not permitted")
 }
 
-func (s *ReadOnlySetServer) Remove(ctx context.Context, request *setapi.RemoveRequest) (*setapi.RemoveResponse, error) {
+func (s *ProxyServer) Remove(ctx context.Context, request *setapi.RemoveRequest) (*setapi.RemoveResponse, error) {
 	return nil, errors.NewUnauthorized("Remove operation is not permitted")
 }
 
-func (s *ReadOnlySetServer) Clear(ctx context.Context, request *setapi.ClearRequest) (*setapi.ClearResponse, error) {
+func (s *ProxyServer) Clear(ctx context.Context, request *setapi.ClearRequest) (*setapi.ClearResponse, error) {
 	return nil, errors.NewUnauthorized("Clear operation is not permitted")
 }
 
-func (s *ReadOnlySetServer) Events(request *setapi.EventsRequest, server setapi.SetService_EventsServer) error {
+func (s *ProxyServer) Events(request *setapi.EventsRequest, server setapi.SetService_EventsServer) error {
 	return s.server.Events(request, server)
 }
 
-func (s *ReadOnlySetServer) Elements(request *setapi.ElementsRequest, server setapi.SetService_ElementsServer) error {
+func (s *ProxyServer) Elements(request *setapi.ElementsRequest, server setapi.SetService_ElementsServer) error {
 	return s.server.Elements(request, server)
 }
 
-var _ setapi.SetServiceServer = &ReadOnlySetServer{}
+var _ setapi.SetServiceServer = &ProxyServer{}

@@ -31,13 +31,13 @@ func RegisterLeaderLatchProxy(protocol *rsm.Protocol) {
 func newLeaderLatchType(protocol *rsm.Protocol) primitive.PrimitiveType {
 	return &leaderLatchType{
 		protocol: protocol,
-		registry: leaderdriver.NewLeaderLatchProxyRegistry(),
+		registry: leaderdriver.NewProxyRegistry(),
 	}
 }
 
 type leaderLatchType struct {
 	protocol *rsm.Protocol
-	registry *leaderdriver.LeaderLatchProxyRegistry
+	registry *leaderdriver.ProxyRegistry
 }
 
 func (p *leaderLatchType) Name() string {
@@ -45,13 +45,13 @@ func (p *leaderLatchType) Name() string {
 }
 
 func (p *leaderLatchType) RegisterServer(s *grpc.Server) {
-	leaderapi.RegisterLeaderLatchServiceServer(s, leaderdriver.NewLeaderLatchProxyServer(p.registry))
+	leaderapi.RegisterLeaderLatchServiceServer(s, leaderdriver.NewProxyServer(p.registry))
 }
 
 func (p *leaderLatchType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
-	server := NewLeaderLatchProxyServer(p.protocol.Client)
+	server := NewProxyServer(p.protocol.Client)
 	if !options.Write {
-		server = leaderro.NewReadOnlyLeaderLatchServer(server)
+		server = leaderro.NewProxyServer(server)
 	}
 	return p.registry.AddProxy(id.PrimitiveId, server)
 }

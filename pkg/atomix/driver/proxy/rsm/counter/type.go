@@ -24,20 +24,20 @@ import (
 	"google.golang.org/grpc"
 )
 
-func RegisterCounterProxy(protocol *rsm.Protocol) {
+func Register(protocol *rsm.Protocol) {
 	protocol.Primitives().RegisterPrimitiveType(newCounterType(protocol))
 }
 
 func newCounterType(protocol *rsm.Protocol) primitive.PrimitiveType {
 	return &counterType{
 		protocol: protocol,
-		registry: counterdriver.NewCounterProxyRegistry(),
+		registry: counterdriver.NewProxyRegistry(),
 	}
 }
 
 type counterType struct {
 	protocol *rsm.Protocol
-	registry *counterdriver.CounterProxyRegistry
+	registry *counterdriver.ProxyRegistry
 }
 
 func (p *counterType) Name() string {
@@ -45,13 +45,13 @@ func (p *counterType) Name() string {
 }
 
 func (p *counterType) RegisterServer(s *grpc.Server) {
-	counterapi.RegisterCounterServiceServer(s, counterdriver.NewCounterProxyServer(p.registry))
+	counterapi.RegisterCounterServiceServer(s, counterdriver.NewProxyServer(p.registry))
 }
 
 func (p *counterType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
-	server := NewCounterProxyServer(p.protocol.Client)
+	server := NewProxyServer(p.protocol.Client)
 	if !options.Write {
-		server = counterro.NewReadOnlyCounterServer(server)
+		server = counterro.NewProxyServer(server)
 	}
 	return p.registry.AddProxy(id.PrimitiveId, server)
 }

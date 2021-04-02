@@ -31,13 +31,13 @@ func RegisterValueProxy(protocol *rsm.Protocol) {
 func newValueType(protocol *rsm.Protocol) primitive.PrimitiveType {
 	return &valueType{
 		protocol: protocol,
-		registry: valuedriver.NewValueProxyRegistry(),
+		registry: valuedriver.NewProxyRegistry(),
 	}
 }
 
 type valueType struct {
 	protocol *rsm.Protocol
-	registry *valuedriver.ValueProxyRegistry
+	registry *valuedriver.ProxyRegistry
 }
 
 func (p *valueType) Name() string {
@@ -45,13 +45,13 @@ func (p *valueType) Name() string {
 }
 
 func (p *valueType) RegisterServer(s *grpc.Server) {
-	valueapi.RegisterValueServiceServer(s, valuedriver.NewValueProxyServer(p.registry))
+	valueapi.RegisterValueServiceServer(s, valuedriver.NewProxyServer(p.registry))
 }
 
 func (p *valueType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
-	server := NewValueProxyServer(p.protocol.Client)
+	server := NewProxyServer(p.protocol.Client)
 	if !options.Write {
-		server = valuero.NewReadOnlyValueServer(server)
+		server = valuero.NewProxyServer(server)
 	}
 	return p.registry.AddProxy(id.PrimitiveId, server)
 }

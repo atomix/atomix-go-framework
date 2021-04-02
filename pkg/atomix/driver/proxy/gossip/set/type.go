@@ -24,7 +24,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-func RegisterSetProxy(protocol *gossip.Protocol) {
+func Register(protocol *gossip.Protocol) {
 	protocol.Primitives().RegisterPrimitiveType(newSetType(protocol))
 }
 
@@ -33,13 +33,13 @@ const Type = "Set"
 func newSetType(protocol *gossip.Protocol) primitive.PrimitiveType {
 	return &setType{
 		protocol: protocol,
-		registry: setproxy.NewSetProxyRegistry(),
+		registry: setproxy.NewProxyRegistry(),
 	}
 }
 
 type setType struct {
 	protocol *gossip.Protocol
-	registry *setproxy.SetProxyRegistry
+	registry *setproxy.ProxyRegistry
 }
 
 func (p *setType) Name() string {
@@ -47,13 +47,13 @@ func (p *setType) Name() string {
 }
 
 func (p *setType) RegisterServer(s *grpc.Server) {
-	setapi.RegisterSetServiceServer(s, setproxy.NewSetProxyServer(p.registry))
+	setapi.RegisterSetServiceServer(s, setproxy.NewProxyServer(p.registry))
 }
 
 func (p *setType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
-	server := NewSetProxyServer(p.protocol.Client)
+	server := NewProxyServer(p.protocol.Client)
 	if !options.Write {
-		server = setro.NewReadOnlySetServer(server)
+		server = setro.NewProxyServer(server)
 	}
 	return p.registry.AddProxy(id.PrimitiveId, server)
 }

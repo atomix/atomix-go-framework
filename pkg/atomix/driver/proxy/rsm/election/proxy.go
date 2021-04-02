@@ -3,8 +3,8 @@ package election
 
 import (
 	"context"
-	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
-	protocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
+	"github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm"
+	storage "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/golang/protobuf/proto"
@@ -24,32 +24,29 @@ const (
     eventsOp = "Events"
 )
 
-// NewElectionProxyServer creates a new ElectionProxyServer
-func NewElectionProxyServer(client *rsm.Client) election.LeaderElectionServiceServer {
-	return &ElectionProxyServer{
-		Proxy: rsm.NewProxy(client),
-		log:   logging.GetLogger("atomix", "counter"),
+// NewProxyServer creates a new ProxyServer
+func NewProxyServer(client *rsm.Client) election.LeaderElectionServiceServer {
+	return &ProxyServer{
+		Client: client,
+		log:    logging.GetLogger("atomix", "counter"),
 	}
 }
 
-type ElectionProxyServer struct {
-	*rsm.Proxy
+type ProxyServer struct {
+	*rsm.Client
 	log logging.Logger
 }
 
-func (s *ElectionProxyServer) Enter(ctx context.Context, request *election.EnterRequest) (*election.EnterResponse, error) {
+func (s *ProxyServer) Enter(ctx context.Context, request *election.EnterRequest) (*election.EnterResponse, error) {
 	s.log.Debugf("Received EnterRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
         s.log.Errorf("Request EnterRequest failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
-    partition, err := s.PartitionFrom(ctx)
-    if err != nil {
-        return nil, errors.Proto(err)
-    }
+    partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 
-	service := protocol.ServiceId{
+	service := storage.ServiceId{
 		Type:      Type,
 		Namespace: request.Headers.PrimitiveID.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
@@ -71,19 +68,16 @@ func (s *ElectionProxyServer) Enter(ctx context.Context, request *election.Enter
 }
 
 
-func (s *ElectionProxyServer) Withdraw(ctx context.Context, request *election.WithdrawRequest) (*election.WithdrawResponse, error) {
+func (s *ProxyServer) Withdraw(ctx context.Context, request *election.WithdrawRequest) (*election.WithdrawResponse, error) {
 	s.log.Debugf("Received WithdrawRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
         s.log.Errorf("Request WithdrawRequest failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
-    partition, err := s.PartitionFrom(ctx)
-    if err != nil {
-        return nil, errors.Proto(err)
-    }
+    partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 
-	service := protocol.ServiceId{
+	service := storage.ServiceId{
 		Type:      Type,
 		Namespace: request.Headers.PrimitiveID.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
@@ -105,19 +99,16 @@ func (s *ElectionProxyServer) Withdraw(ctx context.Context, request *election.Wi
 }
 
 
-func (s *ElectionProxyServer) Anoint(ctx context.Context, request *election.AnointRequest) (*election.AnointResponse, error) {
+func (s *ProxyServer) Anoint(ctx context.Context, request *election.AnointRequest) (*election.AnointResponse, error) {
 	s.log.Debugf("Received AnointRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
         s.log.Errorf("Request AnointRequest failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
-    partition, err := s.PartitionFrom(ctx)
-    if err != nil {
-        return nil, errors.Proto(err)
-    }
+    partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 
-	service := protocol.ServiceId{
+	service := storage.ServiceId{
 		Type:      Type,
 		Namespace: request.Headers.PrimitiveID.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
@@ -139,19 +130,16 @@ func (s *ElectionProxyServer) Anoint(ctx context.Context, request *election.Anoi
 }
 
 
-func (s *ElectionProxyServer) Promote(ctx context.Context, request *election.PromoteRequest) (*election.PromoteResponse, error) {
+func (s *ProxyServer) Promote(ctx context.Context, request *election.PromoteRequest) (*election.PromoteResponse, error) {
 	s.log.Debugf("Received PromoteRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
         s.log.Errorf("Request PromoteRequest failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
-    partition, err := s.PartitionFrom(ctx)
-    if err != nil {
-        return nil, errors.Proto(err)
-    }
+    partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 
-	service := protocol.ServiceId{
+	service := storage.ServiceId{
 		Type:      Type,
 		Namespace: request.Headers.PrimitiveID.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
@@ -173,19 +161,16 @@ func (s *ElectionProxyServer) Promote(ctx context.Context, request *election.Pro
 }
 
 
-func (s *ElectionProxyServer) Evict(ctx context.Context, request *election.EvictRequest) (*election.EvictResponse, error) {
+func (s *ProxyServer) Evict(ctx context.Context, request *election.EvictRequest) (*election.EvictResponse, error) {
 	s.log.Debugf("Received EvictRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
         s.log.Errorf("Request EvictRequest failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
-    partition, err := s.PartitionFrom(ctx)
-    if err != nil {
-        return nil, errors.Proto(err)
-    }
+    partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 
-	service := protocol.ServiceId{
+	service := storage.ServiceId{
 		Type:      Type,
 		Namespace: request.Headers.PrimitiveID.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
@@ -207,19 +192,16 @@ func (s *ElectionProxyServer) Evict(ctx context.Context, request *election.Evict
 }
 
 
-func (s *ElectionProxyServer) GetTerm(ctx context.Context, request *election.GetTermRequest) (*election.GetTermResponse, error) {
+func (s *ProxyServer) GetTerm(ctx context.Context, request *election.GetTermRequest) (*election.GetTermResponse, error) {
 	s.log.Debugf("Received GetTermRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
         s.log.Errorf("Request GetTermRequest failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
-    partition, err := s.PartitionFrom(ctx)
-    if err != nil {
-        return nil, errors.Proto(err)
-    }
+    partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 
-	service := protocol.ServiceId{
+	service := storage.ServiceId{
 		Type:      Type,
 		Namespace: request.Headers.PrimitiveID.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
@@ -241,7 +223,7 @@ func (s *ElectionProxyServer) GetTerm(ctx context.Context, request *election.Get
 }
 
 
-func (s *ElectionProxyServer) Events(request *election.EventsRequest, srv election.LeaderElectionService_EventsServer) error {
+func (s *ProxyServer) Events(request *election.EventsRequest, srv election.LeaderElectionService_EventsServer) error {
     s.log.Debugf("Received EventsRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -250,12 +232,9 @@ func (s *ElectionProxyServer) Events(request *election.EventsRequest, srv electi
 	}
 
 	stream := streams.NewBufferedStream()
-    partition, err := s.PartitionFrom(srv.Context())
-    if err != nil {
-        return errors.Proto(err)
-    }
+    partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 
-	service := protocol.ServiceId{
+	service := storage.ServiceId{
 		Type:      Type,
 		Namespace: request.Headers.PrimitiveID.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,

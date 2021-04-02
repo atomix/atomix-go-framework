@@ -31,13 +31,13 @@ func RegisterLeaderElectionProxy(protocol *rsm.Protocol) {
 func newLeaderElectionType(protocol *rsm.Protocol) primitive.PrimitiveType {
 	return &electionType{
 		protocol: protocol,
-		registry: electiondriver.NewElectionProxyRegistry(),
+		registry: electiondriver.NewProxyRegistry(),
 	}
 }
 
 type electionType struct {
 	protocol *rsm.Protocol
-	registry *electiondriver.ElectionProxyRegistry
+	registry *electiondriver.ProxyRegistry
 }
 
 func (p *electionType) Name() string {
@@ -45,13 +45,13 @@ func (p *electionType) Name() string {
 }
 
 func (p *electionType) RegisterServer(s *grpc.Server) {
-	electionapi.RegisterLeaderElectionServiceServer(s, electiondriver.NewElectionProxyServer(p.registry))
+	electionapi.RegisterLeaderElectionServiceServer(s, electiondriver.NewProxyServer(p.registry))
 }
 
 func (p *electionType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
-	server := NewElectionProxyServer(p.protocol.Client)
+	server := NewProxyServer(p.protocol.Client)
 	if !options.Write {
-		server = electionro.NewReadOnlyLeaderElectionServer(server)
+		server = electionro.NewProxyServer(server)
 	}
 	return p.registry.AddProxy(id.PrimitiveId, server)
 }

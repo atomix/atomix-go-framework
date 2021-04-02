@@ -23,59 +23,59 @@ import (
 
 var log = logging.GetLogger("atomix", "map")
 
-// NewReadOnlyLogServer creates a new read-only log server
-func NewReadOnlyLogServer(s logapi.LogServiceServer) logapi.LogServiceServer {
-	return &ReadOnlyLogServer{
+// NewProxyServer creates a new read-only log server
+func NewProxyServer(s logapi.LogServiceServer) logapi.LogServiceServer {
+	return &ProxyServer{
 		server: s,
 	}
 }
 
-type ReadOnlyLogServer struct {
+type ProxyServer struct {
 	server logapi.LogServiceServer
 }
 
-func (s *ReadOnlyLogServer) Size(ctx context.Context, request *logapi.SizeRequest) (*logapi.SizeResponse, error) {
+func (s *ProxyServer) Size(ctx context.Context, request *logapi.SizeRequest) (*logapi.SizeResponse, error) {
 	return s.server.Size(ctx, request)
 }
 
-func (s *ReadOnlyLogServer) Append(ctx context.Context, request *logapi.AppendRequest) (*logapi.AppendResponse, error) {
+func (s *ProxyServer) Append(ctx context.Context, request *logapi.AppendRequest) (*logapi.AppendResponse, error) {
 	return nil, errors.NewUnauthorized("Append operation is not permitted")
 }
 
-func (s *ReadOnlyLogServer) Get(ctx context.Context, request *logapi.GetRequest) (*logapi.GetResponse, error) {
+func (s *ProxyServer) Get(ctx context.Context, request *logapi.GetRequest) (*logapi.GetResponse, error) {
 	return s.server.Get(ctx, request)
 }
 
-func (s *ReadOnlyLogServer) FirstEntry(ctx context.Context, request *logapi.FirstEntryRequest) (*logapi.FirstEntryResponse, error) {
+func (s *ProxyServer) FirstEntry(ctx context.Context, request *logapi.FirstEntryRequest) (*logapi.FirstEntryResponse, error) {
 	return s.server.FirstEntry(ctx, request)
 }
 
-func (s *ReadOnlyLogServer) LastEntry(ctx context.Context, request *logapi.LastEntryRequest) (*logapi.LastEntryResponse, error) {
+func (s *ProxyServer) LastEntry(ctx context.Context, request *logapi.LastEntryRequest) (*logapi.LastEntryResponse, error) {
 	return s.server.LastEntry(ctx, request)
 }
 
-func (s *ReadOnlyLogServer) PrevEntry(ctx context.Context, request *logapi.PrevEntryRequest) (*logapi.PrevEntryResponse, error) {
+func (s *ProxyServer) PrevEntry(ctx context.Context, request *logapi.PrevEntryRequest) (*logapi.PrevEntryResponse, error) {
 	return s.server.PrevEntry(ctx, request)
 }
 
-func (s *ReadOnlyLogServer) NextEntry(ctx context.Context, request *logapi.NextEntryRequest) (*logapi.NextEntryResponse, error) {
+func (s *ProxyServer) NextEntry(ctx context.Context, request *logapi.NextEntryRequest) (*logapi.NextEntryResponse, error) {
 	return s.server.NextEntry(ctx, request)
 }
 
-func (s *ReadOnlyLogServer) Remove(ctx context.Context, request *logapi.RemoveRequest) (*logapi.RemoveResponse, error) {
+func (s *ProxyServer) Remove(ctx context.Context, request *logapi.RemoveRequest) (*logapi.RemoveResponse, error) {
 	return nil, errors.NewUnauthorized("Remove operation is not permitted")
 }
 
-func (s *ReadOnlyLogServer) Clear(ctx context.Context, request *logapi.ClearRequest) (*logapi.ClearResponse, error) {
+func (s *ProxyServer) Clear(ctx context.Context, request *logapi.ClearRequest) (*logapi.ClearResponse, error) {
 	return nil, errors.NewUnauthorized("Clear operation is not permitted")
 }
 
-func (s *ReadOnlyLogServer) Events(request *logapi.EventsRequest, server logapi.LogService_EventsServer) error {
+func (s *ProxyServer) Events(request *logapi.EventsRequest, server logapi.LogService_EventsServer) error {
 	return s.server.Events(request, server)
 }
 
-func (s *ReadOnlyLogServer) Entries(request *logapi.EntriesRequest, server logapi.LogService_EntriesServer) error {
+func (s *ProxyServer) Entries(request *logapi.EntriesRequest, server logapi.LogService_EntriesServer) error {
 	return s.server.Entries(request, server)
 }
 
-var _ logapi.LogServiceServer = &ReadOnlyLogServer{}
+var _ logapi.LogServiceServer = &ProxyServer{}

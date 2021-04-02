@@ -17,7 +17,7 @@ package rsm
 import (
 	"context"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
-	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
+	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"google.golang.org/grpc"
 	"io"

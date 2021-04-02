@@ -31,13 +31,13 @@ func RegisterListProxy(protocol *rsm.Protocol) {
 func newListType(protocol *rsm.Protocol) primitive.PrimitiveType {
 	return &listType{
 		protocol: protocol,
-		registry: listdriver.NewListProxyRegistry(),
+		registry: listdriver.NewProxyRegistry(),
 	}
 }
 
 type listType struct {
 	protocol *rsm.Protocol
-	registry *listdriver.ListProxyRegistry
+	registry *listdriver.ProxyRegistry
 }
 
 func (p *listType) Name() string {
@@ -45,13 +45,13 @@ func (p *listType) Name() string {
 }
 
 func (p *listType) RegisterServer(s *grpc.Server) {
-	listapi.RegisterListServiceServer(s, listdriver.NewListProxyServer(p.registry))
+	listapi.RegisterListServiceServer(s, listdriver.NewProxyServer(p.registry))
 }
 
 func (p *listType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
-	server := NewListProxyServer(p.protocol.Client)
+	server := NewProxyServer(p.protocol.Client)
 	if !options.Write {
-		server = listro.NewReadOnlyListServer(server)
+		server = listro.NewProxyServer(server)
 	}
 	return p.registry.AddProxy(id.PrimitiveId, server)
 }

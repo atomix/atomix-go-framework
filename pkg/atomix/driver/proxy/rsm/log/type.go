@@ -31,13 +31,13 @@ func RegisterLogProxy(protocol *rsm.Protocol) {
 func newLogType(protocol *rsm.Protocol) primitive.PrimitiveType {
 	return &logType{
 		protocol: protocol,
-		registry: logdriver.NewLogProxyRegistry(),
+		registry: logdriver.NewProxyRegistry(),
 	}
 }
 
 type logType struct {
 	protocol *rsm.Protocol
-	registry *logdriver.LogProxyRegistry
+	registry *logdriver.ProxyRegistry
 }
 
 func (p *logType) Name() string {
@@ -45,13 +45,13 @@ func (p *logType) Name() string {
 }
 
 func (p *logType) RegisterServer(s *grpc.Server) {
-	logapi.RegisterLogServiceServer(s, logdriver.NewLogProxyServer(p.registry))
+	logapi.RegisterLogServiceServer(s, logdriver.NewProxyServer(p.registry))
 }
 
 func (p *logType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
-	server := NewLogProxyServer(p.protocol.Client)
+	server := NewProxyServer(p.protocol.Client)
 	if !options.Write {
-		server = logro.NewReadOnlyLogServer(server)
+		server = logro.NewProxyServer(server)
 	}
 	return p.registry.AddProxy(id.PrimitiveId, server)
 }

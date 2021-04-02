@@ -23,43 +23,43 @@ import (
 
 var log = logging.GetLogger("atomix", "election")
 
-// NewReadOnlyLeaderElectionServer creates a new read-only election server
-func NewReadOnlyLeaderElectionServer(s electionapi.LeaderElectionServiceServer) electionapi.LeaderElectionServiceServer {
-	return &ReadOnlyLeaderElectionServer{
+// NewProxyServer creates a new read-only election server
+func NewProxyServer(s electionapi.LeaderElectionServiceServer) electionapi.LeaderElectionServiceServer {
+	return &ProxyServer{
 		server: s,
 	}
 }
 
-type ReadOnlyLeaderElectionServer struct {
+type ProxyServer struct {
 	server electionapi.LeaderElectionServiceServer
 }
 
-func (s *ReadOnlyLeaderElectionServer) Enter(ctx context.Context, request *electionapi.EnterRequest) (*electionapi.EnterResponse, error) {
+func (s *ProxyServer) Enter(ctx context.Context, request *electionapi.EnterRequest) (*electionapi.EnterResponse, error) {
 	return nil, errors.NewUnauthorized("Enter operation is not permitted")
 }
 
-func (s *ReadOnlyLeaderElectionServer) Withdraw(ctx context.Context, request *electionapi.WithdrawRequest) (*electionapi.WithdrawResponse, error) {
+func (s *ProxyServer) Withdraw(ctx context.Context, request *electionapi.WithdrawRequest) (*electionapi.WithdrawResponse, error) {
 	return nil, errors.NewUnauthorized("Withdraw operation is not permitted")
 }
 
-func (s *ReadOnlyLeaderElectionServer) Anoint(ctx context.Context, request *electionapi.AnointRequest) (*electionapi.AnointResponse, error) {
+func (s *ProxyServer) Anoint(ctx context.Context, request *electionapi.AnointRequest) (*electionapi.AnointResponse, error) {
 	return nil, errors.NewUnauthorized("Anoint operation is not permitted")
 }
 
-func (s *ReadOnlyLeaderElectionServer) Promote(ctx context.Context, request *electionapi.PromoteRequest) (*electionapi.PromoteResponse, error) {
+func (s *ProxyServer) Promote(ctx context.Context, request *electionapi.PromoteRequest) (*electionapi.PromoteResponse, error) {
 	return nil, errors.NewUnauthorized("Promote operation is not permitted")
 }
 
-func (s *ReadOnlyLeaderElectionServer) Evict(ctx context.Context, request *electionapi.EvictRequest) (*electionapi.EvictResponse, error) {
+func (s *ProxyServer) Evict(ctx context.Context, request *electionapi.EvictRequest) (*electionapi.EvictResponse, error) {
 	return nil, errors.NewUnauthorized("Evict operation is not permitted")
 }
 
-func (s *ReadOnlyLeaderElectionServer) GetTerm(ctx context.Context, request *electionapi.GetTermRequest) (*electionapi.GetTermResponse, error) {
+func (s *ProxyServer) GetTerm(ctx context.Context, request *electionapi.GetTermRequest) (*electionapi.GetTermResponse, error) {
 	return s.server.GetTerm(ctx, request)
 }
 
-func (s *ReadOnlyLeaderElectionServer) Events(request *electionapi.EventsRequest, server electionapi.LeaderElectionService_EventsServer) error {
+func (s *ProxyServer) Events(request *electionapi.EventsRequest, server electionapi.LeaderElectionService_EventsServer) error {
 	return s.server.Events(request, server)
 }
 
-var _ electionapi.LeaderElectionServiceServer = &ReadOnlyLeaderElectionServer{}
+var _ electionapi.LeaderElectionServiceServer = &ProxyServer{}

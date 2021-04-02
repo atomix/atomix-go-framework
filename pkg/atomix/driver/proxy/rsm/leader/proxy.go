@@ -3,8 +3,8 @@ package leader
 
 import (
 	"context"
-	"github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
-	protocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
+	"github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm"
+	storage "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/golang/protobuf/proto"
@@ -20,32 +20,29 @@ const (
     eventsOp = "Events"
 )
 
-// NewLeaderLatchProxyServer creates a new LeaderLatchProxyServer
-func NewLeaderLatchProxyServer(client *rsm.Client) leader.LeaderLatchServiceServer {
-	return &LeaderLatchProxyServer{
-		Proxy: rsm.NewProxy(client),
-		log:   logging.GetLogger("atomix", "counter"),
+// NewProxyServer creates a new ProxyServer
+func NewProxyServer(client *rsm.Client) leader.LeaderLatchServiceServer {
+	return &ProxyServer{
+		Client: client,
+		log:    logging.GetLogger("atomix", "counter"),
 	}
 }
 
-type LeaderLatchProxyServer struct {
-	*rsm.Proxy
+type ProxyServer struct {
+	*rsm.Client
 	log logging.Logger
 }
 
-func (s *LeaderLatchProxyServer) Latch(ctx context.Context, request *leader.LatchRequest) (*leader.LatchResponse, error) {
+func (s *ProxyServer) Latch(ctx context.Context, request *leader.LatchRequest) (*leader.LatchResponse, error) {
 	s.log.Debugf("Received LatchRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
         s.log.Errorf("Request LatchRequest failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
-    partition, err := s.PartitionFrom(ctx)
-    if err != nil {
-        return nil, errors.Proto(err)
-    }
+    partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 
-	service := protocol.ServiceId{
+	service := storage.ServiceId{
 		Type:      Type,
 		Namespace: request.Headers.PrimitiveID.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
@@ -67,19 +64,16 @@ func (s *LeaderLatchProxyServer) Latch(ctx context.Context, request *leader.Latc
 }
 
 
-func (s *LeaderLatchProxyServer) Get(ctx context.Context, request *leader.GetRequest) (*leader.GetResponse, error) {
+func (s *ProxyServer) Get(ctx context.Context, request *leader.GetRequest) (*leader.GetResponse, error) {
 	s.log.Debugf("Received GetRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
         s.log.Errorf("Request GetRequest failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
-    partition, err := s.PartitionFrom(ctx)
-    if err != nil {
-        return nil, errors.Proto(err)
-    }
+    partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 
-	service := protocol.ServiceId{
+	service := storage.ServiceId{
 		Type:      Type,
 		Namespace: request.Headers.PrimitiveID.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
@@ -101,7 +95,7 @@ func (s *LeaderLatchProxyServer) Get(ctx context.Context, request *leader.GetReq
 }
 
 
-func (s *LeaderLatchProxyServer) Events(request *leader.EventsRequest, srv leader.LeaderLatchService_EventsServer) error {
+func (s *ProxyServer) Events(request *leader.EventsRequest, srv leader.LeaderLatchService_EventsServer) error {
     s.log.Debugf("Received EventsRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -110,12 +104,9 @@ func (s *LeaderLatchProxyServer) Events(request *leader.EventsRequest, srv leade
 	}
 
 	stream := streams.NewBufferedStream()
-    partition, err := s.PartitionFrom(srv.Context())
-    if err != nil {
-        return errors.Proto(err)
-    }
+    partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
 
-	service := protocol.ServiceId{
+	service := storage.ServiceId{
 		Type:      Type,
 		Namespace: request.Headers.PrimitiveID.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,

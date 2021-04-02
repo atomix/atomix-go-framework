@@ -31,13 +31,13 @@ func RegisterIndexedMapProxy(protocol *rsm.Protocol) {
 func newIndexedMapType(protocol *rsm.Protocol) primitive.PrimitiveType {
 	return &indexedmapType{
 		protocol: protocol,
-		registry: indexedmapdriver.NewIndexedMapProxyRegistry(),
+		registry: indexedmapdriver.NewProxyRegistry(),
 	}
 }
 
 type indexedmapType struct {
 	protocol *rsm.Protocol
-	registry *indexedmapdriver.IndexedMapProxyRegistry
+	registry *indexedmapdriver.ProxyRegistry
 }
 
 func (p *indexedmapType) Name() string {
@@ -45,13 +45,13 @@ func (p *indexedmapType) Name() string {
 }
 
 func (p *indexedmapType) RegisterServer(s *grpc.Server) {
-	indexedmapapi.RegisterIndexedMapServiceServer(s, indexedmapdriver.NewIndexedMapProxyServer(p.registry))
+	indexedmapapi.RegisterIndexedMapServiceServer(s, indexedmapdriver.NewProxyServer(p.registry))
 }
 
 func (p *indexedmapType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
-	server := NewIndexedMapProxyServer(p.protocol.Client)
+	server := NewProxyServer(p.protocol.Client)
 	if !options.Write {
-		server = indexedmapro.NewReadOnlyIndexedMapServer(server)
+		server = indexedmapro.NewProxyServer(server)
 	}
 	return p.registry.AddProxy(id.PrimitiveId, server)
 }

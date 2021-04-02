@@ -4,7 +4,7 @@ package list
 
 import (
 	list "github.com/atomix/api/go/atomix/primitive/list"
-	rsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
+	rsm "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
 	proto "github.com/golang/protobuf/proto"
 	
 	

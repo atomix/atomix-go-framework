@@ -8,19 +8,19 @@ import (
 	indexedmap "github.com/atomix/api/go/atomix/primitive/indexedmap"
 )
 
-// NewIndexedMapProxyRegistry creates a new IndexedMapProxyRegistry
-func NewIndexedMapProxyRegistry() *IndexedMapProxyRegistry {
-	return &IndexedMapProxyRegistry{
+// NewProxyRegistry creates a new ProxyRegistry
+func NewProxyRegistry() *ProxyRegistry {
+	return &ProxyRegistry{
 		proxies: make(map[primitiveapi.PrimitiveId]indexedmap.IndexedMapServiceServer),
 	}
 }
 
-type IndexedMapProxyRegistry struct {
+type ProxyRegistry struct {
 	proxies map[primitiveapi.PrimitiveId]indexedmap.IndexedMapServiceServer
 	mu      sync.RWMutex
 }
 
-func (r *IndexedMapProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server indexedmap.IndexedMapServiceServer) error {
+func (r *ProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server indexedmap.IndexedMapServiceServer) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.proxies[id]; ok {
@@ -30,7 +30,7 @@ func (r *IndexedMapProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server i
 	return nil
 }
 
-func (r *IndexedMapProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error {
+func (r *ProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.proxies[id]; !ok {
@@ -40,7 +40,7 @@ func (r *IndexedMapProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error
 	return nil
 }
 
-func (r *IndexedMapProxyRegistry) GetProxy(id primitiveapi.PrimitiveId) (indexedmap.IndexedMapServiceServer, error) {
+func (r *ProxyRegistry) GetProxy(id primitiveapi.PrimitiveId) (indexedmap.IndexedMapServiceServer, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	proxy, ok := r.proxies[id]

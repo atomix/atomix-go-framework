@@ -23,27 +23,27 @@ import (
 
 var log = logging.GetLogger("atomix", "leader")
 
-// NewReadOnlyLeaderLatchServer creates a new read-only leader server
-func NewReadOnlyLeaderLatchServer(s leaderapi.LeaderLatchServiceServer) leaderapi.LeaderLatchServiceServer {
-	return &ReadOnlyLeaderLatchServer{
+// NewProxyServer creates a new read-only leader server
+func NewProxyServer(s leaderapi.LeaderLatchServiceServer) leaderapi.LeaderLatchServiceServer {
+	return &ProxyServer{
 		server: s,
 	}
 }
 
-type ReadOnlyLeaderLatchServer struct {
+type ProxyServer struct {
 	server leaderapi.LeaderLatchServiceServer
 }
 
-func (r *ReadOnlyLeaderLatchServer) Latch(ctx context.Context, request *leaderapi.LatchRequest) (*leaderapi.LatchResponse, error) {
+func (r *ProxyServer) Latch(ctx context.Context, request *leaderapi.LatchRequest) (*leaderapi.LatchResponse, error) {
 	return nil, errors.NewUnauthorized("Latch operation is not permitted")
 }
 
-func (r *ReadOnlyLeaderLatchServer) Get(ctx context.Context, request *leaderapi.GetRequest) (*leaderapi.GetResponse, error) {
+func (r *ProxyServer) Get(ctx context.Context, request *leaderapi.GetRequest) (*leaderapi.GetResponse, error) {
 	return r.server.Get(ctx, request)
 }
 
-func (r *ReadOnlyLeaderLatchServer) Events(request *leaderapi.EventsRequest, server leaderapi.LeaderLatchService_EventsServer) error {
+func (r *ProxyServer) Events(request *leaderapi.EventsRequest, server leaderapi.LeaderLatchService_EventsServer) error {
 	return r.server.Events(request, server)
 }
 
-var _ leaderapi.LeaderLatchServiceServer = &ReadOnlyLeaderLatchServer{}
+var _ leaderapi.LeaderLatchServiceServer = &ProxyServer{}

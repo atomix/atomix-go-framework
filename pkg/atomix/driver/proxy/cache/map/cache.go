@@ -26,26 +26,26 @@ import (
 
 var log = logging.GetLogger("atomix", "map")
 
-// NewReadOnlyMapServer creates a new read-only map server
-func NewReadOnlyMapServer(s mapapi.MapServiceServer) mapapi.MapServiceServer {
-	return &CachedMapServer{
+// NewServer creates a new cached map server
+func NewServer(s mapapi.MapServiceServer) mapapi.MapServiceServer {
+	return &Server{
 		server:  s,
 		entries: make(map[string]*mapapi.Entry),
 	}
 }
 
-type CachedMapServer struct {
+type Server struct {
 	server       mapapi.MapServiceServer
 	entries      map[string]*mapapi.Entry
 	maxTimestamp time.Timestamp
 	mu           sync.RWMutex
 }
 
-func (s *CachedMapServer) Size(ctx context.Context, request *mapapi.SizeRequest) (*mapapi.SizeResponse, error) {
+func (s *Server) Size(ctx context.Context, request *mapapi.SizeRequest) (*mapapi.SizeResponse, error) {
 	return s.server.Size(ctx, request)
 }
 
-func (s *CachedMapServer) Put(ctx context.Context, request *mapapi.PutRequest) (*mapapi.PutResponse, error) {
+func (s *Server) Put(ctx context.Context, request *mapapi.PutRequest) (*mapapi.PutResponse, error) {
 	response, err := s.server.Put(ctx, request)
 	if err != nil {
 		return nil, errors.Proto(err)
@@ -67,7 +67,7 @@ func (s *CachedMapServer) Put(ctx context.Context, request *mapapi.PutRequest) (
 	return response, nil
 }
 
-func (s *CachedMapServer) Get(ctx context.Context, request *mapapi.GetRequest) (*mapapi.GetResponse, error) {
+func (s *Server) Get(ctx context.Context, request *mapapi.GetRequest) (*mapapi.GetResponse, error) {
 	s.mu.RLock()
 	entry, ok := s.entries[request.Key]
 	s.mu.RUnlock()
@@ -98,7 +98,7 @@ func (s *CachedMapServer) Get(ctx context.Context, request *mapapi.GetRequest) (
 	return response, nil
 }
 
-func (s *CachedMapServer) Remove(ctx context.Context, request *mapapi.RemoveRequest) (*mapapi.RemoveResponse, error) {
+func (s *Server) Remove(ctx context.Context, request *mapapi.RemoveRequest) (*mapapi.RemoveResponse, error) {
 	response, err := s.server.Remove(ctx, request)
 	if err != nil {
 		return nil, errors.Proto(err)
@@ -119,7 +119,7 @@ func (s *CachedMapServer) Remove(ctx context.Context, request *mapapi.RemoveRequ
 	return response, nil
 }
 
-func (s *CachedMapServer) Clear(ctx context.Context, request *mapapi.ClearRequest) (*mapapi.ClearResponse, error) {
+func (s *Server) Clear(ctx context.Context, request *mapapi.ClearRequest) (*mapapi.ClearResponse, error) {
 	response, err := s.server.Clear(ctx, request)
 	if err != nil {
 		return nil, errors.Proto(err)
@@ -131,10 +131,10 @@ func (s *CachedMapServer) Clear(ctx context.Context, request *mapapi.ClearReques
 	return response, nil
 }
 
-func (s *CachedMapServer) Events(request *mapapi.EventsRequest, server mapapi.MapService_EventsServer) error {
+func (s *Server) Events(request *mapapi.EventsRequest, server mapapi.MapService_EventsServer) error {
 	return s.server.Events(request, server)
 }
 
-func (s *CachedMapServer) Entries(request *mapapi.EntriesRequest, server mapapi.MapService_EntriesServer) error {
+func (s *Server) Entries(request *mapapi.EntriesRequest, server mapapi.MapService_EntriesServer) error {
 	return s.server.Entries(request, server)
 }

@@ -3,7 +3,7 @@ package _map
 import (
 	"context"
 	_map "github.com/atomix/api/go/atomix/primitive/map"
-	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
+	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/time"
 )

@@ -24,7 +24,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-func RegisterMapProxy(protocol *gossip.Protocol) {
+func Register(protocol *gossip.Protocol) {
 	protocol.Primitives().RegisterPrimitiveType(newMapType(protocol))
 }
 
@@ -33,13 +33,13 @@ const Type = "Map"
 func newMapType(protocol *gossip.Protocol) primitive.PrimitiveType {
 	return &mapType{
 		protocol: protocol,
-		registry: mapproxy.NewMapProxyRegistry(),
+		registry: mapproxy.NewProxyRegistry(),
 	}
 }
 
 type mapType struct {
 	protocol *gossip.Protocol
-	registry *mapproxy.MapProxyRegistry
+	registry *mapproxy.ProxyRegistry
 }
 
 func (p *mapType) Name() string {
@@ -47,13 +47,13 @@ func (p *mapType) Name() string {
 }
 
 func (p *mapType) RegisterServer(s *grpc.Server) {
-	mapapi.RegisterMapServiceServer(s, mapproxy.NewMapProxyServer(p.registry))
+	mapapi.RegisterMapServiceServer(s, mapproxy.NewProxyServer(p.registry))
 }
 
 func (p *mapType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
-	server := NewMapProxyServer(p.protocol.Client)
+	server := NewProxyServer(p.protocol.Client)
 	if !options.Write {
-		server = mapro.NewReadOnlyMapServer(server)
+		server = mapro.NewProxyServer(server)
 	}
 	return p.registry.AddProxy(id.PrimitiveId, server)
 }

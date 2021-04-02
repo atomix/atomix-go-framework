@@ -31,13 +31,13 @@ func RegisterLockProxy(protocol *rsm.Protocol) {
 func newLockType(protocol *rsm.Protocol) primitive.PrimitiveType {
 	return &lockType{
 		protocol: protocol,
-		registry: lockdriver.NewLockProxyRegistry(),
+		registry: lockdriver.NewProxyRegistry(),
 	}
 }
 
 type lockType struct {
 	protocol *rsm.Protocol
-	registry *lockdriver.LockProxyRegistry
+	registry *lockdriver.ProxyRegistry
 }
 
 func (p *lockType) Name() string {
@@ -45,13 +45,13 @@ func (p *lockType) Name() string {
 }
 
 func (p *lockType) RegisterServer(s *grpc.Server) {
-	lockapi.RegisterLockServiceServer(s, lockdriver.NewLockProxyServer(p.registry))
+	lockapi.RegisterLockServiceServer(s, lockdriver.NewProxyServer(p.registry))
 }
 
 func (p *lockType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
-	server := NewLockProxyServer(p.protocol.Client)
+	server := NewProxyServer(p.protocol.Client)
 	if !options.Write {
-		server = lockro.NewReadOnlyLockServer(server)
+		server = lockro.NewProxyServer(server)
 	}
 	return p.registry.AddProxy(id.PrimitiveId, server)
 }

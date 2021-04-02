@@ -23,51 +23,51 @@ import (
 
 var log = logging.GetLogger("atomix", "list")
 
-// NewReadOnlyListServer creates a new read-only list server
-func NewReadOnlyListServer(s listapi.ListServiceServer) listapi.ListServiceServer {
-	return &ReadOnlyListServer{
+// NewProxyServer creates a new read-only list server
+func NewProxyServer(s listapi.ListServiceServer) listapi.ListServiceServer {
+	return &ProxyServer{
 		server: s,
 	}
 }
 
-type ReadOnlyListServer struct {
+type ProxyServer struct {
 	server listapi.ListServiceServer
 }
 
-func (s *ReadOnlyListServer) Size(ctx context.Context, request *listapi.SizeRequest) (*listapi.SizeResponse, error) {
+func (s *ProxyServer) Size(ctx context.Context, request *listapi.SizeRequest) (*listapi.SizeResponse, error) {
 	return s.server.Size(ctx, request)
 }
 
-func (s *ReadOnlyListServer) Append(ctx context.Context, request *listapi.AppendRequest) (*listapi.AppendResponse, error) {
+func (s *ProxyServer) Append(ctx context.Context, request *listapi.AppendRequest) (*listapi.AppendResponse, error) {
 	return nil, errors.NewUnauthorized("Append operation is not permitted")
 }
 
-func (s *ReadOnlyListServer) Insert(ctx context.Context, request *listapi.InsertRequest) (*listapi.InsertResponse, error) {
+func (s *ProxyServer) Insert(ctx context.Context, request *listapi.InsertRequest) (*listapi.InsertResponse, error) {
 	return nil, errors.NewUnauthorized("Insert operation is not permitted")
 }
 
-func (s *ReadOnlyListServer) Get(ctx context.Context, request *listapi.GetRequest) (*listapi.GetResponse, error) {
+func (s *ProxyServer) Get(ctx context.Context, request *listapi.GetRequest) (*listapi.GetResponse, error) {
 	return s.server.Get(ctx, request)
 }
 
-func (s *ReadOnlyListServer) Set(ctx context.Context, request *listapi.SetRequest) (*listapi.SetResponse, error) {
+func (s *ProxyServer) Set(ctx context.Context, request *listapi.SetRequest) (*listapi.SetResponse, error) {
 	return nil, errors.NewUnauthorized("Set operation is not permitted")
 }
 
-func (s *ReadOnlyListServer) Remove(ctx context.Context, request *listapi.RemoveRequest) (*listapi.RemoveResponse, error) {
+func (s *ProxyServer) Remove(ctx context.Context, request *listapi.RemoveRequest) (*listapi.RemoveResponse, error) {
 	return nil, errors.NewUnauthorized("Remove operation is not permitted")
 }
 
-func (s *ReadOnlyListServer) Clear(ctx context.Context, request *listapi.ClearRequest) (*listapi.ClearResponse, error) {
+func (s *ProxyServer) Clear(ctx context.Context, request *listapi.ClearRequest) (*listapi.ClearResponse, error) {
 	return nil, errors.NewUnauthorized("Clear operation is not permitted")
 }
 
-func (s *ReadOnlyListServer) Events(request *listapi.EventsRequest, server listapi.ListService_EventsServer) error {
+func (s *ProxyServer) Events(request *listapi.EventsRequest, server listapi.ListService_EventsServer) error {
 	return s.server.Events(request, server)
 }
 
-func (s *ReadOnlyListServer) Elements(request *listapi.ElementsRequest, server listapi.ListService_ElementsServer) error {
+func (s *ProxyServer) Elements(request *listapi.ElementsRequest, server listapi.ListService_ElementsServer) error {
 	return s.server.Elements(request, server)
 }
 
-var _ listapi.ListServiceServer = &ReadOnlyListServer{}
+var _ listapi.ListServiceServer = &ProxyServer{}

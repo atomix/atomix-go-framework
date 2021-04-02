@@ -23,59 +23,59 @@ import (
 
 var log = logging.GetLogger("atomix", "indexedmap")
 
-// NewReadOnlyIndexedMapServer creates a new read-only indexedmap server
-func NewReadOnlyIndexedMapServer(s indexedmapapi.IndexedMapServiceServer) indexedmapapi.IndexedMapServiceServer {
-	return &ReadOnlyIndexedMapServer{
+// NewProxyServer creates a new read-only indexedmap server
+func NewProxyServer(s indexedmapapi.IndexedMapServiceServer) indexedmapapi.IndexedMapServiceServer {
+	return &ProxyServer{
 		server: s,
 	}
 }
 
-type ReadOnlyIndexedMapServer struct {
+type ProxyServer struct {
 	server indexedmapapi.IndexedMapServiceServer
 }
 
-func (s *ReadOnlyIndexedMapServer) Size(ctx context.Context, request *indexedmapapi.SizeRequest) (*indexedmapapi.SizeResponse, error) {
+func (s *ProxyServer) Size(ctx context.Context, request *indexedmapapi.SizeRequest) (*indexedmapapi.SizeResponse, error) {
 	return s.server.Size(ctx, request)
 }
 
-func (s *ReadOnlyIndexedMapServer) Put(ctx context.Context, request *indexedmapapi.PutRequest) (*indexedmapapi.PutResponse, error) {
+func (s *ProxyServer) Put(ctx context.Context, request *indexedmapapi.PutRequest) (*indexedmapapi.PutResponse, error) {
 	return nil, errors.NewUnauthorized("Put operation is not permitted")
 }
 
-func (s *ReadOnlyIndexedMapServer) Get(ctx context.Context, request *indexedmapapi.GetRequest) (*indexedmapapi.GetResponse, error) {
+func (s *ProxyServer) Get(ctx context.Context, request *indexedmapapi.GetRequest) (*indexedmapapi.GetResponse, error) {
 	return s.server.Get(ctx, request)
 }
 
-func (s *ReadOnlyIndexedMapServer) FirstEntry(ctx context.Context, request *indexedmapapi.FirstEntryRequest) (*indexedmapapi.FirstEntryResponse, error) {
+func (s *ProxyServer) FirstEntry(ctx context.Context, request *indexedmapapi.FirstEntryRequest) (*indexedmapapi.FirstEntryResponse, error) {
 	return s.server.FirstEntry(ctx, request)
 }
 
-func (s *ReadOnlyIndexedMapServer) LastEntry(ctx context.Context, request *indexedmapapi.LastEntryRequest) (*indexedmapapi.LastEntryResponse, error) {
+func (s *ProxyServer) LastEntry(ctx context.Context, request *indexedmapapi.LastEntryRequest) (*indexedmapapi.LastEntryResponse, error) {
 	return s.server.LastEntry(ctx, request)
 }
 
-func (s *ReadOnlyIndexedMapServer) PrevEntry(ctx context.Context, request *indexedmapapi.PrevEntryRequest) (*indexedmapapi.PrevEntryResponse, error) {
+func (s *ProxyServer) PrevEntry(ctx context.Context, request *indexedmapapi.PrevEntryRequest) (*indexedmapapi.PrevEntryResponse, error) {
 	return s.server.PrevEntry(ctx, request)
 }
 
-func (s *ReadOnlyIndexedMapServer) NextEntry(ctx context.Context, request *indexedmapapi.NextEntryRequest) (*indexedmapapi.NextEntryResponse, error) {
+func (s *ProxyServer) NextEntry(ctx context.Context, request *indexedmapapi.NextEntryRequest) (*indexedmapapi.NextEntryResponse, error) {
 	return s.server.NextEntry(ctx, request)
 }
 
-func (s *ReadOnlyIndexedMapServer) Remove(ctx context.Context, request *indexedmapapi.RemoveRequest) (*indexedmapapi.RemoveResponse, error) {
+func (s *ProxyServer) Remove(ctx context.Context, request *indexedmapapi.RemoveRequest) (*indexedmapapi.RemoveResponse, error) {
 	return nil, errors.NewUnauthorized("Remove operation is not permitted")
 }
 
-func (s *ReadOnlyIndexedMapServer) Clear(ctx context.Context, request *indexedmapapi.ClearRequest) (*indexedmapapi.ClearResponse, error) {
+func (s *ProxyServer) Clear(ctx context.Context, request *indexedmapapi.ClearRequest) (*indexedmapapi.ClearResponse, error) {
 	return nil, errors.NewUnauthorized("Clear operation is not permitted")
 }
 
-func (s *ReadOnlyIndexedMapServer) Events(request *indexedmapapi.EventsRequest, server indexedmapapi.IndexedMapService_EventsServer) error {
+func (s *ProxyServer) Events(request *indexedmapapi.EventsRequest, server indexedmapapi.IndexedMapService_EventsServer) error {
 	return s.server.Events(request, server)
 }
 
-func (s *ReadOnlyIndexedMapServer) Entries(request *indexedmapapi.EntriesRequest, server indexedmapapi.IndexedMapService_EntriesServer) error {
+func (s *ProxyServer) Entries(request *indexedmapapi.EntriesRequest, server indexedmapapi.IndexedMapService_EntriesServer) error {
 	return s.server.Entries(request, server)
 }
 
-var _ indexedmapapi.IndexedMapServiceServer = &ReadOnlyIndexedMapServer{}
+var _ indexedmapapi.IndexedMapServiceServer = &ProxyServer{}

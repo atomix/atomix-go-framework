@@ -3,7 +3,7 @@ package set
 
 import (
 	"context"
-	"github.com/atomix/go-framework/pkg/atomix/proxy/gossip"
+	"github.com/atomix/go-framework/pkg/atomix/driver/proxy/gossip"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	set "github.com/atomix/api/go/atomix/primitive/set"
@@ -19,19 +19,19 @@ import (
 
 
 
-// NewSetProxyServer creates a new SetProxyServer
-func NewSetProxyServer(client *gossip.Client) set.SetServiceServer {
-	return &SetProxyServer{
-        Proxy: gossip.NewProxy(client),
-        log:   logging.GetLogger("atomix", "set"),
+// NewProxyServer creates a new ProxyServer
+func NewProxyServer(client *gossip.Client) set.SetServiceServer {
+	return &ProxyServer{
+        Client: client,
+        log:    logging.GetLogger("atomix", "set"),
     }
 }
-type SetProxyServer struct {
-	*gossip.Proxy
+type ProxyServer struct {
+	*gossip.Client
 	log logging.Logger
 }
 
-func (s *SetProxyServer) Size(ctx context.Context, request *set.SizeRequest) (*set.SizeResponse, error) {
+func (s *ProxyServer) Size(ctx context.Context, request *set.SizeRequest) (*set.SizeResponse, error) {
 	s.log.Debugf("Received SizeRequest %+v", request)
 	partitions := s.Partitions()
 	responses, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
@@ -64,7 +64,7 @@ func (s *SetProxyServer) Size(ctx context.Context, request *set.SizeRequest) (*s
 }
 
 
-func (s *SetProxyServer) Contains(ctx context.Context, request *set.ContainsRequest) (*set.ContainsResponse, error) {
+func (s *ProxyServer) Contains(ctx context.Context, request *set.ContainsRequest) (*set.ContainsResponse, error) {
 	s.log.Debugf("Received ContainsRequest %+v", request)
 	partitionKey := request.Element.Value
     partition := s.PartitionBy([]byte(partitionKey))
@@ -88,7 +88,7 @@ func (s *SetProxyServer) Contains(ctx context.Context, request *set.ContainsRequ
 }
 
 
-func (s *SetProxyServer) Add(ctx context.Context, request *set.AddRequest) (*set.AddResponse, error) {
+func (s *ProxyServer) Add(ctx context.Context, request *set.AddRequest) (*set.AddResponse, error) {
 	s.log.Debugf("Received AddRequest %+v", request)
 	partitionKey := request.Element.Value
     partition := s.PartitionBy([]byte(partitionKey))
@@ -112,7 +112,7 @@ func (s *SetProxyServer) Add(ctx context.Context, request *set.AddRequest) (*set
 }
 
 
-func (s *SetProxyServer) Remove(ctx context.Context, request *set.RemoveRequest) (*set.RemoveResponse, error) {
+func (s *ProxyServer) Remove(ctx context.Context, request *set.RemoveRequest) (*set.RemoveResponse, error) {
 	s.log.Debugf("Received RemoveRequest %+v", request)
 	partitionKey := request.Element.Value
     partition := s.PartitionBy([]byte(partitionKey))
@@ -136,7 +136,7 @@ func (s *SetProxyServer) Remove(ctx context.Context, request *set.RemoveRequest)
 }
 
 
-func (s *SetProxyServer) Clear(ctx context.Context, request *set.ClearRequest) (*set.ClearResponse, error) {
+func (s *ProxyServer) Clear(ctx context.Context, request *set.ClearRequest) (*set.ClearResponse, error) {
 	s.log.Debugf("Received ClearRequest %+v", request)
 	partitions := s.Partitions()
 	responses, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
@@ -166,7 +166,7 @@ func (s *SetProxyServer) Clear(ctx context.Context, request *set.ClearRequest) (
 }
 
 
-func (s *SetProxyServer) Events(request *set.EventsRequest, srv set.SetService_EventsServer) error {
+func (s *ProxyServer) Events(request *set.EventsRequest, srv set.SetService_EventsServer) error {
     s.log.Debugf("Received EventsRequest %+v", request)
 	partitions := s.Partitions()
     wg := &sync.WaitGroup{}
@@ -237,7 +237,7 @@ func (s *SetProxyServer) Events(request *set.EventsRequest, srv set.SetService_E
 }
 
 
-func (s *SetProxyServer) Elements(request *set.ElementsRequest, srv set.SetService_ElementsServer) error {
+func (s *ProxyServer) Elements(request *set.ElementsRequest, srv set.SetService_ElementsServer) error {
     s.log.Debugf("Received ElementsRequest %+v", request)
 	partitions := s.Partitions()
     wg := &sync.WaitGroup{}

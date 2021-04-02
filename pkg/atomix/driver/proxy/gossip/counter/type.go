@@ -24,7 +24,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-func RegisterCounterProxy(protocol *gossip.Protocol) {
+func Register(protocol *gossip.Protocol) {
 	protocol.Primitives().RegisterPrimitiveType(newCounterType(protocol))
 }
 
@@ -33,13 +33,13 @@ const Type = "Counter"
 func newCounterType(protocol *gossip.Protocol) primitive.PrimitiveType {
 	return &counterType{
 		protocol: protocol,
-		registry: counterdriver.NewCounterProxyRegistry(),
+		registry: counterdriver.NewProxyRegistry(),
 	}
 }
 
 type counterType struct {
 	protocol *gossip.Protocol
-	registry *counterdriver.CounterProxyRegistry
+	registry *counterdriver.ProxyRegistry
 }
 
 func (p *counterType) Name() string {
@@ -47,13 +47,13 @@ func (p *counterType) Name() string {
 }
 
 func (p *counterType) RegisterServer(s *grpc.Server) {
-	counterapi.RegisterCounterServiceServer(s, counterdriver.NewCounterProxyServer(p.registry))
+	counterapi.RegisterCounterServiceServer(s, counterdriver.NewProxyServer(p.registry))
 }
 
 func (p *counterType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
-	server := NewCounterProxyServer(p.protocol.Client)
+	server := NewProxyServer(p.protocol.Client)
 	if !options.Write {
-		server = counterro.NewReadOnlyCounterServer(server)
+		server = counterro.NewProxyServer(server)
 	}
 	return p.registry.AddProxy(id.PrimitiveId, server)
 }

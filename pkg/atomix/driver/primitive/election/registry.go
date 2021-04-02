@@ -8,19 +8,19 @@ import (
 	election "github.com/atomix/api/go/atomix/primitive/election"
 )
 
-// NewElectionProxyRegistry creates a new ElectionProxyRegistry
-func NewElectionProxyRegistry() *ElectionProxyRegistry {
-	return &ElectionProxyRegistry{
+// NewProxyRegistry creates a new ProxyRegistry
+func NewProxyRegistry() *ProxyRegistry {
+	return &ProxyRegistry{
 		proxies: make(map[primitiveapi.PrimitiveId]election.LeaderElectionServiceServer),
 	}
 }
 
-type ElectionProxyRegistry struct {
+type ProxyRegistry struct {
 	proxies map[primitiveapi.PrimitiveId]election.LeaderElectionServiceServer
 	mu      sync.RWMutex
 }
 
-func (r *ElectionProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server election.LeaderElectionServiceServer) error {
+func (r *ProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server election.LeaderElectionServiceServer) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.proxies[id]; ok {
@@ -30,7 +30,7 @@ func (r *ElectionProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server ele
 	return nil
 }
 
-func (r *ElectionProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error {
+func (r *ProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.proxies[id]; !ok {
@@ -40,7 +40,7 @@ func (r *ElectionProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error {
 	return nil
 }
 
-func (r *ElectionProxyRegistry) GetProxy(id primitiveapi.PrimitiveId) (election.LeaderElectionServiceServer, error) {
+func (r *ProxyRegistry) GetProxy(id primitiveapi.PrimitiveId) (election.LeaderElectionServiceServer, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	proxy, ok := r.proxies[id]

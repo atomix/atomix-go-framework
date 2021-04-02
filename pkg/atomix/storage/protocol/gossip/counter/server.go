@@ -5,7 +5,7 @@ import (
 	"context"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
+	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/gossip"
 	"google.golang.org/grpc"
 	counter "github.com/atomix/api/go/atomix/primitive/counter"
 )

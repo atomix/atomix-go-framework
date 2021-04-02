@@ -8,19 +8,19 @@ import (
 	_map "github.com/atomix/api/go/atomix/primitive/map"
 )
 
-// NewMapProxyServer creates a new MapProxyServer
-func NewMapProxyServer(registry *MapProxyRegistry) _map.MapServiceServer {
-	return &MapProxyServer{
+// NewProxyServer creates a new ProxyServer
+func NewProxyServer(registry *ProxyRegistry) _map.MapServiceServer {
+	return &ProxyServer{
 		registry: registry,
 		log:      logging.GetLogger("atomix", "map"),
 	}
 }
-type MapProxyServer struct {
-	registry *MapProxyRegistry
+type ProxyServer struct {
+	registry *ProxyRegistry
 	log      logging.Logger
 }
 
-func (s *MapProxyServer) Size(ctx context.Context, request *_map.SizeRequest) (*_map.SizeResponse, error) {
+func (s *ProxyServer) Size(ctx context.Context, request *_map.SizeRequest) (*_map.SizeResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("SizeRequest %+v failed: %v", request, err)
@@ -30,7 +30,7 @@ func (s *MapProxyServer) Size(ctx context.Context, request *_map.SizeRequest) (*
 }
 
 
-func (s *MapProxyServer) Put(ctx context.Context, request *_map.PutRequest) (*_map.PutResponse, error) {
+func (s *ProxyServer) Put(ctx context.Context, request *_map.PutRequest) (*_map.PutResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("PutRequest %+v failed: %v", request, err)
@@ -40,7 +40,7 @@ func (s *MapProxyServer) Put(ctx context.Context, request *_map.PutRequest) (*_m
 }
 
 
-func (s *MapProxyServer) Get(ctx context.Context, request *_map.GetRequest) (*_map.GetResponse, error) {
+func (s *ProxyServer) Get(ctx context.Context, request *_map.GetRequest) (*_map.GetResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("GetRequest %+v failed: %v", request, err)
@@ -50,7 +50,7 @@ func (s *MapProxyServer) Get(ctx context.Context, request *_map.GetRequest) (*_m
 }
 
 
-func (s *MapProxyServer) Remove(ctx context.Context, request *_map.RemoveRequest) (*_map.RemoveResponse, error) {
+func (s *ProxyServer) Remove(ctx context.Context, request *_map.RemoveRequest) (*_map.RemoveResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("RemoveRequest %+v failed: %v", request, err)
@@ -60,7 +60,7 @@ func (s *MapProxyServer) Remove(ctx context.Context, request *_map.RemoveRequest
 }
 
 
-func (s *MapProxyServer) Clear(ctx context.Context, request *_map.ClearRequest) (*_map.ClearResponse, error) {
+func (s *ProxyServer) Clear(ctx context.Context, request *_map.ClearRequest) (*_map.ClearResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("ClearRequest %+v failed: %v", request, err)
@@ -70,7 +70,7 @@ func (s *MapProxyServer) Clear(ctx context.Context, request *_map.ClearRequest) 
 }
 
 
-func (s *MapProxyServer) Events(request *_map.EventsRequest, srv _map.MapService_EventsServer) error {
+func (s *ProxyServer) Events(request *_map.EventsRequest, srv _map.MapService_EventsServer) error {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("EventsRequest %+v failed: %v", request, err)
@@ -80,7 +80,7 @@ func (s *MapProxyServer) Events(request *_map.EventsRequest, srv _map.MapService
 }
 
 
-func (s *MapProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_EntriesServer) error {
+func (s *ProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_EntriesServer) error {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("EntriesRequest %+v failed: %v", request, err)

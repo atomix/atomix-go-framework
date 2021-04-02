@@ -31,13 +31,13 @@ func RegisterMapProxy(protocol *rsm.Protocol) {
 func newMapType(protocol *rsm.Protocol) primitive.PrimitiveType {
 	return &mapType{
 		protocol: protocol,
-		registry: mapdriver.NewMapProxyRegistry(),
+		registry: mapdriver.NewProxyRegistry(),
 	}
 }
 
 type mapType struct {
 	protocol *rsm.Protocol
-	registry *mapdriver.MapProxyRegistry
+	registry *mapdriver.ProxyRegistry
 }
 
 func (p *mapType) Name() string {
@@ -45,13 +45,13 @@ func (p *mapType) Name() string {
 }
 
 func (p *mapType) RegisterServer(s *grpc.Server) {
-	mapapi.RegisterMapServiceServer(s, mapdriver.NewMapProxyServer(p.registry))
+	mapapi.RegisterMapServiceServer(s, mapdriver.NewProxyServer(p.registry))
 }
 
 func (p *mapType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
-	server := NewMapProxyServer(p.protocol.Client)
+	server := NewProxyServer(p.protocol.Client)
 	if !options.Write {
-		server = mapro.NewReadOnlyMapServer(server)
+		server = mapro.NewProxyServer(server)
 	}
 	return p.registry.AddProxy(id.PrimitiveId, server)
 }

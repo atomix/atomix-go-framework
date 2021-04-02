@@ -31,13 +31,13 @@ func RegisterSetProxy(protocol *rsm.Protocol) {
 func newSetType(protocol *rsm.Protocol) primitive.PrimitiveType {
 	return &setType{
 		protocol: protocol,
-		registry: setdriver.NewSetProxyRegistry(),
+		registry: setdriver.NewProxyRegistry(),
 	}
 }
 
 type setType struct {
 	protocol *rsm.Protocol
-	registry *setdriver.SetProxyRegistry
+	registry *setdriver.ProxyRegistry
 }
 
 func (p *setType) Name() string {
@@ -45,13 +45,13 @@ func (p *setType) Name() string {
 }
 
 func (p *setType) RegisterServer(s *grpc.Server) {
-	setapi.RegisterSetServiceServer(s, setdriver.NewSetProxyServer(p.registry))
+	setapi.RegisterSetServiceServer(s, setdriver.NewProxyServer(p.registry))
 }
 
 func (p *setType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
-	server := NewSetProxyServer(p.protocol.Client)
+	server := NewProxyServer(p.protocol.Client)
 	if !options.Write {
-		server = setro.NewReadOnlySetServer(server)
+		server = setro.NewProxyServer(server)
 	}
 	return p.registry.AddProxy(id.PrimitiveId, server)
 }

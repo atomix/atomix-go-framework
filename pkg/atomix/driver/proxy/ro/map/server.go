@@ -23,43 +23,43 @@ import (
 
 var log = logging.GetLogger("atomix", "map")
 
-// NewReadOnlyMapServer creates a new read-only map server
-func NewReadOnlyMapServer(s mapapi.MapServiceServer) mapapi.MapServiceServer {
-	return &ReadOnlyMapServer{
+// NewProxyServer creates a new read-only map server
+func NewProxyServer(s mapapi.MapServiceServer) mapapi.MapServiceServer {
+	return &ProxyServer{
 		server: s,
 	}
 }
 
-type ReadOnlyMapServer struct {
+type ProxyServer struct {
 	server mapapi.MapServiceServer
 }
 
-func (s *ReadOnlyMapServer) Size(ctx context.Context, request *mapapi.SizeRequest) (*mapapi.SizeResponse, error) {
+func (s *ProxyServer) Size(ctx context.Context, request *mapapi.SizeRequest) (*mapapi.SizeResponse, error) {
 	return s.server.Size(ctx, request)
 }
 
-func (s *ReadOnlyMapServer) Put(ctx context.Context, request *mapapi.PutRequest) (*mapapi.PutResponse, error) {
+func (s *ProxyServer) Put(ctx context.Context, request *mapapi.PutRequest) (*mapapi.PutResponse, error) {
 	return nil, errors.NewUnauthorized("Put not authorized")
 }
 
-func (s *ReadOnlyMapServer) Get(ctx context.Context, request *mapapi.GetRequest) (*mapapi.GetResponse, error) {
+func (s *ProxyServer) Get(ctx context.Context, request *mapapi.GetRequest) (*mapapi.GetResponse, error) {
 	return s.server.Get(ctx, request)
 }
 
-func (s *ReadOnlyMapServer) Remove(ctx context.Context, request *mapapi.RemoveRequest) (*mapapi.RemoveResponse, error) {
+func (s *ProxyServer) Remove(ctx context.Context, request *mapapi.RemoveRequest) (*mapapi.RemoveResponse, error) {
 	return nil, errors.NewUnauthorized("Remove not authorized")
 }
 
-func (s *ReadOnlyMapServer) Clear(ctx context.Context, request *mapapi.ClearRequest) (*mapapi.ClearResponse, error) {
+func (s *ProxyServer) Clear(ctx context.Context, request *mapapi.ClearRequest) (*mapapi.ClearResponse, error) {
 	return nil, errors.NewUnauthorized("Clear not authorized")
 }
 
-func (s *ReadOnlyMapServer) Events(request *mapapi.EventsRequest, server mapapi.MapService_EventsServer) error {
+func (s *ProxyServer) Events(request *mapapi.EventsRequest, server mapapi.MapService_EventsServer) error {
 	return s.server.Events(request, server)
 }
 
-func (s *ReadOnlyMapServer) Entries(request *mapapi.EntriesRequest, server mapapi.MapService_EntriesServer) error {
+func (s *ProxyServer) Entries(request *mapapi.EntriesRequest, server mapapi.MapService_EntriesServer) error {
 	return s.server.Entries(request, server)
 }
 
-var _ mapapi.MapServiceServer = &ReadOnlyMapServer{}
+var _ mapapi.MapServiceServer = &ProxyServer{}

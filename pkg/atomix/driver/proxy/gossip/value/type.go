@@ -24,7 +24,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-func RegisterValueProxy(protocol *gossip.Protocol) {
+func Register(protocol *gossip.Protocol) {
 	protocol.Primitives().RegisterPrimitiveType(newValueType(protocol))
 }
 
@@ -33,13 +33,13 @@ const Type = "Value"
 func newValueType(protocol *gossip.Protocol) primitive.PrimitiveType {
 	return &valueType{
 		protocol: protocol,
-		registry: valueproxy.NewValueProxyRegistry(),
+		registry: valueproxy.NewProxyRegistry(),
 	}
 }
 
 type valueType struct {
 	protocol *gossip.Protocol
-	registry *valueproxy.ValueProxyRegistry
+	registry *valueproxy.ProxyRegistry
 }
 
 func (p *valueType) Name() string {
@@ -47,13 +47,13 @@ func (p *valueType) Name() string {
 }
 
 func (p *valueType) RegisterServer(s *grpc.Server) {
-	valueapi.RegisterValueServiceServer(s, valueproxy.NewValueProxyServer(p.registry))
+	valueapi.RegisterValueServiceServer(s, valueproxy.NewProxyServer(p.registry))
 }
 
 func (p *valueType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
-	server := NewValueProxyServer(p.protocol.Client)
+	server := NewProxyServer(p.protocol.Client)
 	if !options.Write {
-		server = valuero.NewReadOnlyValueServer(server)
+		server = valuero.NewProxyServer(server)
 	}
 	return p.registry.AddProxy(id.PrimitiveId, server)
 }

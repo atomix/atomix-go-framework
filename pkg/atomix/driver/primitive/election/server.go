@@ -8,19 +8,19 @@ import (
 	election "github.com/atomix/api/go/atomix/primitive/election"
 )
 
-// NewElectionProxyServer creates a new ElectionProxyServer
-func NewElectionProxyServer(registry *ElectionProxyRegistry) election.LeaderElectionServiceServer {
-	return &ElectionProxyServer{
+// NewProxyServer creates a new ProxyServer
+func NewProxyServer(registry *ProxyRegistry) election.LeaderElectionServiceServer {
+	return &ProxyServer{
 		registry: registry,
 		log:      logging.GetLogger("atomix", "election"),
 	}
 }
-type ElectionProxyServer struct {
-	registry *ElectionProxyRegistry
+type ProxyServer struct {
+	registry *ProxyRegistry
 	log      logging.Logger
 }
 
-func (s *ElectionProxyServer) Enter(ctx context.Context, request *election.EnterRequest) (*election.EnterResponse, error) {
+func (s *ProxyServer) Enter(ctx context.Context, request *election.EnterRequest) (*election.EnterResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("EnterRequest %+v failed: %v", request, err)
@@ -30,7 +30,7 @@ func (s *ElectionProxyServer) Enter(ctx context.Context, request *election.Enter
 }
 
 
-func (s *ElectionProxyServer) Withdraw(ctx context.Context, request *election.WithdrawRequest) (*election.WithdrawResponse, error) {
+func (s *ProxyServer) Withdraw(ctx context.Context, request *election.WithdrawRequest) (*election.WithdrawResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("WithdrawRequest %+v failed: %v", request, err)
@@ -40,7 +40,7 @@ func (s *ElectionProxyServer) Withdraw(ctx context.Context, request *election.Wi
 }
 
 
-func (s *ElectionProxyServer) Anoint(ctx context.Context, request *election.AnointRequest) (*election.AnointResponse, error) {
+func (s *ProxyServer) Anoint(ctx context.Context, request *election.AnointRequest) (*election.AnointResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("AnointRequest %+v failed: %v", request, err)
@@ -50,7 +50,7 @@ func (s *ElectionProxyServer) Anoint(ctx context.Context, request *election.Anoi
 }
 
 
-func (s *ElectionProxyServer) Promote(ctx context.Context, request *election.PromoteRequest) (*election.PromoteResponse, error) {
+func (s *ProxyServer) Promote(ctx context.Context, request *election.PromoteRequest) (*election.PromoteResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("PromoteRequest %+v failed: %v", request, err)
@@ -60,7 +60,7 @@ func (s *ElectionProxyServer) Promote(ctx context.Context, request *election.Pro
 }
 
 
-func (s *ElectionProxyServer) Evict(ctx context.Context, request *election.EvictRequest) (*election.EvictResponse, error) {
+func (s *ProxyServer) Evict(ctx context.Context, request *election.EvictRequest) (*election.EvictResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("EvictRequest %+v failed: %v", request, err)
@@ -70,7 +70,7 @@ func (s *ElectionProxyServer) Evict(ctx context.Context, request *election.Evict
 }
 
 
-func (s *ElectionProxyServer) GetTerm(ctx context.Context, request *election.GetTermRequest) (*election.GetTermResponse, error) {
+func (s *ProxyServer) GetTerm(ctx context.Context, request *election.GetTermRequest) (*election.GetTermResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("GetTermRequest %+v failed: %v", request, err)
@@ -80,7 +80,7 @@ func (s *ElectionProxyServer) GetTerm(ctx context.Context, request *election.Get
 }
 
 
-func (s *ElectionProxyServer) Events(request *election.EventsRequest, srv election.LeaderElectionService_EventsServer) error {
+func (s *ProxyServer) Events(request *election.EventsRequest, srv election.LeaderElectionService_EventsServer) error {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("EventsRequest %+v failed: %v", request, err)

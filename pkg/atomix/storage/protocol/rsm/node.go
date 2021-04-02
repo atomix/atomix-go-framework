@@ -19,7 +19,7 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/atomix/go-framework/pkg/atomix/protocol"
+	"github.com/atomix/go-framework/pkg/atomix/storage/protocol"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"google.golang.org/grpc"
 )

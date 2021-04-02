@@ -8,19 +8,19 @@ import (
 	counter "github.com/atomix/api/go/atomix/primitive/counter"
 )
 
-// NewCounterProxyRegistry creates a new CounterProxyRegistry
-func NewCounterProxyRegistry() *CounterProxyRegistry {
-	return &CounterProxyRegistry{
+// NewProxyRegistry creates a new ProxyRegistry
+func NewProxyRegistry() *ProxyRegistry {
+	return &ProxyRegistry{
 		proxies: make(map[primitiveapi.PrimitiveId]counter.CounterServiceServer),
 	}
 }
 
-type CounterProxyRegistry struct {
+type ProxyRegistry struct {
 	proxies map[primitiveapi.PrimitiveId]counter.CounterServiceServer
 	mu      sync.RWMutex
 }
 
-func (r *CounterProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server counter.CounterServiceServer) error {
+func (r *ProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server counter.CounterServiceServer) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.proxies[id]; ok {
@@ -30,7 +30,7 @@ func (r *CounterProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server coun
 	return nil
 }
 
-func (r *CounterProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error {
+func (r *ProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.proxies[id]; !ok {
@@ -40,7 +40,7 @@ func (r *CounterProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error {
 	return nil
 }
 
-func (r *CounterProxyRegistry) GetProxy(id primitiveapi.PrimitiveId) (counter.CounterServiceServer, error) {
+func (r *ProxyRegistry) GetProxy(id primitiveapi.PrimitiveId) (counter.CounterServiceServer, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	proxy, ok := r.proxies[id]

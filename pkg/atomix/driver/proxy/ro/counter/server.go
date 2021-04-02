@@ -23,31 +23,31 @@ import (
 
 var log = logging.GetLogger("atomix", "counter")
 
-// NewReadOnlyCounterServer creates a new read-only counter server
-func NewReadOnlyCounterServer(s counterapi.CounterServiceServer) counterapi.CounterServiceServer {
-	return &ReadOnlyCounterServer{
+// NewProxyServer creates a new read-only counter server
+func NewProxyServer(s counterapi.CounterServiceServer) counterapi.CounterServiceServer {
+	return &ProxyServer{
 		server: s,
 	}
 }
 
-type ReadOnlyCounterServer struct {
+type ProxyServer struct {
 	server counterapi.CounterServiceServer
 }
 
-func (s *ReadOnlyCounterServer) Get(ctx context.Context, request *counterapi.GetRequest) (*counterapi.GetResponse, error) {
+func (s *ProxyServer) Get(ctx context.Context, request *counterapi.GetRequest) (*counterapi.GetResponse, error) {
 	return s.server.Get(ctx, request)
 }
 
-func (s *ReadOnlyCounterServer) Set(ctx context.Context, request *counterapi.SetRequest) (*counterapi.SetResponse, error) {
+func (s *ProxyServer) Set(ctx context.Context, request *counterapi.SetRequest) (*counterapi.SetResponse, error) {
 	return nil, errors.NewUnauthorized("Set not authorized")
 }
 
-func (s *ReadOnlyCounterServer) Increment(ctx context.Context, request *counterapi.IncrementRequest) (*counterapi.IncrementResponse, error) {
+func (s *ProxyServer) Increment(ctx context.Context, request *counterapi.IncrementRequest) (*counterapi.IncrementResponse, error) {
 	return nil, errors.NewUnauthorized("Increment not authorized")
 }
 
-func (s *ReadOnlyCounterServer) Decrement(ctx context.Context, request *counterapi.DecrementRequest) (*counterapi.DecrementResponse, error) {
+func (s *ProxyServer) Decrement(ctx context.Context, request *counterapi.DecrementRequest) (*counterapi.DecrementResponse, error) {
 	return nil, errors.NewUnauthorized("Decrement not authorized")
 }
 
-var _ counterapi.CounterServiceServer = &ReadOnlyCounterServer{}
+var _ counterapi.CounterServiceServer = &ProxyServer{}

@@ -23,27 +23,27 @@ import (
 
 var log = logging.GetLogger("atomix", "value")
 
-// NewReadOnlyValueServer creates a new read-only value server
-func NewReadOnlyValueServer(s valueapi.ValueServiceServer) valueapi.ValueServiceServer {
-	return &ReadOnlyValueServer{
+// NewProxyServer creates a new read-only value server
+func NewProxyServer(s valueapi.ValueServiceServer) valueapi.ValueServiceServer {
+	return &ProxyServer{
 		server: s,
 	}
 }
 
-type ReadOnlyValueServer struct {
+type ProxyServer struct {
 	server valueapi.ValueServiceServer
 }
 
-func (s *ReadOnlyValueServer) Set(ctx context.Context, request *valueapi.SetRequest) (*valueapi.SetResponse, error) {
+func (s *ProxyServer) Set(ctx context.Context, request *valueapi.SetRequest) (*valueapi.SetResponse, error) {
 	return nil, errors.NewUnauthorized("Set operation is not permitted")
 }
 
-func (s *ReadOnlyValueServer) Get(ctx context.Context, request *valueapi.GetRequest) (*valueapi.GetResponse, error) {
+func (s *ProxyServer) Get(ctx context.Context, request *valueapi.GetRequest) (*valueapi.GetResponse, error) {
 	return s.server.Get(ctx, request)
 }
 
-func (s *ReadOnlyValueServer) Events(request *valueapi.EventsRequest, server valueapi.ValueService_EventsServer) error {
+func (s *ProxyServer) Events(request *valueapi.EventsRequest, server valueapi.ValueService_EventsServer) error {
 	return s.server.Events(request, server)
 }
 
-var _ valueapi.ValueServiceServer = &ReadOnlyValueServer{}
+var _ valueapi.ValueServiceServer = &ProxyServer{}

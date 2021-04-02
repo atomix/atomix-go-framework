@@ -8,19 +8,19 @@ import (
 	log "github.com/atomix/api/go/atomix/primitive/log"
 )
 
-// NewLogProxyRegistry creates a new LogProxyRegistry
-func NewLogProxyRegistry() *LogProxyRegistry {
-	return &LogProxyRegistry{
+// NewProxyRegistry creates a new ProxyRegistry
+func NewProxyRegistry() *ProxyRegistry {
+	return &ProxyRegistry{
 		proxies: make(map[primitiveapi.PrimitiveId]log.LogServiceServer),
 	}
 }
 
-type LogProxyRegistry struct {
+type ProxyRegistry struct {
 	proxies map[primitiveapi.PrimitiveId]log.LogServiceServer
 	mu      sync.RWMutex
 }
 
-func (r *LogProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server log.LogServiceServer) error {
+func (r *ProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server log.LogServiceServer) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.proxies[id]; ok {
@@ -30,7 +30,7 @@ func (r *LogProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server log.LogS
 	return nil
 }
 
-func (r *LogProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error {
+func (r *ProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.proxies[id]; !ok {
@@ -40,7 +40,7 @@ func (r *LogProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error {
 	return nil
 }
 
-func (r *LogProxyRegistry) GetProxy(id primitiveapi.PrimitiveId) (log.LogServiceServer, error) {
+func (r *ProxyRegistry) GetProxy(id primitiveapi.PrimitiveId) (log.LogServiceServer, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	proxy, ok := r.proxies[id]

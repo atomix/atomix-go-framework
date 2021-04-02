@@ -8,19 +8,19 @@ import (
 	list "github.com/atomix/api/go/atomix/primitive/list"
 )
 
-// NewListProxyRegistry creates a new ListProxyRegistry
-func NewListProxyRegistry() *ListProxyRegistry {
-	return &ListProxyRegistry{
+// NewProxyRegistry creates a new ProxyRegistry
+func NewProxyRegistry() *ProxyRegistry {
+	return &ProxyRegistry{
 		proxies: make(map[primitiveapi.PrimitiveId]list.ListServiceServer),
 	}
 }
 
-type ListProxyRegistry struct {
+type ProxyRegistry struct {
 	proxies map[primitiveapi.PrimitiveId]list.ListServiceServer
 	mu      sync.RWMutex
 }
 
-func (r *ListProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server list.ListServiceServer) error {
+func (r *ProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server list.ListServiceServer) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.proxies[id]; ok {
@@ -30,7 +30,7 @@ func (r *ListProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server list.Li
 	return nil
 }
 
-func (r *ListProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error {
+func (r *ProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.proxies[id]; !ok {
@@ -40,7 +40,7 @@ func (r *ListProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error {
 	return nil
 }
 
-func (r *ListProxyRegistry) GetProxy(id primitiveapi.PrimitiveId) (list.ListServiceServer, error) {
+func (r *ProxyRegistry) GetProxy(id primitiveapi.PrimitiveId) (list.ListServiceServer, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	proxy, ok := r.proxies[id]

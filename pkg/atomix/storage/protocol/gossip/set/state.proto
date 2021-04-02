@@ -16,13 +16,13 @@ limitations under the License.
 
 syntax = "proto3";
 
-package atomix.protocol.gossip.set;
+package atomix.storage.protocol.gossip.set;
 
 import "atomix/primitive/meta/object.proto";
-import "atomix/protocol/gossip/primitive/extensions.proto";
+import "atomix/storage/protocol/gossip/primitive/extensions.proto";
 import "gogoproto/gogo.proto";
 
 message SetElement {
-    atomix.primitive.meta.ObjectMeta meta = 1 [(atomix.protocol.gossip.digest) = true, (gogoproto.embed) = true, (gogoproto.nullable) = false];
-    string value = 2 [(atomix.protocol.gossip.key) = true];
+    atomix.primitive.meta.ObjectMeta meta = 1 [(atomix.storage.protocol.gossip.digest) = true, (gogoproto.embed) = true, (gogoproto.nullable) = false];
+    string value = 2 [(atomix.storage.protocol.gossip.key) = true];
 }

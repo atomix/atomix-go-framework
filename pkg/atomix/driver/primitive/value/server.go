@@ -8,19 +8,19 @@ import (
 	value "github.com/atomix/api/go/atomix/primitive/value"
 )
 
-// NewValueProxyServer creates a new ValueProxyServer
-func NewValueProxyServer(registry *ValueProxyRegistry) value.ValueServiceServer {
-	return &ValueProxyServer{
+// NewProxyServer creates a new ProxyServer
+func NewProxyServer(registry *ProxyRegistry) value.ValueServiceServer {
+	return &ProxyServer{
 		registry: registry,
 		log:      logging.GetLogger("atomix", "value"),
 	}
 }
-type ValueProxyServer struct {
-	registry *ValueProxyRegistry
+type ProxyServer struct {
+	registry *ProxyRegistry
 	log      logging.Logger
 }
 
-func (s *ValueProxyServer) Set(ctx context.Context, request *value.SetRequest) (*value.SetResponse, error) {
+func (s *ProxyServer) Set(ctx context.Context, request *value.SetRequest) (*value.SetResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("SetRequest %+v failed: %v", request, err)
@@ -30,7 +30,7 @@ func (s *ValueProxyServer) Set(ctx context.Context, request *value.SetRequest) (
 }
 
 
-func (s *ValueProxyServer) Get(ctx context.Context, request *value.GetRequest) (*value.GetResponse, error) {
+func (s *ProxyServer) Get(ctx context.Context, request *value.GetRequest) (*value.GetResponse, error) {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("GetRequest %+v failed: %v", request, err)
@@ -40,7 +40,7 @@ func (s *ValueProxyServer) Get(ctx context.Context, request *value.GetRequest) (
 }
 
 
-func (s *ValueProxyServer) Events(request *value.EventsRequest, srv value.ValueService_EventsServer) error {
+func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueService_EventsServer) error {
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("EventsRequest %+v failed: %v", request, err)

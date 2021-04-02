@@ -17,7 +17,7 @@ package leader
 import (
 	leaderapi "github.com/atomix/api/go/atomix/primitive/leader"
 	"github.com/atomix/api/go/atomix/primitive/meta"
-	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
+	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
 )
 
 func init() {

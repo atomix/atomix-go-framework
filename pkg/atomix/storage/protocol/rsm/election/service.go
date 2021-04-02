@@ -18,7 +18,7 @@ import (
 	electionapi "github.com/atomix/api/go/atomix/primitive/election"
 	"github.com/atomix/api/go/atomix/primitive/meta"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
+	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
 )
 
 func init() {
