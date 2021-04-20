@@ -1,11 +1,10 @@
-
 package list
 
 import (
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
+	list "github.com/atomix/api/go/atomix/primitive/list"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"sync"
-	list "github.com/atomix/api/go/atomix/primitive/list"
 )
 
 // NewProxyRegistry creates a new ProxyRegistry

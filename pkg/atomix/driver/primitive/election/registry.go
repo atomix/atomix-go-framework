@@ -1,11 +1,10 @@
-
 package election
 
 import (
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
+	election "github.com/atomix/api/go/atomix/primitive/election"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"sync"
-	election "github.com/atomix/api/go/atomix/primitive/election"
 )
 
 // NewProxyRegistry creates a new ProxyRegistry

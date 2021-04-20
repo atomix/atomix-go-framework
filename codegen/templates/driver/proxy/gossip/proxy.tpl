@@ -132,6 +132,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	s.PrepareResponse({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
 	{{- else if .Scope.IsGlobal }}
 	partitions := s.Partitions()
+    {{- if .Response.Aggregates }}
 	responses, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
         partition := partitions[i]
         conn, err := partition.Connect()
@@ -148,12 +149,27 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
     	s.PrepareResponse({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
     	return response, nil
 	})
+    {{- else }}
+	err := async.IterAsync(len(partitions), func(i int) error {
+        partition := partitions[i]
+        conn, err := partition.Connect()
+        if err != nil {
+            return err
+        }
+        client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
+    	s.PrepareRequest({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
+        ctx := partition.AddHeaders(ctx)
+		_, err = client.{{ .Name }}(ctx, request)
+		return err
+	})
+    {{- end }}
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
 
-	response := responses[0].(*{{ template "type" .Response.Type }})
+	response := &{{ template "type" .Response.Type }}{}
+    s.PrepareResponse({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
     {{- range .Response.Aggregates }}
     {{- if .IsChooseFirst }}
     response{{ template "field" . }} = responses[0].(*{{ template "type" $method.Response.Type }}){{ template "field" . }}

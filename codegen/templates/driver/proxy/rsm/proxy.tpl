@@ -171,14 +171,22 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 		Namespace: request{{ template "field" .Request.Headers }}.PrimitiveID.Namespace,
 		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
+	{{- if .Response.Aggregates }}
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
 		return partitions[i].Do{{ template "optype" . }}(ctx, service, {{ $name }}, input)
 	})
+	{{- else }}
+	err = async.IterAsync(len(partitions), func(i int) error {
+		_, err := partitions[i].Do{{ template "optype" . }}(ctx, service, {{ $name }}, input)
+		return err
+	})
+	{{- end }}
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
 
+	{{- if .Response.Aggregates }}
 	responses := make([]{{ template "type" $method.Response.Type }}, 0, len(outputs))
 	for _, output := range outputs {
 	    var response {{ template "type" $method.Response.Type }}
@@ -189,8 +197,9 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
         }
         responses = append(responses, response)
 	}
+	{{- end }}
 
-	response := &responses[0]
+	response := &{{ template "type" $method.Response.Type }}{}
     {{- range .Response.Aggregates }}
     {{- if .IsChooseFirst }}
     response{{ template "field" . }} = responses[0]{{ template "field" . }}

@@ -24,7 +24,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-func RegisterLockProxy(protocol *rsm.Protocol) {
+func Register(protocol *rsm.Protocol) {
 	protocol.Primitives().RegisterPrimitiveType(newLockType(protocol))
 }
 

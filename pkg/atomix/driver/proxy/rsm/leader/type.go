@@ -24,7 +24,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-func RegisterLeaderLatchProxy(protocol *rsm.Protocol) {
+func Register(protocol *rsm.Protocol) {
 	protocol.Primitives().RegisterPrimitiveType(newLeaderLatchType(protocol))
 }
 

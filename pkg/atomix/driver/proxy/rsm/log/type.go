@@ -24,7 +24,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-func RegisterLogProxy(protocol *rsm.Protocol) {
+func Register(protocol *rsm.Protocol) {
 	protocol.Primitives().RegisterPrimitiveType(newLogType(protocol))
 }
 

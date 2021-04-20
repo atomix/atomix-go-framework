@@ -32,7 +32,7 @@ type Server struct {
 
 func (s *Server) StartAgent(ctx context.Context, request *driverapi.StartAgentRequest) (*driverapi.StartAgentResponse, error) {
 	s.driver.log.Debugf("Received StartAgentRequest %+v", request)
-	if err := s.driver.startAgent(request.AgentID, request.Options); err != nil {
+	if err := s.driver.startAgent(request.AgentID, request.Address, request.Config); err != nil {
 		s.driver.log.Warnf("StartAgentRequest %+v failed: %s", request, err)
 		return nil, errors.Proto(err)
 	}

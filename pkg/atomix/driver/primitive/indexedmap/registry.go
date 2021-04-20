@@ -1,11 +1,10 @@
-
 package indexedmap
 
 import (
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
+	indexedmap "github.com/atomix/api/go/atomix/primitive/indexedmap"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"sync"
-	indexedmap "github.com/atomix/api/go/atomix/primitive/indexedmap"
 )
 
 // NewProxyRegistry creates a new ProxyRegistry

@@ -18,14 +18,13 @@ import (
 	protocolapi "github.com/atomix/api/go/atomix/protocol"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/driver/primitive"
-	"github.com/atomix/go-framework/pkg/atomix/driver/proxy"
 	"github.com/atomix/go-framework/pkg/atomix/server"
 	"github.com/atomix/go-framework/pkg/atomix/time"
 	"google.golang.org/grpc"
 )
 
 // NewProtocol creates a new state machine protocol
-func NewProtocol(cluster cluster.Cluster, scheme time.Scheme) proxy.Protocol {
+func NewProtocol(cluster cluster.Cluster, scheme time.Scheme) *Protocol {
 	return &Protocol{
 		Server:     server.NewServer(cluster),
 		Client:     NewClient(cluster, scheme),

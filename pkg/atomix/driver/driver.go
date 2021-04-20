@@ -69,7 +69,7 @@ func (d *Driver) Stop() error {
 	return d.Server.Stop()
 }
 
-func (d *Driver) startAgent(id driverapi.AgentId, options driverapi.AgentOptions) error {
+func (d *Driver) startAgent(id driverapi.AgentId, address driverapi.AgentAddress, config driverapi.AgentConfig) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -81,11 +81,11 @@ func (d *Driver) startAgent(id driverapi.AgentId, options driverapi.AgentOptions
 
 	m, _ := d.Cluster.Member()
 	c := cluster.NewCluster(
-		protocolapi.ProtocolConfig{},
+		config.Protocol,
 		cluster.WithMemberID(id.String()),
 		cluster.WithNodeID(string(m.NodeID)),
-		cluster.WithHost(options.Host),
-		cluster.WithPort(int(options.Port)))
+		cluster.WithHost(address.Host),
+		cluster.WithPort(int(address.Port)))
 
 	a = agent.NewAgent(d.protocol(c))
 

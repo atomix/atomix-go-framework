@@ -1,24 +1,22 @@
-
-
 package election
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/golang/protobuf/proto"
 	election "github.com/atomix/api/go/atomix/primitive/election"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
+	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
+	"github.com/golang/protobuf/proto"
 )
 
 const Type = "Election"
 
 const (
-    enterOp = "Enter"
-    withdrawOp = "Withdraw"
-    anointOp = "Anoint"
-    promoteOp = "Promote"
-    evictOp = "Evict"
-    getTermOp = "GetTerm"
-    eventsOp = "Events"
+	enterOp    = "Enter"
+	withdrawOp = "Withdraw"
+	anointOp   = "Anoint"
+	promoteOp  = "Promote"
+	evictOp    = "Evict"
+	getTermOp  = "GetTerm"
+	eventsOp   = "Events"
 )
 
 var newServiceFunc rsm.NewServiceFunc
@@ -59,176 +57,169 @@ func (s *ServiceAdaptor) init() {
 }
 
 func (s *ServiceAdaptor) SessionOpen(session rsm.Session) {
-    if sessionOpen, ok := s.rsm.(rsm.SessionOpenService); ok {
-        sessionOpen.SessionOpen(session)
-    }
+	if sessionOpen, ok := s.rsm.(rsm.SessionOpenService); ok {
+		sessionOpen.SessionOpen(session)
+	}
 }
 
 func (s *ServiceAdaptor) SessionExpired(session rsm.Session) {
-    if sessionExpired, ok := s.rsm.(rsm.SessionExpiredService); ok {
-        sessionExpired.SessionExpired(session)
-    }
+	if sessionExpired, ok := s.rsm.(rsm.SessionExpiredService); ok {
+		sessionExpired.SessionExpired(session)
+	}
 }
 
 func (s *ServiceAdaptor) SessionClosed(session rsm.Session) {
-    if sessionClosed, ok := s.rsm.(rsm.SessionClosedService); ok {
-        sessionClosed.SessionClosed(session)
-    }
+	if sessionClosed, ok := s.rsm.(rsm.SessionClosedService); ok {
+		sessionClosed.SessionClosed(session)
+	}
 }
 
 func (s *ServiceAdaptor) enter(input []byte) ([]byte, error) {
-    request := &election.EnterRequest{}
+	request := &election.EnterRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.Enter(request)
-	if err !=  nil {
-	    s.log.Error(err)
-    	return nil, err
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
-
 func (s *ServiceAdaptor) withdraw(input []byte) ([]byte, error) {
-    request := &election.WithdrawRequest{}
+	request := &election.WithdrawRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.Withdraw(request)
-	if err !=  nil {
-	    s.log.Error(err)
-    	return nil, err
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
-
 func (s *ServiceAdaptor) anoint(input []byte) ([]byte, error) {
-    request := &election.AnointRequest{}
+	request := &election.AnointRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.Anoint(request)
-	if err !=  nil {
-	    s.log.Error(err)
-    	return nil, err
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
-
 func (s *ServiceAdaptor) promote(input []byte) ([]byte, error) {
-    request := &election.PromoteRequest{}
+	request := &election.PromoteRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.Promote(request)
-	if err !=  nil {
-	    s.log.Error(err)
-    	return nil, err
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
-
 func (s *ServiceAdaptor) evict(input []byte) ([]byte, error) {
-    request := &election.EvictRequest{}
+	request := &election.EvictRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.Evict(request)
-	if err !=  nil {
-	    s.log.Error(err)
-    	return nil, err
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
-
 func (s *ServiceAdaptor) getTerm(input []byte) ([]byte, error) {
-    request := &election.GetTermRequest{}
+	request := &election.GetTermRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 
 	response, err := s.rsm.GetTerm(request)
-	if err !=  nil {
-	    s.log.Error(err)
-    	return nil, err
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
 	}
 
 	output, err := proto.Marshal(response)
 	if err != nil {
-	    s.log.Error(err)
+		s.log.Error(err)
 		return nil, err
 	}
 	return output, nil
 }
 
-
 func (s *ServiceAdaptor) events(input []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
-    request := &election.EventsRequest{}
-    err := proto.Unmarshal(input, request)
-    if err != nil {
-        s.log.Error(err)
-        return nil, err
-    }
-    response := newServiceEventsStream(stream)
-    closer, err := s.rsm.Events(request, response)
-    if err != nil {
-        s.log.Error(err)
-        return nil, err
-    }
-    return closer, nil
+	request := &election.EventsRequest{}
+	err := proto.Unmarshal(input, request)
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
+	}
+	response := newServiceEventsStream(stream)
+	closer, err := s.rsm.Events(request, response)
+	if err != nil {
+		s.log.Error(err)
+		return nil, err
+	}
+	return closer, nil
 }
-
 
 var _ rsm.Service = &ServiceAdaptor{}

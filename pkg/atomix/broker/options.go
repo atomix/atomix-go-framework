@@ -21,11 +21,9 @@ const (
 )
 
 type brokerOptions struct {
-	id              string
-	host            string
-	port            int
-	applicationHost string
-	applicationPort int
+	id   string
+	host string
+	port int
 }
 
 func applyOptions(opts ...Option) brokerOptions {
@@ -49,26 +47,14 @@ func WithID(id string) Option {
 	}
 }
 
-func WithControllerHost(host string) Option {
+func WithHost(host string) Option {
 	return func(opts *brokerOptions) {
 		opts.host = host
 	}
 }
 
-func WithControllerPort(port int) Option {
+func WithPort(port int) Option {
 	return func(opts *brokerOptions) {
 		opts.port = port
-	}
-}
-
-func WithApplicationHost(host string) Option {
-	return func(opts *brokerOptions) {
-		opts.applicationHost = host
-	}
-}
-
-func WithApplicationPort(port int) Option {
-	return func(opts *brokerOptions) {
-		opts.applicationPort = port
 	}
 }
