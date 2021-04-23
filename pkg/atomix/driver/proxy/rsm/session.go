@@ -16,9 +16,16 @@ package rsm
 
 import (
 	"context"
+	"github.com/atomix/go-framework/pkg/atomix/cluster"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
 	streams "github.com/atomix/go-framework/pkg/atomix/stream"
 	"github.com/google/uuid"
+	"google.golang.org/grpc"
+	"io"
+	"math"
+	"math/rand"
 	"sync"
 	"time"
 )
@@ -49,7 +56,7 @@ type sessionOptions struct {
 // NewSession creates a new Session for the given partition
 // name is the name of the primitive
 // handler is the primitive's session handler
-func NewSession(partition *Partition, opts ...SessionOption) *Session {
+func NewSession(partition cluster.Partition, log logging.Logger, opts ...SessionOption) *Session {
 	options := &sessionOptions{
 		id:      uuid.New().String(),
 		timeout: 30 * time.Second,
@@ -58,9 +65,10 @@ func NewSession(partition *Partition, opts ...SessionOption) *Session {
 		opts[i].prepare(options)
 	}
 	return &Session{
-		Partition: partition,
+		partition: partition,
 		Timeout:   options.timeout,
 		streams:   make(map[uint64]*StreamState),
+		log:       log,
 		mu:        sync.RWMutex{},
 		ticker:    time.NewTicker(options.timeout / 2),
 	}
@@ -68,13 +76,16 @@ func NewSession(partition *Partition, opts ...SessionOption) *Session {
 
 // Session maintains the session for a primitive
 type Session struct {
-	Partition  *Partition
+	partition  cluster.Partition
 	Timeout    time.Duration
 	SessionID  uint64
 	lastIndex  uint64
 	requestID  uint64
 	responseID uint64
 	streams    map[uint64]*StreamState
+	log        logging.Logger
+	conn       *grpc.ClientConn
+	leader     *cluster.Replica
 	mu         sync.RWMutex
 	ticker     *time.Ticker
 }
@@ -82,7 +93,7 @@ type Session struct {
 // DoCommand submits a command to the service
 func (s *Session) DoCommand(ctx context.Context, service rsm.ServiceId, name string, input []byte) ([]byte, error) {
 	requestContext := s.nextCommandContext()
-	response, responseStatus, responseContext, err := s.Partition.doCommand(ctx, name, input, service, requestContext)
+	response, responseStatus, responseContext, err := s.doCommand(ctx, name, input, service, requestContext)
 	if err != nil {
 		return nil, err
 	}
@@ -93,12 +104,41 @@ func (s *Session) DoCommand(ctx context.Context, service rsm.ServiceId, name str
 	return response, nil
 }
 
+// doCommand submits a command to the service
+func (s *Session) doCommand(ctx context.Context, name string, input []byte, service rsm.ServiceId, command rsm.SessionCommandContext) ([]byte, rsm.SessionResponseStatus, rsm.SessionResponseContext, error) {
+	request := &rsm.StorageRequest{
+		PartitionID: uint32(s.partition.ID()),
+		Request: &rsm.SessionRequest{
+			Request: &rsm.SessionRequest_Command{
+				Command: &rsm.SessionCommandRequest{
+					Context: command,
+					Command: rsm.ServiceCommandRequest{
+						Service: service,
+						Request: &rsm.ServiceCommandRequest_Operation{
+							Operation: &rsm.ServiceOperationRequest{
+								Method: name,
+								Value:  input,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	response, err := s.doRequest(ctx, request)
+	if err != nil {
+		return nil, rsm.SessionResponseStatus{}, rsm.SessionResponseContext{}, err
+	}
+	return response.Response.GetCommand().Response.GetOperation().Result, response.Response.Status, response.Response.GetCommand().GetContext(), err
+}
+
 // DoCommandStream submits a streaming command to the service
 func (s *Session) DoCommandStream(ctx context.Context, service rsm.ServiceId, name string, input []byte, outStream streams.WriteStream) error {
 	streamState, requestContext := s.nextStream()
 	ch := make(chan streams.Result)
 	inStream := streams.NewChannelStream(ch)
-	err := s.Partition.doCommandStream(context.Background(), name, input, service, requestContext, inStream)
+	err := s.doCommandStream(context.Background(), name, input, service, requestContext, inStream)
 	if err != nil {
 		return err
 	}
@@ -141,10 +181,52 @@ func (s *Session) DoCommandStream(ctx context.Context, service rsm.ServiceId, na
 	return nil
 }
 
+// doCommandStream submits a streaming command to the service
+func (s *Session) doCommandStream(ctx context.Context, name string, input []byte, service rsm.ServiceId, context rsm.SessionCommandContext, stream streams.WriteStream) error {
+	request := &rsm.StorageRequest{
+		PartitionID: uint32(s.partition.ID()),
+		Request: &rsm.SessionRequest{
+			Request: &rsm.SessionRequest_Command{
+				Command: &rsm.SessionCommandRequest{
+					Context: context,
+					Command: rsm.ServiceCommandRequest{
+						Service: service,
+						Request: &rsm.ServiceCommandRequest_Operation{
+							Operation: &rsm.ServiceOperationRequest{
+								Method: name,
+								Value:  input,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	return s.doStream(ctx, request, streams.NewDecodingStream(stream, func(value interface{}, err error) (interface{}, error) {
+		if err != nil {
+			return nil, err
+		}
+		response := value.(*rsm.StorageResponse)
+		commandResponse := response.Response.GetCommand()
+		var result []byte
+		if commandResponse.Response.GetOperation() != nil {
+			result = commandResponse.Response.GetOperation().Result
+		}
+		return PartitionOutput{
+			Type:    response.Response.Type,
+			Status:  response.Response.Status,
+			Context: commandResponse.Context,
+			Result: streams.Result{
+				Value: result,
+			},
+		}, nil
+	}))
+}
+
 // DoQuery submits a query to the service
 func (s *Session) DoQuery(ctx context.Context, service rsm.ServiceId, name string, input []byte) ([]byte, error) {
 	requestContext := s.getQueryContext()
-	response, responseStatus, responseContext, err := s.Partition.doQuery(ctx, name, input, service, requestContext)
+	response, responseStatus, responseContext, err := s.doQuery(ctx, name, input, service, requestContext)
 	if err != nil {
 		return nil, err
 	}
@@ -153,6 +235,35 @@ func (s *Session) DoQuery(ctx context.Context, service rsm.ServiceId, name strin
 	}
 	s.recordQueryResponse(requestContext, responseContext)
 	return response, nil
+}
+
+// doQuery submits a query to the service
+func (s *Session) doQuery(ctx context.Context, name string, input []byte, service rsm.ServiceId, query rsm.SessionQueryContext) ([]byte, rsm.SessionResponseStatus, rsm.SessionResponseContext, error) {
+	request := &rsm.StorageRequest{
+		PartitionID: uint32(s.partition.ID()),
+		Request: &rsm.SessionRequest{
+			Request: &rsm.SessionRequest_Query{
+				Query: &rsm.SessionQueryRequest{
+					Context: query,
+					Query: rsm.ServiceQueryRequest{
+						Service: &service,
+						Request: &rsm.ServiceQueryRequest_Operation{
+							Operation: &rsm.ServiceOperationRequest{
+								Method: name,
+								Value:  input,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	response, err := s.doRequest(ctx, request)
+	if err != nil {
+		return nil, rsm.SessionResponseStatus{}, rsm.SessionResponseContext{}, err
+	}
+	return response.Response.GetQuery().Response.GetOperation().Result, response.Response.Status, response.Response.GetQuery().GetContext(), err
 }
 
 // DoQueryStream submits a streaming query to the service
@@ -171,13 +282,81 @@ func (s *Session) DoQueryStream(ctx context.Context, service rsm.ServiceId, name
 			},
 		}, err
 	})
-	return s.Partition.doQueryStream(ctx, name, input, service, requestContext, stream)
+	return s.doQueryStream(ctx, name, input, service, requestContext, stream)
+}
+
+// doQueryStream submits a streaming query to the service
+func (s *Session) doQueryStream(ctx context.Context, name string, input []byte, service rsm.ServiceId, context rsm.SessionQueryContext, stream streams.WriteStream) error {
+	request := &rsm.StorageRequest{
+		PartitionID: uint32(s.partition.ID()),
+		Request: &rsm.SessionRequest{
+			Request: &rsm.SessionRequest_Query{
+				Query: &rsm.SessionQueryRequest{
+					Context: context,
+					Query: rsm.ServiceQueryRequest{
+						Service: &service,
+						Request: &rsm.ServiceQueryRequest_Operation{
+							Operation: &rsm.ServiceOperationRequest{
+								Method: name,
+								Value:  input,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	return s.doStream(ctx, request, streams.NewDecodingStream(stream, func(value interface{}, err error) (interface{}, error) {
+		if err != nil {
+			return nil, err
+		}
+		response := value.(*rsm.StorageResponse)
+		queryResponse := response.Response.GetQuery()
+		var result []byte
+		if queryResponse.Response.GetOperation() != nil {
+			result = queryResponse.Response.GetOperation().Result
+		}
+		return PartitionOutput{
+			Type:    response.Response.Type,
+			Status:  response.Response.Status,
+			Context: queryResponse.Context,
+			Result: streams.Result{
+				Value: result,
+			},
+		}, nil
+	}))
+}
+
+// doMetadata submits a metadata query to the service
+func (s *Session) doMetadata(ctx context.Context, serviceType string, namespace string, context rsm.SessionQueryContext) ([]*rsm.ServiceId, rsm.SessionResponseStatus, rsm.SessionResponseContext, error) {
+	request := &rsm.StorageRequest{
+		PartitionID: uint32(s.partition.ID()),
+		Request: &rsm.SessionRequest{
+			Request: &rsm.SessionRequest_Query{
+				Query: &rsm.SessionQueryRequest{
+					Context: context,
+					Query: rsm.ServiceQueryRequest{
+						Request: &rsm.ServiceQueryRequest_Metadata{
+							Metadata: &rsm.ServiceMetadataRequest{
+								Type: serviceType,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	response, err := s.doRequest(ctx, request)
+	if err != nil {
+		return nil, rsm.SessionResponseStatus{}, rsm.SessionResponseContext{}, err
+	}
+	return response.Response.GetQuery().Response.GetMetadata().Services, response.Response.Status, response.Response.GetQuery().Context, nil
 }
 
 // DoCreateService creates the service
 func (s *Session) DoCreateService(ctx context.Context, service rsm.ServiceId) error {
 	requestContext := s.nextCommandContext()
-	responseStatus, responseContext, err := s.Partition.doCreateService(ctx, service, requestContext)
+	responseStatus, responseContext, err := s.doCreateService(ctx, service, requestContext)
 	if err != nil {
 		return err
 	}
@@ -186,12 +365,37 @@ func (s *Session) DoCreateService(ctx context.Context, service rsm.ServiceId) er
 	}
 	s.recordCommandResponse(requestContext, responseContext)
 	return nil
+}
+
+// doCreateService creates the service
+func (s *Session) doCreateService(ctx context.Context, service rsm.ServiceId, context rsm.SessionCommandContext) (rsm.SessionResponseStatus, rsm.SessionResponseContext, error) {
+	request := &rsm.StorageRequest{
+		PartitionID: uint32(s.partition.ID()),
+		Request: &rsm.SessionRequest{
+			Request: &rsm.SessionRequest_Command{
+				Command: &rsm.SessionCommandRequest{
+					Context: context,
+					Command: rsm.ServiceCommandRequest{
+						Service: service,
+						Request: &rsm.ServiceCommandRequest_Create{
+							Create: &rsm.ServiceCreateRequest{},
+						},
+					},
+				},
+			},
+		},
+	}
+	response, err := s.doRequest(ctx, request)
+	if err != nil {
+		return rsm.SessionResponseStatus{}, rsm.SessionResponseContext{}, err
+	}
+	return response.Response.Status, response.Response.GetCommand().Context, nil
 }
 
 // DoCloseService closes the service
 func (s *Session) DoCloseService(ctx context.Context, service rsm.ServiceId) error {
 	requestContext := s.nextCommandContext()
-	responseStatus, responseContext, err := s.Partition.doCloseService(ctx, service, requestContext)
+	responseStatus, responseContext, err := s.doCloseService(ctx, service, requestContext)
 	if err != nil {
 		return err
 	}
@@ -200,12 +404,37 @@ func (s *Session) DoCloseService(ctx context.Context, service rsm.ServiceId) err
 	}
 	s.recordCommandResponse(requestContext, responseContext)
 	return nil
+}
+
+// doCloseService closes the service
+func (s *Session) doCloseService(ctx context.Context, service rsm.ServiceId, context rsm.SessionCommandContext) (rsm.SessionResponseStatus, rsm.SessionResponseContext, error) {
+	request := &rsm.StorageRequest{
+		PartitionID: uint32(s.partition.ID()),
+		Request: &rsm.SessionRequest{
+			Request: &rsm.SessionRequest_Command{
+				Command: &rsm.SessionCommandRequest{
+					Context: context,
+					Command: rsm.ServiceCommandRequest{
+						Service: service,
+						Request: &rsm.ServiceCommandRequest_Close{
+							Close: &rsm.ServiceCloseRequest{},
+						},
+					},
+				},
+			},
+		},
+	}
+	response, err := s.doRequest(ctx, request)
+	if err != nil {
+		return rsm.SessionResponseStatus{}, rsm.SessionResponseContext{}, err
+	}
+	return response.Response.Status, response.Response.GetCommand().Context, nil
 }
 
 // DoDeleteService deletes the service
 func (s *Session) DoDeleteService(ctx context.Context, service rsm.ServiceId) error {
 	requestContext := s.nextCommandContext()
-	responseStatus, responseContext, err := s.Partition.doDeleteService(ctx, service, requestContext)
+	responseStatus, responseContext, err := s.doDeleteService(ctx, service, requestContext)
 	if err != nil {
 		return err
 	}
@@ -216,10 +445,35 @@ func (s *Session) DoDeleteService(ctx context.Context, service rsm.ServiceId) er
 	return nil
 }
 
+// doDeleteService deletes the service
+func (s *Session) doDeleteService(ctx context.Context, service rsm.ServiceId, context rsm.SessionCommandContext) (rsm.SessionResponseStatus, rsm.SessionResponseContext, error) {
+	request := &rsm.StorageRequest{
+		PartitionID: uint32(s.partition.ID()),
+		Request: &rsm.SessionRequest{
+			Request: &rsm.SessionRequest_Command{
+				Command: &rsm.SessionCommandRequest{
+					Context: context,
+					Command: rsm.ServiceCommandRequest{
+						Service: service,
+						Request: &rsm.ServiceCommandRequest_Delete{
+							Delete: &rsm.ServiceDeleteRequest{},
+						},
+					},
+				},
+			},
+		},
+	}
+	response, err := s.doRequest(ctx, request)
+	if err != nil {
+		return rsm.SessionResponseStatus{}, rsm.SessionResponseContext{}, err
+	}
+	return response.Response.Status, response.Response.GetCommand().Context, nil
+}
+
 // open creates the session and begins keep-alives
 func (s *Session) open(ctx context.Context) error {
 	requestContext, _ := s.getStateContexts()
-	responseStatus, responseContext, err := s.Partition.doOpenSession(ctx, requestContext, &s.Timeout)
+	responseStatus, responseContext, err := s.doOpenSession(ctx, requestContext, &s.Timeout)
 	if err != nil {
 		return err
 	}
@@ -241,10 +495,34 @@ func (s *Session) open(ctx context.Context) error {
 	return nil
 }
 
+// doOpenSession opens a new session
+func (s *Session) doOpenSession(ctx context.Context, context rsm.SessionCommandContext, timeout *time.Duration) (rsm.SessionResponseStatus, rsm.SessionResponseContext, error) {
+	request := &rsm.StorageRequest{
+		PartitionID: uint32(s.partition.ID()),
+		Request: &rsm.SessionRequest{
+			Request: &rsm.SessionRequest_OpenSession{
+				OpenSession: &rsm.OpenSessionRequest{
+					Timeout: timeout,
+				},
+			},
+		},
+	}
+	response, err := s.doRequest(ctx, request)
+	if err != nil {
+		return rsm.SessionResponseStatus{}, rsm.SessionResponseContext{}, err
+	}
+	sessionID := response.Response.GetOpenSession().SessionID
+	return response.Response.Status, rsm.SessionResponseContext{
+		SessionID: sessionID,
+		StreamID:  sessionID,
+		Index:     sessionID,
+	}, nil
+}
+
 // keepAlive keeps the session alive
 func (s *Session) keepAlive(ctx context.Context) error {
 	requestContext, streamContexts := s.getStateContexts()
-	responseStatus, responseContext, err := s.Partition.doKeepAliveSession(ctx, requestContext, streamContexts)
+	responseStatus, responseContext, err := s.doKeepAliveSession(ctx, requestContext, streamContexts)
 	if err != nil {
 		return err
 	}
@@ -254,6 +532,195 @@ func (s *Session) keepAlive(ctx context.Context) error {
 	}
 
 	s.recordCommandResponse(requestContext, responseContext)
+	return nil
+}
+
+// doKeepAliveSession keeps a session alive
+func (s *Session) doKeepAliveSession(ctx context.Context, context rsm.SessionCommandContext, streams []rsm.SessionStreamContext) (rsm.SessionResponseStatus, rsm.SessionResponseContext, error) {
+	request := &rsm.StorageRequest{
+		PartitionID: uint32(s.partition.ID()),
+		Request: &rsm.SessionRequest{
+			Request: &rsm.SessionRequest_KeepAlive{
+				KeepAlive: &rsm.KeepAliveRequest{
+					SessionID:       context.SessionID,
+					CommandSequence: context.SequenceNumber,
+					Streams:         streams,
+				},
+			},
+		},
+	}
+	response, err := s.doRequest(ctx, request)
+	if err != nil {
+		return rsm.SessionResponseStatus{}, rsm.SessionResponseContext{}, err
+	}
+	return response.Response.Status, rsm.SessionResponseContext{SessionID: context.SessionID}, nil
+}
+
+// doRequest submits a storage request
+func (s *Session) doRequest(ctx context.Context, request *rsm.StorageRequest) (*rsm.StorageResponse, error) {
+	i := 1
+	for {
+		s.log.Debugf("Sending StorageRequest %+v", request)
+		response, err := s.tryRequest(ctx, request)
+		if err == nil {
+			s.log.Debugf("Received StorageResponse %+v", response)
+			switch response.Response.Status.Code {
+			case rsm.SessionResponseCode_OK:
+				return response, err
+			case rsm.SessionResponseCode_NOT_LEADER:
+				s.reconnect(cluster.ReplicaID(response.Response.Status.Leader))
+			default:
+				return response, rsm.GetErrorFromStatus(response.Response.Status)
+			}
+		} else if err == context.Canceled {
+			return nil, errors.NewCanceled(err.Error())
+		} else {
+			s.log.Warnf("Sending StorageRequest %+v failed: %s", request, err)
+			select {
+			case <-time.After(10 * time.Millisecond * time.Duration(math.Min(math.Pow(2, float64(i)), 1000))):
+				i++
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+	}
+}
+
+// tryRequest submits a storage request
+func (s *Session) tryRequest(ctx context.Context, request *rsm.StorageRequest) (*rsm.StorageResponse, error) {
+	conn, err := s.connect()
+	if err != nil {
+		return nil, err
+	}
+	client := rsm.NewStorageServiceClient(conn)
+
+	stream, err := client.Request(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+
+	// Wait for the result
+	response, err := stream.Recv()
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// doStream submits a streaming request to the service
+func (s *Session) doStream(ctx context.Context, request *rsm.StorageRequest, stream streams.WriteStream) error {
+	go s.tryStream(ctx, request, stream, false)
+	return nil
+}
+
+// tryStream submits a stream request to the service recursively
+func (s *Session) tryStream(ctx context.Context, request *rsm.StorageRequest, stream streams.WriteStream, open bool) error {
+	conn, err := s.connect()
+	if err != nil {
+		return err
+	}
+	client := rsm.NewStorageServiceClient(conn)
+
+	s.log.Debugf("Sending StorageRequest %+v", request)
+	responseStream, err := client.Request(ctx, request)
+	if err != nil {
+		s.log.Warnf("Sending StorageRequest %+v failed: %s", request, err)
+		stream.Error(err)
+		stream.Close()
+		return err
+	}
+
+	for {
+		response, err := responseStream.Recv()
+		if err == io.EOF {
+			stream.Close()
+			return nil
+		} else if err != nil {
+			go s.tryStream(ctx, request, stream, open)
+		} else {
+			s.log.Debugf("Received StorageResponse %+v", response)
+			if response.Response.Status.Code == rsm.SessionResponseCode_OK {
+				stream.Value(response)
+			} else {
+				switch response.Response.Type {
+				case rsm.SessionResponseType_OPEN_STREAM:
+					if !open {
+						stream.Value(response)
+						open = true
+					}
+				case rsm.SessionResponseType_CLOSE_STREAM:
+					stream.Close()
+					return nil
+				case rsm.SessionResponseType_RESPONSE:
+					stream.Value(response)
+				}
+			}
+		}
+	}
+}
+
+// connect gets the connection to the service
+func (s *Session) connect() (*grpc.ClientConn, error) {
+	s.mu.RLock()
+	conn := s.conn
+	s.mu.RUnlock()
+	if conn != nil {
+		return conn, nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	conn = s.conn
+	if conn != nil {
+		return conn, nil
+	}
+
+	if s.leader == nil {
+		replicas := make([]*cluster.Replica, 0)
+		for _, replica := range s.partition.Replicas() {
+			replicas = append(replicas, replica)
+		}
+		s.leader = replicas[rand.Intn(len(replicas))]
+		s.conn = nil
+	}
+
+	s.log.Infof("Connecting to partition %d replica %s", s.partition.ID(), s.leader.ID)
+	conn, err := s.leader.Connect(context.Background(), cluster.WithDialOption(grpc.WithInsecure()))
+	if err != nil {
+		s.log.Warnf("Connecting to partition %d replica %s failed", s.partition.ID(), s.leader.ID, err)
+		return nil, err
+	}
+	s.conn = conn
+	return conn, nil
+}
+
+// reconnect the connection to the given leader
+func (s *Session) reconnect(replica cluster.ReplicaID) {
+	if replica == "" {
+		return
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.leader.ID == replica {
+		return
+	}
+
+	leader, ok := s.partition.Replica(replica)
+	if !ok {
+		return
+	}
+
+	s.leader = leader
+	s.conn = nil
+}
+
+// disconnect closes the connections
+func (s *Session) disconnect() error {
+	s.mu.Lock()
+	s.conn = nil
+	s.mu.Unlock()
 	return nil
 }
 
@@ -267,7 +734,7 @@ func (s *Session) Close() error {
 // close closes the session
 func (s *Session) close(ctx context.Context) error {
 	requestContext, _ := s.getStateContexts()
-	responseStatus, responseContext, err := s.Partition.doCloseSession(ctx, requestContext)
+	responseStatus, responseContext, err := s.doCloseSession(ctx, requestContext)
 	if err != nil {
 		return err
 	}
@@ -278,6 +745,25 @@ func (s *Session) close(ctx context.Context) error {
 
 	s.recordCommandResponse(requestContext, responseContext)
 	return nil
+}
+
+// doCloseSession closes a session
+func (s *Session) doCloseSession(ctx context.Context, context rsm.SessionCommandContext) (rsm.SessionResponseStatus, rsm.SessionResponseContext, error) {
+	request := &rsm.StorageRequest{
+		PartitionID: uint32(s.partition.ID()),
+		Request: &rsm.SessionRequest{
+			Request: &rsm.SessionRequest_CloseSession{
+				CloseSession: &rsm.CloseSessionRequest{
+					SessionID: context.SessionID,
+				},
+			},
+		},
+	}
+	response, err := s.doRequest(ctx, request)
+	if err != nil {
+		return rsm.SessionResponseStatus{}, rsm.SessionResponseContext{}, err
+	}
+	return response.Response.Status, rsm.SessionResponseContext{SessionID: context.SessionID}, nil
 }
 
 // getStateContexts gets the header for the current state of the session

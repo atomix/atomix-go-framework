@@ -18,16 +18,20 @@ import (
 	protocolapi "github.com/atomix/api/go/atomix/protocol"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/driver/primitive"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/server"
 	"google.golang.org/grpc"
 )
 
 // NewProtocol creates a new state machine protocol
 func NewProtocol(cluster cluster.Cluster) *Protocol {
+	member, _ := cluster.Member()
+	log := logging.GetLogger("atomix", "proxy", string(member.ID))
 	return &Protocol{
 		Server:     server.NewServer(cluster),
-		Client:     NewClient(cluster),
+		Client:     NewClient(cluster, log),
 		primitives: primitive.NewPrimitiveTypeRegistry(),
+		log:        log,
 	}
 }
 
@@ -36,6 +40,7 @@ type Protocol struct {
 	*server.Server
 	Client     *Client
 	primitives *primitive.PrimitiveTypeRegistry
+	log        logging.Logger
 }
 
 // Name returns the protocol name
@@ -51,6 +56,7 @@ func (n *Protocol) Primitives() *primitive.PrimitiveTypeRegistry {
 
 // Start starts the node
 func (n *Protocol) Start() error {
+	n.log.Info("Starting protocol")
 	n.Services().RegisterService(func(s *grpc.Server) {
 		for _, primitiveType := range n.Primitives().ListPrimitiveTypes() {
 			primitiveType.RegisterServer(s)
@@ -60,9 +66,11 @@ func (n *Protocol) Start() error {
 		RegisterPrimitiveServer(s, n.Client)
 	})
 	if err := n.Server.Start(); err != nil {
+		n.log.Error(err, "Starting protocol")
 		return err
 	}
 	if err := n.Client.Connect(); err != nil {
+		n.log.Error(err, "Starting protocol")
 		return err
 	}
 	return nil

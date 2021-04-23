@@ -82,7 +82,7 @@ func (d *Driver) startAgent(id driverapi.AgentId, address driverapi.AgentAddress
 	m, _ := d.Cluster.Member()
 	c := cluster.NewCluster(
 		config.Protocol,
-		cluster.WithMemberID(id.String()),
+		cluster.WithMemberID(id.Name),
 		cluster.WithNodeID(string(m.NodeID)),
 		cluster.WithHost(address.Host),
 		cluster.WithPort(int(address.Port)))

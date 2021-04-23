@@ -25,22 +25,28 @@ type Server struct {
 }
 
 func (s *Server) Request(request *StorageRequest, stream StorageService_RequestServer) error {
+	log.Debugf("Received StorageRequest %+v", request)
+
 	// If the client requires a leader and is not the leader, return an error
 	partition := s.Protocol.Partition(PartitionID(request.PartitionID))
 	if partition.MustLeader() && !partition.IsLeader() {
-		return stream.Send(&StorageResponse{
+		response := &StorageResponse{
 			PartitionID: request.PartitionID,
 			Response: &SessionResponse{
 				Type: SessionResponseType_RESPONSE,
 				Status: SessionResponseStatus{
-					Code: SessionResponseCode_NOT_LEADER,
+					Code:   SessionResponseCode_NOT_LEADER,
+					Leader: partition.Leader(),
 				},
 			},
-		})
+		}
+		log.Debugf("Sending StorageResponse %+v", response)
+		return stream.Send(response)
 	}
 
 	bytes, err := proto.Marshal(request.Request)
 	if err != nil {
+		log.Debugf("StorageRequest %+v failed: %s", request, err)
 		return err
 	}
 
@@ -49,15 +55,15 @@ func (s *Server) Request(request *StorageRequest, stream StorageService_RequestS
 
 	switch request.Request.Request.(type) {
 	case *SessionRequest_Command:
-		err = partition.ExecuteCommand(stream.Context(), bytes, inStream)
+		go partition.ExecuteCommand(stream.Context(), bytes, inStream)
 	case *SessionRequest_Query:
-		err = partition.ExecuteQuery(stream.Context(), bytes, inStream)
+		go partition.ExecuteQuery(stream.Context(), bytes, inStream)
 	case *SessionRequest_OpenSession:
-		err = partition.ExecuteCommand(stream.Context(), bytes, inStream)
+		go partition.ExecuteCommand(stream.Context(), bytes, inStream)
 	case *SessionRequest_KeepAlive:
-		err = partition.ExecuteCommand(stream.Context(), bytes, inStream)
+		go partition.ExecuteCommand(stream.Context(), bytes, inStream)
 	case *SessionRequest_CloseSession:
-		err = partition.ExecuteCommand(stream.Context(), bytes, inStream)
+		go partition.ExecuteCommand(stream.Context(), bytes, inStream)
 	}
 
 	for result := range ch {
@@ -74,6 +80,7 @@ func (s *Server) Request(request *StorageRequest, stream StorageService_RequestS
 			PartitionID: request.PartitionID,
 			Response:    sessionResponse,
 		}
+		log.Debugf("Sending StorageResponse %+v", response)
 		if err := stream.Send(response); err != nil {
 			return err
 		}

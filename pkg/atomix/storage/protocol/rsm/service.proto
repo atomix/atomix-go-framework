@@ -230,6 +230,7 @@ message SessionStreamContext {
 message SessionResponseStatus {
     SessionResponseCode code = 1;
     string message = 2;
+    string leader = 3;
 }
 
 enum SessionResponseType {

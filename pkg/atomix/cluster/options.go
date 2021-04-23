@@ -210,9 +210,6 @@ type dialOptionOption struct {
 }
 
 func (o *dialOptionOption) apply(options *connectOptions) {
-	if options.dialOptions == nil {
-		options.dialOptions = make([]grpc.DialOption, 0)
-	}
 	options.dialOptions = append(options.dialOptions, o.option)
 }
 
@@ -228,8 +225,5 @@ type dialOptionsOption struct {
 }
 
 func (o *dialOptionsOption) apply(options *connectOptions) {
-	if options.dialOptions == nil {
-		options.dialOptions = make([]grpc.DialOption, 0)
-	}
 	options.dialOptions = append(options.dialOptions, o.options...)
 }

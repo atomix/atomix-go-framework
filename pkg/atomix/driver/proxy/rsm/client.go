@@ -16,31 +16,33 @@ package rsm
 
 import (
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/util"
 	"github.com/atomix/go-framework/pkg/atomix/util/async"
 )
 
 // NewClient creates a new proxy client
-func NewClient(cluster cluster.Cluster) *Client {
+func NewClient(cluster cluster.Cluster, log logging.Logger) *Client {
 	partitions := cluster.Partitions()
 	proxyPartitions := make([]*Partition, 0, len(partitions))
 	proxyPartitionsByID := make(map[PartitionID]*Partition)
 	for _, partition := range partitions {
-		proxyPartition := NewPartition(partition)
+		proxyPartition := NewPartition(partition, log)
 		proxyPartitions = append(proxyPartitions, proxyPartition)
 		proxyPartitionsByID[proxyPartition.ID] = proxyPartition
 	}
 	return &Client{
 		partitions:     proxyPartitions,
 		partitionsByID: proxyPartitionsByID,
+		log:            log,
 	}
 }
 
 // Client is a client for communicating with the storage layer
 type Client struct {
-	cluster        cluster.Cluster
 	partitions     []*Partition
 	partitionsByID map[PartitionID]*Partition
+	log            logging.Logger
 }
 
 func (p *Client) Partition(partitionID PartitionID) *Partition {
