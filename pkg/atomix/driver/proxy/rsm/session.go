@@ -568,7 +568,16 @@ func (s *Session) doRequest(ctx context.Context, request *rsm.StorageRequest) (*
 			case rsm.SessionResponseCode_OK:
 				return response, err
 			case rsm.SessionResponseCode_NOT_LEADER:
-				s.reconnect(cluster.ReplicaID(response.Response.Status.Leader))
+				if response.Response.Status.Leader != "" {
+					s.reconnect(cluster.ReplicaID(response.Response.Status.Leader))
+				} else {
+					select {
+					case <-time.After(10 * time.Millisecond * time.Duration(math.Min(math.Pow(2, float64(i)), 1000))):
+						i++
+					case <-ctx.Done():
+						return nil, ctx.Err()
+					}
+				}
 			default:
 				return response, rsm.GetErrorFromStatus(response.Response.Status)
 			}
