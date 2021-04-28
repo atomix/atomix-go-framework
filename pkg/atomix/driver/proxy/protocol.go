@@ -17,12 +17,13 @@ package proxy
 import (
 	protocolapi "github.com/atomix/api/go/atomix/protocol"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
+	"github.com/atomix/go-framework/pkg/atomix/driver/env"
 	"github.com/atomix/go-framework/pkg/atomix/driver/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/server"
 )
 
 // ProtocolFunc is a protocol factory function
-type ProtocolFunc func(cluster cluster.Cluster) Protocol
+type ProtocolFunc func(cluster cluster.Cluster, env env.DriverEnv) Protocol
 
 // Protocol is a proxy protocol
 type Protocol interface {

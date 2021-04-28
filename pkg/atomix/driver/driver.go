@@ -19,6 +19,7 @@ import (
 	protocolapi "github.com/atomix/api/go/atomix/protocol"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/driver/agent"
+	"github.com/atomix/go-framework/pkg/atomix/driver/env"
 	"github.com/atomix/go-framework/pkg/atomix/driver/proxy"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
@@ -37,6 +38,7 @@ func NewDriver(protocol proxy.ProtocolFunc, opts ...Option) *Driver {
 			cluster.WithMemberID(options.driverID),
 			cluster.WithHost(options.host),
 			cluster.WithPort(options.port))),
+		Env:      env.GetDriverEnv(),
 		protocol: protocol,
 		agents:   make(map[driverapi.AgentId]*agent.Agent),
 		log:      logging.GetLogger("atomix", "driver", strings.ToLower(options.driverID)),
@@ -46,6 +48,7 @@ func NewDriver(protocol proxy.ProtocolFunc, opts ...Option) *Driver {
 // Driver is a driver node
 type Driver struct {
 	*server.Server
+	Env      env.DriverEnv
 	protocol proxy.ProtocolFunc
 	agents   map[driverapi.AgentId]*agent.Agent
 	mu       sync.RWMutex
@@ -87,7 +90,7 @@ func (d *Driver) startAgent(id driverapi.AgentId, address driverapi.AgentAddress
 		cluster.WithHost(address.Host),
 		cluster.WithPort(int(address.Port)))
 
-	a = agent.NewAgent(d.protocol(c))
+	a = agent.NewAgent(d.protocol(c, d.Env))
 
 	// Start the agent before adding it to the cache
 	if err := a.Start(); err != nil {

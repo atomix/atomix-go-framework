@@ -47,7 +47,7 @@ func (p *mapType) Name() string {
 }
 
 func (p *mapType) RegisterServer(s *grpc.Server) {
-	mapapi.RegisterMapServiceServer(s, mapproxy.NewProxyServer(p.registry))
+	mapapi.RegisterMapServiceServer(s, mapproxy.NewProxyServer(p.registry, p.protocol.Env))
 }
 
 func (p *mapType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {

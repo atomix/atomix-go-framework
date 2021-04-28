@@ -45,7 +45,7 @@ func (p *leaderLatchType) Name() string {
 }
 
 func (p *leaderLatchType) RegisterServer(s *grpc.Server) {
-	leaderapi.RegisterLeaderLatchServiceServer(s, leaderdriver.NewProxyServer(p.registry))
+	leaderapi.RegisterLeaderLatchServiceServer(s, leaderdriver.NewProxyServer(p.registry, p.protocol.Env))
 }
 
 func (p *leaderLatchType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {

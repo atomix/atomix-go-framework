@@ -45,7 +45,7 @@ func (p *indexedmapType) Name() string {
 }
 
 func (p *indexedmapType) RegisterServer(s *grpc.Server) {
-	indexedmapapi.RegisterIndexedMapServiceServer(s, indexedmapdriver.NewProxyServer(p.registry))
+	indexedmapapi.RegisterIndexedMapServiceServer(s, indexedmapdriver.NewProxyServer(p.registry, p.protocol.Env))
 }
 
 func (p *indexedmapType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {

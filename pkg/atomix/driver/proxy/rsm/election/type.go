@@ -45,7 +45,7 @@ func (p *electionType) Name() string {
 }
 
 func (p *electionType) RegisterServer(s *grpc.Server) {
-	electionapi.RegisterLeaderElectionServiceServer(s, electiondriver.NewProxyServer(p.registry))
+	electionapi.RegisterLeaderElectionServiceServer(s, electiondriver.NewProxyServer(p.registry, p.protocol.Env))
 }
 
 func (p *electionType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {

@@ -45,7 +45,7 @@ func (p *logType) Name() string {
 }
 
 func (p *logType) RegisterServer(s *grpc.Server) {
-	logapi.RegisterLogServiceServer(s, logdriver.NewProxyServer(p.registry))
+	logapi.RegisterLogServiceServer(s, logdriver.NewProxyServer(p.registry, p.protocol.Env))
 }
 
 func (p *logType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {

@@ -45,7 +45,7 @@ func (p *listType) Name() string {
 }
 
 func (p *listType) RegisterServer(s *grpc.Server) {
-	listapi.RegisterListServiceServer(s, listdriver.NewProxyServer(p.registry))
+	listapi.RegisterListServiceServer(s, listdriver.NewProxyServer(p.registry, p.protocol.Env))
 }
 
 func (p *listType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {

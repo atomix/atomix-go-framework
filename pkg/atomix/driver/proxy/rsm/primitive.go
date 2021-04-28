@@ -17,35 +17,41 @@ package rsm
 import (
 	"context"
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
+	"github.com/atomix/go-framework/pkg/atomix/driver/env"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	storage "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/util/async"
 	"google.golang.org/grpc"
 )
 
-func RegisterPrimitiveServer(server *grpc.Server, client *Client) {
-	primitiveapi.RegisterPrimitiveServer(server, newPrimitiveServer(client))
+func RegisterPrimitiveServer(server *grpc.Server, client *Client, env env.DriverEnv) {
+	primitiveapi.RegisterPrimitiveServer(server, newPrimitiveServer(client, env))
 }
 
-func newPrimitiveServer(client *Client) primitiveapi.PrimitiveServer {
+func newPrimitiveServer(client *Client, env env.DriverEnv) primitiveapi.PrimitiveServer {
 	return &PrimitiveServer{
 		Client: client,
+		env:    env,
 		log:    logging.GetLogger("atomix", "primitive"),
 	}
 }
 
 type PrimitiveServer struct {
 	*Client
+	env env.DriverEnv
 	log logging.Logger
 }
 
 func (s *PrimitiveServer) Create(ctx context.Context, request *primitiveapi.CreateRequest) (*primitiveapi.CreateResponse, error) {
 	s.log.Debugf("Received CreateRequest %+v", request)
+	if request.Headers.PrimitiveID.Namespace == "" {
+		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	}
 	partitions := s.Partitions()
 	service := storage.ServiceId{
-		Type:      request.PrimitiveID.Type,
-		Namespace: request.PrimitiveID.Namespace,
-		Name:      request.PrimitiveID.Name,
+		Type:      request.Headers.PrimitiveID.Type,
+		Namespace: request.Headers.PrimitiveID.Namespace,
+		Name:      request.Headers.PrimitiveID.Name,
 	}
 	err := async.IterAsync(len(partitions), func(i int) error {
 		return partitions[i].DoCreateService(ctx, service)
@@ -61,11 +67,14 @@ func (s *PrimitiveServer) Create(ctx context.Context, request *primitiveapi.Crea
 
 func (s *PrimitiveServer) Close(ctx context.Context, request *primitiveapi.CloseRequest) (*primitiveapi.CloseResponse, error) {
 	s.log.Debugf("Received CloseRequest %+v", request)
+	if request.Headers.PrimitiveID.Namespace == "" {
+		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	}
 	partitions := s.Partitions()
 	service := storage.ServiceId{
-		Type:      request.PrimitiveID.Type,
-		Namespace: request.PrimitiveID.Namespace,
-		Name:      request.PrimitiveID.Name,
+		Type:      request.Headers.PrimitiveID.Type,
+		Namespace: request.Headers.PrimitiveID.Namespace,
+		Name:      request.Headers.PrimitiveID.Name,
 	}
 	err := async.IterAsync(len(partitions), func(i int) error {
 		return partitions[i].DoCloseService(ctx, service)
@@ -81,11 +90,14 @@ func (s *PrimitiveServer) Close(ctx context.Context, request *primitiveapi.Close
 
 func (s *PrimitiveServer) Delete(ctx context.Context, request *primitiveapi.DeleteRequest) (*primitiveapi.DeleteResponse, error) {
 	s.log.Debugf("Received DeleteRequest %+v", request)
+	if request.Headers.PrimitiveID.Namespace == "" {
+		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	}
 	partitions := s.Partitions()
 	service := storage.ServiceId{
-		Type:      request.PrimitiveID.Type,
-		Namespace: request.PrimitiveID.Namespace,
-		Name:      request.PrimitiveID.Name,
+		Type:      request.Headers.PrimitiveID.Type,
+		Namespace: request.Headers.PrimitiveID.Namespace,
+		Name:      request.Headers.PrimitiveID.Name,
 	}
 	err := async.IterAsync(len(partitions), func(i int) error {
 		return partitions[i].DoDeleteService(ctx, service)

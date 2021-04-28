@@ -22,7 +22,6 @@ const (
 
 type driverOptions struct {
 	driverID string
-	nodeID   string
 	host     string
 	port     int
 }
@@ -45,12 +44,6 @@ type Option func(opts *driverOptions)
 func WithDriverID(id string) Option {
 	return func(opts *driverOptions) {
 		opts.driverID = id
-	}
-}
-
-func WithNodeID(id string) Option {
-	return func(opts *driverOptions) {
-		opts.nodeID = id
 	}
 }
 

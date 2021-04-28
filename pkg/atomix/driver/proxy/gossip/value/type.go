@@ -47,7 +47,7 @@ func (p *valueType) Name() string {
 }
 
 func (p *valueType) RegisterServer(s *grpc.Server) {
-	valueapi.RegisterValueServiceServer(s, valueproxy.NewProxyServer(p.registry))
+	valueapi.RegisterValueServiceServer(s, valueproxy.NewProxyServer(p.registry, p.protocol.Env))
 }
 
 func (p *valueType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {

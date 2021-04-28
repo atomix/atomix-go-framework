@@ -45,7 +45,7 @@ func (p *setType) Name() string {
 }
 
 func (p *setType) RegisterServer(s *grpc.Server) {
-	setapi.RegisterSetServiceServer(s, setdriver.NewProxyServer(p.registry))
+	setapi.RegisterSetServiceServer(s, setdriver.NewProxyServer(p.registry, p.protocol.Env))
 }
 
 func (p *setType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {

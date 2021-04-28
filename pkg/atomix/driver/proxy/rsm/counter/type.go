@@ -45,7 +45,7 @@ func (p *counterType) Name() string {
 }
 
 func (p *counterType) RegisterServer(s *grpc.Server) {
-	counterapi.RegisterCounterServiceServer(s, counterdriver.NewProxyServer(p.registry))
+	counterapi.RegisterCounterServiceServer(s, counterdriver.NewProxyServer(p.registry, p.protocol.Env))
 }
 
 func (p *counterType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {

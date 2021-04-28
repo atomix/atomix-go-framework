@@ -17,6 +17,7 @@ package rsm
 import (
 	protocolapi "github.com/atomix/api/go/atomix/protocol"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
+	"github.com/atomix/go-framework/pkg/atomix/driver/env"
 	"github.com/atomix/go-framework/pkg/atomix/driver/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-framework/pkg/atomix/server"
@@ -24,12 +25,13 @@ import (
 )
 
 // NewProtocol creates a new state machine protocol
-func NewProtocol(cluster cluster.Cluster) *Protocol {
+func NewProtocol(cluster cluster.Cluster, env env.DriverEnv) *Protocol {
 	member, _ := cluster.Member()
 	log := logging.GetLogger("atomix", "proxy", string(member.ID))
 	return &Protocol{
 		Server:     server.NewServer(cluster),
 		Client:     NewClient(cluster, log),
+		Env:        env,
 		primitives: primitive.NewPrimitiveTypeRegistry(),
 		log:        log,
 	}
@@ -39,6 +41,7 @@ func NewProtocol(cluster cluster.Cluster) *Protocol {
 type Protocol struct {
 	*server.Server
 	Client     *Client
+	Env        env.DriverEnv
 	primitives *primitive.PrimitiveTypeRegistry
 	log        logging.Logger
 }
@@ -63,7 +66,7 @@ func (n *Protocol) Start() error {
 		}
 	})
 	n.Services().RegisterService(func(s *grpc.Server) {
-		RegisterPrimitiveServer(s, n.Client)
+		RegisterPrimitiveServer(s, n.Client, n.Env)
 	})
 	if err := n.Server.Start(); err != nil {
 		n.log.Error(err, "Starting protocol")

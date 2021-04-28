@@ -17,6 +17,7 @@ package gossip
 import (
 	protocolapi "github.com/atomix/api/go/atomix/protocol"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
+	"github.com/atomix/go-framework/pkg/atomix/driver/env"
 	"github.com/atomix/go-framework/pkg/atomix/driver/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/server"
 	"github.com/atomix/go-framework/pkg/atomix/time"
@@ -24,10 +25,11 @@ import (
 )
 
 // NewProtocol creates a new state machine protocol
-func NewProtocol(cluster cluster.Cluster, scheme time.Scheme) *Protocol {
+func NewProtocol(cluster cluster.Cluster, env env.DriverEnv, scheme time.Scheme) *Protocol {
 	return &Protocol{
 		Server:     server.NewServer(cluster),
 		Client:     NewClient(cluster, scheme),
+		Env:        env,
 		primitives: primitive.NewPrimitiveTypeRegistry(),
 	}
 }
@@ -36,6 +38,7 @@ func NewProtocol(cluster cluster.Cluster, scheme time.Scheme) *Protocol {
 type Protocol struct {
 	*server.Server
 	Client     *Client
+	Env        env.DriverEnv
 	primitives *primitive.PrimitiveTypeRegistry
 }
 
@@ -58,7 +61,7 @@ func (n *Protocol) Start() error {
 		}
 	})
 	n.Services().RegisterService(func(s *grpc.Server) {
-		RegisterPrimitiveServer(s, n.Client)
+		RegisterPrimitiveServer(s, n.Client, n.Env)
 	})
 	if err := n.Server.Start(); err != nil {
 		return err

@@ -45,7 +45,7 @@ func (p *lockType) Name() string {
 }
 
 func (p *lockType) RegisterServer(s *grpc.Server) {
-	lockapi.RegisterLockServiceServer(s, lockdriver.NewProxyServer(p.registry))
+	lockapi.RegisterLockServiceServer(s, lockdriver.NewProxyServer(p.registry, p.protocol.Env))
 }
 
 func (p *lockType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {

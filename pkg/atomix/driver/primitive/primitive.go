@@ -30,7 +30,7 @@ type PrimitiveID interface {
 type PrimitiveType interface {
 	// Name returns the primitive type name
 	Name() string
-	// Register registers the primitive server
+	// RegisterServer registers the primitive server
 	RegisterServer(server *grpc.Server)
 	// AddProxy adds a proxy to the primitive server
 	AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error

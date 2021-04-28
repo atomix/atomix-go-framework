@@ -37,7 +37,7 @@ type Member struct {
 	server *grpc.Server
 }
 
-// serve begins serving the local member
+// Serve begins serving the local member
 func (m *Member) Serve(opts ...ServeOption) error {
 	options := applyServeOptions(opts...)
 
