@@ -32,14 +32,13 @@ func (s *ProxyServer) Set(ctx context.Context, request *value.SetRequest) (*valu
 	}
 
 	client := value.NewValueServiceClient(conn)
-	s.PrepareRequest(&request.Headers)
-	ctx = partition.AddHeaders(ctx)
+	partition.AddRequestHeaders(&request.Headers)
 	response, err := client.Set(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	s.PrepareResponse(&response.Headers)
+	partition.AddResponseHeaders(&response.Headers)
 	s.log.Debugf("Sending SetResponse %+v", response)
 	return response, nil
 }
@@ -54,14 +53,13 @@ func (s *ProxyServer) Get(ctx context.Context, request *value.GetRequest) (*valu
 	}
 
 	client := value.NewValueServiceClient(conn)
-	s.PrepareRequest(&request.Headers)
-	ctx = partition.AddHeaders(ctx)
+	partition.AddRequestHeaders(&request.Headers)
 	response, err := client.Get(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	s.PrepareResponse(&response.Headers)
+	partition.AddResponseHeaders(&response.Headers)
 	s.log.Debugf("Sending GetResponse %+v", response)
 	return response, nil
 }
@@ -77,9 +75,8 @@ func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueServic
 	}
 
 	client := value.NewValueServiceClient(conn)
-	s.PrepareRequest(&request.Headers)
-	ctx := partition.AddHeaders(srv.Context())
-	stream, err := client.Events(ctx, request)
+	partition.AddRequestHeaders(&request.Headers)
+	stream, err := client.Events(srv.Context(), request)
 	if err != nil {
 		s.log.Errorf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
@@ -94,7 +91,7 @@ func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueServic
 			s.log.Errorf("Request EventsRequest failed: %v", err)
 			return errors.Proto(err)
 		}
-		s.PrepareResponse(&response.Headers)
+		partition.AddResponseHeaders(&response.Headers)
 		s.log.Debugf("Sending EventsResponse %+v", response)
 		if err := srv.Send(response); err != nil {
 			s.log.Errorf("Response EventsResponse failed: %v", err)

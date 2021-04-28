@@ -17,10 +17,6 @@ import (
 	{{- if .Request.IsStream }}
 	{{ import "io" }}
 	{{- end }}
-	{{- if .Response.IsStream }}
-	{{ import "sync" }}
-	{{ import "github.com/atomix/go-framework/pkg/atomix/util/async" }}
-	{{- end }}
 	{{- end }}
 )
 
@@ -111,9 +107,8 @@ Query
 {{ if and .Request.IsDiscrete .Response.IsDiscrete }}
 func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "type" .Request.Type }}) (*{{ template "type" .Response.Type }}, error) {
 	s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
-	s.manager.PrepareRequest({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
-	{{- if .Scope.IsPartition }}
-    partition, err := s.manager.PartitionFrom(ctx)
+	s.manager.AddRequestHeaders({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
+	partition, err := s.manager.Partition(gossip.PartitionID(request{{ template "field" .Request.Headers }}.PartitionID))
     if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
         return nil, err
@@ -136,62 +131,16 @@ func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "t
         s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
         return nil, errors.Proto(err)
     }
-    s.manager.PrepareResponse({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
-	{{- else if .Scope.IsGlobal }}
-	partitions, err := s.manager.PartitionsFrom(ctx)
-	if err != nil {
-        s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
-	    return nil, errors.Proto(err)
-	}
-
-    serviceID := gossip.ServiceId{
-        Type:      gossip.ServiceType(request{{ template "field" .Request.Headers }}.PrimitiveID.Type),
-        Namespace: request{{ template "field" .Request.Headers }}.PrimitiveID.Namespace,
-        Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
-    }
-
-	responses, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
-	    partition := partitions[i]
-	    service, err := partition.GetService(ctx, serviceID)
-	    if err != nil {
-	        return nil, err
-	    }
-	    response, err := service.({{ $service }}).{{ .Name }}(ctx, request)
-	    if err != nil {
-	        return nil, err
-	    }
-    	s.manager.PrepareResponse({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
-    	return response, nil
-    })
-	if err != nil {
-        s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
-	    return nil, errors.Proto(err)
-	}
-
-    response := responses[0].(*{{ template "type" .Response.Type }})
-    {{- range .Response.Aggregates }}
-    {{- if .IsChooseFirst }}
-    response{{ template "field" . }} = responses[0].(*{{ template "type" $method.Response.Type }}){{ template "field" . }}
-    {{- else if .IsAppend }}
-    for _, r := range responses {
-        response{{ template "field" . }} = append(response{{ template "field" . }}, r.(*{{ template "type" $method.Response.Type }}){{ template "field" . }}...)
-    }
-    {{- else if .IsSum }}
-    for _, r := range responses {
-        response{{ template "field" . }} += r.(*{{ template "type" $method.Response.Type }}){{ template "field" . }}
-    }
-    {{- end }}
-    {{- end }}
-	{{- end }}
+    s.manager.AddResponseHeaders({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
 	s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
 	return response, nil
 }
 {{ else if .Response.IsStream }}
 func (s *{{ $server }}) {{ .Name }}(request *{{ template "type" .Request.Type }}, srv {{ template "type" $primitive.Type }}_{{ .Name }}Server) error {
     s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
-	s.manager.PrepareRequest({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
+	s.manager.AddRequestHeaders({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
 
-    partitions, err := s.manager.PartitionsFrom(srv.Context())
+	partition, err := s.manager.Partition(gossip.PartitionID(request{{ template "field" .Request.Headers }}.PartitionID))
     if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
         return errors.Proto(err)
@@ -203,49 +152,27 @@ func (s *{{ $server }}) {{ .Name }}(request *{{ template "type" .Request.Type }}
         Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
     }
 
-    responseCh := make(chan {{ template "type" .Response.Type }})
-    wg := &sync.WaitGroup{}
-    wg.Add(len(partitions))
-    err = async.IterAsync(len(partitions), func(i int) error {
-        partition := partitions[i]
-        service, err := partition.GetService(srv.Context(), serviceID)
-        if err != nil {
-            return err
-        }
-
-        partitionCh := make(chan {{ template "type" .Response.Type }})
-		errCh := make(chan error)
-		go func() {
-            err := service.({{ $service }}).{{ .Name }}(srv.Context(), request, partitionCh)
-			if err != nil {
-				errCh <- err
-			}
-			close(errCh)
-		}()
-
-		go func() {
-			defer wg.Done()
-			for response := range partitionCh {
-				responseCh <- response
-			}
-		}()
-		return <-errCh
-    })
+    service, err := partition.GetService(srv.Context(), serviceID)
     if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
-        return errors.Proto(err)
+        return err
     }
 
+    responseCh := make(chan {{ template "type" .Response.Type }})
+    errCh := make(chan error)
     go func() {
-        wg.Wait()
-        close(responseCh)
+        err := service.({{ $service }}).{{ .Name }}(srv.Context(), request, responseCh)
+        if err != nil {
+            errCh <- err
+        }
+        close(errCh)
     }()
 
     for {
         select {
         case response, ok := <-responseCh:
             if ok {
-                s.manager.PrepareResponse({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
+                s.manager.AddResponseHeaders({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
                 s.log.Debugf("Sending {{ .Response.Type.Name }} %v", response)
                 err = srv.Send(&response)
                 if err != nil {

@@ -122,44 +122,45 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	}
 
 	client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-	s.PrepareRequest({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
-	ctx = partition.AddHeaders(ctx)
+	partition.AddRequestHeaders({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
 	response, err := client.{{ .Name }}(ctx, request)
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
-	s.PrepareResponse({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
+	partition.AddResponseHeaders({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
 	{{- else if .Scope.IsGlobal }}
 	partitions := s.Partitions()
     {{- if .Response.Aggregates }}
 	responses, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
+	    var prequest *{{ template "type" .Request.Type }}
+	    *prequest = *request
         partition := partitions[i]
         conn, err := partition.Connect()
         if err != nil {
             return nil, err
         }
         client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-    	s.PrepareRequest({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
-        ctx := partition.AddHeaders(ctx)
-		response, err := client.{{ .Name }}(ctx, request)
+    	partition.AddRequestHeaders({{ template "ref" .Request.Headers }}prequest{{ template "field" .Request.Headers }})
+		presponse, err := client.{{ .Name }}(ctx, prequest)
 		if err != nil {
 		    return nil, err
 		}
-    	s.PrepareResponse({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
-    	return response, nil
+    	partition.AddResponseHeaders({{ template "ref" .Response.Headers }}presponse{{ template "field" .Response.Headers }})
+    	return presponse, nil
 	})
     {{- else }}
 	err := async.IterAsync(len(partitions), func(i int) error {
+	    var prequest *{{ template "type" .Request.Type }}
+	    *prequest = *request
         partition := partitions[i]
         conn, err := partition.Connect()
         if err != nil {
             return err
         }
         client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-    	s.PrepareRequest({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
-        ctx := partition.AddHeaders(ctx)
-		_, err = client.{{ .Name }}(ctx, request)
+    	partition.AddRequestHeaders({{ template "ref" .Request.Headers }}prequest{{ template "field" .Request.Headers }})
+		_, err = client.{{ .Name }}(ctx, prequest)
 		return err
 	})
     {{- end }}
@@ -169,7 +170,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	}
 
 	response := &{{ template "type" .Response.Type }}{}
-    s.PrepareResponse({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
+    s.AddResponseHeaders({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
     {{- range .Response.Aggregates }}
     {{- if .IsChooseFirst }}
     response{{ template "field" . }} = responses[0].(*{{ template "type" $method.Response.Type }}){{ template "field" . }}
@@ -215,9 +216,8 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	}
 
 	client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-	s.PrepareRequest({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
-	ctx := partition.AddHeaders(srv.Context())
-	stream, err := client.{{ .Name }}(ctx, request)
+	partition.AddRequestHeaders({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
+	stream, err := client.{{ .Name }}(srv.Context(), request)
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 		return errors.Proto(err)
@@ -232,7 +232,7 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
             s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 			return errors.Proto(err)
 		}
-    	s.PrepareResponse({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
+    	partition.AddResponseHeaders({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
 		s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
 		if err := srv.Send(response); err != nil {
             s.log.Errorf("Response {{ .Response.Type.Name }} failed: %v", err)
@@ -245,6 +245,8 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
     responseCh := make(chan *{{ template "type" .Response.Type }})
     errCh := make(chan error)
     err := async.IterAsync(len(partitions), func(i int) error {
+	    var prequest *{{ template "type" .Request.Type }}
+	    *prequest = *request
         partition := partitions[i]
         conn, err := partition.Connect()
         if err != nil {
@@ -252,9 +254,8 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
             return err
         }
         client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-	    s.PrepareRequest({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
-        ctx := partition.AddHeaders(srv.Context())
-        stream, err := client.{{ .Name }}(ctx, request)
+	    partition.AddRequestHeaders({{ template "ref" .Request.Headers }}prequest{{ template "field" .Request.Headers }})
+        stream, err := client.{{ .Name }}(srv.Context(), prequest)
         if err != nil {
             s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
             return err
@@ -263,13 +264,14 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
         go func() {
             defer wg.Done()
             for {
-                response, err := stream.Recv()
+                presponse, err := stream.Recv()
                 if err == io.EOF {
                     return
                 } else if err != nil {
                     errCh <- err
                 } else {
-                    responseCh <- response
+                    partition.AddResponseHeaders({{ template "ref" .Response.Headers }}presponse{{ template "field" .Response.Headers }})
+                    responseCh <- presponse
                 }
             }
         }()
@@ -290,7 +292,7 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
         select {
         case response, ok := <-responseCh:
             if ok {
-    	        s.PrepareResponse({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
+    	        s.AddResponseHeaders({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
                 s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
                 err := srv.Send(response)
                 if err != nil {

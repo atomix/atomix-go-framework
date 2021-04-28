@@ -31,14 +31,13 @@ func (s *ProxyServer) Set(ctx context.Context, request *counter.SetRequest) (*co
 	}
 
 	client := counter.NewCounterServiceClient(conn)
-	s.PrepareRequest(&request.Headers)
-	ctx = partition.AddHeaders(ctx)
+	partition.AddRequestHeaders(&request.Headers)
 	response, err := client.Set(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	s.PrepareResponse(&response.Headers)
+	partition.AddResponseHeaders(&response.Headers)
 	s.log.Debugf("Sending SetResponse %+v", response)
 	return response, nil
 }
@@ -53,14 +52,13 @@ func (s *ProxyServer) Get(ctx context.Context, request *counter.GetRequest) (*co
 	}
 
 	client := counter.NewCounterServiceClient(conn)
-	s.PrepareRequest(&request.Headers)
-	ctx = partition.AddHeaders(ctx)
+	partition.AddRequestHeaders(&request.Headers)
 	response, err := client.Get(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	s.PrepareResponse(&response.Headers)
+	partition.AddResponseHeaders(&response.Headers)
 	s.log.Debugf("Sending GetResponse %+v", response)
 	return response, nil
 }
@@ -75,14 +73,13 @@ func (s *ProxyServer) Increment(ctx context.Context, request *counter.IncrementR
 	}
 
 	client := counter.NewCounterServiceClient(conn)
-	s.PrepareRequest(&request.Headers)
-	ctx = partition.AddHeaders(ctx)
+	partition.AddRequestHeaders(&request.Headers)
 	response, err := client.Increment(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request IncrementRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	s.PrepareResponse(&response.Headers)
+	partition.AddResponseHeaders(&response.Headers)
 	s.log.Debugf("Sending IncrementResponse %+v", response)
 	return response, nil
 }
@@ -97,14 +94,13 @@ func (s *ProxyServer) Decrement(ctx context.Context, request *counter.DecrementR
 	}
 
 	client := counter.NewCounterServiceClient(conn)
-	s.PrepareRequest(&request.Headers)
-	ctx = partition.AddHeaders(ctx)
+	partition.AddRequestHeaders(&request.Headers)
 	response, err := client.Decrement(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request DecrementRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	s.PrepareResponse(&response.Headers)
+	partition.AddResponseHeaders(&response.Headers)
 	s.log.Debugf("Sending DecrementResponse %+v", response)
 	return response, nil
 }

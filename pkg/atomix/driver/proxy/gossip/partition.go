@@ -16,21 +16,22 @@ package gossip
 
 import (
 	"context"
-	"fmt"
+	"github.com/atomix/api/go/atomix/primitive"
+	"github.com/atomix/api/go/atomix/primitive/meta"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
-	"github.com/atomix/go-framework/pkg/atomix/headers"
+	"github.com/atomix/go-framework/pkg/atomix/time"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 	"math/rand"
 	"sync"
 )
 
 // NewPartition creates a new proxy partition
-func NewPartition(c cluster.Cluster, p cluster.Partition) *Partition {
+func NewPartition(c cluster.Cluster, p cluster.Partition, clock time.Clock) *Partition {
 	return &Partition{
 		ID:        PartitionID(p.ID()),
 		Partition: p,
 		cluster:   c,
+		clock:     clock,
 	}
 }
 
@@ -41,13 +42,30 @@ type PartitionID int
 type Partition struct {
 	cluster.Partition
 	cluster cluster.Cluster
+	clock   time.Clock
 	ID      PartitionID
 	conn    *grpc.ClientConn
 	mu      sync.RWMutex
 }
 
-func (p *Partition) AddHeaders(ctx context.Context) context.Context {
-	return metadata.AppendToOutgoingContext(ctx, headers.PartitionID.Name(), fmt.Sprint(p.ID))
+func (p *Partition) addTimestamp(timestamp *meta.Timestamp) *meta.Timestamp {
+	var t time.Timestamp
+	if timestamp != nil {
+		t = p.clock.Update(time.NewTimestamp(*timestamp))
+	} else {
+		t = p.clock.Increment()
+	}
+	proto := p.clock.Scheme().Codec().EncodeTimestamp(t)
+	return &proto
+}
+
+func (p *Partition) AddRequestHeaders(headers *primitive.RequestHeaders) {
+	headers.PartitionID = uint32(p.ID)
+	headers.Timestamp = p.addTimestamp(headers.Timestamp)
+}
+
+func (p *Partition) AddResponseHeaders(headers *primitive.ResponseHeaders) {
+	headers.Timestamp = p.addTimestamp(headers.Timestamp)
 }
 
 // Connect gets the connection to the partition

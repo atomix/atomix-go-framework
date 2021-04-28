@@ -15,15 +15,12 @@
 package gossip
 
 import (
-	"context"
 	"github.com/atomix/api/go/atomix/primitive"
 	"github.com/atomix/api/go/atomix/primitive/meta"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/headers"
 	"github.com/atomix/go-framework/pkg/atomix/time"
 	"github.com/atomix/go-framework/pkg/atomix/util"
-	"google.golang.org/grpc/metadata"
 )
 
 // newManager creates a new CRDT manager
@@ -53,7 +50,7 @@ type Manager struct {
 	clock          time.Clock
 }
 
-func (m *Manager) prepareTimestamp(timestamp *meta.Timestamp) *meta.Timestamp {
+func (m *Manager) addTimestamp(timestamp *meta.Timestamp) *meta.Timestamp {
 	var t time.Timestamp
 	if timestamp != nil {
 		t = m.clock.Update(time.NewTimestamp(*timestamp))
@@ -64,47 +61,12 @@ func (m *Manager) prepareTimestamp(timestamp *meta.Timestamp) *meta.Timestamp {
 	return &proto
 }
 
-func (m *Manager) PrepareRequest(headers *primitive.RequestHeaders) {
-	headers.Timestamp = m.prepareTimestamp(headers.Timestamp)
+func (m *Manager) AddRequestHeaders(headers *primitive.RequestHeaders) {
+	headers.Timestamp = m.addTimestamp(headers.Timestamp)
 }
 
-func (m *Manager) PrepareResponse(headers *primitive.ResponseHeaders) {
-	headers.Timestamp = m.prepareTimestamp(headers.Timestamp)
-}
-
-func (m *Manager) PartitionFrom(ctx context.Context) (*Partition, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return nil, errors.NewInvalid("no headers found")
-	}
-
-	partitionID, ok := headers.PartitionID.GetInt(md)
-	if !ok {
-		return nil, errors.NewUnavailable("no %s header found", headers.PartitionID.Name())
-	}
-	return m.Partition(PartitionID(partitionID))
-}
-
-func (m *Manager) PartitionsFrom(ctx context.Context) ([]*Partition, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return nil, errors.NewInvalid("no headers found")
-	}
-
-	partitionIDs, ok := headers.PartitionID.GetInts(md)
-	if !ok {
-		return nil, errors.NewUnavailable("no %s header found", headers.PartitionID.Name())
-	}
-
-	partitions := make([]*Partition, 0, len(partitionIDs))
-	for _, partitionID := range partitionIDs {
-		partition, err := m.Partition(PartitionID(partitionID))
-		if err != nil {
-			return nil, err
-		}
-		partitions = append(partitions, partition)
-	}
-	return partitions, nil
+func (m *Manager) AddResponseHeaders(headers *primitive.ResponseHeaders) {
+	headers.Timestamp = m.addTimestamp(headers.Timestamp)
 }
 
 func (m *Manager) Partition(partitionID PartitionID) (*Partition, error) {

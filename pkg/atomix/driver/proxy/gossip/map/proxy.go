@@ -29,20 +29,21 @@ func (s *ProxyServer) Size(ctx context.Context, request *_map.SizeRequest) (*_ma
 	s.log.Debugf("Received SizeRequest %+v", request)
 	partitions := s.Partitions()
 	responses, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
+		var prequest *_map.SizeRequest
+		*prequest = *request
 		partition := partitions[i]
 		conn, err := partition.Connect()
 		if err != nil {
 			return nil, err
 		}
 		client := _map.NewMapServiceClient(conn)
-		s.PrepareRequest(&request.Headers)
-		ctx := partition.AddHeaders(ctx)
-		response, err := client.Size(ctx, request)
+		partition.AddRequestHeaders(&prequest.Headers)
+		presponse, err := client.Size(ctx, prequest)
 		if err != nil {
 			return nil, err
 		}
-		s.PrepareResponse(&response.Headers)
-		return response, nil
+		partition.AddResponseHeaders(&presponse.Headers)
+		return presponse, nil
 	})
 	if err != nil {
 		s.log.Errorf("Request SizeRequest failed: %v", err)
@@ -50,7 +51,7 @@ func (s *ProxyServer) Size(ctx context.Context, request *_map.SizeRequest) (*_ma
 	}
 
 	response := &_map.SizeResponse{}
-	s.PrepareResponse(&response.Headers)
+	s.AddResponseHeaders(&response.Headers)
 	for _, r := range responses {
 		response.Size_ += r.(*_map.SizeResponse).Size_
 	}
@@ -69,14 +70,13 @@ func (s *ProxyServer) Put(ctx context.Context, request *_map.PutRequest) (*_map.
 	}
 
 	client := _map.NewMapServiceClient(conn)
-	s.PrepareRequest(&request.Headers)
-	ctx = partition.AddHeaders(ctx)
+	partition.AddRequestHeaders(&request.Headers)
 	response, err := client.Put(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request PutRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	s.PrepareResponse(&response.Headers)
+	partition.AddResponseHeaders(&response.Headers)
 	s.log.Debugf("Sending PutResponse %+v", response)
 	return response, nil
 }
@@ -92,14 +92,13 @@ func (s *ProxyServer) Get(ctx context.Context, request *_map.GetRequest) (*_map.
 	}
 
 	client := _map.NewMapServiceClient(conn)
-	s.PrepareRequest(&request.Headers)
-	ctx = partition.AddHeaders(ctx)
+	partition.AddRequestHeaders(&request.Headers)
 	response, err := client.Get(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	s.PrepareResponse(&response.Headers)
+	partition.AddResponseHeaders(&response.Headers)
 	s.log.Debugf("Sending GetResponse %+v", response)
 	return response, nil
 }
@@ -115,14 +114,13 @@ func (s *ProxyServer) Remove(ctx context.Context, request *_map.RemoveRequest) (
 	}
 
 	client := _map.NewMapServiceClient(conn)
-	s.PrepareRequest(&request.Headers)
-	ctx = partition.AddHeaders(ctx)
+	partition.AddRequestHeaders(&request.Headers)
 	response, err := client.Remove(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	s.PrepareResponse(&response.Headers)
+	partition.AddResponseHeaders(&response.Headers)
 	s.log.Debugf("Sending RemoveResponse %+v", response)
 	return response, nil
 }
@@ -131,15 +129,16 @@ func (s *ProxyServer) Clear(ctx context.Context, request *_map.ClearRequest) (*_
 	s.log.Debugf("Received ClearRequest %+v", request)
 	partitions := s.Partitions()
 	err := async.IterAsync(len(partitions), func(i int) error {
+		var prequest *_map.ClearRequest
+		*prequest = *request
 		partition := partitions[i]
 		conn, err := partition.Connect()
 		if err != nil {
 			return err
 		}
 		client := _map.NewMapServiceClient(conn)
-		s.PrepareRequest(&request.Headers)
-		ctx := partition.AddHeaders(ctx)
-		_, err = client.Clear(ctx, request)
+		partition.AddRequestHeaders(&prequest.Headers)
+		_, err = client.Clear(ctx, prequest)
 		return err
 	})
 	if err != nil {
@@ -148,7 +147,7 @@ func (s *ProxyServer) Clear(ctx context.Context, request *_map.ClearRequest) (*_
 	}
 
 	response := &_map.ClearResponse{}
-	s.PrepareResponse(&response.Headers)
+	s.AddResponseHeaders(&response.Headers)
 	s.log.Debugf("Sending ClearResponse %+v", response)
 	return response, nil
 }
@@ -160,6 +159,8 @@ func (s *ProxyServer) Events(request *_map.EventsRequest, srv _map.MapService_Ev
 	responseCh := make(chan *_map.EventsResponse)
 	errCh := make(chan error)
 	err := async.IterAsync(len(partitions), func(i int) error {
+		var prequest *_map.EventsRequest
+		*prequest = *request
 		partition := partitions[i]
 		conn, err := partition.Connect()
 		if err != nil {
@@ -167,9 +168,8 @@ func (s *ProxyServer) Events(request *_map.EventsRequest, srv _map.MapService_Ev
 			return err
 		}
 		client := _map.NewMapServiceClient(conn)
-		s.PrepareRequest(&request.Headers)
-		ctx := partition.AddHeaders(srv.Context())
-		stream, err := client.Events(ctx, request)
+		partition.AddRequestHeaders(&prequest.Headers)
+		stream, err := client.Events(srv.Context(), prequest)
 		if err != nil {
 			s.log.Errorf("Request EventsRequest failed: %v", err)
 			return err
@@ -178,13 +178,14 @@ func (s *ProxyServer) Events(request *_map.EventsRequest, srv _map.MapService_Ev
 		go func() {
 			defer wg.Done()
 			for {
-				response, err := stream.Recv()
+				presponse, err := stream.Recv()
 				if err == io.EOF {
 					return
 				} else if err != nil {
 					errCh <- err
 				} else {
-					responseCh <- response
+					partition.AddResponseHeaders(&presponse.Headers)
+					responseCh <- presponse
 				}
 			}
 		}()
@@ -205,7 +206,7 @@ func (s *ProxyServer) Events(request *_map.EventsRequest, srv _map.MapService_Ev
 		select {
 		case response, ok := <-responseCh:
 			if ok {
-				s.PrepareResponse(&response.Headers)
+				s.AddResponseHeaders(&response.Headers)
 				s.log.Debugf("Sending EventsResponse %+v", response)
 				err := srv.Send(response)
 				if err != nil {
@@ -230,6 +231,8 @@ func (s *ProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_
 	responseCh := make(chan *_map.EntriesResponse)
 	errCh := make(chan error)
 	err := async.IterAsync(len(partitions), func(i int) error {
+		var prequest *_map.EntriesRequest
+		*prequest = *request
 		partition := partitions[i]
 		conn, err := partition.Connect()
 		if err != nil {
@@ -237,9 +240,8 @@ func (s *ProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_
 			return err
 		}
 		client := _map.NewMapServiceClient(conn)
-		s.PrepareRequest(&request.Headers)
-		ctx := partition.AddHeaders(srv.Context())
-		stream, err := client.Entries(ctx, request)
+		partition.AddRequestHeaders(&prequest.Headers)
+		stream, err := client.Entries(srv.Context(), prequest)
 		if err != nil {
 			s.log.Errorf("Request EntriesRequest failed: %v", err)
 			return err
@@ -248,13 +250,14 @@ func (s *ProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_
 		go func() {
 			defer wg.Done()
 			for {
-				response, err := stream.Recv()
+				presponse, err := stream.Recv()
 				if err == io.EOF {
 					return
 				} else if err != nil {
 					errCh <- err
 				} else {
-					responseCh <- response
+					partition.AddResponseHeaders(&presponse.Headers)
+					responseCh <- presponse
 				}
 			}
 		}()
@@ -275,7 +278,7 @@ func (s *ProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_
 		select {
 		case response, ok := <-responseCh:
 			if ok {
-				s.PrepareResponse(&response.Headers)
+				s.AddResponseHeaders(&response.Headers)
 				s.log.Debugf("Sending EntriesResponse %+v", response)
 				err := srv.Send(response)
 				if err != nil {

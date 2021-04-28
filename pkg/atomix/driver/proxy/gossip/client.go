@@ -28,64 +28,61 @@ func NewClient(cluster cluster.Cluster, scheme time.Scheme) *Client {
 	partitions := cluster.Partitions()
 	proxyPartitions := make([]*Partition, 0, len(partitions))
 	proxyPartitionsByID := make(map[PartitionID]*Partition)
+	clock := scheme.NewClock()
 	for _, partition := range partitions {
-		proxyPartition := NewPartition(cluster, partition)
+		proxyPartition := NewPartition(cluster, partition, clock)
 		proxyPartitions = append(proxyPartitions, proxyPartition)
 		proxyPartitionsByID[proxyPartition.ID] = proxyPartition
 	}
 	return &Client{
 		Cluster:        cluster,
+		clock:          clock,
 		partitions:     proxyPartitions,
 		partitionsByID: proxyPartitionsByID,
-		clock:          scheme.NewClock(),
 	}
 }
 
 // Client is a client for communicating with the storage layer
 type Client struct {
 	Cluster        cluster.Cluster
+	clock          time.Clock
 	partitions     []*Partition
 	partitionsByID map[PartitionID]*Partition
-	clock          time.Clock
 }
 
-func (p *Client) prepareTimestamp(timestamp *meta.Timestamp) *meta.Timestamp {
+func (c *Client) addTimestamp(timestamp *meta.Timestamp) *meta.Timestamp {
 	var t time.Timestamp
 	if timestamp != nil {
-		t = p.clock.Update(time.NewTimestamp(*timestamp))
+		t = c.clock.Update(time.NewTimestamp(*timestamp))
 	} else {
-		t = p.clock.Increment()
+		t = c.clock.Increment()
 	}
-	proto := p.clock.Scheme().Codec().EncodeTimestamp(t)
+	proto := c.clock.Scheme().Codec().EncodeTimestamp(t)
 	return &proto
 }
 
-func (p *Client) PrepareRequest(headers *primitive.RequestHeaders) {
-	headers.Timestamp = p.prepareTimestamp(headers.Timestamp)
+func (c *Client) AddResponseHeaders(headers *primitive.ResponseHeaders) {
+	headers.Timestamp = c.addTimestamp(headers.Timestamp)
 }
 
-func (p *Client) PrepareResponse(headers *primitive.ResponseHeaders) {
-	headers.Timestamp = p.prepareTimestamp(headers.Timestamp)
+func (c *Client) Partition(partitionID PartitionID) *Partition {
+	return c.partitionsByID[partitionID]
 }
 
-func (p *Client) Partition(partitionID PartitionID) *Partition {
-	return p.partitionsByID[partitionID]
-}
-
-func (p *Client) PartitionBy(partitionKey []byte) *Partition {
-	i, err := util.GetPartitionIndex(partitionKey, len(p.partitions))
+func (c *Client) PartitionBy(partitionKey []byte) *Partition {
+	i, err := util.GetPartitionIndex(partitionKey, len(c.partitions))
 	if err != nil {
 		panic(err)
 	}
-	return p.partitions[i]
+	return c.partitions[i]
 }
 
-func (p *Client) Partitions() []*Partition {
-	return p.partitions
+func (c *Client) Partitions() []*Partition {
+	return c.partitions
 }
 
-func (p *Client) Close() error {
-	return async.IterAsync(len(p.partitions), func(i int) error {
-		return p.partitions[i].Close()
+func (c *Client) Close() error {
+	return async.IterAsync(len(c.partitions), func(i int) error {
+		return c.partitions[i].Close()
 	})
 }
