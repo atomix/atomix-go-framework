@@ -44,6 +44,7 @@ package {{ .Package.Name }}
 import (
 	"context"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
+	"github.com/atomix/go-framework/pkg/atomix/driver/env"
 	{{- $package := .Package }}
 	{{- range .Imports }}
 	{{ .Alias }} {{ .Path | quote }}
@@ -51,9 +52,10 @@ import (
 )
 
 // New{{ $server }} creates a new {{ $server }}
-func New{{ $server }}(registry *{{ $registry }}) {{ $service }} {
+func New{{ $server }}(registry *{{ $registry }}, env env.DriverEnv) {{ $service }} {
 	return &{{ $server }}{
 		registry: registry,
+		env:      env,
 		log:      logging.GetLogger("atomix", {{ .Primitive.Name | lower | quote }}),
 	}
 }
@@ -61,6 +63,7 @@ func New{{ $server }}(registry *{{ $registry }}) {{ $service }} {
 {{- $primitive := .Primitive }}
 type {{ $server }} struct {
 	registry *{{ $registry }}
+	env      env.DriverEnv
 	log      logging.Logger
 }
 
@@ -68,6 +71,9 @@ type {{ $server }} struct {
 {{- $method := . }}
 {{ if and .Request.IsDiscrete .Response.IsDiscrete }}
 func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "type" .Request.Type }}) (*{{ template "type" .Response.Type }}, error) {
+	if request.Headers.PrimitiveID.Namespace == "" {
+		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	}
 	proxy, err := s.registry.GetProxy(request{{ template "field" .Request.Headers }}.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("{{ .Request.Type.Name }} %+v failed: %v", request, err)
@@ -77,6 +83,9 @@ func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "t
 }
 {{ else if .Response.IsStream }}
 func (s *{{ $server }}) {{ .Name }}(request *{{ template "type" .Request.Type }}, srv {{ template "type" $primitive.Type }}_{{ .Name }}Server) error {
+	if request.Headers.PrimitiveID.Namespace == "" {
+		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	}
 	proxy, err := s.registry.GetProxy(request{{ template "field" .Request.Headers }}.PrimitiveID)
 	if err != nil {
 	    s.log.Warnf("{{ .Request.Type.Name }} %+v failed: %v", request, err)
