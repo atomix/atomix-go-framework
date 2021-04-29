@@ -2,10 +2,10 @@ package _map
 
 import (
 	"context"
-	_map "github.com/atomix/api/go/atomix/primitive/map"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/gossip"
+	_map "github.com/atomix/atomix-api/go/atomix/primitive/map"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/gossip"
 	"google.golang.org/grpc"
 )
 

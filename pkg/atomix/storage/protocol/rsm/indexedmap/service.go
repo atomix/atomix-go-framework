@@ -15,8 +15,8 @@
 package indexedmap
 
 import (
-	"github.com/atomix/api/go/atomix/primitive/indexedmap"
-	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
+	"github.com/atomix/atomix-api/go/atomix/primitive/indexedmap"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 )
 
 func init() {

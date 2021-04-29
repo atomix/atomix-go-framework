@@ -6,8 +6,8 @@
 package {{ .Package.Name }}
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/golang/protobuf/proto"
 	{{- $package := .Package }}
 	{{- range .Imports }}

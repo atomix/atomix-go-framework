@@ -16,11 +16,11 @@ package _map
 
 import (
 	"context"
-	mapapi "github.com/atomix/api/go/atomix/primitive/map"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/atomix/go-framework/pkg/atomix/meta"
-	"github.com/atomix/go-framework/pkg/atomix/time"
+	mapapi "github.com/atomix/atomix-api/go/atomix/primitive/map"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
 	"sync"
 )
 

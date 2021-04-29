@@ -5,9 +5,9 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/atomix/go-framework/pkg/atomix/meta"
-	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/gossip"
-	atime "github.com/atomix/go-framework/pkg/atomix/time"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/gossip"
+	atime "github.com/atomix/atomix-go-framework/pkg/atomix/time"
 
 	"github.com/golang/protobuf/proto"
 )

@@ -1,9 +1,9 @@
 package leader
 
 import (
-	primitiveapi "github.com/atomix/api/go/atomix/primitive"
-	leader "github.com/atomix/api/go/atomix/primitive/leader"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
+	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
+	leader "github.com/atomix/atomix-api/go/atomix/primitive/leader"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"sync"
 )
 

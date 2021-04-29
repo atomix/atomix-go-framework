@@ -2,12 +2,12 @@ package log
 
 import (
 	"context"
-	log "github.com/atomix/api/go/atomix/primitive/log"
-	"github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	storage "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
-	streams "github.com/atomix/go-framework/pkg/atomix/stream"
+	log "github.com/atomix/atomix-api/go/atomix/primitive/log"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	storage "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
+	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 )
 

@@ -15,7 +15,7 @@
 package primitive
 
 import (
-	driverapi "github.com/atomix/api/go/atomix/management/driver"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
 	"google.golang.org/grpc"
 )
 

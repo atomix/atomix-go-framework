@@ -16,9 +16,9 @@ package election
 
 import (
 	"context"
-	electionapi "github.com/atomix/api/go/atomix/primitive/election"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
+	electionapi "github.com/atomix/atomix-api/go/atomix/primitive/election"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 )
 
 var log = logging.GetLogger("atomix", "election")

@@ -3,8 +3,8 @@
 package {{ .Package.Name }}
 
 import (
-	primitiveapi "github.com/atomix/api/go/atomix/primitive"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
+	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"sync"
 	{{- $package := .Package }}
 	{{- range .Imports }}

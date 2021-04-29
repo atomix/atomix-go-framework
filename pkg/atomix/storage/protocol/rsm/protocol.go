@@ -15,7 +15,7 @@
 package rsm
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/cluster"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 )
 
 // Protocol is the interface to be implemented by replication protocols

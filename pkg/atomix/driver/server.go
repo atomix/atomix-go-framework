@@ -16,8 +16,8 @@ package driver
 
 import (
 	"context"
-	driverapi "github.com/atomix/api/go/atomix/management/driver"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 )
 
 func newServer(driver *Driver) *Server {

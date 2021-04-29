@@ -16,10 +16,10 @@ package meta
 
 import (
 	"fmt"
-	"github.com/atomix/api/go/atomix/primitive/extensions/operation"
-	"github.com/atomix/api/go/atomix/primitive/extensions/partition"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/gossip/primitive"
+	"github.com/atomix/atomix-api/go/atomix/primitive/extensions/operation"
+	"github.com/atomix/atomix-api/go/atomix/primitive/extensions/partition"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/gossip/primitive"
 	"github.com/golang/protobuf/proto"
 	"github.com/lyft/protoc-gen-star"
 	"github.com/lyft/protoc-gen-star/lang/go"

@@ -16,9 +16,9 @@ package value
 
 import (
 	"context"
-	valueapi "github.com/atomix/api/go/atomix/primitive/value"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
+	valueapi "github.com/atomix/atomix-api/go/atomix/primitive/value"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 )
 
 var log = logging.GetLogger("atomix", "value")

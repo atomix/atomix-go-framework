@@ -15,12 +15,12 @@
 package _map
 
 import (
-	driverapi "github.com/atomix/api/go/atomix/management/driver"
-	mapapi "github.com/atomix/api/go/atomix/primitive/map"
-	"github.com/atomix/go-framework/pkg/atomix/driver/primitive"
-	mapdriver "github.com/atomix/go-framework/pkg/atomix/driver/primitive/map"
-	mapro "github.com/atomix/go-framework/pkg/atomix/driver/proxy/ro/map"
-	"github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
+	mapapi "github.com/atomix/atomix-api/go/atomix/primitive/map"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive"
+	mapdriver "github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive/map"
+	mapro "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/ro/map"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm"
 	"google.golang.org/grpc"
 )
 

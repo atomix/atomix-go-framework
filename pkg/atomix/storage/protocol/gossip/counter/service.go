@@ -2,10 +2,10 @@ package counter
 
 import (
 	"context"
-	counter "github.com/atomix/api/go/atomix/primitive/counter"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/gossip"
-	"github.com/atomix/go-framework/pkg/atomix/time"
+	counter "github.com/atomix/atomix-api/go/atomix/primitive/counter"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/gossip"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
 )
 
 var log = logging.GetLogger("atomix", "protocol", "gossip", "counter")

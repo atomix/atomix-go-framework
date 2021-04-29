@@ -16,9 +16,9 @@ package log
 
 import (
 	"context"
-	logapi "github.com/atomix/api/go/atomix/primitive/log"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
+	logapi "github.com/atomix/atomix-api/go/atomix/primitive/log"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 )
 
 var log = logging.GetLogger("atomix", "map")

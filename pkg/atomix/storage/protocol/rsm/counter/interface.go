@@ -1,7 +1,7 @@
 package counter
 
 import (
-	counter "github.com/atomix/api/go/atomix/primitive/counter"
+	counter "github.com/atomix/atomix-api/go/atomix/primitive/counter"
 )
 
 type Service interface {

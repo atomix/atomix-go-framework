@@ -15,12 +15,12 @@
 package gossip
 
 import (
-	"github.com/atomix/api/go/atomix/primitive"
-	"github.com/atomix/api/go/atomix/primitive/meta"
-	"github.com/atomix/go-framework/pkg/atomix/cluster"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/time"
-	"github.com/atomix/go-framework/pkg/atomix/util"
+	"github.com/atomix/atomix-api/go/atomix/primitive"
+	"github.com/atomix/atomix-api/go/atomix/primitive/meta"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/util"
 )
 
 // newManager creates a new CRDT manager

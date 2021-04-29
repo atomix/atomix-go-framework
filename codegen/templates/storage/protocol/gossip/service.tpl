@@ -16,9 +16,9 @@ import (
 	{{- range .Imports }}
 	{{ .Alias }} {{ .Path | quote }}
 	{{- end }}
-	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/gossip"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/atomix/go-framework/pkg/atomix/time"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/gossip"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
 )
 
 var log = logging.GetLogger("atomix", "protocol", "gossip", {{ .Primitive.Name | lower | quote }})

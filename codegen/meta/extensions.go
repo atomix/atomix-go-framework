@@ -16,9 +16,9 @@ package meta
 
 import (
 	"errors"
-	operations "github.com/atomix/api/go/atomix/primitive/extensions/operation"
-	partitions "github.com/atomix/api/go/atomix/primitive/extensions/partition"
-	services "github.com/atomix/api/go/atomix/primitive/extensions/service"
+	operations "github.com/atomix/atomix-api/go/atomix/primitive/extensions/operation"
+	partitions "github.com/atomix/atomix-api/go/atomix/primitive/extensions/partition"
+	services "github.com/atomix/atomix-api/go/atomix/primitive/extensions/service"
 	"github.com/gogo/protobuf/gogoproto"
 	gogoprotobuf "github.com/gogo/protobuf/proto"
 	"github.com/golang/protobuf/proto" //nolint:staticcheck

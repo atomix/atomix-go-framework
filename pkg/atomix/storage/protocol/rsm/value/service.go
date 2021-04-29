@@ -15,11 +15,11 @@
 package value
 
 import (
-	metaapi "github.com/atomix/api/go/atomix/primitive/meta"
-	valueapi "github.com/atomix/api/go/atomix/primitive/value"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/meta"
-	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
+	metaapi "github.com/atomix/atomix-api/go/atomix/primitive/meta"
+	valueapi "github.com/atomix/atomix-api/go/atomix/primitive/value"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 )
 
 func init() {

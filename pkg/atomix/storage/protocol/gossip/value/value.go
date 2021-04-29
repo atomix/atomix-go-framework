@@ -16,10 +16,10 @@ package value
 
 import (
 	"context"
-	valueapi "github.com/atomix/api/go/atomix/primitive/value"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/meta"
-	"github.com/atomix/go-framework/pkg/atomix/time"
+	valueapi "github.com/atomix/atomix-api/go/atomix/primitive/value"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
 	"sync"
 )
 

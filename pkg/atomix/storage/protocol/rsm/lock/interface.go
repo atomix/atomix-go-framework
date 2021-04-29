@@ -1,8 +1,8 @@
 package lock
 
 import (
-	lock "github.com/atomix/api/go/atomix/primitive/lock"
-	rsm "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
+	lock "github.com/atomix/atomix-api/go/atomix/primitive/lock"
+	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	proto "github.com/golang/protobuf/proto"
 )
 

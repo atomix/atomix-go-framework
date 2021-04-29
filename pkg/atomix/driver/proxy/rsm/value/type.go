@@ -15,12 +15,12 @@
 package value
 
 import (
-	driverapi "github.com/atomix/api/go/atomix/management/driver"
-	valueapi "github.com/atomix/api/go/atomix/primitive/value"
-	"github.com/atomix/go-framework/pkg/atomix/driver/primitive"
-	valuedriver "github.com/atomix/go-framework/pkg/atomix/driver/primitive/value"
-	valuero "github.com/atomix/go-framework/pkg/atomix/driver/proxy/ro/value"
-	"github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
+	valueapi "github.com/atomix/atomix-api/go/atomix/primitive/value"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive"
+	valuedriver "github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive/value"
+	valuero "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/ro/value"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm"
 	"google.golang.org/grpc"
 )
 

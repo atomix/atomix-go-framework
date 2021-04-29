@@ -12,7 +12,7 @@ import (
 	{{- end }}
 	{{- range .Primitive.Methods }}
 	{{- if or .Type.IsAsync .Response.IsStream }}
-	{{ import "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm" }}
+	{{ import "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm" }}
 	{{ import "github.com/golang/protobuf/proto" }}
 	{{- end }}
 	{{- end }}

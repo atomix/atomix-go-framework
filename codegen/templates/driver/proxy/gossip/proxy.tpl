@@ -4,16 +4,16 @@ package {{ .Package.Name }}
 
 import (
 	"context"
-	"github.com/atomix/go-framework/pkg/atomix/driver/proxy/gossip"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/gossip"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	{{- $package := .Package }}
 	{{- range .Imports }}
 	{{ .Alias }} {{ .Path | quote }}
 	{{- end }}
 	{{- range .Primitive.Methods }}
 	{{- if .Scope.IsGlobal }}
-	{{ import "github.com/atomix/go-framework/pkg/atomix/util/async" }}
+	{{ import "github.com/atomix/atomix-go-framework/pkg/atomix/util/async" }}
 	{{- end }}
 	{{- if or .Request.IsStream .Response.IsStream }}
 	{{ import "io" }}

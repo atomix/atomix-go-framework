@@ -5,9 +5,9 @@ package {{ .Package.Name }}
 
 import (
 	"context"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/gossip"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/gossip"
 	"google.golang.org/grpc"
 	{{- $package := .Package }}
 	{{- range .Imports }}

@@ -16,8 +16,8 @@ package cluster
 
 import (
 	"context"
-	protocolapi "github.com/atomix/api/go/atomix/protocol"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
+	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"sync"
 )
 

@@ -1,9 +1,9 @@
 package value
 
 import (
-	primitiveapi "github.com/atomix/api/go/atomix/primitive"
-	value "github.com/atomix/api/go/atomix/primitive/value"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
+	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
+	value "github.com/atomix/atomix-api/go/atomix/primitive/value"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"sync"
 )
 

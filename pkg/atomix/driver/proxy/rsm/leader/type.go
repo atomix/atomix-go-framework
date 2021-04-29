@@ -15,12 +15,12 @@
 package leader
 
 import (
-	driverapi "github.com/atomix/api/go/atomix/management/driver"
-	leaderapi "github.com/atomix/api/go/atomix/primitive/leader"
-	"github.com/atomix/go-framework/pkg/atomix/driver/primitive"
-	leaderdriver "github.com/atomix/go-framework/pkg/atomix/driver/primitive/leader"
-	leaderro "github.com/atomix/go-framework/pkg/atomix/driver/proxy/ro/leader"
-	"github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
+	leaderapi "github.com/atomix/atomix-api/go/atomix/primitive/leader"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive"
+	leaderdriver "github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive/leader"
+	leaderro "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/ro/leader"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm"
 	"google.golang.org/grpc"
 )
 

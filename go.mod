@@ -1,9 +1,9 @@
-module github.com/atomix/go-framework
+module github.com/atomix/atomix-go-framework
 
 go 1.13
 
 require (
-	github.com/atomix/api/go v0.3.3
+	github.com/atomix/atomix-api/go v0.3.3
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.4.2
@@ -19,4 +19,4 @@ require (
 	gopkg.in/yaml.v2 v2.2.4
 )
 
-replace github.com/atomix/api/go => ../atomix-api/go
+replace github.com/atomix/atomix-api/go => ../atomix-api/go

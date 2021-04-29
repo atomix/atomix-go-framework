@@ -69,10 +69,10 @@ package {{ .Package.Name }}
 
 import (
 	"context"
-	"github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm"
-	storage "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm"
+	storage "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/golang/protobuf/proto"
 	{{- $package := .Package }}
 	{{- range .Imports }}
@@ -80,13 +80,13 @@ import (
 	{{- end }}
 	{{- range .Primitive.Methods }}
 	{{- if .Scope.IsGlobal }}
-	{{ import "github.com/atomix/go-framework/pkg/atomix/util/async" }}
+	{{ import "github.com/atomix/atomix-go-framework/pkg/atomix/util/async" }}
 	{{- end }}
 	{{- if .Request.IsStream }}
 	{{ import "io" }}
 	{{- end }}
 	{{- if .Response.IsStream }}
-	{{ import "streams" "github.com/atomix/go-framework/pkg/atomix/stream" }}
+	{{ import "streams" "github.com/atomix/atomix-go-framework/pkg/atomix/stream" }}
 	{{- end }}
 	{{- end }}
 )

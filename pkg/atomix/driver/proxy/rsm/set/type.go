@@ -15,12 +15,12 @@
 package set
 
 import (
-	driverapi "github.com/atomix/api/go/atomix/management/driver"
-	setapi "github.com/atomix/api/go/atomix/primitive/set"
-	"github.com/atomix/go-framework/pkg/atomix/driver/primitive"
-	setdriver "github.com/atomix/go-framework/pkg/atomix/driver/primitive/set"
-	setro "github.com/atomix/go-framework/pkg/atomix/driver/proxy/ro/set"
-	"github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
+	setapi "github.com/atomix/atomix-api/go/atomix/primitive/set"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive"
+	setdriver "github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive/set"
+	setro "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/ro/set"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm"
 	"google.golang.org/grpc"
 )
 

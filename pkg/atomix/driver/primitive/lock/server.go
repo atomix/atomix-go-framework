@@ -2,9 +2,9 @@ package lock
 
 import (
 	"context"
-	lock "github.com/atomix/api/go/atomix/primitive/lock"
-	"github.com/atomix/go-framework/pkg/atomix/driver/env"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
+	lock "github.com/atomix/atomix-api/go/atomix/primitive/lock"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 )
 
 // NewProxyServer creates a new ProxyServer

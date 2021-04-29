@@ -1,9 +1,9 @@
 package _map
 
 import (
-	primitiveapi "github.com/atomix/api/go/atomix/primitive"
-	_map "github.com/atomix/api/go/atomix/primitive/map"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
+	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
+	_map "github.com/atomix/atomix-api/go/atomix/primitive/map"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"sync"
 )
 

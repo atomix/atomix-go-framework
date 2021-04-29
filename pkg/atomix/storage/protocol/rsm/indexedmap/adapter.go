@@ -1,9 +1,9 @@
 package indexedmap
 
 import (
-	indexedmap "github.com/atomix/api/go/atomix/primitive/indexedmap"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
+	indexedmap "github.com/atomix/atomix-api/go/atomix/primitive/indexedmap"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	"github.com/golang/protobuf/proto"
 )
 

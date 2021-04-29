@@ -5,8 +5,8 @@ package value
 
 import (
 	fmt "fmt"
-	meta "github.com/atomix/api/go/atomix/primitive/meta"
-	_ "github.com/atomix/go-framework/pkg/atomix/storage/protocol/gossip/primitive"
+	meta "github.com/atomix/atomix-api/go/atomix/primitive/meta"
+	_ "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/gossip/primitive"
 	_ "github.com/gogo/protobuf/gogoproto"
 	proto "github.com/gogo/protobuf/proto"
 	io "io"

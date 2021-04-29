@@ -15,7 +15,7 @@
 package time
 
 import (
-	metaapi "github.com/atomix/api/go/atomix/primitive/meta"
+	metaapi "github.com/atomix/atomix-api/go/atomix/primitive/meta"
 	"sync"
 )
 

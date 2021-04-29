@@ -2,9 +2,9 @@ package set
 
 import (
 	"context"
-	set "github.com/atomix/api/go/atomix/primitive/set"
-	"github.com/atomix/go-framework/pkg/atomix/driver/env"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
+	set "github.com/atomix/atomix-api/go/atomix/primitive/set"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 )
 
 // NewProxyServer creates a new ProxyServer

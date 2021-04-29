@@ -17,10 +17,10 @@ package rsm
 import (
 	"context"
 	"fmt"
-	"github.com/atomix/go-framework/pkg/atomix/cluster"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
-	streams "github.com/atomix/go-framework/pkg/atomix/stream"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
+	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
 )
 
 // NewPartition creates a new proxy partition

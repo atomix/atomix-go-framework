@@ -2,9 +2,9 @@ package election
 
 import (
 	"context"
-	election "github.com/atomix/api/go/atomix/primitive/election"
-	"github.com/atomix/go-framework/pkg/atomix/driver/env"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
+	election "github.com/atomix/atomix-api/go/atomix/primitive/election"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 )
 
 // NewProxyServer creates a new ProxyServer

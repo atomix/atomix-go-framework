@@ -6,7 +6,7 @@ package gossip
 import (
 	context "context"
 	fmt "fmt"
-	meta "github.com/atomix/api/go/atomix/primitive/meta"
+	meta "github.com/atomix/atomix-api/go/atomix/primitive/meta"
 	_ "github.com/gogo/protobuf/gogoproto"
 	proto "github.com/gogo/protobuf/proto"
 	grpc "google.golang.org/grpc"

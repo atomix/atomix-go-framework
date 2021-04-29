@@ -15,12 +15,12 @@
 package gossip
 
 import (
-	protocolapi "github.com/atomix/api/go/atomix/protocol"
-	"github.com/atomix/go-framework/pkg/atomix/cluster"
-	"github.com/atomix/go-framework/pkg/atomix/driver/env"
-	"github.com/atomix/go-framework/pkg/atomix/driver/primitive"
-	"github.com/atomix/go-framework/pkg/atomix/server"
-	"github.com/atomix/go-framework/pkg/atomix/time"
+	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/server"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
 	"google.golang.org/grpc"
 )
 

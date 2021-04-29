@@ -1,9 +1,9 @@
 package counter
 
 import (
-	counter "github.com/atomix/api/go/atomix/primitive/counter"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
+	counter "github.com/atomix/atomix-api/go/atomix/primitive/counter"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	"github.com/golang/protobuf/proto"
 )
 

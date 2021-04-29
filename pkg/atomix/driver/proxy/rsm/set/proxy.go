@@ -2,15 +2,15 @@ package set
 
 import (
 	"context"
-	set "github.com/atomix/api/go/atomix/primitive/set"
-	"github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	storage "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
-	async "github.com/atomix/go-framework/pkg/atomix/util/async"
+	set "github.com/atomix/atomix-api/go/atomix/primitive/set"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	storage "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
+	async "github.com/atomix/atomix-go-framework/pkg/atomix/util/async"
 	"github.com/golang/protobuf/proto"
 
-	streams "github.com/atomix/go-framework/pkg/atomix/stream"
+	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
 )
 
 const Type = "Set"

@@ -2,10 +2,10 @@ package counter
 
 import (
 	"context"
-	counter "github.com/atomix/api/go/atomix/primitive/counter"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/gossip"
+	counter "github.com/atomix/atomix-api/go/atomix/primitive/counter"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/gossip"
 	"google.golang.org/grpc"
 )
 

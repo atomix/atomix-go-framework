@@ -15,10 +15,10 @@
 package set
 
 import (
-	setapi "github.com/atomix/api/go/atomix/primitive/set"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/meta"
-	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
+	setapi "github.com/atomix/atomix-api/go/atomix/primitive/set"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 )
 
 func init() {

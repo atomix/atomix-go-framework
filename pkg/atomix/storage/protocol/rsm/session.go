@@ -16,9 +16,9 @@ package rsm
 
 import (
 	"container/list"
-	"github.com/atomix/go-framework/pkg/atomix/cluster"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	streams "github.com/atomix/go-framework/pkg/atomix/stream"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
 	"github.com/gogo/protobuf/proto"
 	"time"
 )

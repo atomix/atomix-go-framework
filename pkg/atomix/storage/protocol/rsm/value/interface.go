@@ -1,8 +1,8 @@
 package value
 
 import (
-	value "github.com/atomix/api/go/atomix/primitive/value"
-	rsm "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
+	value "github.com/atomix/atomix-api/go/atomix/primitive/value"
+	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	proto "github.com/golang/protobuf/proto"
 )
 

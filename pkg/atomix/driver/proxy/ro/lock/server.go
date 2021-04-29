@@ -16,9 +16,9 @@ package lock
 
 import (
 	"context"
-	lockapi "github.com/atomix/api/go/atomix/primitive/lock"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
+	lockapi "github.com/atomix/atomix-api/go/atomix/primitive/lock"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 )
 
 var log = logging.GetLogger("atomix", "lock")

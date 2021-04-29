@@ -1,9 +1,9 @@
 package leader
 
 import (
-	leader "github.com/atomix/api/go/atomix/primitive/leader"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
+	leader "github.com/atomix/atomix-api/go/atomix/primitive/leader"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	"github.com/golang/protobuf/proto"
 )
 

@@ -15,12 +15,12 @@
 package list
 
 import (
-	driverapi "github.com/atomix/api/go/atomix/management/driver"
-	listapi "github.com/atomix/api/go/atomix/primitive/list"
-	"github.com/atomix/go-framework/pkg/atomix/driver/primitive"
-	listdriver "github.com/atomix/go-framework/pkg/atomix/driver/primitive/list"
-	listro "github.com/atomix/go-framework/pkg/atomix/driver/proxy/ro/list"
-	"github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
+	listapi "github.com/atomix/atomix-api/go/atomix/primitive/list"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive"
+	listdriver "github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive/list"
+	listro "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/ro/list"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm"
 	"google.golang.org/grpc"
 )
 

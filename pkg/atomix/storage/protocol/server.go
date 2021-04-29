@@ -16,9 +16,9 @@ package protocol
 
 import (
 	"context"
-	protocolapi "github.com/atomix/api/go/atomix/protocol"
-	"github.com/atomix/go-framework/pkg/atomix/cluster"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
+	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 )
 
 // NewServer creates a new proxy server

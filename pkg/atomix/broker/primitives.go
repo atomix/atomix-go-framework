@@ -15,8 +15,8 @@
 package broker
 
 import (
-	brokerapi "github.com/atomix/api/go/atomix/management/broker"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
+	brokerapi "github.com/atomix/atomix-api/go/atomix/management/broker"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 )
 
 // newPrimitiveRegistry creates a new primitive registry

@@ -2,11 +2,11 @@ package set
 
 import (
 	"context"
-	set "github.com/atomix/api/go/atomix/primitive/set"
-	"github.com/atomix/go-framework/pkg/atomix/driver/proxy/gossip"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	async "github.com/atomix/go-framework/pkg/atomix/util/async"
+	set "github.com/atomix/atomix-api/go/atomix/primitive/set"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/gossip"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	async "github.com/atomix/atomix-go-framework/pkg/atomix/util/async"
 
 	io "io"
 	sync "sync"

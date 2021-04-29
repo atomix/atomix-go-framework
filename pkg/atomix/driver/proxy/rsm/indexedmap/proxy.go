@@ -2,12 +2,12 @@ package indexedmap
 
 import (
 	"context"
-	indexedmap "github.com/atomix/api/go/atomix/primitive/indexedmap"
-	"github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	storage "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
-	streams "github.com/atomix/go-framework/pkg/atomix/stream"
+	indexedmap "github.com/atomix/atomix-api/go/atomix/primitive/indexedmap"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	storage "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
+	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 )
 

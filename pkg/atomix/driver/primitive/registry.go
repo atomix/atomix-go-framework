@@ -15,7 +15,7 @@
 package primitive
 
 import (
-	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"sync"
 )
 

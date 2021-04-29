@@ -2,10 +2,10 @@ package value
 
 import (
 	"context"
-	value "github.com/atomix/api/go/atomix/primitive/value"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/gossip"
-	"github.com/atomix/go-framework/pkg/atomix/time"
+	value "github.com/atomix/atomix-api/go/atomix/primitive/value"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/gossip"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
 )
 
 var log = logging.GetLogger("atomix", "protocol", "gossip", "value")

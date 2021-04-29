@@ -15,8 +15,8 @@
 package log
 
 import (
-	"github.com/atomix/api/go/atomix/primitive/log"
-	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
+	"github.com/atomix/atomix-api/go/atomix/primitive/log"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 )
 
 func init() {

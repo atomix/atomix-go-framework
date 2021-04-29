@@ -15,10 +15,10 @@
 package list
 
 import (
-	listapi "github.com/atomix/api/go/atomix/primitive/list"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/meta"
-	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
+	listapi "github.com/atomix/atomix-api/go/atomix/primitive/list"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 )
 
 func init() {

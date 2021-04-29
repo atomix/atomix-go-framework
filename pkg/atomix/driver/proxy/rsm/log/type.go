@@ -15,12 +15,12 @@
 package log
 
 import (
-	driverapi "github.com/atomix/api/go/atomix/management/driver"
-	logapi "github.com/atomix/api/go/atomix/primitive/log"
-	"github.com/atomix/go-framework/pkg/atomix/driver/primitive"
-	logdriver "github.com/atomix/go-framework/pkg/atomix/driver/primitive/log"
-	logro "github.com/atomix/go-framework/pkg/atomix/driver/proxy/ro/log"
-	"github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
+	logapi "github.com/atomix/atomix-api/go/atomix/primitive/log"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive"
+	logdriver "github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive/log"
+	logro "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/ro/log"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm"
 	"google.golang.org/grpc"
 )
 

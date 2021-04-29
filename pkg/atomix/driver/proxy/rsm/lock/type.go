@@ -15,12 +15,12 @@
 package lock
 
 import (
-	driverapi "github.com/atomix/api/go/atomix/management/driver"
-	lockapi "github.com/atomix/api/go/atomix/primitive/lock"
-	"github.com/atomix/go-framework/pkg/atomix/driver/primitive"
-	lockdriver "github.com/atomix/go-framework/pkg/atomix/driver/primitive/lock"
-	lockro "github.com/atomix/go-framework/pkg/atomix/driver/proxy/ro/lock"
-	"github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
+	lockapi "github.com/atomix/atomix-api/go/atomix/primitive/lock"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive"
+	lockdriver "github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive/lock"
+	lockro "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/ro/lock"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm"
 	"google.golang.org/grpc"
 )
 

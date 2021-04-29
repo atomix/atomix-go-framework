@@ -15,12 +15,12 @@
 package counter
 
 import (
-	driverapi "github.com/atomix/api/go/atomix/management/driver"
-	counterapi "github.com/atomix/api/go/atomix/primitive/counter"
-	"github.com/atomix/go-framework/pkg/atomix/driver/primitive"
-	counterdriver "github.com/atomix/go-framework/pkg/atomix/driver/primitive/counter"
-	"github.com/atomix/go-framework/pkg/atomix/driver/proxy/gossip"
-	counterro "github.com/atomix/go-framework/pkg/atomix/driver/proxy/ro/counter"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
+	counterapi "github.com/atomix/atomix-api/go/atomix/primitive/counter"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive"
+	counterdriver "github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive/counter"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/gossip"
+	counterro "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/ro/counter"
 	"google.golang.org/grpc"
 )
 

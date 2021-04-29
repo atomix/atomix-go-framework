@@ -17,7 +17,7 @@ package cluster
 import (
 	"context"
 	"fmt"
-	protocolapi "github.com/atomix/api/go/atomix/protocol"
+	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
 	"google.golang.org/grpc"
 	"sync"
 )

@@ -1,9 +1,9 @@
 package list
 
 import (
-	list "github.com/atomix/api/go/atomix/primitive/list"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
-	"github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
+	list "github.com/atomix/atomix-api/go/atomix/primitive/list"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	"github.com/golang/protobuf/proto"
 )
 

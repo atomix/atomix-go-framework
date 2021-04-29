@@ -2,9 +2,9 @@ package leader
 
 import (
 	"context"
-	leader "github.com/atomix/api/go/atomix/primitive/leader"
-	"github.com/atomix/go-framework/pkg/atomix/driver/env"
-	"github.com/atomix/go-framework/pkg/atomix/logging"
+	leader "github.com/atomix/atomix-api/go/atomix/primitive/leader"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 )
 
 // NewProxyServer creates a new ProxyServer

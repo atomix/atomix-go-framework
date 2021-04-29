@@ -15,8 +15,8 @@
 package meta
 
 import (
-	metaapi "github.com/atomix/api/go/atomix/primitive/meta"
-	"github.com/atomix/go-framework/pkg/atomix/time"
+	metaapi "github.com/atomix/atomix-api/go/atomix/primitive/meta"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
 )
 
 func Equal(m1, m2 metaapi.ObjectMeta) bool {
