@@ -14,6 +14,14 @@
 
 package broker
 
+import "os"
+
+const (
+	namespaceEnv = "ATOMIX_BROKER_NAMESPACE"
+	nameEnv      = "ATOMIX_BROKER_NAME"
+	nodeEnv      = "ATOMIX_BROKER_NODE"
+)
+
 const (
 	defaultID   = "atomix-broker"
 	defaultHost = ""
@@ -21,16 +29,22 @@ const (
 )
 
 type brokerOptions struct {
-	id   string
-	host string
-	port int
+	namespace string
+	name      string
+	node      string
+	id        string
+	host      string
+	port      int
 }
 
 func applyOptions(opts ...Option) brokerOptions {
 	options := brokerOptions{
-		id:   defaultID,
-		host: defaultHost,
-		port: defaultPort,
+		namespace: os.Getenv(namespaceEnv),
+		name:      os.Getenv(nameEnv),
+		node:      os.Getenv(nodeEnv),
+		id:        defaultID,
+		host:      defaultHost,
+		port:      defaultPort,
 	}
 	for _, opt := range opts {
 		opt(&options)
@@ -40,6 +54,24 @@ func applyOptions(opts ...Option) brokerOptions {
 
 // Option is a broker option
 type Option func(opts *brokerOptions)
+
+func WithNamespace(namespace string) Option {
+	return func(opts *brokerOptions) {
+		opts.namespace = namespace
+	}
+}
+
+func WithName(name string) Option {
+	return func(opts *brokerOptions) {
+		opts.name = name
+	}
+}
+
+func WithNode(node string) Option {
+	return func(opts *brokerOptions) {
+		opts.node = node
+	}
+}
 
 func WithID(id string) Option {
 	return func(opts *brokerOptions) {

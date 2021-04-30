@@ -14,6 +14,8 @@
 
 package driver
 
+import "github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
+
 const (
 	defaultID   = "atomix-driver"
 	defaultHost = ""
@@ -21,6 +23,7 @@ const (
 )
 
 type driverOptions struct {
+	env.DriverEnv
 	driverID string
 	host     string
 	port     int
@@ -28,9 +31,10 @@ type driverOptions struct {
 
 func applyOptions(opts ...Option) driverOptions {
 	options := driverOptions{
-		driverID: defaultID,
-		host:     defaultHost,
-		port:     defaultPort,
+		driverID:  defaultID,
+		host:      defaultHost,
+		port:      defaultPort,
+		DriverEnv: env.GetDriverEnv(),
 	}
 	for _, opt := range opts {
 		opt(&options)
@@ -40,6 +44,24 @@ func applyOptions(opts ...Option) driverOptions {
 
 // Option is a driver option
 type Option func(opts *driverOptions)
+
+func WithNamespace(namespace string) Option {
+	return func(opts *driverOptions) {
+		opts.Namespace = namespace
+	}
+}
+
+func WithName(name string) Option {
+	return func(opts *driverOptions) {
+		opts.Name = name
+	}
+}
+
+func WithNode(node string) Option {
+	return func(opts *driverOptions) {
+		opts.Node = node
+	}
+}
 
 func WithDriverID(id string) Option {
 	return func(opts *driverOptions) {

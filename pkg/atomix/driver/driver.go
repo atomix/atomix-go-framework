@@ -38,7 +38,7 @@ func NewDriver(protocol proxy.ProtocolFunc, opts ...Option) *Driver {
 			cluster.WithMemberID(options.driverID),
 			cluster.WithHost(options.host),
 			cluster.WithPort(options.port))),
-		Env:      env.GetDriverEnv(),
+		Env:      options.DriverEnv,
 		protocol: protocol,
 		agents:   make(map[driverapi.AgentId]*agent.Agent),
 		log:      logging.GetLogger("atomix", "driver", strings.ToLower(options.driverID)),

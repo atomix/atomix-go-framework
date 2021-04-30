@@ -34,17 +34,19 @@ func NewBroker(opts ...Option) *Broker {
 			cluster.WithMemberID(options.id),
 			cluster.WithHost(options.host),
 			cluster.WithPort(options.port))),
+		namespace: options.namespace,
 	}
 }
 
 // Broker is a broker node
 type Broker struct {
 	*server.Server
+	namespace string
 }
 
 // Start starts the node
 func (n *Broker) Start() error {
-	server := NewServer(newPrimitiveRegistry())
+	server := NewServer(newPrimitiveRegistry(n.namespace))
 	n.Server.RegisterService(func(s *grpc.Server) {
 		brokerapi.RegisterBrokerServer(s, server)
 	})
