@@ -22,7 +22,6 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
 	"google.golang.org/grpc"
 	"io"
-	"sync"
 )
 
 type MemberID string
@@ -57,11 +56,9 @@ type Peer struct {
 	replica     *cluster.Replica
 	clock       time.Clock
 	client      GossipProtocolClient
-	stream      GossipProtocol_GossipClient
 	advertiseCh chan Advertise
 	updateCh    chan Update
 	objects     map[string]Object
-	objectsMu   sync.RWMutex
 	cancel      context.CancelFunc
 }
 
@@ -74,6 +71,7 @@ func (p *Peer) connect() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	stream, err := p.client.Gossip(ctx)
 	if err != nil {
+		cancel()
 		return err
 	}
 	p.cancel = cancel

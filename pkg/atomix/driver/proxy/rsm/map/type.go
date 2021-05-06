@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package _map
+package _map //nolint:golint
 
 import (
 	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
@@ -24,6 +24,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+// Register registers the map proxy
 func Register(protocol *rsm.Protocol) {
 	protocol.Primitives().RegisterPrimitiveType(newMapType(protocol))
 }

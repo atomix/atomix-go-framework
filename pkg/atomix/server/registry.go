@@ -33,14 +33,12 @@ type ServiceRegistry struct {
 	services []RegisterServiceFunc
 }
 
+// RegisterService registers a service factory function
 func (r *ServiceRegistry) RegisterService(service RegisterServiceFunc) {
 	r.services = append(r.services, service)
 }
 
+// GetServices returns the registered service factory functions
 func (r *ServiceRegistry) GetServices() []RegisterServiceFunc {
-	primitives := make([]RegisterServiceFunc, 0, len(r.services))
-	for _, primitive := range r.services {
-		primitives = append(primitives, primitive)
-	}
-	return primitives
+	return r.services
 }

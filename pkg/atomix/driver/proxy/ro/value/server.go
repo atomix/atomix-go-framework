@@ -18,10 +18,7 @@ import (
 	"context"
 	valueapi "github.com/atomix/atomix-api/go/atomix/primitive/value"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 )
-
-var log = logging.GetLogger("atomix", "value")
 
 // NewProxyServer creates a new read-only value server
 func NewProxyServer(s valueapi.ValueServiceServer) valueapi.ValueServiceServer {
@@ -30,6 +27,7 @@ func NewProxyServer(s valueapi.ValueServiceServer) valueapi.ValueServiceServer {
 	}
 }
 
+// ProxyServer is a read-only value primitive server
 type ProxyServer struct {
 	server valueapi.ValueServiceServer
 }

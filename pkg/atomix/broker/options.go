@@ -55,36 +55,42 @@ func applyOptions(opts ...Option) brokerOptions {
 // Option is a broker option
 type Option func(opts *brokerOptions)
 
+// WithNamespace sets the pod namespace
 func WithNamespace(namespace string) Option {
 	return func(opts *brokerOptions) {
 		opts.namespace = namespace
 	}
 }
 
+// WithName sets the pod name
 func WithName(name string) Option {
 	return func(opts *brokerOptions) {
 		opts.name = name
 	}
 }
 
+// WithNode sets the pod node
 func WithNode(node string) Option {
 	return func(opts *brokerOptions) {
 		opts.node = node
 	}
 }
 
+// WithID sets the broker identifier
 func WithID(id string) Option {
 	return func(opts *brokerOptions) {
 		opts.id = id
 	}
 }
 
+// WithHost sets the host to which the broker should bind
 func WithHost(host string) Option {
 	return func(opts *brokerOptions) {
 		opts.host = host
 	}
 }
 
+// WithPort sets the port to which the broker should bind
 func WithPort(port int) Option {
 	return func(opts *brokerOptions) {
 		opts.port = port

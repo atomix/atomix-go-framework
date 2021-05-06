@@ -18,10 +18,7 @@ import (
 	"context"
 	counterapi "github.com/atomix/atomix-api/go/atomix/primitive/counter"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 )
-
-var log = logging.GetLogger("atomix", "counter")
 
 // NewProxyServer creates a new read-only counter server
 func NewProxyServer(s counterapi.CounterServiceServer) counterapi.CounterServiceServer {
@@ -30,6 +27,7 @@ func NewProxyServer(s counterapi.CounterServiceServer) counterapi.CounterService
 	}
 }
 
+// ProxyServer is a read-only counter primitive server
 type ProxyServer struct {
 	server counterapi.CounterServiceServer
 }

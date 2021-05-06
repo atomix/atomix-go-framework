@@ -18,10 +18,7 @@ import (
 	"context"
 	leaderapi "github.com/atomix/atomix-api/go/atomix/primitive/leader"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 )
-
-var log = logging.GetLogger("atomix", "leader")
 
 // NewProxyServer creates a new read-only leader server
 func NewProxyServer(s leaderapi.LeaderLatchServiceServer) leaderapi.LeaderLatchServiceServer {
@@ -30,6 +27,7 @@ func NewProxyServer(s leaderapi.LeaderLatchServiceServer) leaderapi.LeaderLatchS
 	}
 }
 
+// ProxyServer is a read-only leader primitive server
 type ProxyServer struct {
 	server leaderapi.LeaderLatchServiceServer
 }

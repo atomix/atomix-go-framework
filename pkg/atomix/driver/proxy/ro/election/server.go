@@ -18,10 +18,7 @@ import (
 	"context"
 	electionapi "github.com/atomix/atomix-api/go/atomix/primitive/election"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 )
-
-var log = logging.GetLogger("atomix", "election")
 
 // NewProxyServer creates a new read-only election server
 func NewProxyServer(s electionapi.LeaderElectionServiceServer) electionapi.LeaderElectionServiceServer {
@@ -30,6 +27,7 @@ func NewProxyServer(s electionapi.LeaderElectionServiceServer) electionapi.Leade
 	}
 }
 
+// ProxyServer is a read-only election primitive server
 type ProxyServer struct {
 	server electionapi.LeaderElectionServiceServer
 }

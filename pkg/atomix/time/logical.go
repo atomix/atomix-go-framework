@@ -21,6 +21,7 @@ import (
 
 const logicalSchemeName = "Logical"
 
+// LogicalScheme is a default Scheme for logical time
 var LogicalScheme = newLogicalScheme()
 
 // newLogicalScheme creates a new logical scheme
@@ -100,14 +101,17 @@ func (c *LogicalClock) Update(t Timestamp) Timestamp {
 	return c.timestamp
 }
 
+// LogicalTime is an instant in logical time
 type LogicalTime uint64
 
+// NewLogicalTimestamp creates a new logical Timestamp
 func NewLogicalTimestamp(time LogicalTime) Timestamp {
 	return LogicalTimestamp{
 		Time: time,
 	}
 }
 
+// LogicalTimestamp is a logical timestamp
 type LogicalTimestamp struct {
 	Time LogicalTime
 }

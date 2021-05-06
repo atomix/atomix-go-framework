@@ -18,10 +18,7 @@ import (
 	"context"
 	indexedmapapi "github.com/atomix/atomix-api/go/atomix/primitive/indexedmap"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 )
-
-var log = logging.GetLogger("atomix", "indexedmap")
 
 // NewProxyServer creates a new read-only indexedmap server
 func NewProxyServer(s indexedmapapi.IndexedMapServiceServer) indexedmapapi.IndexedMapServiceServer {
@@ -30,6 +27,7 @@ func NewProxyServer(s indexedmapapi.IndexedMapServiceServer) indexedmapapi.Index
 	}
 }
 
+// ProxyServer is a read-only indexed map primitive server
 type ProxyServer struct {
 	server indexedmapapi.IndexedMapServiceServer
 }

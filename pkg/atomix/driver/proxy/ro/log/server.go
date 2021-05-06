@@ -18,10 +18,7 @@ import (
 	"context"
 	logapi "github.com/atomix/atomix-api/go/atomix/primitive/log"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 )
-
-var log = logging.GetLogger("atomix", "map")
 
 // NewProxyServer creates a new read-only log server
 func NewProxyServer(s logapi.LogServiceServer) logapi.LogServiceServer {
@@ -30,6 +27,7 @@ func NewProxyServer(s logapi.LogServiceServer) logapi.LogServiceServer {
 	}
 }
 
+// ProxyServer is a read-only log primitive server
 type ProxyServer struct {
 	server logapi.LogServiceServer
 }

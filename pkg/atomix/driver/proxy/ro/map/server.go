@@ -18,10 +18,7 @@ import (
 	"context"
 	mapapi "github.com/atomix/atomix-api/go/atomix/primitive/map"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 )
-
-var log = logging.GetLogger("atomix", "map")
 
 // NewProxyServer creates a new read-only map server
 func NewProxyServer(s mapapi.MapServiceServer) mapapi.MapServiceServer {
@@ -30,6 +27,7 @@ func NewProxyServer(s mapapi.MapServiceServer) mapapi.MapServiceServer {
 	}
 }
 
+// ProxyServer is a read-only map primitive server
 type ProxyServer struct {
 	server mapapi.MapServiceServer
 }

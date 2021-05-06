@@ -93,14 +93,17 @@ func (c *PhysicalClock) Update(update Timestamp) Timestamp {
 	return c.timestamp
 }
 
+// PhysicalTime is an instant in physical time
 type PhysicalTime time.Time
 
+// NewPhysicalTimestamp creates a new Timestamp based in PhysicalTime
 func NewPhysicalTimestamp(time PhysicalTime) Timestamp {
 	return PhysicalTimestamp{
 		Time: time,
 	}
 }
 
+// PhysicalTimestamp is a Timestamp based on PhysicalTime
 type PhysicalTimestamp struct {
 	Time PhysicalTime
 }

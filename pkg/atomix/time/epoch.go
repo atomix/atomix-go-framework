@@ -99,6 +99,7 @@ func (c *EpochClock) Update(t Timestamp) Timestamp {
 
 type Epoch uint64
 
+// NewEpochTimestamp creates a new Epoch based Timestamp
 func NewEpochTimestamp(epoch Epoch, time LogicalTime) Timestamp {
 	return EpochTimestamp{
 		Epoch: epoch,
@@ -106,6 +107,7 @@ func NewEpochTimestamp(epoch Epoch, time LogicalTime) Timestamp {
 	}
 }
 
+// EpochTimestamp is a Timestamp based on an Epoch and LogicalTime
 type EpochTimestamp struct {
 	Epoch Epoch
 	Time  LogicalTime

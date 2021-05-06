@@ -110,6 +110,7 @@ func (c *CompositeClock) Update(t Timestamp) Timestamp {
 	return c.timestamp
 }
 
+// NewCompositeTimestamp creates a new composite Timestamp from the given set of Timestamps
 func NewCompositeTimestamp(timestamps ...Timestamp) Timestamp {
 	schemes := make([]Scheme, len(timestamps))
 	for i, timestamp := range timestamps {
@@ -121,6 +122,7 @@ func NewCompositeTimestamp(timestamps ...Timestamp) Timestamp {
 	}
 }
 
+// CompositeTimestamp is a composite Timestamp implementation
 type CompositeTimestamp struct {
 	scheme     Scheme
 	Timestamps []Timestamp

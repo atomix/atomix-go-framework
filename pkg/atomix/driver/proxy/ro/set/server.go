@@ -18,10 +18,7 @@ import (
 	"context"
 	setapi "github.com/atomix/atomix-api/go/atomix/primitive/set"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 )
-
-var log = logging.GetLogger("atomix", "set")
 
 // NewProxyServer creates a new read-only set server
 func NewProxyServer(s setapi.SetServiceServer) setapi.SetServiceServer {
@@ -30,6 +27,7 @@ func NewProxyServer(s setapi.SetServiceServer) setapi.SetServiceServer {
 	}
 }
 
+// ProxyServer is a read-only set primitive server
 type ProxyServer struct {
 	server setapi.SetServiceServer
 }

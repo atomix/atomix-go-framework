@@ -18,10 +18,7 @@ import (
 	"context"
 	listapi "github.com/atomix/atomix-api/go/atomix/primitive/list"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 )
-
-var log = logging.GetLogger("atomix", "list")
 
 // NewProxyServer creates a new read-only list server
 func NewProxyServer(s listapi.ListServiceServer) listapi.ListServiceServer {
@@ -30,6 +27,7 @@ func NewProxyServer(s listapi.ListServiceServer) listapi.ListServiceServer {
 	}
 }
 
+// ProxyServer is a read-only list primitive server
 type ProxyServer struct {
 	server listapi.ListServiceServer
 }

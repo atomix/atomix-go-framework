@@ -18,10 +18,7 @@ import (
 	"context"
 	lockapi "github.com/atomix/atomix-api/go/atomix/primitive/lock"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 )
-
-var log = logging.GetLogger("atomix", "lock")
 
 // NewProxyServer creates a new read-only lock server
 func NewProxyServer(s lockapi.LockServiceServer) lockapi.LockServiceServer {
@@ -30,6 +27,7 @@ func NewProxyServer(s lockapi.LockServiceServer) lockapi.LockServiceServer {
 	}
 }
 
+// ProxyServer is a read-only lock primitive server
 type ProxyServer struct {
 	server lockapi.LockServiceServer
 }
