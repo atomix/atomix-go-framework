@@ -14,17 +14,15 @@ package {{ .Package.Name }}
 {{- end -}}
 
 import (
-	{{ import "github.com/atomix/atomix-go-framework/pkg/atomix/errors" }}
+	"io"
 	{{ import "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm" }}
+	{{ import "github.com/atomix/atomix-go-framework/pkg/atomix/errors" }}
+	{{ import "github.com/atomix/atomix-go-framework/pkg/atomix/util" }}
+	{{ import "github.com/golang/protobuf/proto" }}
 	{{ import "github.com/google/uuid" }}
 	{{- $package := .Package }}
 	{{- range .Imports }}
 	{{ .Alias }} {{ .Path | quote }}
-	{{- end }}
-	{{- range .Primitive.Methods }}
-	{{- if or .Type.IsAsync .Response.IsStream }}
-	{{ import "github.com/golang/protobuf/proto" }}
-	{{- end }}
 	{{- end }}
 )
 
@@ -33,18 +31,29 @@ import (
 {{- $serviceWatcherInt := printf "%sWatcher" .Generator.Prefix }}
 {{- $serviceWatcherImpl := ( ( printf "%sServiceWatcher" .Generator.Prefix ) | toLowerCamel ) }}
 {{- $newServiceWatcher := printf "new%sWatcher" .Generator.Prefix }}
+
+{{- $serviceSnapshotWriterInt := printf "%sSnapshotWriter" .Generator.Prefix }}
+{{- $serviceSnapshotWriterImpl := ( ( printf "%sServiceSnapshotWriter" .Generator.Prefix ) | toLowerCamel ) }}
+{{- $newServiceSnapshotWriter := printf "new%sSnapshotWriter" .Generator.Prefix }}
+
+{{- $serviceSnapshotReaderInt := printf "%sSnapshotReader" .Generator.Prefix }}
+{{- $serviceSnapshotReaderImpl := ( ( printf "%sServiceSnapshotReader" .Generator.Prefix ) | toLowerCamel ) }}
+{{- $newServiceSnapshotReader := printf "new%sSnapshotReader" .Generator.Prefix }}
+
 {{- $serviceSessionsInt := printf "%sSessions" .Generator.Prefix }}
 {{- $serviceSessionsImpl := ( ( printf "%sServiceSessions" .Generator.Prefix ) | toLowerCamel ) }}
 {{- $newServiceSessions := printf "new%sSessions" .Generator.Prefix }}
-{{- $serviceSessionInt := printf "%sSession" .Generator.Prefix }}
+
 {{- $serviceSessionID := printf "%sSessionID" .Generator.Prefix }}
 {{- $serviceSessionState := printf "%sSessionState" .Generator.Prefix }}
+{{- $serviceSessionInt := printf "%sSession" .Generator.Prefix }}
 {{- $serviceSessionImpl := ( ( printf "%sServiceSession" .Generator.Prefix ) | toLowerCamel ) }}
 {{- $newServiceSession := printf "new%sSession" .Generator.Prefix }}
 
 {{- $serviceProposalsInt := printf "%sProposals" .Generator.Prefix }}
 {{- $serviceProposalsImpl := ( ( printf "%sServiceProposals" .Generator.Prefix ) | toLowerCamel ) }}
 {{- $newServiceProposals := printf "new%sProposals" .Generator.Prefix }}
+
 {{- $serviceProposalID := printf "%sProposalID" .Generator.Prefix }}
 {{- $serviceProposalInt := printf "%sProposal" .Generator.Prefix }}
 {{- $serviceProposalImpl := ( ( printf "%sServiceProposal" .Generator.Prefix ) | toLowerCamel ) }}
@@ -54,8 +63,8 @@ type {{ $serviceInt }} interface {
     {{ $serviceContextInt }}
 
     {{- if .Primitive.State }}
-    GetState() (*{{ template "type" .Primitive.State.Type }}, error)
-    SetState(*{{ template "type" .Primitive.State.Type }}) error
+    Backup({{ $serviceSnapshotWriterInt }}) error
+    Restore({{ $serviceSnapshotReaderInt }}) error
     {{- end }}
 
     {{- range .Primitive.Methods }}
@@ -108,6 +117,63 @@ func (s *{{ $serviceContextImpl }}) Proposals() {{ $serviceProposalsInt }} {
 }
 
 var _ {{ $serviceContextInt }} = &{{ $serviceContextImpl }}{}
+
+type {{ $serviceSnapshotWriterInt }} interface {
+    WriteState(*{{ template "type" .Primitive.State.Type }}) error
+}
+
+func {{ $newServiceSnapshotWriter }}(writer io.Writer) {{ $serviceSnapshotWriterInt }} {
+    return &{{ $serviceSnapshotWriterImpl }}{
+        writer: writer,
+    }
+}
+
+type {{ $serviceSnapshotWriterImpl }} struct {
+    writer io.Writer
+}
+
+func (w *{{ $serviceSnapshotWriterImpl }}) WriteState(state *{{ template "type" .Primitive.State.Type }}) error {
+	bytes, err := proto.Marshal(state)
+	if err != nil {
+		return err
+	}
+	err = util.WriteBytes(w.writer, bytes)
+	if err != nil {
+		return err
+	}
+	return err
+}
+
+var _ {{ $serviceSnapshotWriterInt }} = &{{ $serviceSnapshotWriterImpl }}{}
+
+type {{ $serviceSnapshotReaderInt }} interface {
+    ReadState() (*{{ template "type" .Primitive.State.Type }}, error)
+}
+
+func {{ $newServiceSnapshotReader }}(reader io.Reader) {{ $serviceSnapshotReaderInt }} {
+    return &{{ $serviceSnapshotReaderImpl }}{
+        reader: reader,
+    }
+}
+
+type {{ $serviceSnapshotReaderImpl }} struct {
+    reader io.Reader
+}
+
+func (r *{{ $serviceSnapshotReaderImpl }}) ReadState() (*{{ template "type" .Primitive.State.Type }}, error) {
+    bytes, err := util.ReadBytes(r.reader)
+	if err != nil {
+		return nil, err
+	}
+	state := &{{ template "type" .Primitive.State.Type }}{}
+	err = proto.Unmarshal(bytes, state)
+	if err != nil {
+		return nil, err
+	}
+	return state, nil
+}
+
+var _ {{ $serviceSnapshotReaderInt }} = &{{ $serviceSnapshotReaderImpl }}{}
 
 type {{ $serviceSessionsInt }} interface {
     open({{ $serviceSessionInt }})

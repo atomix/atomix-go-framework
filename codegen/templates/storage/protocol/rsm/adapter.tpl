@@ -17,7 +17,6 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
 	{{- $package := .Package }}
 	{{- range .Imports }}
@@ -76,6 +75,8 @@ func (s *{{ $serviceImpl }}) init() {
 {{- $serviceProposalID := printf "%sProposalID" .Generator.Prefix }}
 {{- $newServiceSession := printf "new%sSession" .Generator.Prefix }}
 {{- $serviceSessionID := printf "%sSessionID" .Generator.Prefix }}
+{{- $newServiceSnapshotWriter := printf "new%sSnapshotWriter" .Generator.Prefix }}
+{{- $newServiceSnapshotReader := printf "new%sSnapshotReader" .Generator.Prefix }}
 func (s *{{ $serviceImpl }}) SessionOpen(rsmSession rsm.Session) {
     s.rsm.Sessions().open({{ $newServiceSession }}(rsmSession))
 }
@@ -90,17 +91,7 @@ func (s *{{ $serviceImpl }}) SessionClosed(session rsm.Session) {
 
 {{- if .Primitive.State }}
 func (s *{{ $serviceImpl }}) Backup(writer io.Writer) error {
-    state, err := s.rsm.GetState()
-	if err != nil {
-		s.log.Error(err)
-		return err
-	}
-	bytes, err := proto.Marshal(state)
-	if err != nil {
-		s.log.Error(err)
-		return err
-	}
-	err = util.WriteBytes(writer, bytes)
+    err := s.rsm.Backup({{ $newServiceSnapshotWriter }}(writer))
 	if err != nil {
 		s.log.Error(err)
 		return err
@@ -109,18 +100,7 @@ func (s *{{ $serviceImpl }}) Backup(writer io.Writer) error {
 }
 
 func (s *{{ $serviceImpl }}) Restore(reader io.Reader) error {
-    bytes, err := util.ReadBytes(reader)
-	if err != nil {
-		s.log.Error(err)
-		return err
-	}
-	state := &{{ template "type" .Primitive.State.Type }}{}
-	err = proto.Unmarshal(bytes, state)
-	if err != nil {
-		s.log.Error(err)
-		return err
-	}
-	err = s.rsm.SetState(state)
+    err := s.rsm.Restore({{ $newServiceSnapshotReader }}(reader))
 	if err != nil {
 		s.log.Error(err)
 		return err

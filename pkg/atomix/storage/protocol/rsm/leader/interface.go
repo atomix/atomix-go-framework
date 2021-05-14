@@ -5,14 +5,16 @@ import (
 	leader "github.com/atomix/atomix-api/go/atomix/primitive/leader"
 	errors "github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
+	util "github.com/atomix/atomix-go-framework/pkg/atomix/util"
 	proto "github.com/golang/protobuf/proto"
 	uuid "github.com/google/uuid"
+	"io"
 )
 
 type Service interface {
 	ServiceContext
-	GetState() (*LeaderLatchState, error)
-	SetState(*LeaderLatchState) error
+	Backup(SnapshotWriter) error
+	Restore(SnapshotReader) error
 	// Latch attempts to acquire the leader latch
 	Latch(LatchProposal) error
 	// Get gets the current leader
@@ -54,6 +56,63 @@ func (s *serviceContext) Proposals() Proposals {
 }
 
 var _ ServiceContext = &serviceContext{}
+
+type SnapshotWriter interface {
+	WriteState(*LeaderLatchState) error
+}
+
+func newSnapshotWriter(writer io.Writer) SnapshotWriter {
+	return &serviceSnapshotWriter{
+		writer: writer,
+	}
+}
+
+type serviceSnapshotWriter struct {
+	writer io.Writer
+}
+
+func (w *serviceSnapshotWriter) WriteState(state *LeaderLatchState) error {
+	bytes, err := proto.Marshal(state)
+	if err != nil {
+		return err
+	}
+	err = util.WriteBytes(w.writer, bytes)
+	if err != nil {
+		return err
+	}
+	return err
+}
+
+var _ SnapshotWriter = &serviceSnapshotWriter{}
+
+type SnapshotReader interface {
+	ReadState() (*LeaderLatchState, error)
+}
+
+func newSnapshotReader(reader io.Reader) SnapshotReader {
+	return &serviceSnapshotReader{
+		reader: reader,
+	}
+}
+
+type serviceSnapshotReader struct {
+	reader io.Reader
+}
+
+func (r *serviceSnapshotReader) ReadState() (*LeaderLatchState, error) {
+	bytes, err := util.ReadBytes(r.reader)
+	if err != nil {
+		return nil, err
+	}
+	state := &LeaderLatchState{}
+	err = proto.Unmarshal(bytes, state)
+	if err != nil {
+		return nil, err
+	}
+	return state, nil
+}
+
+var _ SnapshotReader = &serviceSnapshotReader{}
 
 type Sessions interface {
 	open(Session)

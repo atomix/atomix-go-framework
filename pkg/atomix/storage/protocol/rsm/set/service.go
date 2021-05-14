@@ -37,15 +37,7 @@ type setService struct {
 	values map[string]meta.ObjectMeta
 }
 
-func (s *setService) SetState(state *SetState) error {
-	s.values = make(map[string]meta.ObjectMeta)
-	for _, value := range state.Values {
-		s.values[value.Value] = meta.FromProto(value.ObjectMeta)
-	}
-	return nil
-}
-
-func (s *setService) GetState() (*SetState, error) {
+func (s *setService) Backup(writer SnapshotWriter) error {
 	values := make([]SetValue, 0, len(s.values))
 	for value, obj := range s.values {
 		values = append(values, SetValue{
@@ -53,9 +45,21 @@ func (s *setService) GetState() (*SetState, error) {
 			Value:      value,
 		})
 	}
-	return &SetState{
+	return writer.WriteState(&SetState{
 		Values: values,
-	}, nil
+	})
+}
+
+func (s *setService) Restore(reader SnapshotReader) error {
+	state, err := reader.ReadState()
+	if err != nil {
+		return err
+	}
+	s.values = make(map[string]meta.ObjectMeta)
+	for _, value := range state.Values {
+		s.values[value.Value] = meta.FromProto(value.ObjectMeta)
+	}
+	return nil
 }
 
 func (s *setService) notify(event setapi.Event) error {

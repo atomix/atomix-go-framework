@@ -42,15 +42,7 @@ type lockService struct {
 	timers   map[ProposalID]rsm.Timer
 }
 
-func (l *lockService) SetState(state *LockState) error {
-	l.owner = state.Owner
-	for _, request := range state.Requests {
-		l.queue.PushBack(request)
-	}
-	return nil
-}
-
-func (l *lockService) GetState() (*LockState, error) {
+func (l *lockService) Backup(writer SnapshotWriter) error {
 	state := &LockState{
 		Owner: l.owner,
 	}
@@ -59,7 +51,19 @@ func (l *lockService) GetState() (*LockState, error) {
 		state.Requests = append(state.Requests, request.Value.(LockRequest))
 		request = request.Next()
 	}
-	return state, nil
+	return writer.WriteState(state)
+}
+
+func (l *lockService) Restore(reader SnapshotReader) error {
+	state, err := reader.ReadState()
+	if err != nil {
+		return err
+	}
+	l.owner = state.Owner
+	for _, request := range state.Requests {
+		l.queue.PushBack(request)
+	}
+	return nil
 }
 
 func (l *lockService) Lock(lock LockProposal) error {

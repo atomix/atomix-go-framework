@@ -60,7 +60,7 @@ func (m *mapService) notify(event *mapapi.EventsResponse) error {
 	return nil
 }
 
-func (m *mapService) GetState() (*MapState, error) {
+func (m *mapService) Backup(writer SnapshotWriter) error {
 	listeners := make([]MapStateListener, 0, len(m.listeners))
 	for _, listener := range m.listeners {
 		listeners = append(listeners, *listener)
@@ -69,13 +69,17 @@ func (m *mapService) GetState() (*MapState, error) {
 	for _, entry := range m.entries {
 		entries = append(entries, *entry)
 	}
-	return &MapState{
+	return writer.WriteState(&MapState{
 		Listeners: listeners,
 		Entries:   entries,
-	}, nil
+	})
 }
 
-func (m *mapService) SetState(state *MapState) error {
+func (m *mapService) Restore(reader SnapshotReader) error {
+	state, err := reader.ReadState()
+	if err != nil {
+		return err
+	}
 	m.listeners = make(map[ProposalID]*MapStateListener)
 	for _, state := range state.Listeners {
 		listener := state

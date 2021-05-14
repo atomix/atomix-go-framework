@@ -38,12 +38,16 @@ type electionService struct {
 	term electionapi.Term
 }
 
-func (e *electionService) SetState(state *LeaderElectionState) error {
-	return nil
+func (e *electionService) Backup(writer SnapshotWriter) error {
+	return writer.WriteState(&LeaderElectionState{})
 }
 
-func (e *electionService) GetState() (*LeaderElectionState, error) {
-	return &LeaderElectionState{}, nil
+func (e *electionService) Restore(reader SnapshotReader) error {
+	_, err := reader.ReadState()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // SessionExpired is called when a session is expired by the server

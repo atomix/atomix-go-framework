@@ -5,14 +5,16 @@ import (
 	log "github.com/atomix/atomix-api/go/atomix/primitive/log"
 	errors "github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
+	util "github.com/atomix/atomix-go-framework/pkg/atomix/util"
 	proto "github.com/golang/protobuf/proto"
 	uuid "github.com/google/uuid"
+	"io"
 )
 
 type Service interface {
 	ServiceContext
-	GetState() (*LogState, error)
-	SetState(*LogState) error
+	Backup(SnapshotWriter) error
+	Restore(SnapshotReader) error
 	// Size returns the size of the log
 	Size(SizeProposal) error
 	// Appends appends an entry into the log
@@ -70,6 +72,63 @@ func (s *serviceContext) Proposals() Proposals {
 }
 
 var _ ServiceContext = &serviceContext{}
+
+type SnapshotWriter interface {
+	WriteState(*LogState) error
+}
+
+func newSnapshotWriter(writer io.Writer) SnapshotWriter {
+	return &serviceSnapshotWriter{
+		writer: writer,
+	}
+}
+
+type serviceSnapshotWriter struct {
+	writer io.Writer
+}
+
+func (w *serviceSnapshotWriter) WriteState(state *LogState) error {
+	bytes, err := proto.Marshal(state)
+	if err != nil {
+		return err
+	}
+	err = util.WriteBytes(w.writer, bytes)
+	if err != nil {
+		return err
+	}
+	return err
+}
+
+var _ SnapshotWriter = &serviceSnapshotWriter{}
+
+type SnapshotReader interface {
+	ReadState() (*LogState, error)
+}
+
+func newSnapshotReader(reader io.Reader) SnapshotReader {
+	return &serviceSnapshotReader{
+		reader: reader,
+	}
+}
+
+type serviceSnapshotReader struct {
+	reader io.Reader
+}
+
+func (r *serviceSnapshotReader) ReadState() (*LogState, error) {
+	bytes, err := util.ReadBytes(r.reader)
+	if err != nil {
+		return nil, err
+	}
+	state := &LogState{}
+	err = proto.Unmarshal(bytes, state)
+	if err != nil {
+		return nil, err
+	}
+	return state, nil
+}
+
+var _ SnapshotReader = &serviceSnapshotReader{}
 
 type Sessions interface {
 	open(Session)

@@ -48,6 +48,18 @@ type indexedMapService struct {
 	timers     map[string]rsm.Timer
 }
 
+func (m *indexedMapService) Backup(writer SnapshotWriter) error {
+	return writer.WriteState(&IndexedMapState{})
+}
+
+func (m *indexedMapService) Restore(reader SnapshotReader) error {
+	_, err := reader.ReadState()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (m *indexedMapService) SetState(state *IndexedMapState) error {
 	m.listeners = make(map[ProposalID]*IndexedMapStateListener)
 	for _, state := range state.Listeners {

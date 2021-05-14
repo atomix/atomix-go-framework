@@ -35,15 +35,19 @@ type counterService struct {
 	value int64
 }
 
-func (c *counterService) SetState(state *CounterState) error {
-	c.value = state.Value
-	return nil
+func (c *counterService) Backup(writer SnapshotWriter) error {
+	return writer.WriteState(&CounterState{
+		Value: c.value,
+	})
 }
 
-func (c *counterService) GetState() (*CounterState, error) {
-	return &CounterState{
-		Value: c.value,
-	}, nil
+func (c *counterService) Restore(reader SnapshotReader) error {
+	state, err := reader.ReadState()
+	if err != nil {
+		return err
+	}
+	c.value = state.Value
+	return nil
 }
 
 func (c *counterService) Set(set SetProposal) error {

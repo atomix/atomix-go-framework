@@ -36,7 +36,24 @@ type listService struct {
 	items []listapi.Value
 }
 
-func (l *listService) SetState(state *ListState) error {
+func (l *listService) Backup(writer SnapshotWriter) error {
+	values := make([]ListValue, 0, len(l.items))
+	for _, item := range l.items {
+		values = append(values, ListValue{
+			ObjectMeta: item.ObjectMeta,
+			Value:      item.Value,
+		})
+	}
+	return writer.WriteState(&ListState{
+		Values: values,
+	})
+}
+
+func (l *listService) Restore(reader SnapshotReader) error {
+	state, err := reader.ReadState()
+	if err != nil {
+		return err
+	}
 	l.items = make([]listapi.Value, 0, len(state.Values))
 	for _, value := range state.Values {
 		l.items = append(l.items, listapi.Value{
@@ -45,19 +62,6 @@ func (l *listService) SetState(state *ListState) error {
 		})
 	}
 	return nil
-}
-
-func (l *listService) GetState() (*ListState, error) {
-	values := make([]ListValue, 0, len(l.items))
-	for _, item := range l.items {
-		values = append(values, ListValue{
-			ObjectMeta: item.ObjectMeta,
-			Value:      item.Value,
-		})
-	}
-	return &ListState{
-		Values: values,
-	}, nil
 }
 
 func (l *listService) notify(event listapi.Event) error {

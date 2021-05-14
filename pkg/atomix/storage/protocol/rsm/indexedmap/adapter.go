@@ -6,7 +6,6 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
 	"io"
 )
@@ -79,17 +78,7 @@ func (s *ServiceAdaptor) SessionClosed(session rsm.Session) {
 	s.rsm.Sessions().close(SessionID(session.ID()))
 }
 func (s *ServiceAdaptor) Backup(writer io.Writer) error {
-	state, err := s.rsm.GetState()
-	if err != nil {
-		s.log.Error(err)
-		return err
-	}
-	bytes, err := proto.Marshal(state)
-	if err != nil {
-		s.log.Error(err)
-		return err
-	}
-	err = util.WriteBytes(writer, bytes)
+	err := s.rsm.Backup(newSnapshotWriter(writer))
 	if err != nil {
 		s.log.Error(err)
 		return err
@@ -98,18 +87,7 @@ func (s *ServiceAdaptor) Backup(writer io.Writer) error {
 }
 
 func (s *ServiceAdaptor) Restore(reader io.Reader) error {
-	bytes, err := util.ReadBytes(reader)
-	if err != nil {
-		s.log.Error(err)
-		return err
-	}
-	state := &IndexedMapState{}
-	err = proto.Unmarshal(bytes, state)
-	if err != nil {
-		s.log.Error(err)
-		return err
-	}
-	err = s.rsm.SetState(state)
+	err := s.rsm.Restore(newSnapshotReader(reader))
 	if err != nil {
 		s.log.Error(err)
 		return err

@@ -37,19 +37,23 @@ type valueService struct {
 	value valueapi.Value
 }
 
-func (v *valueService) SetState(state *ValueState) error {
+func (v *valueService) Backup(writer SnapshotWriter) error {
+	return writer.WriteState(&ValueState{
+		ObjectMeta: v.value.ObjectMeta,
+		Value:      v.value.Value,
+	})
+}
+
+func (v *valueService) Restore(reader SnapshotReader) error {
+	state, err := reader.ReadState()
+	if err != nil {
+		return err
+	}
 	v.value = valueapi.Value{
 		ObjectMeta: state.ObjectMeta,
 		Value:      state.Value,
 	}
 	return nil
-}
-
-func (v *valueService) GetState() (*ValueState, error) {
-	return &ValueState{
-		ObjectMeta: v.value.ObjectMeta,
-		Value:      v.value.Value,
-	}, nil
 }
 
 func (v *valueService) notify(event valueapi.Event) error {

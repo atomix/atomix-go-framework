@@ -38,12 +38,16 @@ type logService struct {
 	lastEntry  *LinkedEntry
 }
 
-func (l *logService) SetState(state *LogState) error {
-	return nil
+func (l *logService) Backup(writer SnapshotWriter) error {
+	return writer.WriteState(&LogState{})
 }
 
-func (l *logService) GetState() (*LogState, error) {
-	return &LogState{}, nil
+func (l *logService) Restore(reader SnapshotReader) error {
+	_, err := reader.ReadState()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (l *logService) notify(event *log.EventsResponse) error {

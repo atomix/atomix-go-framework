@@ -37,12 +37,16 @@ type leaderService struct {
 	latch leaderapi.Latch
 }
 
-func (l *leaderService) SetState(state *LeaderLatchState) error {
-	return nil
+func (l *leaderService) Backup(writer SnapshotWriter) error {
+	return writer.WriteState(&LeaderLatchState{})
 }
 
-func (l *leaderService) GetState() (*LeaderLatchState, error) {
-	return &LeaderLatchState{}, nil
+func (l *leaderService) Restore(reader SnapshotReader) error {
+	_, err := reader.ReadState()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // SessionExpired is called when a session is expired by the server
