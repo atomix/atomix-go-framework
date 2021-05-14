@@ -75,45 +75,54 @@ func (c *Context) GetPackageMeta(entity pgs.Entity) PackageMeta {
 }
 
 func (c *Context) GetStateMeta(packages map[string]pgs.Package) (*StateMeta, error) {
-	stateType := strings.ToLower(c.ctx.Params().Str("state"))
-	if len(stateType) == 0 {
-		return nil, nil
-	}
-
-	stateMeta := &StateMeta{}
-	switch stateType {
-	case "discrete":
-		stateMeta.IsDiscrete = true
-		stateMeta.IsContinuous = false
-	case "continuous":
-		stateMeta.IsDiscrete = false
-		stateMeta.IsContinuous = true
+	stateType := c.ctx.Params().Str("state")
+	if stateType != "" {
+		msgType, ok := c.findMessage(stateType, packages)
+		if !ok {
+			return nil, errors.NewNotFound("could not find state message '%s'", stateType)
+		}
+		stateTypeMeta := c.GetMessageTypeMeta(msgType)
+		keyField, err := c.GetStateKeyFieldMeta(msgType)
+		if err != nil {
+			return nil, err
+		}
+		digestField, err := c.GetStateDigestFieldMeta(msgType)
+		if err != nil {
+			return nil, err
+		}
+		return &StateMeta{
+			IsDiscrete:   true,
+			IsContinuous: false,
+			Type:         stateTypeMeta,
+			Key:          keyField,
+			Digest:       digestField,
+		}, nil
 	}
 
 	entryType := c.ctx.Params().Str("entry")
-	if len(entryType) == 0 {
-		return stateMeta, nil
+	if entryType != "" {
+		msgType, ok := c.findMessage(entryType, packages)
+		if !ok {
+			return nil, errors.NewNotFound("could not find entry message '%s'", entryType)
+		}
+		entryTypeMeta := c.GetMessageTypeMeta(msgType)
+		keyField, err := c.GetStateKeyFieldMeta(msgType)
+		if err != nil {
+			return nil, err
+		}
+		digestField, err := c.GetStateDigestFieldMeta(msgType)
+		if err != nil {
+			return nil, err
+		}
+		return &StateMeta{
+			IsDiscrete:   false,
+			IsContinuous: true,
+			Type:         entryTypeMeta,
+			Key:          keyField,
+			Digest:       digestField,
+		}, nil
 	}
-
-	msgType, ok := c.findMessage(entryType, packages)
-	if !ok {
-		return nil, errors.NewNotFound("could not find state message '%s'", entryType)
-	}
-	keyField, err := c.GetStateKeyFieldMeta(msgType)
-	if err != nil {
-		return nil, err
-	}
-	digestField, err := c.GetStateDigestFieldMeta(msgType)
-	if err != nil {
-		return nil, err
-	}
-	entryTypeMeta := c.GetMessageTypeMeta(msgType)
-	stateMeta.Entry = &StateTypeMeta{
-		Type:   entryTypeMeta,
-		Key:    keyField,
-		Digest: digestField,
-	}
-	return stateMeta, nil
+	return nil, nil
 }
 
 func (c *Context) findMessage(typeName string, packages map[string]pgs.Package) (pgs.Message, bool) {

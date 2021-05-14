@@ -3,135 +3,916 @@ package list
 
 import (
 	list "github.com/atomix/atomix-api/go/atomix/primitive/list"
+	errors "github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	proto "github.com/golang/protobuf/proto"
 )
 
-type ServiceEventsStream interface {
-	// ID returns the stream identifier
-	ID() rsm.StreamID
-
-	// OperationID returns the stream operation identifier
-	OperationID() rsm.OperationID
-
-	// Session returns the stream session
-	Session() rsm.Session
-
-	// Notify sends a value on the stream
-	Notify(value *list.EventsResponse) error
-
-	// Close closes the stream
-	Close()
-}
-
-func newServiceEventsStream(stream rsm.Stream) ServiceEventsStream {
-	return &ServiceAdaptorEventsStream{
-		stream: stream,
-	}
-}
-
-type ServiceAdaptorEventsStream struct {
-	stream rsm.Stream
-}
-
-func (s *ServiceAdaptorEventsStream) ID() rsm.StreamID {
-	return s.stream.ID()
-}
-
-func (s *ServiceAdaptorEventsStream) OperationID() rsm.OperationID {
-	return s.stream.OperationID()
-}
-
-func (s *ServiceAdaptorEventsStream) Session() rsm.Session {
-	return s.stream.Session()
-}
-
-func (s *ServiceAdaptorEventsStream) Notify(value *list.EventsResponse) error {
-	bytes, err := proto.Marshal(value)
-	if err != nil {
-		return err
-	}
-	s.stream.Value(bytes)
-	return nil
-}
-
-func (s *ServiceAdaptorEventsStream) Close() {
-	s.stream.Close()
-}
-
-var _ ServiceEventsStream = &ServiceAdaptorEventsStream{}
-
-type ServiceElementsStream interface {
-	// ID returns the stream identifier
-	ID() rsm.StreamID
-
-	// OperationID returns the stream operation identifier
-	OperationID() rsm.OperationID
-
-	// Session returns the stream session
-	Session() rsm.Session
-
-	// Notify sends a value on the stream
-	Notify(value *list.ElementsResponse) error
-
-	// Close closes the stream
-	Close()
-}
-
-func newServiceElementsStream(stream rsm.Stream) ServiceElementsStream {
-	return &ServiceAdaptorElementsStream{
-		stream: stream,
-	}
-}
-
-type ServiceAdaptorElementsStream struct {
-	stream rsm.Stream
-}
-
-func (s *ServiceAdaptorElementsStream) ID() rsm.StreamID {
-	return s.stream.ID()
-}
-
-func (s *ServiceAdaptorElementsStream) OperationID() rsm.OperationID {
-	return s.stream.OperationID()
-}
-
-func (s *ServiceAdaptorElementsStream) Session() rsm.Session {
-	return s.stream.Session()
-}
-
-func (s *ServiceAdaptorElementsStream) Notify(value *list.ElementsResponse) error {
-	bytes, err := proto.Marshal(value)
-	if err != nil {
-		return err
-	}
-	s.stream.Value(bytes)
-	return nil
-}
-
-func (s *ServiceAdaptorElementsStream) Close() {
-	s.stream.Close()
-}
-
-var _ ServiceElementsStream = &ServiceAdaptorElementsStream{}
-
 type Service interface {
+	ServiceContext
+	GetState() (*ListState, error)
+	SetState(*ListState) error
 	// Size gets the number of elements in the list
-	Size(*list.SizeRequest) (*list.SizeResponse, error)
+	Size(SizeProposal) error
 	// Append appends a value to the list
-	Append(*list.AppendRequest) (*list.AppendResponse, error)
+	Append(AppendProposal) error
 	// Insert inserts a value at a specific index in the list
-	Insert(*list.InsertRequest) (*list.InsertResponse, error)
+	Insert(InsertProposal) error
 	// Get gets the value at an index in the list
-	Get(*list.GetRequest) (*list.GetResponse, error)
+	Get(GetProposal) error
 	// Set sets the value at an index in the list
-	Set(*list.SetRequest) (*list.SetResponse, error)
+	Set(SetProposal) error
 	// Remove removes an element from the list
-	Remove(*list.RemoveRequest) (*list.RemoveResponse, error)
+	Remove(RemoveProposal) error
 	// Clear removes all elements from the list
-	Clear(*list.ClearRequest) (*list.ClearResponse, error)
+	Clear(ClearProposal) error
 	// Events listens for change events
-	Events(*list.EventsRequest, ServiceEventsStream) (rsm.StreamCloser, error)
+	Events(EventsProposal) error
 	// Elements streams all elements in the list
-	Elements(*list.ElementsRequest, ServiceElementsStream) (rsm.StreamCloser, error)
+	Elements(ElementsProposal) error
 }
+
+type ServiceContext interface {
+	Scheduler() rsm.Scheduler
+	Sessions() Sessions
+	Proposals() Proposals
+}
+
+func newServiceContext(scheduler rsm.Scheduler) ServiceContext {
+	return &serviceContext{
+		scheduler: scheduler,
+		sessions:  newSessions(),
+		proposals: newProposals(),
+	}
+}
+
+type serviceContext struct {
+	scheduler rsm.Scheduler
+	sessions  Sessions
+	proposals Proposals
+}
+
+func (s *serviceContext) Scheduler() rsm.Scheduler {
+	return s.scheduler
+}
+
+func (s *serviceContext) Sessions() Sessions {
+	return s.sessions
+}
+
+func (s *serviceContext) Proposals() Proposals {
+	return s.proposals
+}
+
+var _ ServiceContext = &serviceContext{}
+
+type Sessions interface {
+	open(Session)
+	expire(SessionID)
+	close(SessionID)
+	Get(SessionID) (Session, bool)
+	List() []Session
+}
+
+func newSessions() Sessions {
+	return &serviceSessions{
+		sessions: make(map[SessionID]Session),
+	}
+}
+
+type serviceSessions struct {
+	sessions map[SessionID]Session
+}
+
+func (s *serviceSessions) open(session Session) {
+	s.sessions[session.ID()] = session
+}
+
+func (s *serviceSessions) expire(sessionID SessionID) {
+	delete(s.sessions, sessionID)
+}
+
+func (s *serviceSessions) close(sessionID SessionID) {
+	delete(s.sessions, sessionID)
+}
+
+func (s *serviceSessions) Get(id SessionID) (Session, bool) {
+	session, ok := s.sessions[id]
+	return session, ok
+}
+
+func (s *serviceSessions) List() []Session {
+	sessions := make([]Session, 0, len(s.sessions))
+	for _, session := range s.sessions {
+		sessions = append(sessions, session)
+	}
+	return sessions
+}
+
+var _ Sessions = &serviceSessions{}
+
+type SessionID uint64
+
+type Session interface {
+	ID() SessionID
+	Proposals() Proposals
+}
+
+func newSession(session rsm.Session) Session {
+	return &serviceSession{
+		session:   session,
+		proposals: newProposals(),
+	}
+}
+
+type serviceSession struct {
+	session   rsm.Session
+	proposals Proposals
+}
+
+func (s *serviceSession) ID() SessionID {
+	return SessionID(s.session.ID())
+}
+
+func (s *serviceSession) Proposals() Proposals {
+	return s.proposals
+}
+
+var _ Session = &serviceSession{}
+
+type Proposals interface {
+	Size() SizeProposals
+	Append() AppendProposals
+	Insert() InsertProposals
+	Get() GetProposals
+	Set() SetProposals
+	Remove() RemoveProposals
+	Clear() ClearProposals
+	Events() EventsProposals
+	Elements() ElementsProposals
+}
+
+func newProposals() Proposals {
+	return &serviceProposals{
+		sizeProposals:     newSizeProposals(),
+		appendProposals:   newAppendProposals(),
+		insertProposals:   newInsertProposals(),
+		getProposals:      newGetProposals(),
+		setProposals:      newSetProposals(),
+		removeProposals:   newRemoveProposals(),
+		clearProposals:    newClearProposals(),
+		eventsProposals:   newEventsProposals(),
+		elementsProposals: newElementsProposals(),
+	}
+}
+
+type serviceProposals struct {
+	sizeProposals     SizeProposals
+	appendProposals   AppendProposals
+	insertProposals   InsertProposals
+	getProposals      GetProposals
+	setProposals      SetProposals
+	removeProposals   RemoveProposals
+	clearProposals    ClearProposals
+	eventsProposals   EventsProposals
+	elementsProposals ElementsProposals
+}
+
+func (s *serviceProposals) Size() SizeProposals {
+	return s.sizeProposals
+}
+func (s *serviceProposals) Append() AppendProposals {
+	return s.appendProposals
+}
+func (s *serviceProposals) Insert() InsertProposals {
+	return s.insertProposals
+}
+func (s *serviceProposals) Get() GetProposals {
+	return s.getProposals
+}
+func (s *serviceProposals) Set() SetProposals {
+	return s.setProposals
+}
+func (s *serviceProposals) Remove() RemoveProposals {
+	return s.removeProposals
+}
+func (s *serviceProposals) Clear() ClearProposals {
+	return s.clearProposals
+}
+func (s *serviceProposals) Events() EventsProposals {
+	return s.eventsProposals
+}
+func (s *serviceProposals) Elements() ElementsProposals {
+	return s.elementsProposals
+}
+
+var _ Proposals = &serviceProposals{}
+
+type ProposalID uint64
+
+type Proposal interface {
+	ID() ProposalID
+	Session() Session
+}
+
+func newProposal(id ProposalID, session Session) Proposal {
+	return &serviceProposal{
+		id:      id,
+		session: session,
+	}
+}
+
+type serviceProposal struct {
+	id      ProposalID
+	session Session
+}
+
+func (p *serviceProposal) ID() ProposalID {
+	return p.id
+}
+
+func (p *serviceProposal) Session() Session {
+	return p.session
+}
+
+var _ Proposal = &serviceProposal{}
+
+type SizeProposals interface {
+	register(SizeProposal)
+	unregister(ProposalID)
+	Get(ProposalID) (SizeProposal, bool)
+	List() []SizeProposal
+}
+
+func newSizeProposals() SizeProposals {
+	return &sizeProposals{
+		proposals: make(map[ProposalID]SizeProposal),
+	}
+}
+
+type sizeProposals struct {
+	proposals map[ProposalID]SizeProposal
+}
+
+func (p *sizeProposals) register(proposal SizeProposal) {
+	p.proposals[proposal.ID()] = proposal
+}
+
+func (p *sizeProposals) unregister(id ProposalID) {
+	delete(p.proposals, id)
+}
+
+func (p *sizeProposals) Get(id ProposalID) (SizeProposal, bool) {
+	proposal, ok := p.proposals[id]
+	return proposal, ok
+}
+
+func (p *sizeProposals) List() []SizeProposal {
+	proposals := make([]SizeProposal, 0, len(p.proposals))
+	for _, proposal := range p.proposals {
+		proposals = append(proposals, proposal)
+	}
+	return proposals
+}
+
+var _ SizeProposals = &sizeProposals{}
+
+type SizeProposal interface {
+	Proposal
+	Request() *list.SizeRequest
+	Reply(*list.SizeResponse) error
+}
+
+func newSizeProposal(id ProposalID, session Session, request *list.SizeRequest, response *list.SizeResponse) SizeProposal {
+	return &sizeProposal{
+		Proposal: newProposal(id, session),
+		request:  request,
+		response: response,
+	}
+}
+
+type sizeProposal struct {
+	Proposal
+	request  *list.SizeRequest
+	response *list.SizeResponse
+}
+
+func (p *sizeProposal) Request() *list.SizeRequest {
+	return p.request
+}
+
+func (p *sizeProposal) Reply(reply *list.SizeResponse) error {
+	if p.response != nil {
+		return errors.NewConflict("reply already sent")
+	}
+	p.response = reply
+	return nil
+}
+
+var _ SizeProposal = &sizeProposal{}
+
+type AppendProposals interface {
+	register(AppendProposal)
+	unregister(ProposalID)
+	Get(ProposalID) (AppendProposal, bool)
+	List() []AppendProposal
+}
+
+func newAppendProposals() AppendProposals {
+	return &appendProposals{
+		proposals: make(map[ProposalID]AppendProposal),
+	}
+}
+
+type appendProposals struct {
+	proposals map[ProposalID]AppendProposal
+}
+
+func (p *appendProposals) register(proposal AppendProposal) {
+	p.proposals[proposal.ID()] = proposal
+}
+
+func (p *appendProposals) unregister(id ProposalID) {
+	delete(p.proposals, id)
+}
+
+func (p *appendProposals) Get(id ProposalID) (AppendProposal, bool) {
+	proposal, ok := p.proposals[id]
+	return proposal, ok
+}
+
+func (p *appendProposals) List() []AppendProposal {
+	proposals := make([]AppendProposal, 0, len(p.proposals))
+	for _, proposal := range p.proposals {
+		proposals = append(proposals, proposal)
+	}
+	return proposals
+}
+
+var _ AppendProposals = &appendProposals{}
+
+type AppendProposal interface {
+	Proposal
+	Request() *list.AppendRequest
+	Reply(*list.AppendResponse) error
+}
+
+func newAppendProposal(id ProposalID, session Session, request *list.AppendRequest, response *list.AppendResponse) AppendProposal {
+	return &appendProposal{
+		Proposal: newProposal(id, session),
+		request:  request,
+		response: response,
+	}
+}
+
+type appendProposal struct {
+	Proposal
+	request  *list.AppendRequest
+	response *list.AppendResponse
+}
+
+func (p *appendProposal) Request() *list.AppendRequest {
+	return p.request
+}
+
+func (p *appendProposal) Reply(reply *list.AppendResponse) error {
+	if p.response != nil {
+		return errors.NewConflict("reply already sent")
+	}
+	p.response = reply
+	return nil
+}
+
+var _ AppendProposal = &appendProposal{}
+
+type InsertProposals interface {
+	register(InsertProposal)
+	unregister(ProposalID)
+	Get(ProposalID) (InsertProposal, bool)
+	List() []InsertProposal
+}
+
+func newInsertProposals() InsertProposals {
+	return &insertProposals{
+		proposals: make(map[ProposalID]InsertProposal),
+	}
+}
+
+type insertProposals struct {
+	proposals map[ProposalID]InsertProposal
+}
+
+func (p *insertProposals) register(proposal InsertProposal) {
+	p.proposals[proposal.ID()] = proposal
+}
+
+func (p *insertProposals) unregister(id ProposalID) {
+	delete(p.proposals, id)
+}
+
+func (p *insertProposals) Get(id ProposalID) (InsertProposal, bool) {
+	proposal, ok := p.proposals[id]
+	return proposal, ok
+}
+
+func (p *insertProposals) List() []InsertProposal {
+	proposals := make([]InsertProposal, 0, len(p.proposals))
+	for _, proposal := range p.proposals {
+		proposals = append(proposals, proposal)
+	}
+	return proposals
+}
+
+var _ InsertProposals = &insertProposals{}
+
+type InsertProposal interface {
+	Proposal
+	Request() *list.InsertRequest
+	Reply(*list.InsertResponse) error
+}
+
+func newInsertProposal(id ProposalID, session Session, request *list.InsertRequest, response *list.InsertResponse) InsertProposal {
+	return &insertProposal{
+		Proposal: newProposal(id, session),
+		request:  request,
+		response: response,
+	}
+}
+
+type insertProposal struct {
+	Proposal
+	request  *list.InsertRequest
+	response *list.InsertResponse
+}
+
+func (p *insertProposal) Request() *list.InsertRequest {
+	return p.request
+}
+
+func (p *insertProposal) Reply(reply *list.InsertResponse) error {
+	if p.response != nil {
+		return errors.NewConflict("reply already sent")
+	}
+	p.response = reply
+	return nil
+}
+
+var _ InsertProposal = &insertProposal{}
+
+type GetProposals interface {
+	register(GetProposal)
+	unregister(ProposalID)
+	Get(ProposalID) (GetProposal, bool)
+	List() []GetProposal
+}
+
+func newGetProposals() GetProposals {
+	return &getProposals{
+		proposals: make(map[ProposalID]GetProposal),
+	}
+}
+
+type getProposals struct {
+	proposals map[ProposalID]GetProposal
+}
+
+func (p *getProposals) register(proposal GetProposal) {
+	p.proposals[proposal.ID()] = proposal
+}
+
+func (p *getProposals) unregister(id ProposalID) {
+	delete(p.proposals, id)
+}
+
+func (p *getProposals) Get(id ProposalID) (GetProposal, bool) {
+	proposal, ok := p.proposals[id]
+	return proposal, ok
+}
+
+func (p *getProposals) List() []GetProposal {
+	proposals := make([]GetProposal, 0, len(p.proposals))
+	for _, proposal := range p.proposals {
+		proposals = append(proposals, proposal)
+	}
+	return proposals
+}
+
+var _ GetProposals = &getProposals{}
+
+type GetProposal interface {
+	Proposal
+	Request() *list.GetRequest
+	Reply(*list.GetResponse) error
+}
+
+func newGetProposal(id ProposalID, session Session, request *list.GetRequest, response *list.GetResponse) GetProposal {
+	return &getProposal{
+		Proposal: newProposal(id, session),
+		request:  request,
+		response: response,
+	}
+}
+
+type getProposal struct {
+	Proposal
+	request  *list.GetRequest
+	response *list.GetResponse
+}
+
+func (p *getProposal) Request() *list.GetRequest {
+	return p.request
+}
+
+func (p *getProposal) Reply(reply *list.GetResponse) error {
+	if p.response != nil {
+		return errors.NewConflict("reply already sent")
+	}
+	p.response = reply
+	return nil
+}
+
+var _ GetProposal = &getProposal{}
+
+type SetProposals interface {
+	register(SetProposal)
+	unregister(ProposalID)
+	Get(ProposalID) (SetProposal, bool)
+	List() []SetProposal
+}
+
+func newSetProposals() SetProposals {
+	return &setProposals{
+		proposals: make(map[ProposalID]SetProposal),
+	}
+}
+
+type setProposals struct {
+	proposals map[ProposalID]SetProposal
+}
+
+func (p *setProposals) register(proposal SetProposal) {
+	p.proposals[proposal.ID()] = proposal
+}
+
+func (p *setProposals) unregister(id ProposalID) {
+	delete(p.proposals, id)
+}
+
+func (p *setProposals) Get(id ProposalID) (SetProposal, bool) {
+	proposal, ok := p.proposals[id]
+	return proposal, ok
+}
+
+func (p *setProposals) List() []SetProposal {
+	proposals := make([]SetProposal, 0, len(p.proposals))
+	for _, proposal := range p.proposals {
+		proposals = append(proposals, proposal)
+	}
+	return proposals
+}
+
+var _ SetProposals = &setProposals{}
+
+type SetProposal interface {
+	Proposal
+	Request() *list.SetRequest
+	Reply(*list.SetResponse) error
+}
+
+func newSetProposal(id ProposalID, session Session, request *list.SetRequest, response *list.SetResponse) SetProposal {
+	return &setProposal{
+		Proposal: newProposal(id, session),
+		request:  request,
+		response: response,
+	}
+}
+
+type setProposal struct {
+	Proposal
+	request  *list.SetRequest
+	response *list.SetResponse
+}
+
+func (p *setProposal) Request() *list.SetRequest {
+	return p.request
+}
+
+func (p *setProposal) Reply(reply *list.SetResponse) error {
+	if p.response != nil {
+		return errors.NewConflict("reply already sent")
+	}
+	p.response = reply
+	return nil
+}
+
+var _ SetProposal = &setProposal{}
+
+type RemoveProposals interface {
+	register(RemoveProposal)
+	unregister(ProposalID)
+	Get(ProposalID) (RemoveProposal, bool)
+	List() []RemoveProposal
+}
+
+func newRemoveProposals() RemoveProposals {
+	return &removeProposals{
+		proposals: make(map[ProposalID]RemoveProposal),
+	}
+}
+
+type removeProposals struct {
+	proposals map[ProposalID]RemoveProposal
+}
+
+func (p *removeProposals) register(proposal RemoveProposal) {
+	p.proposals[proposal.ID()] = proposal
+}
+
+func (p *removeProposals) unregister(id ProposalID) {
+	delete(p.proposals, id)
+}
+
+func (p *removeProposals) Get(id ProposalID) (RemoveProposal, bool) {
+	proposal, ok := p.proposals[id]
+	return proposal, ok
+}
+
+func (p *removeProposals) List() []RemoveProposal {
+	proposals := make([]RemoveProposal, 0, len(p.proposals))
+	for _, proposal := range p.proposals {
+		proposals = append(proposals, proposal)
+	}
+	return proposals
+}
+
+var _ RemoveProposals = &removeProposals{}
+
+type RemoveProposal interface {
+	Proposal
+	Request() *list.RemoveRequest
+	Reply(*list.RemoveResponse) error
+}
+
+func newRemoveProposal(id ProposalID, session Session, request *list.RemoveRequest, response *list.RemoveResponse) RemoveProposal {
+	return &removeProposal{
+		Proposal: newProposal(id, session),
+		request:  request,
+		response: response,
+	}
+}
+
+type removeProposal struct {
+	Proposal
+	request  *list.RemoveRequest
+	response *list.RemoveResponse
+}
+
+func (p *removeProposal) Request() *list.RemoveRequest {
+	return p.request
+}
+
+func (p *removeProposal) Reply(reply *list.RemoveResponse) error {
+	if p.response != nil {
+		return errors.NewConflict("reply already sent")
+	}
+	p.response = reply
+	return nil
+}
+
+var _ RemoveProposal = &removeProposal{}
+
+type ClearProposals interface {
+	register(ClearProposal)
+	unregister(ProposalID)
+	Get(ProposalID) (ClearProposal, bool)
+	List() []ClearProposal
+}
+
+func newClearProposals() ClearProposals {
+	return &clearProposals{
+		proposals: make(map[ProposalID]ClearProposal),
+	}
+}
+
+type clearProposals struct {
+	proposals map[ProposalID]ClearProposal
+}
+
+func (p *clearProposals) register(proposal ClearProposal) {
+	p.proposals[proposal.ID()] = proposal
+}
+
+func (p *clearProposals) unregister(id ProposalID) {
+	delete(p.proposals, id)
+}
+
+func (p *clearProposals) Get(id ProposalID) (ClearProposal, bool) {
+	proposal, ok := p.proposals[id]
+	return proposal, ok
+}
+
+func (p *clearProposals) List() []ClearProposal {
+	proposals := make([]ClearProposal, 0, len(p.proposals))
+	for _, proposal := range p.proposals {
+		proposals = append(proposals, proposal)
+	}
+	return proposals
+}
+
+var _ ClearProposals = &clearProposals{}
+
+type ClearProposal interface {
+	Proposal
+	Request() *list.ClearRequest
+	Reply(*list.ClearResponse) error
+}
+
+func newClearProposal(id ProposalID, session Session, request *list.ClearRequest, response *list.ClearResponse) ClearProposal {
+	return &clearProposal{
+		Proposal: newProposal(id, session),
+		request:  request,
+		response: response,
+	}
+}
+
+type clearProposal struct {
+	Proposal
+	request  *list.ClearRequest
+	response *list.ClearResponse
+}
+
+func (p *clearProposal) Request() *list.ClearRequest {
+	return p.request
+}
+
+func (p *clearProposal) Reply(reply *list.ClearResponse) error {
+	if p.response != nil {
+		return errors.NewConflict("reply already sent")
+	}
+	p.response = reply
+	return nil
+}
+
+var _ ClearProposal = &clearProposal{}
+
+type EventsProposals interface {
+	register(EventsProposal)
+	unregister(ProposalID)
+	Get(ProposalID) (EventsProposal, bool)
+	List() []EventsProposal
+}
+
+func newEventsProposals() EventsProposals {
+	return &eventsProposals{
+		proposals: make(map[ProposalID]EventsProposal),
+	}
+}
+
+type eventsProposals struct {
+	proposals map[ProposalID]EventsProposal
+}
+
+func (p *eventsProposals) register(proposal EventsProposal) {
+	p.proposals[proposal.ID()] = proposal
+}
+
+func (p *eventsProposals) unregister(id ProposalID) {
+	delete(p.proposals, id)
+}
+
+func (p *eventsProposals) Get(id ProposalID) (EventsProposal, bool) {
+	proposal, ok := p.proposals[id]
+	return proposal, ok
+}
+
+func (p *eventsProposals) List() []EventsProposal {
+	proposals := make([]EventsProposal, 0, len(p.proposals))
+	for _, proposal := range p.proposals {
+		proposals = append(proposals, proposal)
+	}
+	return proposals
+}
+
+var _ EventsProposals = &eventsProposals{}
+
+type EventsProposal interface {
+	Proposal
+	Request() *list.EventsRequest
+	Notify(*list.EventsResponse) error
+	Close() error
+}
+
+func newEventsProposal(id ProposalID, session Session, request *list.EventsRequest, stream rsm.Stream) EventsProposal {
+	return &eventsProposal{
+		Proposal: newProposal(id, session),
+		request:  request,
+		stream:   stream,
+	}
+}
+
+type eventsProposal struct {
+	Proposal
+	request *list.EventsRequest
+	stream  rsm.Stream
+}
+
+func (p *eventsProposal) Request() *list.EventsRequest {
+	return p.request
+}
+
+func (p *eventsProposal) Notify(notification *list.EventsResponse) error {
+	bytes, err := proto.Marshal(notification)
+	if err != nil {
+		return err
+	}
+	p.stream.Value(bytes)
+	return nil
+}
+
+func (p *eventsProposal) Close() error {
+	p.stream.Close()
+	return nil
+}
+
+var _ EventsProposal = &eventsProposal{}
+
+type ElementsProposals interface {
+	register(ElementsProposal)
+	unregister(ProposalID)
+	Get(ProposalID) (ElementsProposal, bool)
+	List() []ElementsProposal
+}
+
+func newElementsProposals() ElementsProposals {
+	return &elementsProposals{
+		proposals: make(map[ProposalID]ElementsProposal),
+	}
+}
+
+type elementsProposals struct {
+	proposals map[ProposalID]ElementsProposal
+}
+
+func (p *elementsProposals) register(proposal ElementsProposal) {
+	p.proposals[proposal.ID()] = proposal
+}
+
+func (p *elementsProposals) unregister(id ProposalID) {
+	delete(p.proposals, id)
+}
+
+func (p *elementsProposals) Get(id ProposalID) (ElementsProposal, bool) {
+	proposal, ok := p.proposals[id]
+	return proposal, ok
+}
+
+func (p *elementsProposals) List() []ElementsProposal {
+	proposals := make([]ElementsProposal, 0, len(p.proposals))
+	for _, proposal := range p.proposals {
+		proposals = append(proposals, proposal)
+	}
+	return proposals
+}
+
+var _ ElementsProposals = &elementsProposals{}
+
+type ElementsProposal interface {
+	Proposal
+	Request() *list.ElementsRequest
+	Notify(*list.ElementsResponse) error
+	Close() error
+}
+
+func newElementsProposal(id ProposalID, session Session, request *list.ElementsRequest, stream rsm.Stream) ElementsProposal {
+	return &elementsProposal{
+		Proposal: newProposal(id, session),
+		request:  request,
+		stream:   stream,
+	}
+}
+
+type elementsProposal struct {
+	Proposal
+	request *list.ElementsRequest
+	stream  rsm.Stream
+}
+
+func (p *elementsProposal) Request() *list.ElementsRequest {
+	return p.request
+}
+
+func (p *elementsProposal) Notify(notification *list.ElementsResponse) error {
+	bytes, err := proto.Marshal(notification)
+	if err != nil {
+		return err
+	}
+	p.stream.Value(bytes)
+	return nil
+}
+
+func (p *elementsProposal) Close() error {
+	p.stream.Close()
+	return nil
+}
+
+var _ ElementsProposal = &elementsProposal{}

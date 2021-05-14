@@ -106,7 +106,7 @@ Query
 
 {{- range .Primitive.Methods }}
 {{- $method := . }}
-{{ if and .Request.IsDiscrete .Response.IsDiscrete }}
+{{ if and .Request.IsUnary .Response.IsUnary }}
 func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "type" .Request.Type }}) (*{{ template "type" .Response.Type }}, error) {
 	s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
 	s.manager.AddRequestHeaders({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})

@@ -70,7 +70,7 @@ type {{ $server }} struct {
 
 {{- range .Primitive.Methods }}
 {{- $method := . }}
-{{ if and .Request.IsDiscrete .Response.IsDiscrete }}
+{{ if and .Request.IsUnary .Response.IsUnary }}
 func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "type" .Request.Type }}) (*{{ template "type" .Response.Type }}, error) {
 	if request.Headers.PrimitiveID.Namespace == "" {
 		request.Headers.PrimitiveID.Namespace = s.env.Namespace

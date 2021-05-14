@@ -3,69 +3,417 @@ package value
 
 import (
 	value "github.com/atomix/atomix-api/go/atomix/primitive/value"
+	errors "github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	proto "github.com/golang/protobuf/proto"
 )
 
-type ServiceEventsStream interface {
-	// ID returns the stream identifier
-	ID() rsm.StreamID
-
-	// OperationID returns the stream operation identifier
-	OperationID() rsm.OperationID
-
-	// Session returns the stream session
-	Session() rsm.Session
-
-	// Notify sends a value on the stream
-	Notify(value *value.EventsResponse) error
-
-	// Close closes the stream
-	Close()
+type Service interface {
+	ServiceContext
+	GetState() (*ValueState, error)
+	SetState(*ValueState) error
+	// Set sets the value
+	Set(SetProposal) error
+	// Get gets the value
+	Get(GetProposal) error
+	// Events listens for value change events
+	Events(EventsProposal) error
 }
 
-func newServiceEventsStream(stream rsm.Stream) ServiceEventsStream {
-	return &ServiceAdaptorEventsStream{
-		stream: stream,
+type ServiceContext interface {
+	Scheduler() rsm.Scheduler
+	Sessions() Sessions
+	Proposals() Proposals
+}
+
+func newServiceContext(scheduler rsm.Scheduler) ServiceContext {
+	return &serviceContext{
+		scheduler: scheduler,
+		sessions:  newSessions(),
+		proposals: newProposals(),
 	}
 }
 
-type ServiceAdaptorEventsStream struct {
-	stream rsm.Stream
+type serviceContext struct {
+	scheduler rsm.Scheduler
+	sessions  Sessions
+	proposals Proposals
 }
 
-func (s *ServiceAdaptorEventsStream) ID() rsm.StreamID {
-	return s.stream.ID()
+func (s *serviceContext) Scheduler() rsm.Scheduler {
+	return s.scheduler
 }
 
-func (s *ServiceAdaptorEventsStream) OperationID() rsm.OperationID {
-	return s.stream.OperationID()
+func (s *serviceContext) Sessions() Sessions {
+	return s.sessions
 }
 
-func (s *ServiceAdaptorEventsStream) Session() rsm.Session {
-	return s.stream.Session()
+func (s *serviceContext) Proposals() Proposals {
+	return s.proposals
 }
 
-func (s *ServiceAdaptorEventsStream) Notify(value *value.EventsResponse) error {
-	bytes, err := proto.Marshal(value)
-	if err != nil {
-		return err
+var _ ServiceContext = &serviceContext{}
+
+type Sessions interface {
+	open(Session)
+	expire(SessionID)
+	close(SessionID)
+	Get(SessionID) (Session, bool)
+	List() []Session
+}
+
+func newSessions() Sessions {
+	return &serviceSessions{
+		sessions: make(map[SessionID]Session),
 	}
-	s.stream.Value(bytes)
+}
+
+type serviceSessions struct {
+	sessions map[SessionID]Session
+}
+
+func (s *serviceSessions) open(session Session) {
+	s.sessions[session.ID()] = session
+}
+
+func (s *serviceSessions) expire(sessionID SessionID) {
+	delete(s.sessions, sessionID)
+}
+
+func (s *serviceSessions) close(sessionID SessionID) {
+	delete(s.sessions, sessionID)
+}
+
+func (s *serviceSessions) Get(id SessionID) (Session, bool) {
+	session, ok := s.sessions[id]
+	return session, ok
+}
+
+func (s *serviceSessions) List() []Session {
+	sessions := make([]Session, 0, len(s.sessions))
+	for _, session := range s.sessions {
+		sessions = append(sessions, session)
+	}
+	return sessions
+}
+
+var _ Sessions = &serviceSessions{}
+
+type SessionID uint64
+
+type Session interface {
+	ID() SessionID
+	Proposals() Proposals
+}
+
+func newSession(session rsm.Session) Session {
+	return &serviceSession{
+		session:   session,
+		proposals: newProposals(),
+	}
+}
+
+type serviceSession struct {
+	session   rsm.Session
+	proposals Proposals
+}
+
+func (s *serviceSession) ID() SessionID {
+	return SessionID(s.session.ID())
+}
+
+func (s *serviceSession) Proposals() Proposals {
+	return s.proposals
+}
+
+var _ Session = &serviceSession{}
+
+type Proposals interface {
+	Set() SetProposals
+	Get() GetProposals
+	Events() EventsProposals
+}
+
+func newProposals() Proposals {
+	return &serviceProposals{
+		setProposals:    newSetProposals(),
+		getProposals:    newGetProposals(),
+		eventsProposals: newEventsProposals(),
+	}
+}
+
+type serviceProposals struct {
+	setProposals    SetProposals
+	getProposals    GetProposals
+	eventsProposals EventsProposals
+}
+
+func (s *serviceProposals) Set() SetProposals {
+	return s.setProposals
+}
+func (s *serviceProposals) Get() GetProposals {
+	return s.getProposals
+}
+func (s *serviceProposals) Events() EventsProposals {
+	return s.eventsProposals
+}
+
+var _ Proposals = &serviceProposals{}
+
+type ProposalID uint64
+
+type Proposal interface {
+	ID() ProposalID
+	Session() Session
+}
+
+func newProposal(id ProposalID, session Session) Proposal {
+	return &serviceProposal{
+		id:      id,
+		session: session,
+	}
+}
+
+type serviceProposal struct {
+	id      ProposalID
+	session Session
+}
+
+func (p *serviceProposal) ID() ProposalID {
+	return p.id
+}
+
+func (p *serviceProposal) Session() Session {
+	return p.session
+}
+
+var _ Proposal = &serviceProposal{}
+
+type SetProposals interface {
+	register(SetProposal)
+	unregister(ProposalID)
+	Get(ProposalID) (SetProposal, bool)
+	List() []SetProposal
+}
+
+func newSetProposals() SetProposals {
+	return &setProposals{
+		proposals: make(map[ProposalID]SetProposal),
+	}
+}
+
+type setProposals struct {
+	proposals map[ProposalID]SetProposal
+}
+
+func (p *setProposals) register(proposal SetProposal) {
+	p.proposals[proposal.ID()] = proposal
+}
+
+func (p *setProposals) unregister(id ProposalID) {
+	delete(p.proposals, id)
+}
+
+func (p *setProposals) Get(id ProposalID) (SetProposal, bool) {
+	proposal, ok := p.proposals[id]
+	return proposal, ok
+}
+
+func (p *setProposals) List() []SetProposal {
+	proposals := make([]SetProposal, 0, len(p.proposals))
+	for _, proposal := range p.proposals {
+		proposals = append(proposals, proposal)
+	}
+	return proposals
+}
+
+var _ SetProposals = &setProposals{}
+
+type SetProposal interface {
+	Proposal
+	Request() *value.SetRequest
+	Reply(*value.SetResponse) error
+}
+
+func newSetProposal(id ProposalID, session Session, request *value.SetRequest, response *value.SetResponse) SetProposal {
+	return &setProposal{
+		Proposal: newProposal(id, session),
+		request:  request,
+		response: response,
+	}
+}
+
+type setProposal struct {
+	Proposal
+	request  *value.SetRequest
+	response *value.SetResponse
+}
+
+func (p *setProposal) Request() *value.SetRequest {
+	return p.request
+}
+
+func (p *setProposal) Reply(reply *value.SetResponse) error {
+	if p.response != nil {
+		return errors.NewConflict("reply already sent")
+	}
+	p.response = reply
 	return nil
 }
 
-func (s *ServiceAdaptorEventsStream) Close() {
-	s.stream.Close()
+var _ SetProposal = &setProposal{}
+
+type GetProposals interface {
+	register(GetProposal)
+	unregister(ProposalID)
+	Get(ProposalID) (GetProposal, bool)
+	List() []GetProposal
 }
 
-var _ ServiceEventsStream = &ServiceAdaptorEventsStream{}
-
-type Service interface {
-	// Set sets the value
-	Set(*value.SetRequest) (*value.SetResponse, error)
-	// Get gets the value
-	Get(*value.GetRequest) (*value.GetResponse, error)
-	// Events listens for value change events
-	Events(*value.EventsRequest, ServiceEventsStream) (rsm.StreamCloser, error)
+func newGetProposals() GetProposals {
+	return &getProposals{
+		proposals: make(map[ProposalID]GetProposal),
+	}
 }
+
+type getProposals struct {
+	proposals map[ProposalID]GetProposal
+}
+
+func (p *getProposals) register(proposal GetProposal) {
+	p.proposals[proposal.ID()] = proposal
+}
+
+func (p *getProposals) unregister(id ProposalID) {
+	delete(p.proposals, id)
+}
+
+func (p *getProposals) Get(id ProposalID) (GetProposal, bool) {
+	proposal, ok := p.proposals[id]
+	return proposal, ok
+}
+
+func (p *getProposals) List() []GetProposal {
+	proposals := make([]GetProposal, 0, len(p.proposals))
+	for _, proposal := range p.proposals {
+		proposals = append(proposals, proposal)
+	}
+	return proposals
+}
+
+var _ GetProposals = &getProposals{}
+
+type GetProposal interface {
+	Proposal
+	Request() *value.GetRequest
+	Reply(*value.GetResponse) error
+}
+
+func newGetProposal(id ProposalID, session Session, request *value.GetRequest, response *value.GetResponse) GetProposal {
+	return &getProposal{
+		Proposal: newProposal(id, session),
+		request:  request,
+		response: response,
+	}
+}
+
+type getProposal struct {
+	Proposal
+	request  *value.GetRequest
+	response *value.GetResponse
+}
+
+func (p *getProposal) Request() *value.GetRequest {
+	return p.request
+}
+
+func (p *getProposal) Reply(reply *value.GetResponse) error {
+	if p.response != nil {
+		return errors.NewConflict("reply already sent")
+	}
+	p.response = reply
+	return nil
+}
+
+var _ GetProposal = &getProposal{}
+
+type EventsProposals interface {
+	register(EventsProposal)
+	unregister(ProposalID)
+	Get(ProposalID) (EventsProposal, bool)
+	List() []EventsProposal
+}
+
+func newEventsProposals() EventsProposals {
+	return &eventsProposals{
+		proposals: make(map[ProposalID]EventsProposal),
+	}
+}
+
+type eventsProposals struct {
+	proposals map[ProposalID]EventsProposal
+}
+
+func (p *eventsProposals) register(proposal EventsProposal) {
+	p.proposals[proposal.ID()] = proposal
+}
+
+func (p *eventsProposals) unregister(id ProposalID) {
+	delete(p.proposals, id)
+}
+
+func (p *eventsProposals) Get(id ProposalID) (EventsProposal, bool) {
+	proposal, ok := p.proposals[id]
+	return proposal, ok
+}
+
+func (p *eventsProposals) List() []EventsProposal {
+	proposals := make([]EventsProposal, 0, len(p.proposals))
+	for _, proposal := range p.proposals {
+		proposals = append(proposals, proposal)
+	}
+	return proposals
+}
+
+var _ EventsProposals = &eventsProposals{}
+
+type EventsProposal interface {
+	Proposal
+	Request() *value.EventsRequest
+	Notify(*value.EventsResponse) error
+	Close() error
+}
+
+func newEventsProposal(id ProposalID, session Session, request *value.EventsRequest, stream rsm.Stream) EventsProposal {
+	return &eventsProposal{
+		Proposal: newProposal(id, session),
+		request:  request,
+		stream:   stream,
+	}
+}
+
+type eventsProposal struct {
+	Proposal
+	request *value.EventsRequest
+	stream  rsm.Stream
+}
+
+func (p *eventsProposal) Request() *value.EventsRequest {
+	return p.request
+}
+
+func (p *eventsProposal) Notify(notification *value.EventsResponse) error {
+	bytes, err := proto.Marshal(notification)
+	if err != nil {
+		return err
+	}
+	p.stream.Value(bytes)
+	return nil
+}
+
+func (p *eventsProposal) Close() error {
+	p.stream.Close()
+	return nil
+}
+
+var _ EventsProposal = &eventsProposal{}

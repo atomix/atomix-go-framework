@@ -16,7 +16,9 @@ package lock
 
 import (
 	"container/list"
-	"github.com/atomix/atomix-api/go/atomix/primitive/lock"
+	lockapi "github.com/atomix/atomix-api/go/atomix/primitive/lock"
+	metaapi "github.com/atomix/atomix-api/go/atomix/primitive/meta"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 )
 
@@ -24,30 +26,166 @@ func init() {
 	registerServiceFunc(newService)
 }
 
-func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
+func newService(context ServiceContext) Service {
 	return &lockService{
-		Service: rsm.NewService(scheduler, context),
-		queue:   list.New(),
-		timers:  make(map[rsm.Index]rsm.Timer),
+		ServiceContext: context,
+		timers:         make(map[ProposalID]rsm.Timer),
 	}
 }
 
 // lockService is a state machine for a list primitive
 type lockService struct {
-	rsm.Service
-	lock   *lock.Lock
+	ServiceContext
+	owner  *LockRequest
 	queue  *list.List
-	timers map[rsm.Index]rsm.Timer
+	timers map[ProposalID]rsm.Timer
 }
 
-func (l *lockService) Lock(input *lock.LockRequest) (*LockResponseFuture, error) {
-	panic("implement me")
+func (l *lockService) SetState(state *LockState) error {
+	l.owner = state.Owner
+	for _, request := range state.Requests {
+		l.queue.PushBack(request)
+	}
+	return nil
 }
 
-func (l *lockService) Unlock(input *lock.UnlockRequest) (*lock.UnlockResponse, error) {
-	panic("implement me")
+func (l *lockService) GetState() (*LockState, error) {
+	state := &LockState{
+		Owner:    l.owner,
+	}
+	request := l.queue.Front()
+	for request != nil {
+		state.Requests = append(state.Requests, request.Value.(LockRequest))
+		request = request.Next()
+	}
+	return state, nil
 }
 
-func (l *lockService) GetLock(input *lock.GetLockRequest) (*lock.GetLockResponse, error) {
-	panic("implement me")
+func (l *lockService) Lock(lock LockProposal) error {
+	request := LockRequest{
+		ProposalID: lock.ID(),
+		SessionID:  lock.Session().ID(),
+	}
+	if lock.Request().Timeout != nil {
+		expire := l.Scheduler().Time().Add(*lock.Request().Timeout)
+		request.Expire = &expire
+	}
+
+	if l.owner == nil {
+		// If the lock is not already owned, immediately grant the lock to the requester.
+		// Note that we still have to publish an event to the session. The event is guaranteed to be received
+		// by the client-side primitive after the LOCK response.
+		l.owner = &request
+		return lock.Reply(&lockapi.LockResponse{
+			Lock: lockapi.Lock{
+				ObjectMeta: metaapi.ObjectMeta{
+					Revision: &metaapi.Revision{
+						Num: metaapi.RevisionNum(lock.ID()),
+					},
+				},
+				State: lockapi.Lock_LOCKED,
+			},
+		})
+	} else if lock.Request().Timeout != nil && int64(*lock.Request().Timeout) == 0 {
+		// If the timeout is 0, that indicates this is a tryLock request. Immediately fail the request.
+		return lock.Fail(errors.NewTimeout("lock request timed out"))
+	} else if lock.Request().Timeout != nil {
+		// If a timeout exists, add the request to the queue and set a timer. Note that the lock request expiration
+		// time is based on the *state machine* time - not the system time - to ensure consistency across servers.
+		element := l.queue.PushBack(request)
+		l.timers[lock.ID()] = l.Scheduler().RunAt(*request.Expire, func() {
+			// When the lock request timer expires, remove the request from the queue and publish a FAILED
+			// event to the session. Note that this timer is guaranteed to be executed in the same thread as the
+			// state machine commands, so there's no need to use a lock here.
+			delete(l.timers, lock.ID())
+			l.queue.Remove(element)
+			lock.Fail(errors.NewTimeout("lock request timed out"))
+		})
+	} else {
+		// If the lock does not have an expiration, just add the request to the queue with no expiration.
+		l.queue.PushBack(request)
+	}
+	return nil
+}
+
+func (l *lockService) Unlock(unlock UnlockProposal) error {
+	if l.owner != nil {
+		// If the commit's session does not match the current lock holder, preserve the existing lock.
+		// If the current lock ID does not match the requested lock ID, preserve the existing lock.
+		// However, ensure the associated lock request is removed from the queue.
+		if unlock.Session().ID() != l.owner.SessionID {
+			return errors.NewConflict("not the lock owner")
+		}
+
+		// The lock has been released. Populate the lock from the queue.
+		element := l.queue.Front()
+		if element != nil {
+			request := element.Value.(LockRequest)
+			l.queue.Remove(element)
+
+			// If the waiter has a lock timer, cancel the timer.
+			timer, ok := l.timers[request.ProposalID]
+			if ok {
+				timer.Cancel()
+				delete(l.timers, request.ProposalID)
+			}
+
+			lock, ok := l.Proposals().Lock().Get(request.ProposalID)
+			if ok {
+				l.owner = &request
+				lock.Reply(&lockapi.LockResponse{
+					Lock: lockapi.Lock{
+						ObjectMeta: metaapi.ObjectMeta{
+							Revision: &metaapi.Revision{
+								Num: metaapi.RevisionNum(lock.ID()),
+							},
+						},
+						State: lockapi.Lock_LOCKED,
+					},
+				})
+				return unlock.Reply(&lockapi.UnlockResponse{
+					Lock: lockapi.Lock{
+						ObjectMeta: metaapi.ObjectMeta{
+							Revision: &metaapi.Revision{
+								Num: metaapi.RevisionNum(lock.ID()),
+							},
+						},
+						State: lockapi.Lock_LOCKED,
+					},
+				})
+			}
+		} else {
+			l.owner = nil
+			return unlock.Reply(&lockapi.UnlockResponse{
+				Lock: lockapi.Lock{
+					State: lockapi.Lock_UNLOCKED,
+				},
+			})
+		}
+	}
+	return unlock.Reply(&lockapi.UnlockResponse{
+		Lock: lockapi.Lock{
+			State: lockapi.Lock_UNLOCKED,
+		},
+	})
+}
+
+func (l *lockService) GetLock(get GetLockProposal) error {
+	if l.owner != nil {
+		return get.Reply(&lockapi.GetLockResponse{
+			Lock: lockapi.Lock{
+				ObjectMeta: metaapi.ObjectMeta{
+					Revision: &metaapi.Revision{
+						Num: metaapi.RevisionNum(l.owner.ProposalID),
+					},
+				},
+				State: lockapi.Lock_LOCKED,
+			},
+		})
+	}
+	return get.Reply(&lockapi.GetLockResponse{
+		Lock: lockapi.Lock{
+			State: lockapi.Lock_UNLOCKED,
+		},
+	})
 }

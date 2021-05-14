@@ -117,7 +117,7 @@ type {{ $proxy }} struct {
 {{- range .Primitive.Methods }}
 {{- $name := ((printf "%s%sOp" $root.Generator.Prefix .Name) | toLowerCamel) }}
 {{- $method := . }}
-{{ if and .Request.IsDiscrete .Response.IsDiscrete }}
+{{ if and .Request.IsUnary .Response.IsUnary }}
 func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "type" .Request.Type }}) (*{{ template "type" .Response.Type }}, error) {
 	s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
 	input, err := proto.Marshal(request)

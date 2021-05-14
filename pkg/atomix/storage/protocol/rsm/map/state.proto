@@ -1,0 +1,48 @@
+/*
+Copyright 2021-present Open Networking Foundation.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+syntax = "proto3";
+
+package atomix.storage.protocol.rsm.map;
+
+import "google/protobuf/timestamp.proto";
+import "atomix/primitive/meta/object.proto";
+import "gogoproto/gogo.proto";
+
+message MapState {
+    repeated MapStateListener listeners = 1 [(gogoproto.nullable) = false];
+    repeated MapStateEntry entries = 2 [(gogoproto.nullable) = false];
+}
+
+message MapStateListener {
+    uint64 proposal_id = 1 [(gogoproto.customname) = "ProposalID", (gogoproto.casttype) = "ProposalID"];
+    string key = 2;
+}
+
+message MapStateEntry {
+    MapStateKey key = 1 [(gogoproto.nullable) = false];
+    MapStateValue value = 2;
+}
+
+message MapStateKey {
+    atomix.primitive.meta.ObjectMeta meta = 1 [(gogoproto.embed) = true, (gogoproto.nullable) = false];
+    string key = 2;
+}
+
+message MapStateValue {
+    bytes value = 1;
+    google.protobuf.Timestamp expire = 2 [(gogoproto.stdtime) = true];
+}

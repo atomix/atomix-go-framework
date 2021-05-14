@@ -21,17 +21,26 @@ import (
 
 // Scheduler provides deterministic scheduling for a state machine
 type Scheduler interface {
-	// Execute executes a function asynchronously
-	Execute(f func())
+	// Time returns the current time
+	Time() time.Time
 
-	// ScheduleOnce schedules a function to be run once after the given delay
-	ScheduleOnce(delay time.Duration, f func()) Timer
+	// Run executes a function asynchronously
+	Run(f func())
 
-	// ScheduleRepeat schedules a function to run repeatedly every interval starting after the given delay
-	ScheduleRepeat(delay time.Duration, interval time.Duration, f func()) Timer
+	// RunAfter schedules a function to be run once after the given delay
+	RunAfter(d time.Duration, f func()) Timer
 
-	// ScheduleIndex schedules a function to run at a specific index
-	ScheduleIndex(index Index, f func())
+	// RepeatAfter schedules a function to run repeatedly every interval starting after the given delay
+	RepeatAfter(d time.Duration, i time.Duration, f func()) Timer
+
+	// RunAt schedules a function to be run once after the given delay
+	RunAt(t time.Time, f func()) Timer
+
+	// RepeatAt schedules a function to run repeatedly every interval starting after the given delay
+	RepeatAt(t time.Time, i time.Duration, f func()) Timer
+
+	// RunAtIndex schedules a function to run at a specific index
+	RunAtIndex(index Index, f func())
 }
 
 // Timer is a cancellable timer
@@ -50,21 +59,24 @@ func newScheduler() *scheduler {
 }
 
 type scheduler struct {
-	Scheduler
 	tasks          *list.List
 	scheduledTasks *list.List
 	indexTasks     map[Index]*list.List
 	time           time.Time
 }
 
-func (s *scheduler) Execute(f func()) {
+func (s *scheduler) Time() time.Time {
+	return s.time
+}
+
+func (s *scheduler) Run(f func()) {
 	s.tasks.PushBack(f)
 }
 
-func (s *scheduler) ScheduleOnce(delay time.Duration, f func()) Timer {
+func (s *scheduler) RunAfter(d time.Duration, f func()) Timer {
 	task := &task{
 		scheduler: s,
-		time:      time.Now().Add(delay),
+		time:      time.Now().Add(d),
 		interval:  0,
 		callback:  f,
 	}
@@ -72,22 +84,44 @@ func (s *scheduler) ScheduleOnce(delay time.Duration, f func()) Timer {
 	return task
 }
 
-func (s *scheduler) ScheduleRepeat(delay time.Duration, interval time.Duration, f func()) Timer {
+func (s *scheduler) RepeatAfter(d time.Duration, i time.Duration, f func()) Timer {
 	task := &task{
 		scheduler: s,
-		time:      time.Now().Add(delay),
-		interval:  interval,
+		time:      time.Now().Add(d),
+		interval:  i,
 		callback:  f,
 	}
 	s.schedule(task)
 	return task
 }
 
-func (s *scheduler) ScheduleIndex(index Index, f func()) {
-	tasks, ok := s.indexTasks[index]
+func (s *scheduler) RunAt(t time.Time, f func()) Timer {
+	task := &task{
+		scheduler: s,
+		time:      t,
+		interval:  0,
+		callback:  f,
+	}
+	s.schedule(task)
+	return task
+}
+
+func (s *scheduler) RepeatAt(t time.Time, i time.Duration, f func()) Timer {
+	task := &task{
+		scheduler: s,
+		time:      t,
+		interval:  i,
+		callback:  f,
+	}
+	s.schedule(task)
+	return task
+}
+
+func (s *scheduler) RunAtIndex(i Index, f func()) {
+	tasks, ok := s.indexTasks[i]
 	if !ok {
 		tasks = list.New()
-		s.indexTasks[index] = tasks
+		s.indexTasks[i] = tasks
 	}
 	tasks.PushBack(f)
 }
@@ -164,6 +198,8 @@ func (s *scheduler) schedule(t *task) {
 		t.element = s.scheduledTasks.PushFront(t)
 	}
 }
+
+var _ Scheduler = &scheduler{}
 
 // Scheduler task
 type task struct {

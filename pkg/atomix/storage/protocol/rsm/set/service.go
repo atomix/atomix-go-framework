@@ -18,108 +18,113 @@ import (
 	setapi "github.com/atomix/atomix-api/go/atomix/primitive/set"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 )
 
 func init() {
 	registerServiceFunc(newService)
 }
 
-func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
+func newService(context ServiceContext) Service {
 	return &setService{
-		Service: rsm.NewService(scheduler, context),
-		values:  make(map[string]meta.ObjectMeta),
-		streams: make(map[rsm.StreamID]ServiceEventsStream),
+		ServiceContext: context,
+		values:         make(map[string]meta.ObjectMeta),
 	}
 }
 
 // setService is a state machine for a list primitive
 type setService struct {
-	rsm.Service
-	values  map[string]meta.ObjectMeta
-	streams map[rsm.StreamID]ServiceEventsStream
+	ServiceContext
+	values map[string]meta.ObjectMeta
+}
+
+func (s *setService) SetState(state *SetState) error {
+	return nil
+}
+
+func (s *setService) GetState() (*SetState, error) {
+	return &SetState{}, nil
 }
 
 func (s *setService) notify(event setapi.Event) error {
 	output := &setapi.EventsResponse{
 		Event: event,
 	}
-	for _, stream := range s.streams {
-		if err := stream.Notify(output); err != nil {
+	for _, events := range s.Proposals().Events().List() {
+		if err := events.Notify(output); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (s *setService) Size(*setapi.SizeRequest) (*setapi.SizeResponse, error) {
-	return &setapi.SizeResponse{
+func (s *setService) Size(size SizeProposal) error {
+	return size.Reply(&setapi.SizeResponse{
 		Size_: uint32(len(s.values)),
-	}, nil
+	})
 }
 
-func (s *setService) Contains(request *setapi.ContainsRequest) (*setapi.ContainsResponse, error) {
-	_, ok := s.values[request.Element.Value]
-	return &setapi.ContainsResponse{
+func (s *setService) Contains(contains ContainsProposal) error {
+	_, ok := s.values[contains.Request().Element.Value]
+	return contains.Reply(&setapi.ContainsResponse{
 		Contains: ok,
-	}, nil
+	})
 }
 
-func (s *setService) Add(request *setapi.AddRequest) (*setapi.AddResponse, error) {
-	if _, ok := s.values[request.Element.Value]; ok {
-		return nil, errors.NewAlreadyExists("value already exists")
+func (s *setService) Add(add AddProposal) error {
+	if _, ok := s.values[add.Request().Element.Value]; ok {
+		return errors.NewAlreadyExists("value already exists")
 	}
 
-	s.values[request.Element.Value] = meta.FromProto(request.Element.ObjectMeta)
+	s.values[add.Request().Element.Value] = meta.FromProto(add.Request().Element.ObjectMeta)
 	err := s.notify(setapi.Event{
 		Type:    setapi.Event_ADD,
-		Element: request.Element,
+		Element: add.Request().Element,
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return &setapi.AddResponse{
-		Element: request.Element,
-	}, nil
+	return add.Reply(&setapi.AddResponse{
+		Element: add.Request().Element,
+	})
 }
 
-func (s *setService) Remove(request *setapi.RemoveRequest) (*setapi.RemoveResponse, error) {
-	object, ok := s.values[request.Element.Value]
+func (s *setService) Remove(remove RemoveProposal) error {
+	object, ok := s.values[remove.Request().Element.Value]
 	if !ok {
-		return nil, errors.NewNotFound("value not found")
+		return errors.NewNotFound("value not found")
 	}
 
-	if !object.Equal(meta.FromProto(request.Element.ObjectMeta)) {
-		return nil, errors.NewConflict("metadata mismatch")
+	if !object.Equal(meta.FromProto(remove.Request().Element.ObjectMeta)) {
+		return errors.NewConflict("metadata mismatch")
 	}
 
-	delete(s.values, request.Element.Value)
+	delete(s.values, remove.Request().Element.Value)
 
 	element := setapi.Element{
 		ObjectMeta: object.Proto(),
-		Value:      request.Element.Value,
+		Value:      remove.Request().Element.Value,
 	}
 	err := s.notify(setapi.Event{
 		Type:    setapi.Event_REMOVE,
 		Element: element,
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return &setapi.RemoveResponse{
+	return remove.Reply(&setapi.RemoveResponse{
 		Element: element,
-	}, nil
+	})
 }
 
-func (s *setService) Clear(*setapi.ClearRequest) (*setapi.ClearResponse, error) {
+func (s *setService) Clear(clear ClearProposal) error {
 	s.values = make(map[string]meta.ObjectMeta)
-	return &setapi.ClearResponse{}, nil
+	return clear.Reply(&setapi.ClearResponse{})
 }
 
-func (s *setService) Events(request *setapi.EventsRequest, stream ServiceEventsStream) (rsm.StreamCloser, error) {
-	if request.Replay {
+func (s *setService) Events(events EventsProposal) error {
+	if events.Request().Replay {
 		for value, metadata := range s.values {
-			err := stream.Notify(&setapi.EventsResponse{
+			err := events.Notify(&setapi.EventsResponse{
 				Event: setapi.Event{
 					Type: setapi.Event_REPLAY,
 					Element: setapi.Element{
@@ -129,27 +134,25 @@ func (s *setService) Events(request *setapi.EventsRequest, stream ServiceEventsS
 				},
 			})
 			if err != nil {
-				return nil, err
+				return err
 			}
 		}
 	}
-	s.streams[stream.ID()] = stream
-	return func() {
-		delete(s.streams, stream.ID())
-	}, nil
+	return nil
 }
 
-func (s *setService) Elements(request *setapi.ElementsRequest, stream ServiceElementsStream) (rsm.StreamCloser, error) {
+func (s *setService) Elements(elements ElementsProposal) error {
+	defer elements.Close()
 	for value, object := range s.values {
-		err := stream.Notify(&setapi.ElementsResponse{
+		err := elements.Notify(&setapi.ElementsResponse{
 			Element: setapi.Element{
 				ObjectMeta: object.Proto(),
 				Value:      value,
 			},
 		})
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return nil, nil
+	return nil
 }

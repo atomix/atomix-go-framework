@@ -3,9 +3,12 @@ package counter
 
 import (
 	counter "github.com/atomix/atomix-api/go/atomix/primitive/counter"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
+	"io"
 )
 
 const Type = "Counter"
@@ -23,7 +26,7 @@ func registerServiceFunc(rsmf NewServiceFunc) {
 	newServiceFunc = func(scheduler rsm.Scheduler, context rsm.ServiceContext) rsm.Service {
 		service := &ServiceAdaptor{
 			Service: rsm.NewService(scheduler, context),
-			rsm:     rsmf(scheduler, context),
+			rsm:     rsmf(newServiceContext(scheduler)),
 			log:     logging.GetLogger("atomix", "counter", "service"),
 		}
 		service.init()
@@ -31,7 +34,7 @@ func registerServiceFunc(rsmf NewServiceFunc) {
 	}
 }
 
-type NewServiceFunc func(scheduler rsm.Scheduler, context rsm.ServiceContext) Service
+type NewServiceFunc func(ServiceContext) Service
 
 // RegisterService registers the election primitive service on the given node
 func RegisterService(node *rsm.Node) {
@@ -50,26 +53,56 @@ func (s *ServiceAdaptor) init() {
 	s.RegisterUnaryOperation(incrementOp, s.increment)
 	s.RegisterUnaryOperation(decrementOp, s.decrement)
 }
-
-func (s *ServiceAdaptor) SessionOpen(session rsm.Session) {
-	if sessionOpen, ok := s.rsm.(rsm.SessionOpenService); ok {
-		sessionOpen.SessionOpen(session)
-	}
+func (s *ServiceAdaptor) SessionOpen(rsmSession rsm.Session) {
+	s.rsm.Sessions().open(newSession(rsmSession))
 }
 
 func (s *ServiceAdaptor) SessionExpired(session rsm.Session) {
-	if sessionExpired, ok := s.rsm.(rsm.SessionExpiredService); ok {
-		sessionExpired.SessionExpired(session)
-	}
+	s.rsm.Sessions().expire(SessionID(session.ID()))
 }
 
 func (s *ServiceAdaptor) SessionClosed(session rsm.Session) {
-	if sessionClosed, ok := s.rsm.(rsm.SessionClosedService); ok {
-		sessionClosed.SessionClosed(session)
+	s.rsm.Sessions().close(SessionID(session.ID()))
+}
+func (s *ServiceAdaptor) Backup(writer io.Writer) error {
+	state, err := s.rsm.GetState()
+	if err != nil {
+		s.log.Error(err)
+		return err
 	}
+	bytes, err := proto.Marshal(state)
+	if err != nil {
+		s.log.Error(err)
+		return err
+	}
+	err = util.WriteBytes(writer, bytes)
+	if err != nil {
+		s.log.Error(err)
+		return err
+	}
+	return nil
 }
 
-func (s *ServiceAdaptor) set(input []byte) ([]byte, error) {
+func (s *ServiceAdaptor) Restore(reader io.Reader) error {
+	bytes, err := util.ReadBytes(reader)
+	if err != nil {
+		s.log.Error(err)
+		return err
+	}
+	state := &CounterState{}
+	err = proto.Unmarshal(bytes, state)
+	if err != nil {
+		s.log.Error(err)
+		return err
+	}
+	err = s.rsm.SetState(state)
+	if err != nil {
+		s.log.Error(err)
+		return err
+	}
+	return nil
+}
+func (s *ServiceAdaptor) set(input []byte, rsmSession rsm.Session) ([]byte, error) {
 	request := &counter.SetRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
@@ -77,7 +110,25 @@ func (s *ServiceAdaptor) set(input []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	response, err := s.rsm.Set(request)
+	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
+	if !ok {
+		err := errors.NewConflict("session %d not found", rsmSession.ID())
+		s.log.Error(err)
+		return nil, err
+	}
+
+	var response *counter.SetResponse
+	proposal := newSetProposal(ProposalID(s.Index()), session, request, response)
+
+	s.rsm.Proposals().Set().register(proposal)
+	session.Proposals().Set().register(proposal)
+
+	defer func() {
+		session.Proposals().Set().unregister(proposal.ID())
+		s.rsm.Proposals().Set().unregister(proposal.ID())
+	}()
+
+	err = s.rsm.Set(proposal)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
@@ -90,8 +141,7 @@ func (s *ServiceAdaptor) set(input []byte) ([]byte, error) {
 	}
 	return output, nil
 }
-
-func (s *ServiceAdaptor) get(input []byte) ([]byte, error) {
+func (s *ServiceAdaptor) get(input []byte, rsmSession rsm.Session) ([]byte, error) {
 	request := &counter.GetRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
@@ -99,7 +149,25 @@ func (s *ServiceAdaptor) get(input []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	response, err := s.rsm.Get(request)
+	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
+	if !ok {
+		err := errors.NewConflict("session %d not found", rsmSession.ID())
+		s.log.Error(err)
+		return nil, err
+	}
+
+	var response *counter.GetResponse
+	proposal := newGetProposal(ProposalID(s.Index()), session, request, response)
+
+	s.rsm.Proposals().Get().register(proposal)
+	session.Proposals().Get().register(proposal)
+
+	defer func() {
+		session.Proposals().Get().unregister(proposal.ID())
+		s.rsm.Proposals().Get().unregister(proposal.ID())
+	}()
+
+	err = s.rsm.Get(proposal)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
@@ -112,8 +180,7 @@ func (s *ServiceAdaptor) get(input []byte) ([]byte, error) {
 	}
 	return output, nil
 }
-
-func (s *ServiceAdaptor) increment(input []byte) ([]byte, error) {
+func (s *ServiceAdaptor) increment(input []byte, rsmSession rsm.Session) ([]byte, error) {
 	request := &counter.IncrementRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
@@ -121,7 +188,25 @@ func (s *ServiceAdaptor) increment(input []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	response, err := s.rsm.Increment(request)
+	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
+	if !ok {
+		err := errors.NewConflict("session %d not found", rsmSession.ID())
+		s.log.Error(err)
+		return nil, err
+	}
+
+	var response *counter.IncrementResponse
+	proposal := newIncrementProposal(ProposalID(s.Index()), session, request, response)
+
+	s.rsm.Proposals().Increment().register(proposal)
+	session.Proposals().Increment().register(proposal)
+
+	defer func() {
+		session.Proposals().Increment().unregister(proposal.ID())
+		s.rsm.Proposals().Increment().unregister(proposal.ID())
+	}()
+
+	err = s.rsm.Increment(proposal)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
@@ -134,8 +219,7 @@ func (s *ServiceAdaptor) increment(input []byte) ([]byte, error) {
 	}
 	return output, nil
 }
-
-func (s *ServiceAdaptor) decrement(input []byte) ([]byte, error) {
+func (s *ServiceAdaptor) decrement(input []byte, rsmSession rsm.Session) ([]byte, error) {
 	request := &counter.DecrementRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
@@ -143,7 +227,25 @@ func (s *ServiceAdaptor) decrement(input []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	response, err := s.rsm.Decrement(request)
+	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
+	if !ok {
+		err := errors.NewConflict("session %d not found", rsmSession.ID())
+		s.log.Error(err)
+		return nil, err
+	}
+
+	var response *counter.DecrementResponse
+	proposal := newDecrementProposal(ProposalID(s.Index()), session, request, response)
+
+	s.rsm.Proposals().Decrement().register(proposal)
+	session.Proposals().Decrement().register(proposal)
+
+	defer func() {
+		session.Proposals().Decrement().unregister(proposal.ID())
+		s.rsm.Proposals().Decrement().unregister(proposal.ID())
+	}()
+
+	err = s.rsm.Decrement(proposal)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err

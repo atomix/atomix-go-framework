@@ -360,7 +360,7 @@ func (m *Manager) applyServiceCommandOperation(request ServiceCommandRequest, co
 
 	operation := service.GetOperation(operationID)
 	if unaryOp, ok := operation.(UnaryOperation); ok {
-		output, err := unaryOp.Execute(request.GetOperation().Value)
+		output, err := unaryOp.Execute(request.GetOperation().Value, session)
 		result := session.addUnaryResult(context.SequenceNumber, streams.Result{
 			Value: output,
 			Error: err,
@@ -369,7 +369,7 @@ func (m *Manager) applyServiceCommandOperation(request ServiceCommandRequest, co
 		stream.Close()
 	} else if streamOp, ok := operation.(StreamingOperation); ok {
 		sessionStream := session.addStream(StreamID(context.SequenceNumber), operationID, stream)
-		closer, err := streamOp.Execute(request.GetOperation().Value, sessionStream)
+		closer, err := streamOp.Execute(request.GetOperation().Value, session, sessionStream)
 		if err != nil {
 			stream.Error(err)
 			stream.Close()
@@ -657,7 +657,7 @@ func (m *Manager) Query(bytes []byte, stream streams.WriteStream) {
 			log.WithFields(
 				logging.String("NodeID", string(m.member.NodeID))).
 				Debugf("Query index %d greater than last index %d", query.Context.LastIndex, m.context.Index())
-			m.scheduler.ScheduleIndex(Index(query.Context.LastIndex), func() {
+			m.scheduler.RunAtIndex(Index(query.Context.LastIndex), func() {
 				m.sequenceQuery(query, stream)
 			})
 		} else {
@@ -774,7 +774,7 @@ func (m *Manager) applyServiceQueryOperation(request ServiceQueryRequest, contex
 	})
 
 	if unaryOp, ok := operation.(UnaryOperation); ok {
-		responseStream.Result(unaryOp.Execute(request.GetOperation().Value))
+		responseStream.Result(unaryOp.Execute(request.GetOperation().Value, session))
 		responseStream.Close()
 	} else if streamOp, ok := operation.(StreamingOperation); ok {
 		stream.Result(proto.Marshal(&SessionResponse{
@@ -818,7 +818,7 @@ func (m *Manager) applyServiceQueryOperation(request ServiceQueryRequest, contex
 			},
 		}
 
-		closer, err := streamOp.Execute(request.GetOperation().Value, queryStream)
+		closer, err := streamOp.Execute(request.GetOperation().Value, session, queryStream)
 		if err != nil {
 			stream.Error(err)
 			stream.Close()

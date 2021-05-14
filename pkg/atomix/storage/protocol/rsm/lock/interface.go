@@ -3,61 +3,440 @@ package lock
 
 import (
 	lock "github.com/atomix/atomix-api/go/atomix/primitive/lock"
+	errors "github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	proto "github.com/golang/protobuf/proto"
 )
 
-type LockResponseFuture struct {
-	stream rsm.Stream
-	output *lock.LockResponse
-	err    error
-}
-
-func (f *LockResponseFuture) setStream(stream rsm.Stream) {
-	if f.output != nil {
-		bytes, err := proto.Marshal(f.output)
-		if err != nil {
-			stream.Error(err)
-		} else {
-			stream.Value(bytes)
-		}
-		stream.Close()
-	} else if f.err != nil {
-		stream.Error(f.err)
-		stream.Close()
-	} else {
-		f.stream = stream
-	}
-}
-
-func (f *LockResponseFuture) Complete(output *lock.LockResponse) {
-	if f.stream != nil {
-		bytes, err := proto.Marshal(output)
-		if err != nil {
-			f.stream.Error(err)
-		} else {
-			f.stream.Value(bytes)
-		}
-		f.stream.Close()
-	} else {
-		f.output = output
-	}
-}
-
-func (f *LockResponseFuture) Fail(err error) {
-	if f.stream != nil {
-		f.stream.Error(err)
-		f.stream.Close()
-	} else {
-		f.err = err
-	}
-}
-
 type Service interface {
+	ServiceContext
+	GetState() (*LockState, error)
+	SetState(*LockState) error
 	// Lock attempts to acquire the lock
-	Lock(*lock.LockRequest) (*LockResponseFuture, error)
+	Lock(LockProposal) error
 	// Unlock releases the lock
-	Unlock(*lock.UnlockRequest) (*lock.UnlockResponse, error)
+	Unlock(UnlockProposal) error
 	// GetLock gets the lock state
-	GetLock(*lock.GetLockRequest) (*lock.GetLockResponse, error)
+	GetLock(GetLockProposal) error
 }
+
+type ServiceContext interface {
+	Scheduler() rsm.Scheduler
+	Sessions() Sessions
+	Proposals() Proposals
+}
+
+func newServiceContext(scheduler rsm.Scheduler) ServiceContext {
+	return &serviceContext{
+		scheduler: scheduler,
+		sessions:  newSessions(),
+		proposals: newProposals(),
+	}
+}
+
+type serviceContext struct {
+	scheduler rsm.Scheduler
+	sessions  Sessions
+	proposals Proposals
+}
+
+func (s *serviceContext) Scheduler() rsm.Scheduler {
+	return s.scheduler
+}
+
+func (s *serviceContext) Sessions() Sessions {
+	return s.sessions
+}
+
+func (s *serviceContext) Proposals() Proposals {
+	return s.proposals
+}
+
+var _ ServiceContext = &serviceContext{}
+
+type Sessions interface {
+	open(Session)
+	expire(SessionID)
+	close(SessionID)
+	Get(SessionID) (Session, bool)
+	List() []Session
+}
+
+func newSessions() Sessions {
+	return &serviceSessions{
+		sessions: make(map[SessionID]Session),
+	}
+}
+
+type serviceSessions struct {
+	sessions map[SessionID]Session
+}
+
+func (s *serviceSessions) open(session Session) {
+	s.sessions[session.ID()] = session
+}
+
+func (s *serviceSessions) expire(sessionID SessionID) {
+	delete(s.sessions, sessionID)
+}
+
+func (s *serviceSessions) close(sessionID SessionID) {
+	delete(s.sessions, sessionID)
+}
+
+func (s *serviceSessions) Get(id SessionID) (Session, bool) {
+	session, ok := s.sessions[id]
+	return session, ok
+}
+
+func (s *serviceSessions) List() []Session {
+	sessions := make([]Session, 0, len(s.sessions))
+	for _, session := range s.sessions {
+		sessions = append(sessions, session)
+	}
+	return sessions
+}
+
+var _ Sessions = &serviceSessions{}
+
+type SessionID uint64
+
+type Session interface {
+	ID() SessionID
+	Proposals() Proposals
+}
+
+func newSession(session rsm.Session) Session {
+	return &serviceSession{
+		session:   session,
+		proposals: newProposals(),
+	}
+}
+
+type serviceSession struct {
+	session   rsm.Session
+	proposals Proposals
+}
+
+func (s *serviceSession) ID() SessionID {
+	return SessionID(s.session.ID())
+}
+
+func (s *serviceSession) Proposals() Proposals {
+	return s.proposals
+}
+
+var _ Session = &serviceSession{}
+
+type Proposals interface {
+	Lock() LockProposals
+	Unlock() UnlockProposals
+	GetLock() GetLockProposals
+}
+
+func newProposals() Proposals {
+	return &serviceProposals{
+		lockProposals:    newLockProposals(),
+		unlockProposals:  newUnlockProposals(),
+		getLockProposals: newGetLockProposals(),
+	}
+}
+
+type serviceProposals struct {
+	lockProposals    LockProposals
+	unlockProposals  UnlockProposals
+	getLockProposals GetLockProposals
+}
+
+func (s *serviceProposals) Lock() LockProposals {
+	return s.lockProposals
+}
+func (s *serviceProposals) Unlock() UnlockProposals {
+	return s.unlockProposals
+}
+func (s *serviceProposals) GetLock() GetLockProposals {
+	return s.getLockProposals
+}
+
+var _ Proposals = &serviceProposals{}
+
+type ProposalID uint64
+
+type Proposal interface {
+	ID() ProposalID
+	Session() Session
+}
+
+func newProposal(id ProposalID, session Session) Proposal {
+	return &serviceProposal{
+		id:      id,
+		session: session,
+	}
+}
+
+type serviceProposal struct {
+	id      ProposalID
+	session Session
+}
+
+func (p *serviceProposal) ID() ProposalID {
+	return p.id
+}
+
+func (p *serviceProposal) Session() Session {
+	return p.session
+}
+
+var _ Proposal = &serviceProposal{}
+
+type LockProposals interface {
+	register(LockProposal)
+	unregister(ProposalID)
+	Get(ProposalID) (LockProposal, bool)
+	List() []LockProposal
+}
+
+func newLockProposals() LockProposals {
+	return &lockProposals{
+		proposals: make(map[ProposalID]LockProposal),
+	}
+}
+
+type lockProposals struct {
+	proposals map[ProposalID]LockProposal
+}
+
+func (p *lockProposals) register(proposal LockProposal) {
+	p.proposals[proposal.ID()] = proposal
+}
+
+func (p *lockProposals) unregister(id ProposalID) {
+	delete(p.proposals, id)
+}
+
+func (p *lockProposals) Get(id ProposalID) (LockProposal, bool) {
+	proposal, ok := p.proposals[id]
+	return proposal, ok
+}
+
+func (p *lockProposals) List() []LockProposal {
+	proposals := make([]LockProposal, 0, len(p.proposals))
+	for _, proposal := range p.proposals {
+		proposals = append(proposals, proposal)
+	}
+	return proposals
+}
+
+var _ LockProposals = &lockProposals{}
+
+type LockProposal interface {
+	Proposal
+	Request() *lock.LockRequest
+	Reply(*lock.LockResponse) error
+	Fail(error) error
+	Close() error
+}
+
+func newLockProposal(id ProposalID, session Session, request *lock.LockRequest, stream rsm.Stream) LockProposal {
+	return &lockProposal{
+		Proposal: newProposal(id, session),
+		request:  request,
+		stream:   stream,
+	}
+}
+
+type lockProposal struct {
+	Proposal
+	request  *lock.LockRequest
+	stream   rsm.Stream
+	complete bool
+}
+
+func (p *lockProposal) Request() *lock.LockRequest {
+	return p.request
+}
+
+func (p *lockProposal) Reply(reply *lock.LockResponse) error {
+	if p.complete {
+		return errors.NewConflict("reply already sent")
+	}
+	p.complete = true
+	bytes, err := proto.Marshal(reply)
+	if err != nil {
+		p.stream.Error(err)
+		return err
+	} else {
+		p.stream.Value(bytes)
+	}
+	p.stream.Close()
+	return nil
+}
+
+func (p *lockProposal) Fail(err error) error {
+	if p.complete {
+		return errors.NewConflict("reply already sent")
+	}
+	p.complete = true
+	p.stream.Error(err)
+	p.stream.Close()
+	return nil
+}
+
+func (p *lockProposal) Close() error {
+	if p.complete {
+		return errors.NewConflict("reply already sent")
+	}
+	p.complete = true
+	p.stream.Close()
+	return nil
+}
+
+var _ LockProposal = &lockProposal{}
+
+type UnlockProposals interface {
+	register(UnlockProposal)
+	unregister(ProposalID)
+	Get(ProposalID) (UnlockProposal, bool)
+	List() []UnlockProposal
+}
+
+func newUnlockProposals() UnlockProposals {
+	return &unlockProposals{
+		proposals: make(map[ProposalID]UnlockProposal),
+	}
+}
+
+type unlockProposals struct {
+	proposals map[ProposalID]UnlockProposal
+}
+
+func (p *unlockProposals) register(proposal UnlockProposal) {
+	p.proposals[proposal.ID()] = proposal
+}
+
+func (p *unlockProposals) unregister(id ProposalID) {
+	delete(p.proposals, id)
+}
+
+func (p *unlockProposals) Get(id ProposalID) (UnlockProposal, bool) {
+	proposal, ok := p.proposals[id]
+	return proposal, ok
+}
+
+func (p *unlockProposals) List() []UnlockProposal {
+	proposals := make([]UnlockProposal, 0, len(p.proposals))
+	for _, proposal := range p.proposals {
+		proposals = append(proposals, proposal)
+	}
+	return proposals
+}
+
+var _ UnlockProposals = &unlockProposals{}
+
+type UnlockProposal interface {
+	Proposal
+	Request() *lock.UnlockRequest
+	Reply(*lock.UnlockResponse) error
+}
+
+func newUnlockProposal(id ProposalID, session Session, request *lock.UnlockRequest, response *lock.UnlockResponse) UnlockProposal {
+	return &unlockProposal{
+		Proposal: newProposal(id, session),
+		request:  request,
+		response: response,
+	}
+}
+
+type unlockProposal struct {
+	Proposal
+	request  *lock.UnlockRequest
+	response *lock.UnlockResponse
+}
+
+func (p *unlockProposal) Request() *lock.UnlockRequest {
+	return p.request
+}
+
+func (p *unlockProposal) Reply(reply *lock.UnlockResponse) error {
+	if p.response != nil {
+		return errors.NewConflict("reply already sent")
+	}
+	p.response = reply
+	return nil
+}
+
+var _ UnlockProposal = &unlockProposal{}
+
+type GetLockProposals interface {
+	register(GetLockProposal)
+	unregister(ProposalID)
+	Get(ProposalID) (GetLockProposal, bool)
+	List() []GetLockProposal
+}
+
+func newGetLockProposals() GetLockProposals {
+	return &getLockProposals{
+		proposals: make(map[ProposalID]GetLockProposal),
+	}
+}
+
+type getLockProposals struct {
+	proposals map[ProposalID]GetLockProposal
+}
+
+func (p *getLockProposals) register(proposal GetLockProposal) {
+	p.proposals[proposal.ID()] = proposal
+}
+
+func (p *getLockProposals) unregister(id ProposalID) {
+	delete(p.proposals, id)
+}
+
+func (p *getLockProposals) Get(id ProposalID) (GetLockProposal, bool) {
+	proposal, ok := p.proposals[id]
+	return proposal, ok
+}
+
+func (p *getLockProposals) List() []GetLockProposal {
+	proposals := make([]GetLockProposal, 0, len(p.proposals))
+	for _, proposal := range p.proposals {
+		proposals = append(proposals, proposal)
+	}
+	return proposals
+}
+
+var _ GetLockProposals = &getLockProposals{}
+
+type GetLockProposal interface {
+	Proposal
+	Request() *lock.GetLockRequest
+	Reply(*lock.GetLockResponse) error
+}
+
+func newGetLockProposal(id ProposalID, session Session, request *lock.GetLockRequest, response *lock.GetLockResponse) GetLockProposal {
+	return &getLockProposal{
+		Proposal: newProposal(id, session),
+		request:  request,
+		response: response,
+	}
+}
+
+type getLockProposal struct {
+	Proposal
+	request  *lock.GetLockRequest
+	response *lock.GetLockResponse
+}
+
+func (p *getLockProposal) Request() *lock.GetLockRequest {
+	return p.request
+}
+
+func (p *getLockProposal) Reply(reply *lock.GetLockResponse) error {
+	if p.response != nil {
+		return errors.NewConflict("reply already sent")
+	}
+	p.response = reply
+	return nil
+}
+
+var _ GetLockProposal = &getLockProposal{}

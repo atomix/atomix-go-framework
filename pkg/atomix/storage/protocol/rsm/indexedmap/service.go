@@ -23,72 +23,75 @@ func init() {
 	registerServiceFunc(newService)
 }
 
-func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
+func newService(context ServiceContext) Service {
 	return &indexedMapService{
-		Service: rsm.NewService(scheduler, context),
+		ServiceContext: context,
 		entries: make(map[string]*LinkedMapEntryValue),
 		indexes: make(map[uint64]*LinkedMapEntryValue),
 		timers:  make(map[string]rsm.Timer),
-		streams: make(map[rsm.StreamID]ServiceEventsStream),
 	}
 }
 
 // indexedMapService is a state machine for a map primitive
 type indexedMapService struct {
-	rsm.Service
+	ServiceContext
 	lastIndex  uint64
 	entries    map[string]*LinkedMapEntryValue
 	indexes    map[uint64]*LinkedMapEntryValue
 	firstEntry *LinkedMapEntryValue
 	lastEntry  *LinkedMapEntryValue
 	timers     map[string]rsm.Timer
-	streams    map[rsm.StreamID]ServiceEventsStream
 }
 
-func (m *indexedMapService) Size(*indexedmap.SizeRequest) (*indexedmap.SizeResponse, error) {
+func (m *indexedMapService) SetState(state *IndexedMapState) error {
+	return nil
+}
+
+func (m *indexedMapService) GetState() (*IndexedMapState, error) {
+	return &IndexedMapState{}, nil
+}
+
+func (m *indexedMapService) Size(size SizeProposal) error {
 	panic("implement me")
 }
 
-func (m *indexedMapService) Put(*indexedmap.PutRequest) (*indexedmap.PutResponse, error) {
+func (m *indexedMapService) Put(put PutProposal) error {
 	panic("implement me")
 }
 
-func (m *indexedMapService) Get(*indexedmap.GetRequest) (*indexedmap.GetResponse, error) {
+func (m *indexedMapService) Get(get GetProposal) error {
 	panic("implement me")
 }
 
-func (m *indexedMapService) FirstEntry(*indexedmap.FirstEntryRequest) (*indexedmap.FirstEntryResponse, error) {
+func (m *indexedMapService) FirstEntry(firstEntry FirstEntryProposal) error {
 	panic("implement me")
 }
 
-func (m *indexedMapService) LastEntry(*indexedmap.LastEntryRequest) (*indexedmap.LastEntryResponse, error) {
+func (m *indexedMapService) LastEntry(lastEntry LastEntryProposal) error {
 	panic("implement me")
 }
 
-func (m *indexedMapService) PrevEntry(*indexedmap.PrevEntryRequest) (*indexedmap.PrevEntryResponse, error) {
+func (m *indexedMapService) PrevEntry(prevEntry PrevEntryProposal) error {
 	panic("implement me")
 }
 
-func (m *indexedMapService) NextEntry(*indexedmap.NextEntryRequest) (*indexedmap.NextEntryResponse, error) {
+func (m *indexedMapService) NextEntry(nextEntry NextEntryProposal) error {
 	panic("implement me")
 }
 
-func (m *indexedMapService) Remove(*indexedmap.RemoveRequest) (*indexedmap.RemoveResponse, error) {
+func (m *indexedMapService) Remove(remove RemoveProposal) error {
 	panic("implement me")
 }
 
-func (m *indexedMapService) Clear(*indexedmap.ClearRequest) (*indexedmap.ClearResponse, error) {
+func (m *indexedMapService) Clear(clear ClearProposal) error {
 	panic("implement me")
 }
 
-func (m *indexedMapService) Events(input *indexedmap.EventsRequest, stream ServiceEventsStream) (rsm.StreamCloser, error) {
-	m.streams[stream.ID()] = stream
-	return func() {
-		delete(m.streams, stream.ID())
-	}, nil
+func (m *indexedMapService) Events(events EventsProposal) error {
+	return nil
 }
 
-func (m *indexedMapService) Entries(*indexedmap.EntriesRequest, ServiceEntriesStream) (rsm.StreamCloser, error) {
+func (m *indexedMapService) Entries(entries EntriesProposal) error {
 	panic("implement me")
 }
 

@@ -20,10 +20,10 @@ type OperationID string
 // Executor executes primitive operations
 type Executor interface {
 	// RegisterUnaryOperation registers a unary primitive operation
-	RegisterUnaryOperation(id OperationID, callback func([]byte) ([]byte, error))
+	RegisterUnaryOperation(id OperationID, callback func([]byte, Session) ([]byte, error))
 
 	// RegisterStreamOperation registers a new primitive operation
-	RegisterStreamOperation(id OperationID, callback func([]byte, Stream) (StreamCloser, error))
+	RegisterStreamOperation(id OperationID, callback func([]byte, Session, Stream) (StreamCloser, error))
 
 	// GetOperation returns an operation by name
 	GetOperation(id OperationID) Operation
@@ -35,13 +35,13 @@ type Operation interface{}
 // UnaryOperation is a primitive operation that returns a result
 type UnaryOperation interface {
 	// Execute executes the operation
-	Execute(bytes []byte) ([]byte, error)
+	Execute(bytes []byte, session Session) ([]byte, error)
 }
 
 // StreamingOperation is a primitive operation that returns a stream
 type StreamingOperation interface {
 	// Execute executes the operation
-	Execute(bytes []byte, stream Stream) (StreamCloser, error)
+	Execute(bytes []byte, session Session, stream Stream) (StreamCloser, error)
 }
 
 // newExecutor returns a new executor
@@ -57,13 +57,13 @@ type executor struct {
 	operations map[OperationID]Operation
 }
 
-func (e *executor) RegisterUnaryOperation(id OperationID, callback func([]byte) ([]byte, error)) {
+func (e *executor) RegisterUnaryOperation(id OperationID, callback func([]byte, Session) ([]byte, error)) {
 	e.operations[id] = &unaryOperation{
 		f: callback,
 	}
 }
 
-func (e *executor) RegisterStreamOperation(id OperationID, callback func([]byte, Stream) (StreamCloser, error)) {
+func (e *executor) RegisterStreamOperation(id OperationID, callback func([]byte, Session, Stream) (StreamCloser, error)) {
 	e.operations[id] = &streamingOperation{
 		f: callback,
 	}
@@ -75,18 +75,18 @@ func (e *executor) GetOperation(id OperationID) Operation {
 
 // unaryOperation is an implementation of the UnaryOperation interface
 type unaryOperation struct {
-	f func([]byte) ([]byte, error)
+	f func([]byte, Session) ([]byte, error)
 }
 
-func (o *unaryOperation) Execute(bytes []byte) ([]byte, error) {
-	return o.f(bytes)
+func (o *unaryOperation) Execute(bytes []byte, session Session) ([]byte, error) {
+	return o.f(bytes, session)
 }
 
 // streamingOperation is an implementation of the StreamingOperation interface
 type streamingOperation struct {
-	f func([]byte, Stream) (StreamCloser, error)
+	f func([]byte, Session, Stream) (StreamCloser, error)
 }
 
-func (o *streamingOperation) Execute(bytes []byte, stream Stream) (StreamCloser, error) {
-	return o.f(bytes, stream)
+func (o *streamingOperation) Execute(bytes []byte, session Session, stream Stream) (StreamCloser, error) {
+	return o.f(bytes, session, stream)
 }

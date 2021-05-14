@@ -97,7 +97,7 @@ Query
 
 {{- range .Primitive.Methods }}
 {{- $method := . }}
-{{ if and .Request.IsDiscrete .Response.IsDiscrete }}
+{{ if and .Request.IsUnary .Response.IsUnary }}
 func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "type" .Request.Type }}) (*{{ template "type" .Response.Type }}, error) {
 	s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
 	{{- if .Scope.IsPartition }}

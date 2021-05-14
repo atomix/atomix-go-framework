@@ -83,13 +83,9 @@ type ServiceMeta struct {
 type StateMeta struct {
 	IsDiscrete   bool
 	IsContinuous bool
-	Entry        *StateTypeMeta
-}
-
-type StateTypeMeta struct {
-	Type   TypeMeta
-	Key    *FieldRefMeta
-	Digest *FieldRefMeta
+	Type         TypeMeta
+	Key          *FieldRefMeta
+	Digest       *FieldRefMeta
 }
 
 type ServiceTypeMeta struct {
@@ -151,7 +147,7 @@ type RequestMeta struct {
 	Headers        FieldRefMeta
 	PartitionKey   *FieldRefMeta
 	PartitionRange *FieldRefMeta
-	IsDiscrete     bool
+	IsUnary        bool
 	IsStream       bool
 }
 
@@ -160,7 +156,7 @@ type ResponseMeta struct {
 	MessageMeta
 	Headers    FieldRefMeta
 	Aggregates []AggregatorMeta
-	IsDiscrete bool
+	IsUnary    bool
 	IsStream   bool
 }
 
@@ -175,5 +171,6 @@ type AggregatorMeta struct {
 type MethodTypeMeta struct {
 	IsCommand bool
 	IsQuery   bool
+	IsSync    bool
 	IsAsync   bool
 }

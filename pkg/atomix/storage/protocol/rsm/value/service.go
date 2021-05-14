@@ -19,50 +19,55 @@ import (
 	valueapi "github.com/atomix/atomix-api/go/atomix/primitive/value"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 )
 
 func init() {
 	registerServiceFunc(newService)
 }
 
-func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
+func newService(context ServiceContext) Service {
 	return &valueService{
-		Service: rsm.NewService(scheduler, context),
-		streams: make(map[rsm.StreamID]ServiceEventsStream),
+		ServiceContext: context,
 	}
 }
 
 // valueService is a state machine for a list primitive
 type valueService struct {
-	rsm.Service
-	value   valueapi.Value
-	streams map[rsm.StreamID]ServiceEventsStream
+	ServiceContext
+	value valueapi.Value
+}
+
+func (v *valueService) SetState(state *ValueState) error {
+	return nil
+}
+
+func (v *valueService) GetState() (*ValueState, error) {
+	return &ValueState{}, nil
 }
 
 func (v *valueService) notify(event valueapi.Event) error {
 	output := &valueapi.EventsResponse{
 		Event: event,
 	}
-	for _, stream := range v.streams {
-		if err := stream.Notify(output); err != nil {
+	for _, events := range v.Proposals().Events().List() {
+		if err := events.Notify(output); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (v *valueService) Set(input *valueapi.SetRequest) (*valueapi.SetResponse, error) {
-	for _, precondition := range input.Preconditions {
+func (v *valueService) Set(set SetProposal) error {
+	for _, precondition := range set.Request().Preconditions {
 		switch p := precondition.Precondition.(type) {
 		case *valueapi.Precondition_Metadata:
 			if !meta.Equal(v.value.ObjectMeta, *p.Metadata) {
-				return nil, errors.NewConflict("metadata precondition failed")
+				return errors.NewConflict("metadata precondition failed")
 			}
 		}
 	}
 
-	meta := input.Value.ObjectMeta
+	meta := set.Request().Value.ObjectMeta
 	if meta.Revision == nil {
 		if v.value.Revision != nil {
 			meta.Revision = &metaapi.Revision{
@@ -77,7 +82,7 @@ func (v *valueService) Set(input *valueapi.SetRequest) (*valueapi.SetResponse, e
 
 	value := valueapi.Value{
 		ObjectMeta: meta,
-		Value:      input.Value.Value,
+		Value:      set.Request().Value.Value,
 	}
 	v.value = value
 
@@ -86,22 +91,19 @@ func (v *valueService) Set(input *valueapi.SetRequest) (*valueapi.SetResponse, e
 		Value: v.value,
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return &valueapi.SetResponse{
+	return set.Reply(&valueapi.SetResponse{
 		Value: value,
-	}, nil
+	})
 }
 
-func (v *valueService) Get(input *valueapi.GetRequest) (*valueapi.GetResponse, error) {
-	return &valueapi.GetResponse{
+func (v *valueService) Get(get GetProposal) error {
+	return get.Reply(&valueapi.GetResponse{
 		Value: v.value,
-	}, nil
+	})
 }
 
-func (v *valueService) Events(input *valueapi.EventsRequest, stream ServiceEventsStream) (rsm.StreamCloser, error) {
-	v.streams[stream.ID()] = stream
-	return func() {
-		delete(v.streams, stream.ID())
-	}, nil
+func (v *valueService) Events(events EventsProposal) error {
+	return nil
 }

@@ -48,14 +48,14 @@ package {{ .Package.Name }}
 {{- if .Primitive.State.IsDiscrete -}}
 ""
 {{- else if .Primitive.State.IsContinuous -}}
-{{- if .Primitive.State.Entry.Key -}}
-state{{ template "field" .Primitive.State.Entry.Key -}}
+{{- if .Primitive.State.Key -}}
+state{{ template "field" .Primitive.State.Key -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}
 
 {{- define "stateDigest" -}}
-state{{ template "field" .Primitive.State.Entry.Digest }}
+state{{ template "field" .Primitive.State.Digest }}
 {{- end -}}
 
 import (
@@ -69,8 +69,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	{{- if .Primitive.State.Entry.Type.Package.Import }}
-	{{ .Primitive.State.Entry.Type.Package.Alias }} {{ .Primitive.State.Entry.Type.Package.Path | quote }}
+	{{- if .Primitive.State.Type.Package.Import }}
+	{{ .Primitive.State.Type.Package.Alias }} {{ .Primitive.State.Type.Package.Path | quote }}
 	{{- end }}
 )
 
@@ -96,20 +96,20 @@ type GossipProtocol interface {
 
 type GossipHandler interface {
     {{- if .Primitive.State.IsDiscrete }}
-	Read(ctx context.Context) (*{{ template "type" .Primitive.State.Entry.Type }}, error)
-	Update(ctx context.Context, state *{{ template "type" .Primitive.State.Entry.Type }}) error
+	Read(ctx context.Context) (*{{ template "type" .Primitive.State.Type }}, error)
+	Update(ctx context.Context, state *{{ template "type" .Primitive.State.Type }}) error
     {{- else if .Primitive.State.IsContinuous }}
-    {{- if .Primitive.State.Entry.Key }}
-    {{- if .Primitive.State.Entry.Key.Field.Type.IsScalar }}
-	Read(ctx context.Context, key {{ .Primitive.State.Entry.Key.Field.Type.Name }}) (*{{ template "type" .Primitive.State.Entry.Type }}, error)
+    {{- if .Primitive.State.Key }}
+    {{- if .Primitive.State.Key.Field.Type.IsScalar }}
+	Read(ctx context.Context, key {{ .Primitive.State.Key.Field.Type.Name }}) (*{{ template "type" .Primitive.State.Type }}, error)
     {{- else }}
-	Read(ctx context.Context, key {{ template "type" .Primitive.State.Entry.Key.Field.Type }}) (*{{ template "type" .Primitive.State.Entry.Type }}, error)
+	Read(ctx context.Context, key {{ template "type" .Primitive.State.Key.Field.Type }}) (*{{ template "type" .Primitive.State.Type }}, error)
 	{{- end }}
     {{- else }}
-	Read(ctx context.Context) (*{{ template "type" .Primitive.State.Entry.Type }}, error)
+	Read(ctx context.Context) (*{{ template "type" .Primitive.State.Type }}, error)
     {{- end }}
-    List(ctx context.Context, ch chan<- {{ template "type" .Primitive.State.Entry.Type }}) error
-	Update(ctx context.Context, entry *{{ template "type" .Primitive.State.Entry.Type }}) error
+    List(ctx context.Context, ch chan<- {{ template "type" .Primitive.State.Type }}) error
+	Update(ctx context.Context, entry *{{ template "type" .Primitive.State.Type }}) error
     {{- end }}
 }
 
@@ -120,13 +120,13 @@ type GossipServer interface {
 
 type GossipClient interface {
     {{- if .Primitive.State.IsDiscrete }}
-	Bootstrap(ctx context.Context) (*{{ template "type" .Primitive.State.Entry.Type }}, error)
+	Bootstrap(ctx context.Context) (*{{ template "type" .Primitive.State.Type }}, error)
 	{{- else if .Primitive.State.IsContinuous }}
-	Bootstrap(ctx context.Context, ch chan<- {{ template "type" .Primitive.State.Entry.Type }}) error
+	Bootstrap(ctx context.Context, ch chan<- {{ template "type" .Primitive.State.Type }}) error
 	{{- end }}
-	Repair(ctx context.Context, state *{{ template "type" .Primitive.State.Entry.Type }}) (*{{ template "type" .Primitive.State.Entry.Type }}, error)
-	Advertise(ctx context.Context, state *{{ template "type" .Primitive.State.Entry.Type }}) error
-	Update(ctx context.Context, state *{{ template "type" .Primitive.State.Entry.Type }}) error
+	Repair(ctx context.Context, state *{{ template "type" .Primitive.State.Type }}) (*{{ template "type" .Primitive.State.Type }}, error)
+	Advertise(ctx context.Context, state *{{ template "type" .Primitive.State.Type }}) error
+	Update(ctx context.Context, state *{{ template "type" .Primitive.State.Type }}) error
 }
 
 type GossipGroup interface {
@@ -203,36 +203,36 @@ func (p *gossipGroup) Member(id GossipMemberID) GossipMember {
 }
 
 {{- if .Primitive.State.IsDiscrete }}
-func (p *gossipGroup) Bootstrap(ctx context.Context) (*{{ template "type" .Primitive.State.Entry.Type }}, error) {
+func (p *gossipGroup) Bootstrap(ctx context.Context) (*{{ template "type" .Primitive.State.Type }}, error) {
 	objects, err := p.group.Read(ctx, "")
 	if err != nil {
 		return nil, err
 	}
 
-    state := &{{ template "type" .Primitive.State.Entry.Type }}{}
+    state := &{{ template "type" .Primitive.State.Type }}{}
 	for _, object := range objects {
-        {{- if .Primitive.State.Entry.Digest }}
+        {{- if .Primitive.State.Digest }}
 		if meta.FromProto(object.ObjectMeta).After(meta.FromProto({{ template "stateDigest" . }})) {
 		{{- end }}
 			err = proto.Unmarshal(object.Value, state)
 			if err != nil {
 				return nil, err
 			}
-        {{- if .Primitive.State.Entry.Digest }}
+        {{- if .Primitive.State.Digest }}
 		}
 		{{- end }}
 	}
 	return state, nil
 }
 {{- else if .Primitive.State.IsContinuous }}
-func (p *gossipGroup) Bootstrap(ctx context.Context, ch chan<- {{ template "type" .Primitive.State.Entry.Type }}) error {
+func (p *gossipGroup) Bootstrap(ctx context.Context, ch chan<- {{ template "type" .Primitive.State.Type }}) error {
 	objectCh := make(chan gossip.Object)
 	if err := p.group.ReadAll(ctx, objectCh); err != nil {
 		return err
 	}
 	go func() {
 		for object := range objectCh {
-			var entry {{ template "type" .Primitive.State.Entry.Type }}
+			var entry {{ template "type" .Primitive.State.Type }}
 			err := proto.Unmarshal(object.Value, &entry)
 			if err != nil {
 				log.Errorf("Bootstrap failed: %v", err)
@@ -245,31 +245,31 @@ func (p *gossipGroup) Bootstrap(ctx context.Context, ch chan<- {{ template "type
 }
 {{- end }}
 
-func (p *gossipGroup) Repair(ctx context.Context, state *{{ template "type" .Primitive.State.Entry.Type }}) (*{{ template "type" .Primitive.State.Entry.Type }}, error) {
+func (p *gossipGroup) Repair(ctx context.Context, state *{{ template "type" .Primitive.State.Type }}) (*{{ template "type" .Primitive.State.Type }}, error) {
 	objects, err := p.group.Read(ctx, {{ template "stateKey" . }})
 	if err != nil {
 		return nil, err
 	}
 
 	for _, object := range objects {
-        {{- if .Primitive.State.Entry.Digest }}
+        {{- if .Primitive.State.Digest }}
 		if meta.FromProto(object.ObjectMeta).After(meta.FromProto({{ template "stateDigest" . }})) {
 		{{- end }}
 			err = proto.Unmarshal(object.Value, state)
 			if err != nil {
 				return nil, err
 			}
-        {{- if .Primitive.State.Entry.Digest }}
+        {{- if .Primitive.State.Digest }}
 		}
 		{{- end }}
 	}
 	return state, nil
 }
 
-func (p *gossipGroup) Advertise(ctx context.Context, state *{{ template "type" .Primitive.State.Entry.Type }}) error {
+func (p *gossipGroup) Advertise(ctx context.Context, state *{{ template "type" .Primitive.State.Type }}) error {
 	peers := p.group.Peers()
 	peer := peers[rand.Intn(len(peers))]
-    {{- if .Primitive.State.Entry.Digest }}
+    {{- if .Primitive.State.Digest }}
 	peer.Advertise(ctx, {{ template "stateKey" . }}, meta.FromProto({{ template "stateDigest" . }}))
 	{{- else }}
 	peer.Advertise(ctx, {{ template "stateKey" . }}, meta.ObjectMeta{})
@@ -277,13 +277,13 @@ func (p *gossipGroup) Advertise(ctx context.Context, state *{{ template "type" .
 	return nil
 }
 
-func (p *gossipGroup) Update(ctx context.Context, state *{{ template "type" .Primitive.State.Entry.Type }}) error {
+func (p *gossipGroup) Update(ctx context.Context, state *{{ template "type" .Primitive.State.Type }}) error {
 	bytes, err := proto.Marshal(state)
 	if err != nil {
 		return err
 	}
 	object := &gossip.Object{
-        {{- if .Primitive.State.Entry.Digest }}
+        {{- if .Primitive.State.Digest }}
 		ObjectMeta: {{ template "stateDigest" . }},
 		{{- end }}
 		Value:      bytes,
@@ -339,13 +339,13 @@ func (p *gossipMember) Client() *gossip.Peer {
 }
 
 {{- if .Primitive.State.IsDiscrete }}
-func (p *gossipMember) Bootstrap(ctx context.Context) (*{{ template "type" .Primitive.State.Entry.Type }}, error) {
+func (p *gossipMember) Bootstrap(ctx context.Context) (*{{ template "type" .Primitive.State.Type }}, error) {
 	object, err := p.peer.Read(ctx, "")
 	if err != nil {
 		return nil, err
 	}
 
-    state := &{{ template "type" .Primitive.State.Entry.Type }}{}
+    state := &{{ template "type" .Primitive.State.Type }}{}
     err = proto.Unmarshal(object.Value, state)
     if err != nil {
         return nil, err
@@ -353,14 +353,14 @@ func (p *gossipMember) Bootstrap(ctx context.Context) (*{{ template "type" .Prim
 	return state, nil
 }
 {{- else if .Primitive.State.IsContinuous }}
-func (p *gossipMember) Bootstrap(ctx context.Context, ch chan<- {{ template "type" .Primitive.State.Entry.Type }}) error {
+func (p *gossipMember) Bootstrap(ctx context.Context, ch chan<- {{ template "type" .Primitive.State.Type }}) error {
 	objectCh := make(chan gossip.Object)
 	if err := p.peer.ReadAll(ctx, objectCh); err != nil {
 		return err
 	}
 	go func() {
 		for object := range objectCh {
-			var entry {{ template "type" .Primitive.State.Entry.Type }}
+			var entry {{ template "type" .Primitive.State.Type }}
 			err := proto.Unmarshal(object.Value, &entry)
 			if err != nil {
 				log.Errorf("Bootstrap failed: %v", err)
@@ -373,27 +373,27 @@ func (p *gossipMember) Bootstrap(ctx context.Context, ch chan<- {{ template "typ
 }
 {{- end }}
 
-func (p *gossipMember) Repair(ctx context.Context, state *{{ template "type" .Primitive.State.Entry.Type }}) (*{{ template "type" .Primitive.State.Entry.Type }}, error) {
+func (p *gossipMember) Repair(ctx context.Context, state *{{ template "type" .Primitive.State.Type }}) (*{{ template "type" .Primitive.State.Type }}, error) {
 	object, err := p.peer.Read(ctx, {{ template "stateKey" . }})
 	if err != nil {
 		return nil, err
 	}
 
-    {{- if .Primitive.State.Entry.Digest }}
+    {{- if .Primitive.State.Digest }}
     if meta.FromProto(object.ObjectMeta).After(meta.FromProto({{ template "stateDigest" . }})) {
 	{{- end }}
         err = proto.Unmarshal(object.Value, state)
         if err != nil {
             return nil, err
         }
-    {{- if .Primitive.State.Entry.Digest }}
+    {{- if .Primitive.State.Digest }}
 	}
 	{{- end }}
 	return state, nil
 }
 
-func (p *gossipMember) Advertise(ctx context.Context, state *{{ template "type" .Primitive.State.Entry.Type }}) error {
-    {{- if .Primitive.State.Entry.Digest }}
+func (p *gossipMember) Advertise(ctx context.Context, state *{{ template "type" .Primitive.State.Type }}) error {
+    {{- if .Primitive.State.Digest }}
 	p.peer.Advertise(ctx, "", meta.FromProto({{ template "stateDigest" . }}))
 	{{- else }}
 	p.peer.Advertise(ctx, "", meta.ObjectMeta{})
@@ -401,13 +401,13 @@ func (p *gossipMember) Advertise(ctx context.Context, state *{{ template "type" 
 	return nil
 }
 
-func (p *gossipMember) Update(ctx context.Context, state *{{ template "type" .Primitive.State.Entry.Type }}) error {
+func (p *gossipMember) Update(ctx context.Context, state *{{ template "type" .Primitive.State.Type }}) error {
 	bytes, err := proto.Marshal(state)
 	if err != nil {
 		return err
 	}
 	object := &gossip.Object{
-        {{- if .Primitive.State.Entry.Digest }}
+        {{- if .Primitive.State.Digest }}
 		ObjectMeta: {{ template "stateDigest" . }},
 		{{- end }}
 		Value:      bytes,
@@ -439,7 +439,7 @@ func (s *gossipReplica) Type() gossip.ServiceType {
 }
 
 func (s *gossipReplica) Update(ctx context.Context, object *gossip.Object) error {
-	state := &{{ template "type" .Primitive.State.Entry.Type }}{}
+	state := &{{ template "type" .Primitive.State.Type }}{}
 	err := proto.Unmarshal(object.Value, state)
 	if err != nil {
 		return err
@@ -451,7 +451,7 @@ func (s *gossipReplica) Read(ctx context.Context, key string) (*gossip.Object, e
     {{- if .Primitive.State.IsDiscrete }}
 	state, err := s.handler.Read(ctx)
     {{- else if .Primitive.State.IsContinuous }}
-    {{- if .Primitive.State.Entry.Key }}
+    {{- if .Primitive.State.Key }}
 	state, err := s.handler.Read(ctx, key)
 	{{- else }}
 	state, err := s.handler.Read(ctx)
@@ -468,10 +468,10 @@ func (s *gossipReplica) Read(ctx context.Context, key string) (*gossip.Object, e
 		return nil, err
 	}
 	return &gossip.Object{
-        {{- if .Primitive.State.Entry.Digest }}
+        {{- if .Primitive.State.Digest }}
         ObjectMeta: {{ template "stateDigest" . }},
         {{- end }}
-        {{- if .Primitive.State.Entry.Key }}
+        {{- if .Primitive.State.Key }}
         Key:        {{ template "stateKey" . }},
         {{- end }}
 		Value:      bytes,
@@ -494,7 +494,7 @@ func (s *gossipReplica) ReadAll(ctx context.Context, ch chan<- gossip.Object) er
             return
         }
         object := gossip.Object{
-            {{- if .Primitive.State.Entry.Digest }}
+            {{- if .Primitive.State.Digest }}
             ObjectMeta: {{ template "stateDigest" . }},
             {{- end }}
             Value:      bytes,
@@ -503,7 +503,7 @@ func (s *gossipReplica) ReadAll(ctx context.Context, ch chan<- gossip.Object) er
     }()
 	return <-errCh
     {{- else if .Primitive.State.IsContinuous }}
-	entriesCh := make(chan {{ template "type" .Primitive.State.Entry.Type }})
+	entriesCh := make(chan {{ template "type" .Primitive.State.Type }})
 	errCh := make(chan error)
 	go func() {
 		err := s.handler.List(ctx, entriesCh)
@@ -520,10 +520,10 @@ func (s *gossipReplica) ReadAll(ctx context.Context, ch chan<- gossip.Object) er
 				return
 			}
 			object := gossip.Object{
-			    {{- if .Primitive.State.Entry.Digest }}
+			    {{- if .Primitive.State.Digest }}
 				ObjectMeta: {{ template "stateDigest" . }},
 				{{- end }}
-				{{- if .Primitive.State.Entry.Key }}
+				{{- if .Primitive.State.Key }}
 				Key: {{ template "stateKey" . }},
 				{{- end }}
 				Value:      bytes,
@@ -573,7 +573,7 @@ func (m *gossipEngine) bootstrap(ctx context.Context) error {
         return err
     }
     {{- else if .Primitive.State.IsContinuous }}
-	stateCh := make(chan {{ template "type" .Primitive.State.Entry.Type }})
+	stateCh := make(chan {{ template "type" .Primitive.State.Type }})
 	if err := m.protocol.Group().Bootstrap(ctx, stateCh); err != nil {
 		return err
 	}
@@ -605,7 +605,7 @@ func (m *gossipEngine) advertise(ctx context.Context) error {
         return err
     }
     {{- else if .Primitive.State.IsContinuous }}
-	stateCh := make(chan {{ template "type" .Primitive.State.Entry.Type }})
+	stateCh := make(chan {{ template "type" .Primitive.State.Type }})
 	if err := m.protocol.Server().handler().List(ctx, stateCh); err != nil {
 		return err
 	}

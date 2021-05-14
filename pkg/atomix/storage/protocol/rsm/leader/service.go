@@ -15,6 +15,7 @@
 package leader
 
 import (
+	"fmt"
 	leaderapi "github.com/atomix/atomix-api/go/atomix/primitive/leader"
 	"github.com/atomix/atomix-api/go/atomix/primitive/meta"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
@@ -24,18 +25,24 @@ func init() {
 	registerServiceFunc(newService)
 }
 
-func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
+func newService(context ServiceContext) Service {
 	return &leaderService{
-		Service: rsm.NewService(scheduler, context),
-		streams: make(map[rsm.StreamID]ServiceEventsStream),
+		ServiceContext: context,
 	}
 }
 
 // leaderService is a state machine for an election primitive
 type leaderService struct {
-	rsm.Service
-	latch   leaderapi.Latch
-	streams map[rsm.StreamID]ServiceEventsStream
+	ServiceContext
+	latch leaderapi.Latch
+}
+
+func (l *leaderService) SetState(state *LeaderLatchState) error {
+	return nil
+}
+
+func (l *leaderService) GetState() (*LeaderLatchState, error) {
+	return &LeaderLatchState{}, nil
 }
 
 // SessionExpired is called when a session is expired by the server
@@ -63,8 +70,8 @@ func (l *leaderService) notify(event leaderapi.Event) error {
 	output := &leaderapi.EventsResponse{
 		Event: event,
 	}
-	for _, stream := range l.streams {
-		if err := stream.Notify(output); err != nil {
+	for _, events := range l.Proposals().Events().List() {
+		if err := events.Notify(output); err != nil {
 			return err
 		}
 	}
@@ -94,7 +101,7 @@ func (l *leaderService) updateLatch(newParticipants []string) (leaderapi.Latch, 
 	newLatch.ObjectMeta.Timestamp = &meta.Timestamp{
 		Timestamp: &meta.Timestamp_PhysicalTimestamp{
 			PhysicalTimestamp: &meta.PhysicalTimestamp{
-				Time: l.Timestamp(),
+				Time: l.Scheduler().Time(),
 			},
 		},
 	}
@@ -109,8 +116,8 @@ func (l *leaderService) updateLatch(newParticipants []string) (leaderapi.Latch, 
 	return newLatch, nil
 }
 
-func (l *leaderService) Latch(input *leaderapi.LatchRequest) (*leaderapi.LatchResponse, error) {
-	clientID := string(l.CurrentSession().ClientID())
+func (l *leaderService) Latch(proposal LatchProposal) error {
+	clientID := fmt.Sprint(proposal.Session().ID())
 	participants := l.latch.Participants[:]
 	if !sliceContains(participants, clientID) {
 		participants = append(participants, clientID)
@@ -118,25 +125,22 @@ func (l *leaderService) Latch(input *leaderapi.LatchRequest) (*leaderapi.LatchRe
 
 	latch, err := l.updateLatch(participants)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return &leaderapi.LatchResponse{
+	return proposal.Reply(&leaderapi.LatchResponse{
 		Latch: latch,
-	}, nil
+	})
 }
 
-func (l *leaderService) Get(input *leaderapi.GetRequest) (*leaderapi.GetResponse, error) {
-	return &leaderapi.GetResponse{
+func (l *leaderService) Get(get GetProposal) error {
+	return get.Reply(&leaderapi.GetResponse{
 		Latch: l.latch,
-	}, nil
+	})
 }
 
-func (l *leaderService) Events(input *leaderapi.EventsRequest, stream ServiceEventsStream) (rsm.StreamCloser, error) {
-	l.streams[stream.ID()] = stream
-	return func() {
-		delete(l.streams, stream.ID())
-	}, nil
+func (l *leaderService) Events(events EventsProposal) error {
+	return nil
 }
 
 func slicesMatch(s1, s2 []string) bool {

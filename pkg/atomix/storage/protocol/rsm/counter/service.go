@@ -17,53 +17,60 @@ package counter
 import (
 	"github.com/atomix/atomix-api/go/atomix/primitive/counter"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 )
 
 func init() {
 	registerServiceFunc(newService)
 }
 
-func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
+func newService(context ServiceContext) Service {
 	return &counterService{
-		Service: rsm.NewService(scheduler, context),
+		ServiceContext: context,
 	}
 }
 
 // counterService is a state machine for a counter primitive
 type counterService struct {
-	rsm.Service
+	ServiceContext
 	value int64
 }
 
-func (c *counterService) Set(input *counter.SetRequest) (*counter.SetResponse, error) {
-	if err := checkPreconditions(c.value, input.Preconditions); err != nil {
-		return nil, err
+func (c *counterService) SetState(state *CounterState) error {
+	return nil
+}
+
+func (c *counterService) GetState() (*CounterState, error) {
+	return &CounterState{}, nil
+}
+
+func (c *counterService) Set(set SetProposal) error {
+	if err := checkPreconditions(c.value, set.Request().Preconditions); err != nil {
+		return err
 	}
-	c.value = input.Value
-	return &counter.SetResponse{
+	c.value = set.Request().Value
+	return set.Reply(&counter.SetResponse{
 		Value: c.value,
-	}, nil
+	})
 }
 
-func (c *counterService) Get(input *counter.GetRequest) (*counter.GetResponse, error) {
-	return &counter.GetResponse{
+func (c *counterService) Get(get GetProposal) error {
+	return get.Reply(&counter.GetResponse{
 		Value: c.value,
-	}, nil
+	})
 }
 
-func (c *counterService) Increment(input *counter.IncrementRequest) (*counter.IncrementResponse, error) {
-	c.value += input.Delta
-	return &counter.IncrementResponse{
+func (c *counterService) Increment(increment IncrementProposal) error {
+	c.value += increment.Request().Delta
+	return increment.Reply(&counter.IncrementResponse{
 		Value: c.value,
-	}, nil
+	})
 }
 
-func (c *counterService) Decrement(input *counter.DecrementRequest) (*counter.DecrementResponse, error) {
-	c.value -= input.Delta
-	return &counter.DecrementResponse{
+func (c *counterService) Decrement(decrement DecrementProposal) error {
+	c.value -= decrement.Request().Delta
+	return decrement.Reply(&counter.DecrementResponse{
 		Value: c.value,
-	}, nil
+	})
 }
 
 func checkPreconditions(value int64, preconditions []counter.Precondition) error {

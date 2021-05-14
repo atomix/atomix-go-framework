@@ -16,86 +16,88 @@ package log
 
 import (
 	"github.com/atomix/atomix-api/go/atomix/primitive/log"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 )
 
 func init() {
 	registerServiceFunc(newService)
 }
 
-func newService(scheduler rsm.Scheduler, context rsm.ServiceContext) Service {
+func newService(context ServiceContext) Service {
 	return &logService{
-		Service: rsm.NewService(scheduler, context),
-		indexes: make(map[uint64]*LinkedEntry),
-		streams: make(map[rsm.StreamID]ServiceEventsStream),
+		ServiceContext: context,
+		indexes:        make(map[uint64]*LinkedEntry),
 	}
 }
 
 // logService is a state machine for a log primitive
 type logService struct {
-	rsm.Service
+	ServiceContext
 	lastIndex  uint64
 	indexes    map[uint64]*LinkedEntry
 	firstEntry *LinkedEntry
 	lastEntry  *LinkedEntry
-	streams    map[rsm.StreamID]ServiceEventsStream
+}
+
+func (l *logService) SetState(state *LogState) error {
+	return nil
+}
+
+func (l *logService) GetState() (*LogState, error) {
+	return &LogState{}, nil
 }
 
 func (l *logService) notify(event *log.EventsResponse) error {
-	for _, stream := range l.streams {
-		if err := stream.Notify(event); err != nil {
+	for _, events := range l.Proposals().Events().List() {
+		if err := events.Notify(event); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (l *logService) Size(*log.SizeRequest) (*log.SizeResponse, error) {
-	return &log.SizeResponse{
+func (l *logService) Size(size SizeProposal) error {
+	return size.Reply(&log.SizeResponse{
 		Size_: int32(len(l.indexes)),
-	}, nil
+	})
 }
 
-func (l *logService) Append(*log.AppendRequest) (*log.AppendResponse, error) {
+func (l *logService) Append(append AppendProposal) error {
 	panic("implement me")
 }
 
-func (l *logService) Get(*log.GetRequest) (*log.GetResponse, error) {
+func (l *logService) Get(get GetProposal) error {
 	panic("implement me")
 }
 
-func (l *logService) FirstEntry(*log.FirstEntryRequest) (*log.FirstEntryResponse, error) {
+func (l *logService) FirstEntry(firstEntry FirstEntryProposal) error {
 	panic("implement me")
 }
 
-func (l *logService) LastEntry(*log.LastEntryRequest) (*log.LastEntryResponse, error) {
+func (l *logService) LastEntry(lastEntry LastEntryProposal) error {
 	panic("implement me")
 }
 
-func (l *logService) PrevEntry(*log.PrevEntryRequest) (*log.PrevEntryResponse, error) {
+func (l *logService) PrevEntry(prevEntry PrevEntryProposal) error {
 	panic("implement me")
 }
 
-func (l *logService) NextEntry(*log.NextEntryRequest) (*log.NextEntryResponse, error) {
+func (l *logService) NextEntry(nextEntry NextEntryProposal) error {
 	panic("implement me")
 }
 
-func (l *logService) Remove(*log.RemoveRequest) (*log.RemoveResponse, error) {
+func (l *logService) Remove(remove RemoveProposal) error {
 	panic("implement me")
 }
 
-func (l *logService) Clear(*log.ClearRequest) (*log.ClearResponse, error) {
+func (l *logService) Clear(clear ClearProposal) error {
 	panic("implement me")
 }
 
-func (l *logService) Events(input *log.EventsRequest, stream ServiceEventsStream) (rsm.StreamCloser, error) {
-	l.streams[stream.ID()] = stream
-	return func() {
-		delete(l.streams, stream.ID())
-	}, nil
+func (l *logService) Events(events EventsProposal) error {
+	return nil
 }
 
-func (l *logService) Entries(*log.EntriesRequest, ServiceEntriesStream) (rsm.StreamCloser, error) {
+func (l *logService) Entries(entries EntriesProposal) error {
 	panic("implement me")
 }
 

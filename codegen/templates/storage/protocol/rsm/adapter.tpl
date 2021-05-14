@@ -4,11 +4,20 @@ package {{ .Package.Name }}
 {{ $serviceInt := printf "%sService" .Generator.Prefix }}
 {{- $serviceImpl := printf "%sServiceAdaptor" .Generator.Prefix }}
 
-{{- define "type" }}{{ printf "%s.%s" .Package.Alias .Name }}{{ end }}
+{{ define "type" }}
+{{- if .Package.Import -}}
+{{- printf "%s.%s" .Package.Alias .Name -}}
+{{- else -}}
+{{- .Name -}}
+{{- end -}}
+{{- end -}}
 
 import (
+    "io"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
 	{{- $package := .Package }}
 	{{- range .Imports }}
@@ -24,13 +33,14 @@ const (
     {{- end }}
 )
 
+{{ $serviceContextInt := printf "%sServiceContext" .Generator.Prefix }}
 var new{{ $serviceInt }}Func rsm.NewServiceFunc
 
 func register{{ $serviceInt }}Func(rsmf New{{ $serviceInt }}Func) {
 	new{{ $serviceInt }}Func = func(scheduler rsm.Scheduler, context rsm.ServiceContext) rsm.Service {
 		service := &{{ $serviceImpl }}{
 			Service: rsm.NewService(scheduler, context),
-			rsm:     rsmf(scheduler, context),
+			rsm:     rsmf(new{{ $serviceContextInt }}(scheduler)),
 			log:     logging.GetLogger("atomix", {{ .Primitive.Name | lower | quote }}, "service"),
 		}
 		service.init()
@@ -38,7 +48,7 @@ func register{{ $serviceInt }}Func(rsmf New{{ $serviceInt }}Func) {
 	}
 }
 
-type New{{ $serviceInt }}Func func(scheduler rsm.Scheduler, context rsm.ServiceContext) {{ $serviceInt }}
+type New{{ $serviceInt }}Func func({{ $serviceContextInt }}) {{ $serviceInt }}
 
 // Register{{ $serviceInt }} registers the election primitive service on the given node
 func Register{{ $serviceInt }}(node *rsm.Node) {
@@ -52,55 +62,77 @@ type {{ $serviceImpl }} struct {
 }
 
 func (s *{{ $serviceImpl }}) init() {
-    {{- $root := . }}
     {{- range .Primitive.Methods }}
     {{- $name := ((printf "%s%sOp" $root.Generator.Prefix .Name) | toLowerCamel) }}
-    {{- if and .Response.IsDiscrete (not .Type.IsAsync) }}
-	s.RegisterUnaryOperation({{ $name }}, s.{{ .Name | toLowerCamel }})
-    {{- else }}
-	s.RegisterStreamOperation({{ $name }}, s.{{ .Name | toLowerCamel }})
+    {{- $op := ( .Name | toLowerCamel ) }}
+    {{- if ( and .Response.IsUnary .Type.IsSync ) }}
+	s.RegisterUnaryOperation({{ $name }}, s.{{ $op }})
+	{{- else }}
+	s.RegisterStreamOperation({{ $name }}, s.{{ $op }})
     {{- end }}
     {{- end }}
 }
 
-func (s *{{ $serviceImpl }}) SessionOpen(session rsm.Session) {
-    if sessionOpen, ok := s.rsm.(rsm.SessionOpenService); ok {
-        sessionOpen.SessionOpen(session)
-    }
+{{- $serviceProposalID := printf "%sProposalID" .Generator.Prefix }}
+{{- $newServiceSession := printf "new%sSession" .Generator.Prefix }}
+{{- $serviceSessionID := printf "%sSessionID" .Generator.Prefix }}
+func (s *{{ $serviceImpl }}) SessionOpen(rsmSession rsm.Session) {
+    s.rsm.Sessions().open({{ $newServiceSession }}(rsmSession))
 }
 
 func (s *{{ $serviceImpl }}) SessionExpired(session rsm.Session) {
-    if sessionExpired, ok := s.rsm.(rsm.SessionExpiredService); ok {
-        sessionExpired.SessionExpired(session)
-    }
+    s.rsm.Sessions().expire({{ $serviceSessionID }}(session.ID()))
 }
 
 func (s *{{ $serviceImpl }}) SessionClosed(session rsm.Session) {
-    if sessionClosed, ok := s.rsm.(rsm.SessionClosedService); ok {
-        sessionClosed.SessionClosed(session)
-    }
+    s.rsm.Sessions().close({{ $serviceSessionID }}(session.ID()))
 }
 
-{{- range .Primitive.Methods }}
-{{ if .Response.IsDiscrete }}
-{{- if .Type.IsAsync }}
-func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
-    request := &{{ template "type" .Request.Type }}{}
-    err := proto.Unmarshal(input, request)
-    if err != nil {
-        s.log.Error(err)
-        return nil, err
-    }
-    future, err := s.rsm.{{ .Name }}(request)
-    if err != nil {
-        s.log.Error(err)
-        return nil, err
-    }
-    future.setStream(stream)
-    return nil, nil
+{{- if .Primitive.State }}
+func (s *{{ $serviceImpl }}) Backup(writer io.Writer) error {
+    state, err := s.rsm.GetState()
+	if err != nil {
+		s.log.Error(err)
+		return err
+	}
+	bytes, err := proto.Marshal(state)
+	if err != nil {
+		s.log.Error(err)
+		return err
+	}
+	err = util.WriteBytes(writer, bytes)
+	if err != nil {
+		s.log.Error(err)
+		return err
+	}
+	return nil
 }
-{{- else }}
-func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte) ([]byte, error) {
+
+func (s *{{ $serviceImpl }}) Restore(reader io.Reader) error {
+    bytes, err := util.ReadBytes(reader)
+	if err != nil {
+		s.log.Error(err)
+		return err
+	}
+	state := &{{ template "type" .Primitive.State.Type }}{}
+	err = proto.Unmarshal(bytes, state)
+	if err != nil {
+		s.log.Error(err)
+		return err
+	}
+	err = s.rsm.SetState(state)
+	if err != nil {
+		s.log.Error(err)
+		return err
+	}
+	return nil
+}
+{{- end }}
+
+{{- range .Primitive.Methods }}
+{{- $newProposal := printf "new%sProposal" .Name }}
+{{- if ( and .Response.IsUnary .Type.IsSync ) }}
+func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte, rsmSession rsm.Session) ([]byte, error) {
     request := &{{ template "type" .Request.Type }}{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
@@ -108,7 +140,25 @@ func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte) ([]byte, e
 		return nil, err
 	}
 
-	response, err := s.rsm.{{ .Name }}(request)
+    session, ok := s.rsm.Sessions().Get({{ $serviceSessionID }}(rsmSession.ID()))
+    if !ok {
+        err := errors.NewConflict("session %d not found", rsmSession.ID())
+        s.log.Error(err)
+        return nil, err
+    }
+
+    var response *{{ template "type" .Response.Type }}
+    proposal := {{ $newProposal }}({{ $serviceProposalID }}(s.Index()), session, request, response)
+
+    s.rsm.Proposals().{{ .Name }}().register(proposal)
+    session.Proposals().{{ .Name }}().register(proposal)
+
+    defer func() {
+        session.Proposals().{{ .Name }}().unregister(proposal.ID())
+        s.rsm.Proposals().{{ .Name }}().unregister(proposal.ID())
+    }()
+
+	err = s.rsm.{{ .Name }}(proposal)
 	if err !=  nil {
 	    s.log.Error(err)
     	return nil, err
@@ -121,24 +171,36 @@ func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte) ([]byte, e
 	}
 	return output, nil
 }
-{{- end }}
-{{ else }}
-{{- $newStream := printf "new%s%sStream" $serviceInt .Name }}
-{{- $newInformer := printf "new%s%sInformer" $serviceInt .Name }}
-func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
+{{- else }}
+func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte, rsmSession rsm.Session, stream rsm.Stream) (rsm.StreamCloser, error) {
     request := &{{ template "type" .Request.Type }}{}
     err := proto.Unmarshal(input, request)
     if err != nil {
         s.log.Error(err)
         return nil, err
     }
-    response := {{ $newStream }}(stream)
-    closer, err := s.rsm.{{ .Name }}(request, response)
+
+    session, ok := s.rsm.Sessions().Get({{ $serviceSessionID }}(rsmSession.ID()))
+    if !ok {
+        err := errors.NewConflict("session %d not found", rsmSession.ID())
+        s.log.Error(err)
+        return nil, err
+    }
+
+    proposal := {{ $newProposal }}({{ $serviceProposalID }}(stream.ID()), session,request, stream)
+
+    s.rsm.Proposals().{{ .Name }}().register(proposal)
+    session.Proposals().{{ .Name }}().register(proposal)
+
+    err = s.rsm.{{ .Name }}(proposal)
     if err != nil {
         s.log.Error(err)
         return nil, err
     }
-    return closer, nil
+    return func() {
+        session.Proposals().{{ .Name }}().unregister(proposal.ID())
+        s.rsm.Proposals().{{ .Name }}().unregister(proposal.ID())
+    }, nil
 }
 {{ end }}
 {{- end }}

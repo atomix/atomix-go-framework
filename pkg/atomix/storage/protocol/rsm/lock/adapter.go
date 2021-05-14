@@ -3,9 +3,12 @@ package lock
 
 import (
 	lock "github.com/atomix/atomix-api/go/atomix/primitive/lock"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/util"
 	"github.com/golang/protobuf/proto"
+	"io"
 )
 
 const Type = "Lock"
@@ -22,7 +25,7 @@ func registerServiceFunc(rsmf NewServiceFunc) {
 	newServiceFunc = func(scheduler rsm.Scheduler, context rsm.ServiceContext) rsm.Service {
 		service := &ServiceAdaptor{
 			Service: rsm.NewService(scheduler, context),
-			rsm:     rsmf(scheduler, context),
+			rsm:     rsmf(newServiceContext(scheduler)),
 			log:     logging.GetLogger("atomix", "lock", "service"),
 		}
 		service.init()
@@ -30,7 +33,7 @@ func registerServiceFunc(rsmf NewServiceFunc) {
 	}
 }
 
-type NewServiceFunc func(scheduler rsm.Scheduler, context rsm.ServiceContext) Service
+type NewServiceFunc func(ServiceContext) Service
 
 // RegisterService registers the election primitive service on the given node
 func RegisterService(node *rsm.Node) {
@@ -48,42 +51,87 @@ func (s *ServiceAdaptor) init() {
 	s.RegisterUnaryOperation(unlockOp, s.unlock)
 	s.RegisterUnaryOperation(getLockOp, s.getLock)
 }
-
-func (s *ServiceAdaptor) SessionOpen(session rsm.Session) {
-	if sessionOpen, ok := s.rsm.(rsm.SessionOpenService); ok {
-		sessionOpen.SessionOpen(session)
-	}
+func (s *ServiceAdaptor) SessionOpen(rsmSession rsm.Session) {
+	s.rsm.Sessions().open(newSession(rsmSession))
 }
 
 func (s *ServiceAdaptor) SessionExpired(session rsm.Session) {
-	if sessionExpired, ok := s.rsm.(rsm.SessionExpiredService); ok {
-		sessionExpired.SessionExpired(session)
-	}
+	s.rsm.Sessions().expire(SessionID(session.ID()))
 }
 
 func (s *ServiceAdaptor) SessionClosed(session rsm.Session) {
-	if sessionClosed, ok := s.rsm.(rsm.SessionClosedService); ok {
-		sessionClosed.SessionClosed(session)
+	s.rsm.Sessions().close(SessionID(session.ID()))
+}
+func (s *ServiceAdaptor) Backup(writer io.Writer) error {
+	state, err := s.rsm.GetState()
+	if err != nil {
+		s.log.Error(err)
+		return err
 	}
+	bytes, err := proto.Marshal(state)
+	if err != nil {
+		s.log.Error(err)
+		return err
+	}
+	err = util.WriteBytes(writer, bytes)
+	if err != nil {
+		s.log.Error(err)
+		return err
+	}
+	return nil
 }
 
-func (s *ServiceAdaptor) lock(input []byte, stream rsm.Stream) (rsm.StreamCloser, error) {
+func (s *ServiceAdaptor) Restore(reader io.Reader) error {
+	bytes, err := util.ReadBytes(reader)
+	if err != nil {
+		s.log.Error(err)
+		return err
+	}
+	state := &LockState{}
+	err = proto.Unmarshal(bytes, state)
+	if err != nil {
+		s.log.Error(err)
+		return err
+	}
+	err = s.rsm.SetState(state)
+	if err != nil {
+		s.log.Error(err)
+		return err
+	}
+	return nil
+}
+func (s *ServiceAdaptor) lock(input []byte, rsmSession rsm.Session, stream rsm.Stream) (rsm.StreamCloser, error) {
 	request := &lock.LockRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
-	future, err := s.rsm.Lock(request)
+
+	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
+	if !ok {
+		err := errors.NewConflict("session %d not found", rsmSession.ID())
+		s.log.Error(err)
+		return nil, err
+	}
+
+	proposal := newLockProposal(ProposalID(stream.ID()), session, request, stream)
+
+	s.rsm.Proposals().Lock().register(proposal)
+	session.Proposals().Lock().register(proposal)
+
+	err = s.rsm.Lock(proposal)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
 	}
-	future.setStream(stream)
-	return nil, nil
+	return func() {
+		session.Proposals().Lock().unregister(proposal.ID())
+		s.rsm.Proposals().Lock().unregister(proposal.ID())
+	}, nil
 }
 
-func (s *ServiceAdaptor) unlock(input []byte) ([]byte, error) {
+func (s *ServiceAdaptor) unlock(input []byte, rsmSession rsm.Session) ([]byte, error) {
 	request := &lock.UnlockRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
@@ -91,7 +139,25 @@ func (s *ServiceAdaptor) unlock(input []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	response, err := s.rsm.Unlock(request)
+	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
+	if !ok {
+		err := errors.NewConflict("session %d not found", rsmSession.ID())
+		s.log.Error(err)
+		return nil, err
+	}
+
+	var response *lock.UnlockResponse
+	proposal := newUnlockProposal(ProposalID(s.Index()), session, request, response)
+
+	s.rsm.Proposals().Unlock().register(proposal)
+	session.Proposals().Unlock().register(proposal)
+
+	defer func() {
+		session.Proposals().Unlock().unregister(proposal.ID())
+		s.rsm.Proposals().Unlock().unregister(proposal.ID())
+	}()
+
+	err = s.rsm.Unlock(proposal)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
@@ -104,8 +170,7 @@ func (s *ServiceAdaptor) unlock(input []byte) ([]byte, error) {
 	}
 	return output, nil
 }
-
-func (s *ServiceAdaptor) getLock(input []byte) ([]byte, error) {
+func (s *ServiceAdaptor) getLock(input []byte, rsmSession rsm.Session) ([]byte, error) {
 	request := &lock.GetLockRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
@@ -113,7 +178,25 @@ func (s *ServiceAdaptor) getLock(input []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	response, err := s.rsm.GetLock(request)
+	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
+	if !ok {
+		err := errors.NewConflict("session %d not found", rsmSession.ID())
+		s.log.Error(err)
+		return nil, err
+	}
+
+	var response *lock.GetLockResponse
+	proposal := newGetLockProposal(ProposalID(s.Index()), session, request, response)
+
+	s.rsm.Proposals().GetLock().register(proposal)
+	session.Proposals().GetLock().register(proposal)
+
+	defer func() {
+		session.Proposals().GetLock().unregister(proposal.ID())
+		s.rsm.Proposals().GetLock().unregister(proposal.ID())
+	}()
+
+	err = s.rsm.GetLock(proposal)
 	if err != nil {
 		s.log.Error(err)
 		return nil, err

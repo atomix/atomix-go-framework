@@ -75,6 +75,7 @@ func (m *Module) Execute(targets map[string]pgs.File, packages map[string]pgs.Pa
 }
 
 func (m *Module) executeTarget(target pgs.File, packages map[string]pgs.Package) {
+	println(target.File().InputPath())
 	for _, service := range target.Services() {
 		m.executeService(service, packages)
 	}
@@ -131,6 +132,7 @@ func (m *Module) executeService(service pgs.Service, packages map[string]pgs.Pac
 		methodTypeMeta := meta.MethodTypeMeta{
 			IsCommand: operationType == operationext.OperationType_COMMAND,
 			IsQuery:   operationType == operationext.OperationType_QUERY,
+			IsSync:    !async,
 			IsAsync:   async,
 		}
 
@@ -145,9 +147,9 @@ func (m *Module) executeService(service pgs.Service, packages map[string]pgs.Pac
 			MessageMeta: meta.MessageMeta{
 				Type: m.ctx.GetMessageTypeMeta(method.Input()),
 			},
-			Headers:    *requestHeaders,
-			IsDiscrete: !method.ClientStreaming(),
-			IsStream:   method.ClientStreaming(),
+			Headers:  *requestHeaders,
+			IsUnary:  !method.ClientStreaming(),
+			IsStream: method.ClientStreaming(),
 		}
 		addImport(&requestMeta.Type)
 
@@ -241,9 +243,9 @@ func (m *Module) executeService(service pgs.Service, packages map[string]pgs.Pac
 			MessageMeta: meta.MessageMeta{
 				Type: m.ctx.GetMessageTypeMeta(method.Output()),
 			},
-			Headers:    *responseHeaders,
-			IsDiscrete: !method.ServerStreaming(),
-			IsStream:   method.ServerStreaming(),
+			Headers:  *responseHeaders,
+			IsUnary:  !method.ServerStreaming(),
+			IsStream: method.ServerStreaming(),
 		}
 		addImport(&responseMeta.Type)
 
@@ -276,9 +278,7 @@ func (m *Module) executeService(service pgs.Service, packages map[string]pgs.Pac
 	if err != nil {
 		panic(err)
 	} else if stateMeta != nil {
-		if stateMeta.Entry != nil {
-			addImport(&stateMeta.Entry.Type)
-		}
+		addImport(&stateMeta.Type)
 	}
 
 	primitiveMeta := meta.PrimitiveMeta{
