@@ -18,6 +18,7 @@ import (
 	"context"
 	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	storage "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/util/async"
@@ -58,7 +59,7 @@ func (s *PrimitiveServer) Create(ctx context.Context, request *primitiveapi.Crea
 	})
 	if err != nil {
 		s.log.Errorf("Request CreateRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	response := &primitiveapi.CreateResponse{}
 	s.log.Debugf("Sending CreateResponse %+v", response)
@@ -81,7 +82,7 @@ func (s *PrimitiveServer) Close(ctx context.Context, request *primitiveapi.Close
 	})
 	if err != nil {
 		s.log.Errorf("Request CloseRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	response := &primitiveapi.CloseResponse{}
 	s.log.Debugf("Sending CloseResponse %+v", response)
@@ -104,7 +105,7 @@ func (s *PrimitiveServer) Delete(ctx context.Context, request *primitiveapi.Dele
 	})
 	if err != nil {
 		s.log.Errorf("Request DeleteRequest failed: %v", err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 	response := &primitiveapi.DeleteResponse{}
 	s.log.Debugf("Sending DeleteResponse %+v", response)
