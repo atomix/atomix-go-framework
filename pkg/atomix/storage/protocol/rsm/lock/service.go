@@ -36,9 +36,10 @@ func newService(context ServiceContext) Service {
 // lockService is a state machine for a list primitive
 type lockService struct {
 	ServiceContext
-	owner  *LockRequest
-	queue  *list.List
-	timers map[ProposalID]rsm.Timer
+	owner    *LockRequest
+	queue    *list.List
+	watchers map[ProposalID]Watcher
+	timers   map[ProposalID]rsm.Timer
 }
 
 func (l *lockService) SetState(state *LockState) error {
@@ -51,7 +52,7 @@ func (l *lockService) SetState(state *LockState) error {
 
 func (l *lockService) GetState() (*LockState, error) {
 	state := &LockState{
-		Owner:    l.owner,
+		Owner: l.owner,
 	}
 	request := l.queue.Front()
 	for request != nil {
@@ -76,6 +77,12 @@ func (l *lockService) Lock(lock LockProposal) error {
 		// Note that we still have to publish an event to the session. The event is guaranteed to be received
 		// by the client-side primitive after the LOCK response.
 		l.owner = &request
+		l.watchers[lock.ID()] = lock.Session().Watch(func(state SessionState) {
+			if state == SessionClosed {
+				l.unlock(lock.Session())
+				delete(l.watchers, lock.ID())
+			}
+		})
 		return lock.Reply(&lockapi.LockResponse{
 			Lock: lockapi.Lock{
 				ObjectMeta: metaapi.ObjectMeta{
@@ -101,9 +108,21 @@ func (l *lockService) Lock(lock LockProposal) error {
 			l.queue.Remove(element)
 			lock.Fail(errors.NewTimeout("lock request timed out"))
 		})
+		l.watchers[lock.ID()] = lock.Session().Watch(func(state SessionState) {
+			if state == SessionClosed {
+				l.unlock(lock.Session())
+				delete(l.watchers, lock.ID())
+			}
+		})
 	} else {
 		// If the lock does not have an expiration, just add the request to the queue with no expiration.
 		l.queue.PushBack(request)
+		l.watchers[lock.ID()] = lock.Session().Watch(func(state SessionState) {
+			if state == SessionClosed {
+				l.unlock(lock.Session())
+				delete(l.watchers, lock.ID())
+			}
+		})
 	}
 	return nil
 }
@@ -188,4 +207,57 @@ func (l *lockService) GetLock(get GetLockProposal) error {
 			State: lockapi.Lock_UNLOCKED,
 		},
 	})
+}
+
+func (l *lockService) unlock(session Session) {
+	// Remove all instances of the session from the queue.
+	element := l.queue.Front()
+	for element != nil {
+		next := element.Next()
+		lock := element.Value.(LockRequest)
+		if lock.SessionID == session.ID() {
+			l.queue.Remove(element)
+			timer, ok := l.timers[lock.ProposalID]
+			if ok {
+				timer.Cancel()
+				delete(l.timers, lock.ProposalID)
+			}
+		}
+		element = next
+	}
+
+	// If the removed session is the current holder of the lock, nullify the lock and attempt to grant it
+	// to the next waiter in the queue.
+	if l.owner != nil && l.owner.SessionID == session.ID() {
+		l.owner = nil
+
+		element := l.queue.Front()
+		if element != nil {
+			lock := element.Value.(LockRequest)
+			l.queue.Remove(element)
+
+			// If the waiter has a lock timer, cancel the timer.
+			timer, ok := l.timers[lock.ProposalID]
+			if ok {
+				timer.Cancel()
+				delete(l.timers, lock.ProposalID)
+			}
+
+			l.owner = &lock
+
+			proposal, ok := l.Proposals().Lock().Get(lock.ProposalID)
+			if ok {
+				proposal.Reply(&lockapi.LockResponse{
+					Lock: lockapi.Lock{
+						ObjectMeta: metaapi.ObjectMeta{
+							Revision: &metaapi.Revision{
+								Num: metaapi.RevisionNum(l.owner.ProposalID),
+							},
+						},
+						State: lockapi.Lock_LOCKED,
+					},
+				})
+			}
+		}
+	}
 }

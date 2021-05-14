@@ -6,6 +6,7 @@ import (
 	errors "github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	proto "github.com/golang/protobuf/proto"
+	uuid "github.com/google/uuid"
 )
 
 type Service interface {
@@ -74,14 +75,23 @@ type serviceSessions struct {
 
 func (s *serviceSessions) open(session Session) {
 	s.sessions[session.ID()] = session
+	session.setState(SessionOpen)
 }
 
 func (s *serviceSessions) expire(sessionID SessionID) {
-	delete(s.sessions, sessionID)
+	session, ok := s.sessions[sessionID]
+	if ok {
+		session.setState(SessionClosed)
+		delete(s.sessions, sessionID)
+	}
 }
 
 func (s *serviceSessions) close(sessionID SessionID) {
-	delete(s.sessions, sessionID)
+	session, ok := s.sessions[sessionID]
+	if ok {
+		session.setState(SessionClosed)
+		delete(s.sessions, sessionID)
+	}
 }
 
 func (s *serviceSessions) Get(id SessionID) (Session, bool) {
@@ -101,8 +111,38 @@ var _ Sessions = &serviceSessions{}
 
 type SessionID uint64
 
+type SessionState int
+
+const (
+	SessionClosed SessionState = iota
+	SessionOpen
+)
+
+type Watcher interface {
+	Cancel()
+}
+
+func newWatcher(f func()) Watcher {
+	return &serviceWatcher{
+		f: f,
+	}
+}
+
+type serviceWatcher struct {
+	f func()
+}
+
+func (s *serviceWatcher) Cancel() {
+	s.f()
+}
+
+var _ Watcher = &serviceWatcher{}
+
 type Session interface {
 	ID() SessionID
+	State() SessionState
+	setState(SessionState)
+	Watch(func(SessionState)) Watcher
 	Proposals() Proposals
 }
 
@@ -110,12 +150,15 @@ func newSession(session rsm.Session) Session {
 	return &serviceSession{
 		session:   session,
 		proposals: newProposals(),
+		watchers:  make(map[string]func(SessionState)),
 	}
 }
 
 type serviceSession struct {
 	session   rsm.Session
 	proposals Proposals
+	state     SessionState
+	watchers  map[string]func(SessionState)
 }
 
 func (s *serviceSession) ID() SessionID {
@@ -124,6 +167,27 @@ func (s *serviceSession) ID() SessionID {
 
 func (s *serviceSession) Proposals() Proposals {
 	return s.proposals
+}
+
+func (s *serviceSession) State() SessionState {
+	return s.state
+}
+
+func (s *serviceSession) setState(state SessionState) {
+	if state != s.state {
+		s.state = state
+		for _, watcher := range s.watchers {
+			watcher(state)
+		}
+	}
+}
+
+func (s *serviceSession) Watch(f func(SessionState)) Watcher {
+	id := uuid.New().String()
+	s.watchers[id] = f
+	return newWatcher(func() {
+		delete(s.watchers, id)
+	})
 }
 
 var _ Session = &serviceSession{}

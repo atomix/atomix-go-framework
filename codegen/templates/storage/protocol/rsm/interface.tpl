@@ -16,6 +16,7 @@ package {{ .Package.Name }}
 import (
 	{{ import "github.com/atomix/atomix-go-framework/pkg/atomix/errors" }}
 	{{ import "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm" }}
+	{{ import "github.com/google/uuid" }}
 	{{- $package := .Package }}
 	{{- range .Imports }}
 	{{ .Alias }} {{ .Path | quote }}
@@ -29,11 +30,15 @@ import (
 
 {{- $primitive := .Primitive }}
 
+{{- $serviceWatcherInt := printf "%sWatcher" .Generator.Prefix }}
+{{- $serviceWatcherImpl := ( ( printf "%sServiceWatcher" .Generator.Prefix ) | toLowerCamel ) }}
+{{- $newServiceWatcher := printf "new%sWatcher" .Generator.Prefix }}
 {{- $serviceSessionsInt := printf "%sSessions" .Generator.Prefix }}
 {{- $serviceSessionsImpl := ( ( printf "%sServiceSessions" .Generator.Prefix ) | toLowerCamel ) }}
 {{- $newServiceSessions := printf "new%sSessions" .Generator.Prefix }}
 {{- $serviceSessionInt := printf "%sSession" .Generator.Prefix }}
 {{- $serviceSessionID := printf "%sSessionID" .Generator.Prefix }}
+{{- $serviceSessionState := printf "%sSessionState" .Generator.Prefix }}
 {{- $serviceSessionImpl := ( ( printf "%sServiceSession" .Generator.Prefix ) | toLowerCamel ) }}
 {{- $newServiceSession := printf "new%sSession" .Generator.Prefix }}
 
@@ -123,15 +128,24 @@ type {{ $serviceSessionsImpl }} struct {
 }
 
 func (s *{{ $serviceSessionsImpl }}) open(session {{ $serviceSessionInt }}) {
-    s.sessions[session.ID()] = session
+	s.sessions[session.ID()] = session
+	session.setState(SessionOpen)
 }
 
 func (s *{{ $serviceSessionsImpl }}) expire(sessionID {{ $serviceSessionID }}) {
-    delete(s.sessions, sessionID)
+	session, ok := s.sessions[sessionID]
+	if ok {
+		session.setState(SessionClosed)
+		delete(s.sessions, sessionID)
+	}
 }
 
 func (s *{{ $serviceSessionsImpl }}) close(sessionID {{ $serviceSessionID }}) {
-    delete(s.sessions, sessionID)
+	session, ok := s.sessions[sessionID]
+	if ok {
+		session.setState(SessionClosed)
+		delete(s.sessions, sessionID)
+	}
 }
 
 func (s *{{ $serviceSessionsImpl }}) Get(id {{ $serviceSessionID }}) ({{ $serviceSessionInt }}, bool) {
@@ -151,8 +165,38 @@ var _ {{ $serviceSessionsInt }} = &{{ $serviceSessionsImpl }}{}
 
 type {{ $serviceSessionID }} uint64
 
+type {{ $serviceSessionState }} int
+
+const (
+	SessionClosed {{ $serviceSessionState }} = iota
+	SessionOpen
+)
+
+type {{ $serviceWatcherInt }} interface {
+	Cancel()
+}
+
+func {{ $newServiceWatcher }}(f func()) {{ $serviceWatcherInt }} {
+	return &{{ $serviceWatcherImpl }}{
+		f: f,
+	}
+}
+
+type {{ $serviceWatcherImpl }} struct {
+	f func()
+}
+
+func (s *{{ $serviceWatcherImpl }}) Cancel() {
+	s.f()
+}
+
+var _ {{ $serviceWatcherInt }} = &{{ $serviceWatcherImpl }}{}
+
 type {{ $serviceSessionInt }} interface {
     ID() {{ $serviceSessionID }}
+	State() {{ $serviceSessionState }}
+	setState({{ $serviceSessionState }})
+	Watch(func({{ $serviceSessionState }})) Watcher
     Proposals() {{ $serviceProposalsInt }}
 }
 
@@ -160,12 +204,15 @@ func {{ $newServiceSession }}(session rsm.Session) {{ $serviceSessionInt }} {
     return &{{ $serviceSessionImpl }}{
         session:    session,
         proposals: {{ $newServiceProposals }}(),
+        watchers:  make(map[string]func({{ $serviceSessionState }})),
     }
 }
 
 type {{ $serviceSessionImpl }} struct {
     session   rsm.Session
     proposals {{ $serviceProposalsInt }}
+	state     {{ $serviceSessionState }}
+	watchers  map[string]func({{ $serviceSessionState }})
 }
 
 func (s *{{ $serviceSessionImpl }}) ID() {{ $serviceSessionID }} {
@@ -174,6 +221,27 @@ func (s *{{ $serviceSessionImpl }}) ID() {{ $serviceSessionID }} {
 
 func (s *{{ $serviceSessionImpl }}) Proposals() {{ $serviceProposalsInt }} {
     return s.proposals
+}
+
+func (s *{{ $serviceSessionImpl }}) State() SessionState {
+	return s.state
+}
+
+func (s *{{ $serviceSessionImpl }}) setState(state {{ $serviceSessionState }}) {
+	if state != s.state {
+		s.state = state
+		for _, watcher := range s.watchers {
+			watcher(state)
+		}
+	}
+}
+
+func (s *{{ $serviceSessionImpl }}) Watch(f func({{ $serviceSessionState }})) Watcher {
+	id := uuid.New().String()
+	s.watchers[id] = f
+	return {{ $newServiceWatcher }}(func() {
+		delete(s.watchers, id)
+	})
 }
 
 var _ {{ $serviceSessionInt }} = &{{ $serviceSessionImpl }}{}
