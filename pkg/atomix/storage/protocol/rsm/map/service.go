@@ -217,6 +217,7 @@ func (m *mapService) Events(events EventsProposal) error {
 }
 
 func (m *mapService) Entries(entries EntriesProposal) error {
+	defer entries.Close()
 	for _, entry := range m.entries {
 		err := entries.Notify(&mapapi.EntriesResponse{
 			Entry: *m.newEntry(entry),

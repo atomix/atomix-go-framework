@@ -18,10 +18,33 @@ syntax = "proto3";
 
 package atomix.storage.protocol.rsm.indexedmap;
 
+import "google/protobuf/timestamp.proto";
 import "atomix/primitive/meta/object.proto";
 import "gogoproto/gogo.proto";
 
 message IndexedMapState {
+    repeated IndexedMapStateListener listeners = 1 [(gogoproto.nullable) = false];
+    repeated IndexedMapEntry entries = 2 [(gogoproto.nullable) = false];
+}
+
+message IndexedMapStateListener {
+    uint64 proposal_id = 1 [(gogoproto.customname) = "ProposalID", (gogoproto.casttype) = "ProposalID"];
+    string key = 2;
+    uint64 index = 3;
+}
+
+message IndexedMapEntry {
+    IndexedMapEntryPosition pos = 1 [(gogoproto.embed) = true, (gogoproto.nullable) = false];
+    IndexedMapEntryValue value = 2 [(gogoproto.embed) = true, (gogoproto.nullable) = false];
+}
+
+message IndexedMapEntryPosition {
+    uint64 index = 1;
+    string key = 2;
+}
+
+message IndexedMapEntryValue {
     atomix.primitive.meta.ObjectMeta meta = 1 [(gogoproto.embed) = true, (gogoproto.nullable) = false];
-    int64 value = 2;
+    bytes value = 2;
+    google.protobuf.Timestamp expire = 3 [(gogoproto.stdtime) = true];
 }

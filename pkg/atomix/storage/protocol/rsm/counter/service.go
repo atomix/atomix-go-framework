@@ -36,11 +36,14 @@ type counterService struct {
 }
 
 func (c *counterService) SetState(state *CounterState) error {
+	c.value = state.Value
 	return nil
 }
 
 func (c *counterService) GetState() (*CounterState, error) {
-	return &CounterState{}, nil
+	return &CounterState{
+		Value: c.value,
+	}, nil
 }
 
 func (c *counterService) Set(set SetProposal) error {

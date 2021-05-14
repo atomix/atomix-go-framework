@@ -38,11 +38,18 @@ type valueService struct {
 }
 
 func (v *valueService) SetState(state *ValueState) error {
+	v.value = valueapi.Value{
+		ObjectMeta: state.ObjectMeta,
+		Value:      state.Value,
+	}
 	return nil
 }
 
 func (v *valueService) GetState() (*ValueState, error) {
-	return &ValueState{}, nil
+	return &ValueState{
+		ObjectMeta: v.value.ObjectMeta,
+		Value:      v.value.Value,
+	}, nil
 }
 
 func (v *valueService) notify(event valueapi.Event) error {

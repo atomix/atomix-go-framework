@@ -38,11 +38,24 @@ type setService struct {
 }
 
 func (s *setService) SetState(state *SetState) error {
+	s.values = make(map[string]meta.ObjectMeta)
+	for _, value := range state.Values {
+		s.values[value.Value] = meta.FromProto(value.ObjectMeta)
+	}
 	return nil
 }
 
 func (s *setService) GetState() (*SetState, error) {
-	return &SetState{}, nil
+	values := make([]SetValue, 0, len(s.values))
+	for value, obj := range s.values {
+		values = append(values, SetValue{
+			ObjectMeta: obj.Proto(),
+			Value:      value,
+		})
+	}
+	return &SetState{
+		Values: values,
+	}, nil
 }
 
 func (s *setService) notify(event setapi.Event) error {

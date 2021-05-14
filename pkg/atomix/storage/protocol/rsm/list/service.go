@@ -37,11 +37,27 @@ type listService struct {
 }
 
 func (l *listService) SetState(state *ListState) error {
+	l.items = make([]listapi.Value, 0, len(state.Values))
+	for _, value := range state.Values {
+		l.items = append(l.items, listapi.Value{
+			ObjectMeta: value.ObjectMeta,
+			Value:      value.Value,
+		})
+	}
 	return nil
 }
 
 func (l *listService) GetState() (*ListState, error) {
-	return &ListState{}, nil
+	values := make([]ListValue, 0, len(l.items))
+	for _, item := range l.items {
+		values = append(values, ListValue{
+			ObjectMeta: item.ObjectMeta,
+			Value:      item.Value,
+		})
+	}
+	return &ListState{
+		Values: values,
+	}, nil
 }
 
 func (l *listService) notify(event listapi.Event) error {
