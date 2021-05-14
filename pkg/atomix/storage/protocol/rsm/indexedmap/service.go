@@ -32,6 +32,7 @@ func newService(context ServiceContext) Service {
 		ServiceContext: context,
 		entries:        make(map[string]*LinkedMapEntryValue),
 		indexes:        make(map[uint64]*LinkedMapEntryValue),
+		listeners:      make(map[ProposalID]*IndexedMapStateListener),
 		timers:         make(map[string]rsm.Timer),
 	}
 }
@@ -112,7 +113,9 @@ func (m *indexedMapService) GetState() (*IndexedMapState, error) {
 
 func (m *indexedMapService) notify(event *indexedmapapi.EventsResponse) error {
 	for proposalID, listener := range m.listeners {
-		if listener.Key == "" || listener.Key == event.Event.Entry.Key {
+		if (listener.Key == "" && listener.Index == 0) ||
+			(listener.Key != "" && listener.Key == event.Event.Entry.Key) ||
+			(listener.Index != 0 && listener.Index == event.Event.Entry.Index) {
 			proposal, ok := m.Proposals().Events().Get(proposalID)
 			if ok {
 				if err := proposal.Notify(event); err != nil {
@@ -404,16 +407,17 @@ func (m *indexedMapService) Clear(clear ClearProposal) error {
 }
 
 func (m *indexedMapService) Events(events EventsProposal) error {
-	m.listeners[events.ID()] = &IndexedMapStateListener{
+	listener := &IndexedMapStateListener{
 		ProposalID: events.ID(),
 		Key:        events.Request().Pos.Key,
 		Index:      events.Request().Pos.Index,
 	}
+	m.listeners[events.ID()] = listener
 	if events.Request().Replay {
 		for _, entry := range m.entries {
-			if (events.Request().Pos.Key == "" && events.Request().Pos.Index == 0) ||
-				(events.Request().Pos.Key != "" && events.Request().Pos.Key == entry.Key) ||
-				(events.Request().Pos.Index != 0 && events.Request().Pos.Index == entry.Index) {
+			if (listener.Key == "" && listener.Index == 0) ||
+				(listener.Key != "" && listener.Key == entry.Key) ||
+				(listener.Index != 0 && listener.Index == entry.Index) {
 				event := indexedmapapi.Event{
 					Type:  indexedmapapi.Event_REPLAY,
 					Entry: *m.newEntry(entry.IndexedMapEntry),
