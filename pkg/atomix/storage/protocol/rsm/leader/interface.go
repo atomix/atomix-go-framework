@@ -356,32 +356,36 @@ type LatchProposal interface {
 	Proposal
 	Request() *leader.LatchRequest
 	Reply(*leader.LatchResponse) error
+	response() *leader.LatchResponse
 }
 
-func newLatchProposal(id ProposalID, session Session, request *leader.LatchRequest, response *leader.LatchResponse) LatchProposal {
+func newLatchProposal(id ProposalID, session Session, request *leader.LatchRequest) LatchProposal {
 	return &latchProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type latchProposal struct {
 	Proposal
-	request  *leader.LatchRequest
-	response *leader.LatchResponse
+	req *leader.LatchRequest
+	res *leader.LatchResponse
 }
 
 func (p *latchProposal) Request() *leader.LatchRequest {
-	return p.request
+	return p.req
 }
 
 func (p *latchProposal) Reply(reply *leader.LatchResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *latchProposal) response() *leader.LatchResponse {
+	return p.res
 }
 
 var _ LatchProposal = &latchProposal{}
@@ -430,32 +434,36 @@ type GetProposal interface {
 	Proposal
 	Request() *leader.GetRequest
 	Reply(*leader.GetResponse) error
+	response() *leader.GetResponse
 }
 
-func newGetProposal(id ProposalID, session Session, request *leader.GetRequest, response *leader.GetResponse) GetProposal {
+func newGetProposal(id ProposalID, session Session, request *leader.GetRequest) GetProposal {
 	return &getProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type getProposal struct {
 	Proposal
-	request  *leader.GetRequest
-	response *leader.GetResponse
+	req *leader.GetRequest
+	res *leader.GetResponse
 }
 
 func (p *getProposal) Request() *leader.GetRequest {
-	return p.request
+	return p.req
 }
 
 func (p *getProposal) Reply(reply *leader.GetResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *getProposal) response() *leader.GetResponse {
+	return p.res
 }
 
 var _ GetProposal = &getProposal{}

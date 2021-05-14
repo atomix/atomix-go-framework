@@ -420,32 +420,36 @@ type SizeProposal interface {
 	Proposal
 	Request() *log.SizeRequest
 	Reply(*log.SizeResponse) error
+	response() *log.SizeResponse
 }
 
-func newSizeProposal(id ProposalID, session Session, request *log.SizeRequest, response *log.SizeResponse) SizeProposal {
+func newSizeProposal(id ProposalID, session Session, request *log.SizeRequest) SizeProposal {
 	return &sizeProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type sizeProposal struct {
 	Proposal
-	request  *log.SizeRequest
-	response *log.SizeResponse
+	req *log.SizeRequest
+	res *log.SizeResponse
 }
 
 func (p *sizeProposal) Request() *log.SizeRequest {
-	return p.request
+	return p.req
 }
 
 func (p *sizeProposal) Reply(reply *log.SizeResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *sizeProposal) response() *log.SizeResponse {
+	return p.res
 }
 
 var _ SizeProposal = &sizeProposal{}
@@ -494,32 +498,36 @@ type AppendProposal interface {
 	Proposal
 	Request() *log.AppendRequest
 	Reply(*log.AppendResponse) error
+	response() *log.AppendResponse
 }
 
-func newAppendProposal(id ProposalID, session Session, request *log.AppendRequest, response *log.AppendResponse) AppendProposal {
+func newAppendProposal(id ProposalID, session Session, request *log.AppendRequest) AppendProposal {
 	return &appendProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type appendProposal struct {
 	Proposal
-	request  *log.AppendRequest
-	response *log.AppendResponse
+	req *log.AppendRequest
+	res *log.AppendResponse
 }
 
 func (p *appendProposal) Request() *log.AppendRequest {
-	return p.request
+	return p.req
 }
 
 func (p *appendProposal) Reply(reply *log.AppendResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *appendProposal) response() *log.AppendResponse {
+	return p.res
 }
 
 var _ AppendProposal = &appendProposal{}
@@ -568,32 +576,36 @@ type GetProposal interface {
 	Proposal
 	Request() *log.GetRequest
 	Reply(*log.GetResponse) error
+	response() *log.GetResponse
 }
 
-func newGetProposal(id ProposalID, session Session, request *log.GetRequest, response *log.GetResponse) GetProposal {
+func newGetProposal(id ProposalID, session Session, request *log.GetRequest) GetProposal {
 	return &getProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type getProposal struct {
 	Proposal
-	request  *log.GetRequest
-	response *log.GetResponse
+	req *log.GetRequest
+	res *log.GetResponse
 }
 
 func (p *getProposal) Request() *log.GetRequest {
-	return p.request
+	return p.req
 }
 
 func (p *getProposal) Reply(reply *log.GetResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *getProposal) response() *log.GetResponse {
+	return p.res
 }
 
 var _ GetProposal = &getProposal{}
@@ -642,32 +654,36 @@ type FirstEntryProposal interface {
 	Proposal
 	Request() *log.FirstEntryRequest
 	Reply(*log.FirstEntryResponse) error
+	response() *log.FirstEntryResponse
 }
 
-func newFirstEntryProposal(id ProposalID, session Session, request *log.FirstEntryRequest, response *log.FirstEntryResponse) FirstEntryProposal {
+func newFirstEntryProposal(id ProposalID, session Session, request *log.FirstEntryRequest) FirstEntryProposal {
 	return &firstEntryProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type firstEntryProposal struct {
 	Proposal
-	request  *log.FirstEntryRequest
-	response *log.FirstEntryResponse
+	req *log.FirstEntryRequest
+	res *log.FirstEntryResponse
 }
 
 func (p *firstEntryProposal) Request() *log.FirstEntryRequest {
-	return p.request
+	return p.req
 }
 
 func (p *firstEntryProposal) Reply(reply *log.FirstEntryResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *firstEntryProposal) response() *log.FirstEntryResponse {
+	return p.res
 }
 
 var _ FirstEntryProposal = &firstEntryProposal{}
@@ -716,32 +732,36 @@ type LastEntryProposal interface {
 	Proposal
 	Request() *log.LastEntryRequest
 	Reply(*log.LastEntryResponse) error
+	response() *log.LastEntryResponse
 }
 
-func newLastEntryProposal(id ProposalID, session Session, request *log.LastEntryRequest, response *log.LastEntryResponse) LastEntryProposal {
+func newLastEntryProposal(id ProposalID, session Session, request *log.LastEntryRequest) LastEntryProposal {
 	return &lastEntryProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type lastEntryProposal struct {
 	Proposal
-	request  *log.LastEntryRequest
-	response *log.LastEntryResponse
+	req *log.LastEntryRequest
+	res *log.LastEntryResponse
 }
 
 func (p *lastEntryProposal) Request() *log.LastEntryRequest {
-	return p.request
+	return p.req
 }
 
 func (p *lastEntryProposal) Reply(reply *log.LastEntryResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *lastEntryProposal) response() *log.LastEntryResponse {
+	return p.res
 }
 
 var _ LastEntryProposal = &lastEntryProposal{}
@@ -790,32 +810,36 @@ type PrevEntryProposal interface {
 	Proposal
 	Request() *log.PrevEntryRequest
 	Reply(*log.PrevEntryResponse) error
+	response() *log.PrevEntryResponse
 }
 
-func newPrevEntryProposal(id ProposalID, session Session, request *log.PrevEntryRequest, response *log.PrevEntryResponse) PrevEntryProposal {
+func newPrevEntryProposal(id ProposalID, session Session, request *log.PrevEntryRequest) PrevEntryProposal {
 	return &prevEntryProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type prevEntryProposal struct {
 	Proposal
-	request  *log.PrevEntryRequest
-	response *log.PrevEntryResponse
+	req *log.PrevEntryRequest
+	res *log.PrevEntryResponse
 }
 
 func (p *prevEntryProposal) Request() *log.PrevEntryRequest {
-	return p.request
+	return p.req
 }
 
 func (p *prevEntryProposal) Reply(reply *log.PrevEntryResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *prevEntryProposal) response() *log.PrevEntryResponse {
+	return p.res
 }
 
 var _ PrevEntryProposal = &prevEntryProposal{}
@@ -864,32 +888,36 @@ type NextEntryProposal interface {
 	Proposal
 	Request() *log.NextEntryRequest
 	Reply(*log.NextEntryResponse) error
+	response() *log.NextEntryResponse
 }
 
-func newNextEntryProposal(id ProposalID, session Session, request *log.NextEntryRequest, response *log.NextEntryResponse) NextEntryProposal {
+func newNextEntryProposal(id ProposalID, session Session, request *log.NextEntryRequest) NextEntryProposal {
 	return &nextEntryProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type nextEntryProposal struct {
 	Proposal
-	request  *log.NextEntryRequest
-	response *log.NextEntryResponse
+	req *log.NextEntryRequest
+	res *log.NextEntryResponse
 }
 
 func (p *nextEntryProposal) Request() *log.NextEntryRequest {
-	return p.request
+	return p.req
 }
 
 func (p *nextEntryProposal) Reply(reply *log.NextEntryResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *nextEntryProposal) response() *log.NextEntryResponse {
+	return p.res
 }
 
 var _ NextEntryProposal = &nextEntryProposal{}
@@ -938,32 +966,36 @@ type RemoveProposal interface {
 	Proposal
 	Request() *log.RemoveRequest
 	Reply(*log.RemoveResponse) error
+	response() *log.RemoveResponse
 }
 
-func newRemoveProposal(id ProposalID, session Session, request *log.RemoveRequest, response *log.RemoveResponse) RemoveProposal {
+func newRemoveProposal(id ProposalID, session Session, request *log.RemoveRequest) RemoveProposal {
 	return &removeProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type removeProposal struct {
 	Proposal
-	request  *log.RemoveRequest
-	response *log.RemoveResponse
+	req *log.RemoveRequest
+	res *log.RemoveResponse
 }
 
 func (p *removeProposal) Request() *log.RemoveRequest {
-	return p.request
+	return p.req
 }
 
 func (p *removeProposal) Reply(reply *log.RemoveResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *removeProposal) response() *log.RemoveResponse {
+	return p.res
 }
 
 var _ RemoveProposal = &removeProposal{}
@@ -1012,32 +1044,36 @@ type ClearProposal interface {
 	Proposal
 	Request() *log.ClearRequest
 	Reply(*log.ClearResponse) error
+	response() *log.ClearResponse
 }
 
-func newClearProposal(id ProposalID, session Session, request *log.ClearRequest, response *log.ClearResponse) ClearProposal {
+func newClearProposal(id ProposalID, session Session, request *log.ClearRequest) ClearProposal {
 	return &clearProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type clearProposal struct {
 	Proposal
-	request  *log.ClearRequest
-	response *log.ClearResponse
+	req *log.ClearRequest
+	res *log.ClearResponse
 }
 
 func (p *clearProposal) Request() *log.ClearRequest {
-	return p.request
+	return p.req
 }
 
 func (p *clearProposal) Reply(reply *log.ClearResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *clearProposal) response() *log.ClearResponse {
+	return p.res
 }
 
 var _ ClearProposal = &clearProposal{}

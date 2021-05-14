@@ -404,32 +404,36 @@ type SizeProposal interface {
 	Proposal
 	Request() *list.SizeRequest
 	Reply(*list.SizeResponse) error
+	response() *list.SizeResponse
 }
 
-func newSizeProposal(id ProposalID, session Session, request *list.SizeRequest, response *list.SizeResponse) SizeProposal {
+func newSizeProposal(id ProposalID, session Session, request *list.SizeRequest) SizeProposal {
 	return &sizeProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type sizeProposal struct {
 	Proposal
-	request  *list.SizeRequest
-	response *list.SizeResponse
+	req *list.SizeRequest
+	res *list.SizeResponse
 }
 
 func (p *sizeProposal) Request() *list.SizeRequest {
-	return p.request
+	return p.req
 }
 
 func (p *sizeProposal) Reply(reply *list.SizeResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *sizeProposal) response() *list.SizeResponse {
+	return p.res
 }
 
 var _ SizeProposal = &sizeProposal{}
@@ -478,32 +482,36 @@ type AppendProposal interface {
 	Proposal
 	Request() *list.AppendRequest
 	Reply(*list.AppendResponse) error
+	response() *list.AppendResponse
 }
 
-func newAppendProposal(id ProposalID, session Session, request *list.AppendRequest, response *list.AppendResponse) AppendProposal {
+func newAppendProposal(id ProposalID, session Session, request *list.AppendRequest) AppendProposal {
 	return &appendProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type appendProposal struct {
 	Proposal
-	request  *list.AppendRequest
-	response *list.AppendResponse
+	req *list.AppendRequest
+	res *list.AppendResponse
 }
 
 func (p *appendProposal) Request() *list.AppendRequest {
-	return p.request
+	return p.req
 }
 
 func (p *appendProposal) Reply(reply *list.AppendResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *appendProposal) response() *list.AppendResponse {
+	return p.res
 }
 
 var _ AppendProposal = &appendProposal{}
@@ -552,32 +560,36 @@ type InsertProposal interface {
 	Proposal
 	Request() *list.InsertRequest
 	Reply(*list.InsertResponse) error
+	response() *list.InsertResponse
 }
 
-func newInsertProposal(id ProposalID, session Session, request *list.InsertRequest, response *list.InsertResponse) InsertProposal {
+func newInsertProposal(id ProposalID, session Session, request *list.InsertRequest) InsertProposal {
 	return &insertProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type insertProposal struct {
 	Proposal
-	request  *list.InsertRequest
-	response *list.InsertResponse
+	req *list.InsertRequest
+	res *list.InsertResponse
 }
 
 func (p *insertProposal) Request() *list.InsertRequest {
-	return p.request
+	return p.req
 }
 
 func (p *insertProposal) Reply(reply *list.InsertResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *insertProposal) response() *list.InsertResponse {
+	return p.res
 }
 
 var _ InsertProposal = &insertProposal{}
@@ -626,32 +638,36 @@ type GetProposal interface {
 	Proposal
 	Request() *list.GetRequest
 	Reply(*list.GetResponse) error
+	response() *list.GetResponse
 }
 
-func newGetProposal(id ProposalID, session Session, request *list.GetRequest, response *list.GetResponse) GetProposal {
+func newGetProposal(id ProposalID, session Session, request *list.GetRequest) GetProposal {
 	return &getProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type getProposal struct {
 	Proposal
-	request  *list.GetRequest
-	response *list.GetResponse
+	req *list.GetRequest
+	res *list.GetResponse
 }
 
 func (p *getProposal) Request() *list.GetRequest {
-	return p.request
+	return p.req
 }
 
 func (p *getProposal) Reply(reply *list.GetResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *getProposal) response() *list.GetResponse {
+	return p.res
 }
 
 var _ GetProposal = &getProposal{}
@@ -700,32 +716,36 @@ type SetProposal interface {
 	Proposal
 	Request() *list.SetRequest
 	Reply(*list.SetResponse) error
+	response() *list.SetResponse
 }
 
-func newSetProposal(id ProposalID, session Session, request *list.SetRequest, response *list.SetResponse) SetProposal {
+func newSetProposal(id ProposalID, session Session, request *list.SetRequest) SetProposal {
 	return &setProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type setProposal struct {
 	Proposal
-	request  *list.SetRequest
-	response *list.SetResponse
+	req *list.SetRequest
+	res *list.SetResponse
 }
 
 func (p *setProposal) Request() *list.SetRequest {
-	return p.request
+	return p.req
 }
 
 func (p *setProposal) Reply(reply *list.SetResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *setProposal) response() *list.SetResponse {
+	return p.res
 }
 
 var _ SetProposal = &setProposal{}
@@ -774,32 +794,36 @@ type RemoveProposal interface {
 	Proposal
 	Request() *list.RemoveRequest
 	Reply(*list.RemoveResponse) error
+	response() *list.RemoveResponse
 }
 
-func newRemoveProposal(id ProposalID, session Session, request *list.RemoveRequest, response *list.RemoveResponse) RemoveProposal {
+func newRemoveProposal(id ProposalID, session Session, request *list.RemoveRequest) RemoveProposal {
 	return &removeProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type removeProposal struct {
 	Proposal
-	request  *list.RemoveRequest
-	response *list.RemoveResponse
+	req *list.RemoveRequest
+	res *list.RemoveResponse
 }
 
 func (p *removeProposal) Request() *list.RemoveRequest {
-	return p.request
+	return p.req
 }
 
 func (p *removeProposal) Reply(reply *list.RemoveResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *removeProposal) response() *list.RemoveResponse {
+	return p.res
 }
 
 var _ RemoveProposal = &removeProposal{}
@@ -848,32 +872,36 @@ type ClearProposal interface {
 	Proposal
 	Request() *list.ClearRequest
 	Reply(*list.ClearResponse) error
+	response() *list.ClearResponse
 }
 
-func newClearProposal(id ProposalID, session Session, request *list.ClearRequest, response *list.ClearResponse) ClearProposal {
+func newClearProposal(id ProposalID, session Session, request *list.ClearRequest) ClearProposal {
 	return &clearProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type clearProposal struct {
 	Proposal
-	request  *list.ClearRequest
-	response *list.ClearResponse
+	req *list.ClearRequest
+	res *list.ClearResponse
 }
 
 func (p *clearProposal) Request() *list.ClearRequest {
-	return p.request
+	return p.req
 }
 
 func (p *clearProposal) Reply(reply *list.ClearResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *clearProposal) response() *list.ClearResponse {
+	return p.res
 }
 
 var _ ClearProposal = &clearProposal{}

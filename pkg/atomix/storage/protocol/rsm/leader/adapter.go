@@ -93,8 +93,7 @@ func (s *ServiceAdaptor) latch(input []byte, rsmSession rsm.Session) ([]byte, er
 		return nil, err
 	}
 
-	var response *leader.LatchResponse
-	proposal := newLatchProposal(ProposalID(s.Index()), session, request, response)
+	proposal := newLatchProposal(ProposalID(s.Index()), session, request)
 
 	s.rsm.Proposals().Latch().register(proposal)
 	session.Proposals().Latch().register(proposal)
@@ -110,7 +109,7 @@ func (s *ServiceAdaptor) latch(input []byte, rsmSession rsm.Session) ([]byte, er
 		return nil, err
 	}
 
-	output, err := proto.Marshal(response)
+	output, err := proto.Marshal(proposal.response())
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
@@ -132,8 +131,7 @@ func (s *ServiceAdaptor) get(input []byte, rsmSession rsm.Session) ([]byte, erro
 		return nil, err
 	}
 
-	var response *leader.GetResponse
-	proposal := newGetProposal(ProposalID(s.Index()), session, request, response)
+	proposal := newGetProposal(ProposalID(s.Index()), session, request)
 
 	s.rsm.Proposals().Get().register(proposal)
 	session.Proposals().Get().register(proposal)
@@ -149,7 +147,7 @@ func (s *ServiceAdaptor) get(input []byte, rsmSession rsm.Session) ([]byte, erro
 		return nil, err
 	}
 
-	output, err := proto.Marshal(response)
+	output, err := proto.Marshal(proposal.response())
 	if err != nil {
 		s.log.Error(err)
 		return nil, err

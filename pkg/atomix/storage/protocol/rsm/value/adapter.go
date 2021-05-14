@@ -93,8 +93,7 @@ func (s *ServiceAdaptor) set(input []byte, rsmSession rsm.Session) ([]byte, erro
 		return nil, err
 	}
 
-	var response *value.SetResponse
-	proposal := newSetProposal(ProposalID(s.Index()), session, request, response)
+	proposal := newSetProposal(ProposalID(s.Index()), session, request)
 
 	s.rsm.Proposals().Set().register(proposal)
 	session.Proposals().Set().register(proposal)
@@ -110,7 +109,7 @@ func (s *ServiceAdaptor) set(input []byte, rsmSession rsm.Session) ([]byte, erro
 		return nil, err
 	}
 
-	output, err := proto.Marshal(response)
+	output, err := proto.Marshal(proposal.response())
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
@@ -132,8 +131,7 @@ func (s *ServiceAdaptor) get(input []byte, rsmSession rsm.Session) ([]byte, erro
 		return nil, err
 	}
 
-	var response *value.GetResponse
-	proposal := newGetProposal(ProposalID(s.Index()), session, request, response)
+	proposal := newGetProposal(ProposalID(s.Index()), session, request)
 
 	s.rsm.Proposals().Get().register(proposal)
 	session.Proposals().Get().register(proposal)
@@ -149,7 +147,7 @@ func (s *ServiceAdaptor) get(input []byte, rsmSession rsm.Session) ([]byte, erro
 		return nil, err
 	}
 
-	output, err := proto.Marshal(response)
+	output, err := proto.Marshal(proposal.response())
 	if err != nil {
 		s.log.Error(err)
 		return nil, err

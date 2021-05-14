@@ -124,8 +124,7 @@ func (s *ServiceAdaptor) unlock(input []byte, rsmSession rsm.Session) ([]byte, e
 		return nil, err
 	}
 
-	var response *lock.UnlockResponse
-	proposal := newUnlockProposal(ProposalID(s.Index()), session, request, response)
+	proposal := newUnlockProposal(ProposalID(s.Index()), session, request)
 
 	s.rsm.Proposals().Unlock().register(proposal)
 	session.Proposals().Unlock().register(proposal)
@@ -141,7 +140,7 @@ func (s *ServiceAdaptor) unlock(input []byte, rsmSession rsm.Session) ([]byte, e
 		return nil, err
 	}
 
-	output, err := proto.Marshal(response)
+	output, err := proto.Marshal(proposal.response())
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
@@ -163,8 +162,7 @@ func (s *ServiceAdaptor) getLock(input []byte, rsmSession rsm.Session) ([]byte, 
 		return nil, err
 	}
 
-	var response *lock.GetLockResponse
-	proposal := newGetLockProposal(ProposalID(s.Index()), session, request, response)
+	proposal := newGetLockProposal(ProposalID(s.Index()), session, request)
 
 	s.rsm.Proposals().GetLock().register(proposal)
 	session.Proposals().GetLock().register(proposal)
@@ -180,7 +178,7 @@ func (s *ServiceAdaptor) getLock(input []byte, rsmSession rsm.Session) ([]byte, 
 		return nil, err
 	}
 
-	output, err := proto.Marshal(response)
+	output, err := proto.Marshal(proposal.response())
 	if err != nil {
 		s.log.Error(err)
 		return nil, err

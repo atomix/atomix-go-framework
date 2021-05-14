@@ -127,8 +127,7 @@ func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte, rsmSession
         return nil, err
     }
 
-    var response *{{ template "type" .Response.Type }}
-    proposal := {{ $newProposal }}({{ $serviceProposalID }}(s.Index()), session, request, response)
+    proposal := {{ $newProposal }}({{ $serviceProposalID }}(s.Index()), session, request)
 
     s.rsm.Proposals().{{ .Name }}().register(proposal)
     session.Proposals().{{ .Name }}().register(proposal)
@@ -144,7 +143,7 @@ func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte, rsmSession
     	return nil, err
 	}
 
-	output, err := proto.Marshal(response)
+	output, err := proto.Marshal(proposal.response())
 	if err != nil {
 	    s.log.Error(err)
 		return nil, err

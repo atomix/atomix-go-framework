@@ -356,32 +356,36 @@ type SetProposal interface {
 	Proposal
 	Request() *value.SetRequest
 	Reply(*value.SetResponse) error
+	response() *value.SetResponse
 }
 
-func newSetProposal(id ProposalID, session Session, request *value.SetRequest, response *value.SetResponse) SetProposal {
+func newSetProposal(id ProposalID, session Session, request *value.SetRequest) SetProposal {
 	return &setProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type setProposal struct {
 	Proposal
-	request  *value.SetRequest
-	response *value.SetResponse
+	req *value.SetRequest
+	res *value.SetResponse
 }
 
 func (p *setProposal) Request() *value.SetRequest {
-	return p.request
+	return p.req
 }
 
 func (p *setProposal) Reply(reply *value.SetResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *setProposal) response() *value.SetResponse {
+	return p.res
 }
 
 var _ SetProposal = &setProposal{}
@@ -430,32 +434,36 @@ type GetProposal interface {
 	Proposal
 	Request() *value.GetRequest
 	Reply(*value.GetResponse) error
+	response() *value.GetResponse
 }
 
-func newGetProposal(id ProposalID, session Session, request *value.GetRequest, response *value.GetResponse) GetProposal {
+func newGetProposal(id ProposalID, session Session, request *value.GetRequest) GetProposal {
 	return &getProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type getProposal struct {
 	Proposal
-	request  *value.GetRequest
-	response *value.GetResponse
+	req *value.GetRequest
+	res *value.GetResponse
 }
 
 func (p *getProposal) Request() *value.GetRequest {
-	return p.request
+	return p.req
 }
 
 func (p *getProposal) Reply(reply *value.GetResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *getProposal) response() *value.GetResponse {
+	return p.res
 }
 
 var _ GetProposal = &getProposal{}

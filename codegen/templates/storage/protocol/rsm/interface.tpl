@@ -426,19 +426,49 @@ var _ {{ $proposalsInt }} = &{{ $proposalsImpl }}{}
 type {{ $proposalInt }} interface {
     {{ $serviceProposalInt }}
     Request() *{{ template "type" .Request.Type }}
-    {{- if ( and .Response.IsUnary .Type.IsAsync ) }}
+    {{- if ( and .Response.IsUnary .Type.IsSync ) }}
+    Reply(*{{ template "type" .Response.Type }}) error
+    response() *{{ template "type" .Response.Type }}
+    {{- else if ( and .Response.IsUnary .Type.IsAsync ) }}
     Reply(*{{ template "type" .Response.Type }}) error
     Fail(error) error
     Close() error
     {{- else if .Response.IsStream }}
     Notify(*{{ template "type" .Response.Type }}) error
     Close() error
-    {{- else }}
-    Reply(*{{ template "type" .Response.Type }}) error
     {{- end }}
 }
 
-{{- if ( and .Response.IsUnary .Type.IsAsync ) }}
+{{- if ( and .Response.IsUnary .Type.IsSync ) }}
+func {{ $newProposal }}(id {{ $serviceProposalID }}, session {{ $serviceSessionInt }}, request *{{ template "type" .Request.Type }}) {{ $proposalInt }} {
+    return &{{ $proposalImpl }}{
+        {{ $serviceProposalInt }}: {{ $newServiceProposal }}(id, session),
+        req: request,
+    }
+}
+
+type {{ $proposalImpl }} struct {
+    {{ $serviceProposalInt }}
+    req *{{ template "type" .Request.Type }}
+    res *{{ template "type" .Response.Type }}
+}
+
+func (p *{{ $proposalImpl }}) Request() *{{ template "type" .Request.Type }} {
+    return p.req
+}
+
+func (p *{{ $proposalImpl }}) Reply(reply *{{ template "type" .Response.Type }}) error {
+    if p.res != nil {
+        return errors.NewConflict("reply already sent")
+    }
+    p.res = reply
+    return nil
+}
+
+func (p *{{ $proposalImpl }}) response() *{{ template "type" .Response.Type }} {
+    return p.res
+}
+{{- else if ( and .Response.IsUnary .Type.IsAsync ) }}
 func {{ $newProposal }}(id {{ $serviceProposalID }}, session {{ $serviceSessionInt }}, request *{{ template "type" .Request.Type }}, stream rsm.Stream) {{ $proposalInt }} {
     return &{{ $proposalImpl }}{
         {{ $serviceProposalInt }}: {{ $newServiceProposal }}(id, session),
@@ -522,32 +552,6 @@ func (p *{{ $proposalImpl }}) Notify(notification *{{ template "type" .Response.
 
 func (p *{{ $proposalImpl }}) Close() error {
     p.stream.Close()
-    return nil
-}
-{{- else }}
-func {{ $newProposal }}(id {{ $serviceProposalID }}, session {{ $serviceSessionInt }}, request *{{ template "type" .Request.Type }}, response *{{ template "type" .Response.Type }}) {{ $proposalInt }} {
-    return &{{ $proposalImpl }}{
-        {{ $serviceProposalInt }}: {{ $newServiceProposal }}(id, session),
-        request:  request,
-        response: response,
-    }
-}
-
-type {{ $proposalImpl }} struct {
-    {{ $serviceProposalInt }}
-    request  *{{ template "type" .Request.Type }}
-    response *{{ template "type" .Response.Type }}
-}
-
-func (p *{{ $proposalImpl }}) Request() *{{ template "type" .Request.Type }} {
-    return p.request
-}
-
-func (p *{{ $proposalImpl }}) Reply(reply *{{ template "type" .Response.Type }}) error {
-    if p.response != nil {
-        return errors.NewConflict("reply already sent")
-    }
-    p.response = reply
     return nil
 }
 {{- end }}

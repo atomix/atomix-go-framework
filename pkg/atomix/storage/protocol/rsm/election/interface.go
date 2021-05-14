@@ -388,32 +388,36 @@ type EnterProposal interface {
 	Proposal
 	Request() *election.EnterRequest
 	Reply(*election.EnterResponse) error
+	response() *election.EnterResponse
 }
 
-func newEnterProposal(id ProposalID, session Session, request *election.EnterRequest, response *election.EnterResponse) EnterProposal {
+func newEnterProposal(id ProposalID, session Session, request *election.EnterRequest) EnterProposal {
 	return &enterProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type enterProposal struct {
 	Proposal
-	request  *election.EnterRequest
-	response *election.EnterResponse
+	req *election.EnterRequest
+	res *election.EnterResponse
 }
 
 func (p *enterProposal) Request() *election.EnterRequest {
-	return p.request
+	return p.req
 }
 
 func (p *enterProposal) Reply(reply *election.EnterResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *enterProposal) response() *election.EnterResponse {
+	return p.res
 }
 
 var _ EnterProposal = &enterProposal{}
@@ -462,32 +466,36 @@ type WithdrawProposal interface {
 	Proposal
 	Request() *election.WithdrawRequest
 	Reply(*election.WithdrawResponse) error
+	response() *election.WithdrawResponse
 }
 
-func newWithdrawProposal(id ProposalID, session Session, request *election.WithdrawRequest, response *election.WithdrawResponse) WithdrawProposal {
+func newWithdrawProposal(id ProposalID, session Session, request *election.WithdrawRequest) WithdrawProposal {
 	return &withdrawProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type withdrawProposal struct {
 	Proposal
-	request  *election.WithdrawRequest
-	response *election.WithdrawResponse
+	req *election.WithdrawRequest
+	res *election.WithdrawResponse
 }
 
 func (p *withdrawProposal) Request() *election.WithdrawRequest {
-	return p.request
+	return p.req
 }
 
 func (p *withdrawProposal) Reply(reply *election.WithdrawResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *withdrawProposal) response() *election.WithdrawResponse {
+	return p.res
 }
 
 var _ WithdrawProposal = &withdrawProposal{}
@@ -536,32 +544,36 @@ type AnointProposal interface {
 	Proposal
 	Request() *election.AnointRequest
 	Reply(*election.AnointResponse) error
+	response() *election.AnointResponse
 }
 
-func newAnointProposal(id ProposalID, session Session, request *election.AnointRequest, response *election.AnointResponse) AnointProposal {
+func newAnointProposal(id ProposalID, session Session, request *election.AnointRequest) AnointProposal {
 	return &anointProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type anointProposal struct {
 	Proposal
-	request  *election.AnointRequest
-	response *election.AnointResponse
+	req *election.AnointRequest
+	res *election.AnointResponse
 }
 
 func (p *anointProposal) Request() *election.AnointRequest {
-	return p.request
+	return p.req
 }
 
 func (p *anointProposal) Reply(reply *election.AnointResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *anointProposal) response() *election.AnointResponse {
+	return p.res
 }
 
 var _ AnointProposal = &anointProposal{}
@@ -610,32 +622,36 @@ type PromoteProposal interface {
 	Proposal
 	Request() *election.PromoteRequest
 	Reply(*election.PromoteResponse) error
+	response() *election.PromoteResponse
 }
 
-func newPromoteProposal(id ProposalID, session Session, request *election.PromoteRequest, response *election.PromoteResponse) PromoteProposal {
+func newPromoteProposal(id ProposalID, session Session, request *election.PromoteRequest) PromoteProposal {
 	return &promoteProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type promoteProposal struct {
 	Proposal
-	request  *election.PromoteRequest
-	response *election.PromoteResponse
+	req *election.PromoteRequest
+	res *election.PromoteResponse
 }
 
 func (p *promoteProposal) Request() *election.PromoteRequest {
-	return p.request
+	return p.req
 }
 
 func (p *promoteProposal) Reply(reply *election.PromoteResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *promoteProposal) response() *election.PromoteResponse {
+	return p.res
 }
 
 var _ PromoteProposal = &promoteProposal{}
@@ -684,32 +700,36 @@ type EvictProposal interface {
 	Proposal
 	Request() *election.EvictRequest
 	Reply(*election.EvictResponse) error
+	response() *election.EvictResponse
 }
 
-func newEvictProposal(id ProposalID, session Session, request *election.EvictRequest, response *election.EvictResponse) EvictProposal {
+func newEvictProposal(id ProposalID, session Session, request *election.EvictRequest) EvictProposal {
 	return &evictProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type evictProposal struct {
 	Proposal
-	request  *election.EvictRequest
-	response *election.EvictResponse
+	req *election.EvictRequest
+	res *election.EvictResponse
 }
 
 func (p *evictProposal) Request() *election.EvictRequest {
-	return p.request
+	return p.req
 }
 
 func (p *evictProposal) Reply(reply *election.EvictResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *evictProposal) response() *election.EvictResponse {
+	return p.res
 }
 
 var _ EvictProposal = &evictProposal{}
@@ -758,32 +778,36 @@ type GetTermProposal interface {
 	Proposal
 	Request() *election.GetTermRequest
 	Reply(*election.GetTermResponse) error
+	response() *election.GetTermResponse
 }
 
-func newGetTermProposal(id ProposalID, session Session, request *election.GetTermRequest, response *election.GetTermResponse) GetTermProposal {
+func newGetTermProposal(id ProposalID, session Session, request *election.GetTermRequest) GetTermProposal {
 	return &getTermProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type getTermProposal struct {
 	Proposal
-	request  *election.GetTermRequest
-	response *election.GetTermResponse
+	req *election.GetTermRequest
+	res *election.GetTermResponse
 }
 
 func (p *getTermProposal) Request() *election.GetTermRequest {
-	return p.request
+	return p.req
 }
 
 func (p *getTermProposal) Reply(reply *election.GetTermResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *getTermProposal) response() *election.GetTermResponse {
+	return p.res
 }
 
 var _ GetTermProposal = &getTermProposal{}

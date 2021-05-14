@@ -420,32 +420,36 @@ type SizeProposal interface {
 	Proposal
 	Request() *indexedmap.SizeRequest
 	Reply(*indexedmap.SizeResponse) error
+	response() *indexedmap.SizeResponse
 }
 
-func newSizeProposal(id ProposalID, session Session, request *indexedmap.SizeRequest, response *indexedmap.SizeResponse) SizeProposal {
+func newSizeProposal(id ProposalID, session Session, request *indexedmap.SizeRequest) SizeProposal {
 	return &sizeProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type sizeProposal struct {
 	Proposal
-	request  *indexedmap.SizeRequest
-	response *indexedmap.SizeResponse
+	req *indexedmap.SizeRequest
+	res *indexedmap.SizeResponse
 }
 
 func (p *sizeProposal) Request() *indexedmap.SizeRequest {
-	return p.request
+	return p.req
 }
 
 func (p *sizeProposal) Reply(reply *indexedmap.SizeResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *sizeProposal) response() *indexedmap.SizeResponse {
+	return p.res
 }
 
 var _ SizeProposal = &sizeProposal{}
@@ -494,32 +498,36 @@ type PutProposal interface {
 	Proposal
 	Request() *indexedmap.PutRequest
 	Reply(*indexedmap.PutResponse) error
+	response() *indexedmap.PutResponse
 }
 
-func newPutProposal(id ProposalID, session Session, request *indexedmap.PutRequest, response *indexedmap.PutResponse) PutProposal {
+func newPutProposal(id ProposalID, session Session, request *indexedmap.PutRequest) PutProposal {
 	return &putProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type putProposal struct {
 	Proposal
-	request  *indexedmap.PutRequest
-	response *indexedmap.PutResponse
+	req *indexedmap.PutRequest
+	res *indexedmap.PutResponse
 }
 
 func (p *putProposal) Request() *indexedmap.PutRequest {
-	return p.request
+	return p.req
 }
 
 func (p *putProposal) Reply(reply *indexedmap.PutResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *putProposal) response() *indexedmap.PutResponse {
+	return p.res
 }
 
 var _ PutProposal = &putProposal{}
@@ -568,32 +576,36 @@ type GetProposal interface {
 	Proposal
 	Request() *indexedmap.GetRequest
 	Reply(*indexedmap.GetResponse) error
+	response() *indexedmap.GetResponse
 }
 
-func newGetProposal(id ProposalID, session Session, request *indexedmap.GetRequest, response *indexedmap.GetResponse) GetProposal {
+func newGetProposal(id ProposalID, session Session, request *indexedmap.GetRequest) GetProposal {
 	return &getProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type getProposal struct {
 	Proposal
-	request  *indexedmap.GetRequest
-	response *indexedmap.GetResponse
+	req *indexedmap.GetRequest
+	res *indexedmap.GetResponse
 }
 
 func (p *getProposal) Request() *indexedmap.GetRequest {
-	return p.request
+	return p.req
 }
 
 func (p *getProposal) Reply(reply *indexedmap.GetResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *getProposal) response() *indexedmap.GetResponse {
+	return p.res
 }
 
 var _ GetProposal = &getProposal{}
@@ -642,32 +654,36 @@ type FirstEntryProposal interface {
 	Proposal
 	Request() *indexedmap.FirstEntryRequest
 	Reply(*indexedmap.FirstEntryResponse) error
+	response() *indexedmap.FirstEntryResponse
 }
 
-func newFirstEntryProposal(id ProposalID, session Session, request *indexedmap.FirstEntryRequest, response *indexedmap.FirstEntryResponse) FirstEntryProposal {
+func newFirstEntryProposal(id ProposalID, session Session, request *indexedmap.FirstEntryRequest) FirstEntryProposal {
 	return &firstEntryProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type firstEntryProposal struct {
 	Proposal
-	request  *indexedmap.FirstEntryRequest
-	response *indexedmap.FirstEntryResponse
+	req *indexedmap.FirstEntryRequest
+	res *indexedmap.FirstEntryResponse
 }
 
 func (p *firstEntryProposal) Request() *indexedmap.FirstEntryRequest {
-	return p.request
+	return p.req
 }
 
 func (p *firstEntryProposal) Reply(reply *indexedmap.FirstEntryResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *firstEntryProposal) response() *indexedmap.FirstEntryResponse {
+	return p.res
 }
 
 var _ FirstEntryProposal = &firstEntryProposal{}
@@ -716,32 +732,36 @@ type LastEntryProposal interface {
 	Proposal
 	Request() *indexedmap.LastEntryRequest
 	Reply(*indexedmap.LastEntryResponse) error
+	response() *indexedmap.LastEntryResponse
 }
 
-func newLastEntryProposal(id ProposalID, session Session, request *indexedmap.LastEntryRequest, response *indexedmap.LastEntryResponse) LastEntryProposal {
+func newLastEntryProposal(id ProposalID, session Session, request *indexedmap.LastEntryRequest) LastEntryProposal {
 	return &lastEntryProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type lastEntryProposal struct {
 	Proposal
-	request  *indexedmap.LastEntryRequest
-	response *indexedmap.LastEntryResponse
+	req *indexedmap.LastEntryRequest
+	res *indexedmap.LastEntryResponse
 }
 
 func (p *lastEntryProposal) Request() *indexedmap.LastEntryRequest {
-	return p.request
+	return p.req
 }
 
 func (p *lastEntryProposal) Reply(reply *indexedmap.LastEntryResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *lastEntryProposal) response() *indexedmap.LastEntryResponse {
+	return p.res
 }
 
 var _ LastEntryProposal = &lastEntryProposal{}
@@ -790,32 +810,36 @@ type PrevEntryProposal interface {
 	Proposal
 	Request() *indexedmap.PrevEntryRequest
 	Reply(*indexedmap.PrevEntryResponse) error
+	response() *indexedmap.PrevEntryResponse
 }
 
-func newPrevEntryProposal(id ProposalID, session Session, request *indexedmap.PrevEntryRequest, response *indexedmap.PrevEntryResponse) PrevEntryProposal {
+func newPrevEntryProposal(id ProposalID, session Session, request *indexedmap.PrevEntryRequest) PrevEntryProposal {
 	return &prevEntryProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type prevEntryProposal struct {
 	Proposal
-	request  *indexedmap.PrevEntryRequest
-	response *indexedmap.PrevEntryResponse
+	req *indexedmap.PrevEntryRequest
+	res *indexedmap.PrevEntryResponse
 }
 
 func (p *prevEntryProposal) Request() *indexedmap.PrevEntryRequest {
-	return p.request
+	return p.req
 }
 
 func (p *prevEntryProposal) Reply(reply *indexedmap.PrevEntryResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *prevEntryProposal) response() *indexedmap.PrevEntryResponse {
+	return p.res
 }
 
 var _ PrevEntryProposal = &prevEntryProposal{}
@@ -864,32 +888,36 @@ type NextEntryProposal interface {
 	Proposal
 	Request() *indexedmap.NextEntryRequest
 	Reply(*indexedmap.NextEntryResponse) error
+	response() *indexedmap.NextEntryResponse
 }
 
-func newNextEntryProposal(id ProposalID, session Session, request *indexedmap.NextEntryRequest, response *indexedmap.NextEntryResponse) NextEntryProposal {
+func newNextEntryProposal(id ProposalID, session Session, request *indexedmap.NextEntryRequest) NextEntryProposal {
 	return &nextEntryProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type nextEntryProposal struct {
 	Proposal
-	request  *indexedmap.NextEntryRequest
-	response *indexedmap.NextEntryResponse
+	req *indexedmap.NextEntryRequest
+	res *indexedmap.NextEntryResponse
 }
 
 func (p *nextEntryProposal) Request() *indexedmap.NextEntryRequest {
-	return p.request
+	return p.req
 }
 
 func (p *nextEntryProposal) Reply(reply *indexedmap.NextEntryResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *nextEntryProposal) response() *indexedmap.NextEntryResponse {
+	return p.res
 }
 
 var _ NextEntryProposal = &nextEntryProposal{}
@@ -938,32 +966,36 @@ type RemoveProposal interface {
 	Proposal
 	Request() *indexedmap.RemoveRequest
 	Reply(*indexedmap.RemoveResponse) error
+	response() *indexedmap.RemoveResponse
 }
 
-func newRemoveProposal(id ProposalID, session Session, request *indexedmap.RemoveRequest, response *indexedmap.RemoveResponse) RemoveProposal {
+func newRemoveProposal(id ProposalID, session Session, request *indexedmap.RemoveRequest) RemoveProposal {
 	return &removeProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type removeProposal struct {
 	Proposal
-	request  *indexedmap.RemoveRequest
-	response *indexedmap.RemoveResponse
+	req *indexedmap.RemoveRequest
+	res *indexedmap.RemoveResponse
 }
 
 func (p *removeProposal) Request() *indexedmap.RemoveRequest {
-	return p.request
+	return p.req
 }
 
 func (p *removeProposal) Reply(reply *indexedmap.RemoveResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *removeProposal) response() *indexedmap.RemoveResponse {
+	return p.res
 }
 
 var _ RemoveProposal = &removeProposal{}
@@ -1012,32 +1044,36 @@ type ClearProposal interface {
 	Proposal
 	Request() *indexedmap.ClearRequest
 	Reply(*indexedmap.ClearResponse) error
+	response() *indexedmap.ClearResponse
 }
 
-func newClearProposal(id ProposalID, session Session, request *indexedmap.ClearRequest, response *indexedmap.ClearResponse) ClearProposal {
+func newClearProposal(id ProposalID, session Session, request *indexedmap.ClearRequest) ClearProposal {
 	return &clearProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type clearProposal struct {
 	Proposal
-	request  *indexedmap.ClearRequest
-	response *indexedmap.ClearResponse
+	req *indexedmap.ClearRequest
+	res *indexedmap.ClearResponse
 }
 
 func (p *clearProposal) Request() *indexedmap.ClearRequest {
-	return p.request
+	return p.req
 }
 
 func (p *clearProposal) Reply(reply *indexedmap.ClearResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *clearProposal) response() *indexedmap.ClearResponse {
+	return p.res
 }
 
 var _ ClearProposal = &clearProposal{}

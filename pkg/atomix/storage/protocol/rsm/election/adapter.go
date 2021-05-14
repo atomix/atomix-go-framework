@@ -101,8 +101,7 @@ func (s *ServiceAdaptor) enter(input []byte, rsmSession rsm.Session) ([]byte, er
 		return nil, err
 	}
 
-	var response *election.EnterResponse
-	proposal := newEnterProposal(ProposalID(s.Index()), session, request, response)
+	proposal := newEnterProposal(ProposalID(s.Index()), session, request)
 
 	s.rsm.Proposals().Enter().register(proposal)
 	session.Proposals().Enter().register(proposal)
@@ -118,7 +117,7 @@ func (s *ServiceAdaptor) enter(input []byte, rsmSession rsm.Session) ([]byte, er
 		return nil, err
 	}
 
-	output, err := proto.Marshal(response)
+	output, err := proto.Marshal(proposal.response())
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
@@ -140,8 +139,7 @@ func (s *ServiceAdaptor) withdraw(input []byte, rsmSession rsm.Session) ([]byte,
 		return nil, err
 	}
 
-	var response *election.WithdrawResponse
-	proposal := newWithdrawProposal(ProposalID(s.Index()), session, request, response)
+	proposal := newWithdrawProposal(ProposalID(s.Index()), session, request)
 
 	s.rsm.Proposals().Withdraw().register(proposal)
 	session.Proposals().Withdraw().register(proposal)
@@ -157,7 +155,7 @@ func (s *ServiceAdaptor) withdraw(input []byte, rsmSession rsm.Session) ([]byte,
 		return nil, err
 	}
 
-	output, err := proto.Marshal(response)
+	output, err := proto.Marshal(proposal.response())
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
@@ -179,8 +177,7 @@ func (s *ServiceAdaptor) anoint(input []byte, rsmSession rsm.Session) ([]byte, e
 		return nil, err
 	}
 
-	var response *election.AnointResponse
-	proposal := newAnointProposal(ProposalID(s.Index()), session, request, response)
+	proposal := newAnointProposal(ProposalID(s.Index()), session, request)
 
 	s.rsm.Proposals().Anoint().register(proposal)
 	session.Proposals().Anoint().register(proposal)
@@ -196,7 +193,7 @@ func (s *ServiceAdaptor) anoint(input []byte, rsmSession rsm.Session) ([]byte, e
 		return nil, err
 	}
 
-	output, err := proto.Marshal(response)
+	output, err := proto.Marshal(proposal.response())
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
@@ -218,8 +215,7 @@ func (s *ServiceAdaptor) promote(input []byte, rsmSession rsm.Session) ([]byte, 
 		return nil, err
 	}
 
-	var response *election.PromoteResponse
-	proposal := newPromoteProposal(ProposalID(s.Index()), session, request, response)
+	proposal := newPromoteProposal(ProposalID(s.Index()), session, request)
 
 	s.rsm.Proposals().Promote().register(proposal)
 	session.Proposals().Promote().register(proposal)
@@ -235,7 +231,7 @@ func (s *ServiceAdaptor) promote(input []byte, rsmSession rsm.Session) ([]byte, 
 		return nil, err
 	}
 
-	output, err := proto.Marshal(response)
+	output, err := proto.Marshal(proposal.response())
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
@@ -257,8 +253,7 @@ func (s *ServiceAdaptor) evict(input []byte, rsmSession rsm.Session) ([]byte, er
 		return nil, err
 	}
 
-	var response *election.EvictResponse
-	proposal := newEvictProposal(ProposalID(s.Index()), session, request, response)
+	proposal := newEvictProposal(ProposalID(s.Index()), session, request)
 
 	s.rsm.Proposals().Evict().register(proposal)
 	session.Proposals().Evict().register(proposal)
@@ -274,7 +269,7 @@ func (s *ServiceAdaptor) evict(input []byte, rsmSession rsm.Session) ([]byte, er
 		return nil, err
 	}
 
-	output, err := proto.Marshal(response)
+	output, err := proto.Marshal(proposal.response())
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
@@ -296,8 +291,7 @@ func (s *ServiceAdaptor) getTerm(input []byte, rsmSession rsm.Session) ([]byte, 
 		return nil, err
 	}
 
-	var response *election.GetTermResponse
-	proposal := newGetTermProposal(ProposalID(s.Index()), session, request, response)
+	proposal := newGetTermProposal(ProposalID(s.Index()), session, request)
 
 	s.rsm.Proposals().GetTerm().register(proposal)
 	session.Proposals().GetTerm().register(proposal)
@@ -313,7 +307,7 @@ func (s *ServiceAdaptor) getTerm(input []byte, rsmSession rsm.Session) ([]byte, 
 		return nil, err
 	}
 
-	output, err := proto.Marshal(response)
+	output, err := proto.Marshal(proposal.response())
 	if err != nil {
 		s.log.Error(err)
 		return nil, err

@@ -105,8 +105,7 @@ func (s *ServiceAdaptor) size(input []byte, rsmSession rsm.Session) ([]byte, err
 		return nil, err
 	}
 
-	var response *list.SizeResponse
-	proposal := newSizeProposal(ProposalID(s.Index()), session, request, response)
+	proposal := newSizeProposal(ProposalID(s.Index()), session, request)
 
 	s.rsm.Proposals().Size().register(proposal)
 	session.Proposals().Size().register(proposal)
@@ -122,7 +121,7 @@ func (s *ServiceAdaptor) size(input []byte, rsmSession rsm.Session) ([]byte, err
 		return nil, err
 	}
 
-	output, err := proto.Marshal(response)
+	output, err := proto.Marshal(proposal.response())
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
@@ -144,8 +143,7 @@ func (s *ServiceAdaptor) append(input []byte, rsmSession rsm.Session) ([]byte, e
 		return nil, err
 	}
 
-	var response *list.AppendResponse
-	proposal := newAppendProposal(ProposalID(s.Index()), session, request, response)
+	proposal := newAppendProposal(ProposalID(s.Index()), session, request)
 
 	s.rsm.Proposals().Append().register(proposal)
 	session.Proposals().Append().register(proposal)
@@ -161,7 +159,7 @@ func (s *ServiceAdaptor) append(input []byte, rsmSession rsm.Session) ([]byte, e
 		return nil, err
 	}
 
-	output, err := proto.Marshal(response)
+	output, err := proto.Marshal(proposal.response())
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
@@ -183,8 +181,7 @@ func (s *ServiceAdaptor) insert(input []byte, rsmSession rsm.Session) ([]byte, e
 		return nil, err
 	}
 
-	var response *list.InsertResponse
-	proposal := newInsertProposal(ProposalID(s.Index()), session, request, response)
+	proposal := newInsertProposal(ProposalID(s.Index()), session, request)
 
 	s.rsm.Proposals().Insert().register(proposal)
 	session.Proposals().Insert().register(proposal)
@@ -200,7 +197,7 @@ func (s *ServiceAdaptor) insert(input []byte, rsmSession rsm.Session) ([]byte, e
 		return nil, err
 	}
 
-	output, err := proto.Marshal(response)
+	output, err := proto.Marshal(proposal.response())
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
@@ -222,8 +219,7 @@ func (s *ServiceAdaptor) get(input []byte, rsmSession rsm.Session) ([]byte, erro
 		return nil, err
 	}
 
-	var response *list.GetResponse
-	proposal := newGetProposal(ProposalID(s.Index()), session, request, response)
+	proposal := newGetProposal(ProposalID(s.Index()), session, request)
 
 	s.rsm.Proposals().Get().register(proposal)
 	session.Proposals().Get().register(proposal)
@@ -239,7 +235,7 @@ func (s *ServiceAdaptor) get(input []byte, rsmSession rsm.Session) ([]byte, erro
 		return nil, err
 	}
 
-	output, err := proto.Marshal(response)
+	output, err := proto.Marshal(proposal.response())
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
@@ -261,8 +257,7 @@ func (s *ServiceAdaptor) set(input []byte, rsmSession rsm.Session) ([]byte, erro
 		return nil, err
 	}
 
-	var response *list.SetResponse
-	proposal := newSetProposal(ProposalID(s.Index()), session, request, response)
+	proposal := newSetProposal(ProposalID(s.Index()), session, request)
 
 	s.rsm.Proposals().Set().register(proposal)
 	session.Proposals().Set().register(proposal)
@@ -278,7 +273,7 @@ func (s *ServiceAdaptor) set(input []byte, rsmSession rsm.Session) ([]byte, erro
 		return nil, err
 	}
 
-	output, err := proto.Marshal(response)
+	output, err := proto.Marshal(proposal.response())
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
@@ -300,8 +295,7 @@ func (s *ServiceAdaptor) remove(input []byte, rsmSession rsm.Session) ([]byte, e
 		return nil, err
 	}
 
-	var response *list.RemoveResponse
-	proposal := newRemoveProposal(ProposalID(s.Index()), session, request, response)
+	proposal := newRemoveProposal(ProposalID(s.Index()), session, request)
 
 	s.rsm.Proposals().Remove().register(proposal)
 	session.Proposals().Remove().register(proposal)
@@ -317,7 +311,7 @@ func (s *ServiceAdaptor) remove(input []byte, rsmSession rsm.Session) ([]byte, e
 		return nil, err
 	}
 
-	output, err := proto.Marshal(response)
+	output, err := proto.Marshal(proposal.response())
 	if err != nil {
 		s.log.Error(err)
 		return nil, err
@@ -339,8 +333,7 @@ func (s *ServiceAdaptor) clear(input []byte, rsmSession rsm.Session) ([]byte, er
 		return nil, err
 	}
 
-	var response *list.ClearResponse
-	proposal := newClearProposal(ProposalID(s.Index()), session, request, response)
+	proposal := newClearProposal(ProposalID(s.Index()), session, request)
 
 	s.rsm.Proposals().Clear().register(proposal)
 	session.Proposals().Clear().register(proposal)
@@ -356,7 +349,7 @@ func (s *ServiceAdaptor) clear(input []byte, rsmSession rsm.Session) ([]byte, er
 		return nil, err
 	}
 
-	output, err := proto.Marshal(response)
+	output, err := proto.Marshal(proposal.response())
 	if err != nil {
 		s.log.Error(err)
 		return nil, err

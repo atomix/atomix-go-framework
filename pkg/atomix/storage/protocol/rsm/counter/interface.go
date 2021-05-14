@@ -364,32 +364,36 @@ type SetProposal interface {
 	Proposal
 	Request() *counter.SetRequest
 	Reply(*counter.SetResponse) error
+	response() *counter.SetResponse
 }
 
-func newSetProposal(id ProposalID, session Session, request *counter.SetRequest, response *counter.SetResponse) SetProposal {
+func newSetProposal(id ProposalID, session Session, request *counter.SetRequest) SetProposal {
 	return &setProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type setProposal struct {
 	Proposal
-	request  *counter.SetRequest
-	response *counter.SetResponse
+	req *counter.SetRequest
+	res *counter.SetResponse
 }
 
 func (p *setProposal) Request() *counter.SetRequest {
-	return p.request
+	return p.req
 }
 
 func (p *setProposal) Reply(reply *counter.SetResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *setProposal) response() *counter.SetResponse {
+	return p.res
 }
 
 var _ SetProposal = &setProposal{}
@@ -438,32 +442,36 @@ type GetProposal interface {
 	Proposal
 	Request() *counter.GetRequest
 	Reply(*counter.GetResponse) error
+	response() *counter.GetResponse
 }
 
-func newGetProposal(id ProposalID, session Session, request *counter.GetRequest, response *counter.GetResponse) GetProposal {
+func newGetProposal(id ProposalID, session Session, request *counter.GetRequest) GetProposal {
 	return &getProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type getProposal struct {
 	Proposal
-	request  *counter.GetRequest
-	response *counter.GetResponse
+	req *counter.GetRequest
+	res *counter.GetResponse
 }
 
 func (p *getProposal) Request() *counter.GetRequest {
-	return p.request
+	return p.req
 }
 
 func (p *getProposal) Reply(reply *counter.GetResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *getProposal) response() *counter.GetResponse {
+	return p.res
 }
 
 var _ GetProposal = &getProposal{}
@@ -512,32 +520,36 @@ type IncrementProposal interface {
 	Proposal
 	Request() *counter.IncrementRequest
 	Reply(*counter.IncrementResponse) error
+	response() *counter.IncrementResponse
 }
 
-func newIncrementProposal(id ProposalID, session Session, request *counter.IncrementRequest, response *counter.IncrementResponse) IncrementProposal {
+func newIncrementProposal(id ProposalID, session Session, request *counter.IncrementRequest) IncrementProposal {
 	return &incrementProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type incrementProposal struct {
 	Proposal
-	request  *counter.IncrementRequest
-	response *counter.IncrementResponse
+	req *counter.IncrementRequest
+	res *counter.IncrementResponse
 }
 
 func (p *incrementProposal) Request() *counter.IncrementRequest {
-	return p.request
+	return p.req
 }
 
 func (p *incrementProposal) Reply(reply *counter.IncrementResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *incrementProposal) response() *counter.IncrementResponse {
+	return p.res
 }
 
 var _ IncrementProposal = &incrementProposal{}
@@ -586,32 +598,36 @@ type DecrementProposal interface {
 	Proposal
 	Request() *counter.DecrementRequest
 	Reply(*counter.DecrementResponse) error
+	response() *counter.DecrementResponse
 }
 
-func newDecrementProposal(id ProposalID, session Session, request *counter.DecrementRequest, response *counter.DecrementResponse) DecrementProposal {
+func newDecrementProposal(id ProposalID, session Session, request *counter.DecrementRequest) DecrementProposal {
 	return &decrementProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type decrementProposal struct {
 	Proposal
-	request  *counter.DecrementRequest
-	response *counter.DecrementResponse
+	req *counter.DecrementRequest
+	res *counter.DecrementResponse
 }
 
 func (p *decrementProposal) Request() *counter.DecrementRequest {
-	return p.request
+	return p.req
 }
 
 func (p *decrementProposal) Reply(reply *counter.DecrementResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *decrementProposal) response() *counter.DecrementResponse {
+	return p.res
 }
 
 var _ DecrementProposal = &decrementProposal{}

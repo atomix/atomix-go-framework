@@ -460,32 +460,36 @@ type UnlockProposal interface {
 	Proposal
 	Request() *lock.UnlockRequest
 	Reply(*lock.UnlockResponse) error
+	response() *lock.UnlockResponse
 }
 
-func newUnlockProposal(id ProposalID, session Session, request *lock.UnlockRequest, response *lock.UnlockResponse) UnlockProposal {
+func newUnlockProposal(id ProposalID, session Session, request *lock.UnlockRequest) UnlockProposal {
 	return &unlockProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type unlockProposal struct {
 	Proposal
-	request  *lock.UnlockRequest
-	response *lock.UnlockResponse
+	req *lock.UnlockRequest
+	res *lock.UnlockResponse
 }
 
 func (p *unlockProposal) Request() *lock.UnlockRequest {
-	return p.request
+	return p.req
 }
 
 func (p *unlockProposal) Reply(reply *lock.UnlockResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *unlockProposal) response() *lock.UnlockResponse {
+	return p.res
 }
 
 var _ UnlockProposal = &unlockProposal{}
@@ -534,32 +538,36 @@ type GetLockProposal interface {
 	Proposal
 	Request() *lock.GetLockRequest
 	Reply(*lock.GetLockResponse) error
+	response() *lock.GetLockResponse
 }
 
-func newGetLockProposal(id ProposalID, session Session, request *lock.GetLockRequest, response *lock.GetLockResponse) GetLockProposal {
+func newGetLockProposal(id ProposalID, session Session, request *lock.GetLockRequest) GetLockProposal {
 	return &getLockProposal{
 		Proposal: newProposal(id, session),
-		request:  request,
-		response: response,
+		req:      request,
 	}
 }
 
 type getLockProposal struct {
 	Proposal
-	request  *lock.GetLockRequest
-	response *lock.GetLockResponse
+	req *lock.GetLockRequest
+	res *lock.GetLockResponse
 }
 
 func (p *getLockProposal) Request() *lock.GetLockRequest {
-	return p.request
+	return p.req
 }
 
 func (p *getLockProposal) Reply(reply *lock.GetLockResponse) error {
-	if p.response != nil {
+	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
-	p.response = reply
+	p.res = reply
 	return nil
+}
+
+func (p *getLockProposal) response() *lock.GetLockResponse {
+	return p.res
 }
 
 var _ GetLockProposal = &getLockProposal{}
