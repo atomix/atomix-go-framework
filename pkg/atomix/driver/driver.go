@@ -69,6 +69,11 @@ func (d *Driver) Start() error {
 
 // Stop stops the node
 func (d *Driver) Stop() error {
+	for _, agent := range d.agents {
+		if err := agent.Stop(); err != nil {
+			return err
+		}
+	}
 	return d.Server.Stop()
 }
 
