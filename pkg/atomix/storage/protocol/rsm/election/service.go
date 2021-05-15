@@ -19,7 +19,6 @@ import (
 	electionapi "github.com/atomix/atomix-api/go/atomix/primitive/election"
 	"github.com/atomix/atomix-api/go/atomix/primitive/meta"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 )
 
 func init() {
@@ -29,13 +28,15 @@ func init() {
 func newService(context ServiceContext) Service {
 	return &electionService{
 		ServiceContext: context,
+		watchers:       make(map[SessionID]Watcher),
 	}
 }
 
 // electionService is a state machine for an election primitive
 type electionService struct {
 	ServiceContext
-	term electionapi.Term
+	watchers map[SessionID]Watcher
+	term     electionapi.Term
 }
 
 func (e *electionService) Backup(writer SnapshotWriter) error {
@@ -50,25 +51,19 @@ func (e *electionService) Restore(reader SnapshotReader) error {
 	return nil
 }
 
-// SessionExpired is called when a session is expired by the server
-func (e *electionService) SessionExpired(session rsm.Session) {
-	e.close(session)
-}
-
-// SessionClosed is called when a session is closed by the client
-func (e *electionService) SessionClosed(session rsm.Session) {
-	e.close(session)
-}
-
-// close elects a new leader when a session is closed
-func (e *electionService) close(session rsm.Session) {
-	newCandidates := make([]string, 0, len(e.term.Candidates))
-	for _, candidate := range e.term.Candidates {
-		if rsm.ClientID(candidate) != session.ClientID() {
-			newCandidates = append(newCandidates, candidate)
+func (e *electionService) watchSession(session Session) {
+	e.watchers[session.ID()] = session.Watch(func(state SessionState) {
+		if state == SessionClosed {
+			newCandidates := make([]string, 0, len(e.term.Candidates))
+			for _, candidate := range e.term.Candidates {
+				if candidate != fmt.Sprint(session.ID()) {
+					newCandidates = append(newCandidates, candidate)
+				}
+			}
+			e.updateTerm(newCandidates)
+			delete(e.watchers, session.ID())
 		}
-	}
-	e.updateTerm(newCandidates)
+	})
 }
 
 func (e *electionService) notify(event electionapi.Event) error {
@@ -122,6 +117,8 @@ func (e *electionService) updateTerm(newCandidates []string) (electionapi.Term, 
 }
 
 func (e *electionService) Enter(enter EnterProposal) error {
+	e.watchSession(enter.Session())
+
 	clientID := fmt.Sprint(enter.Session().ID())
 	candidates := e.term.Candidates[:]
 	if !sliceContains(candidates, clientID) {
@@ -139,6 +136,8 @@ func (e *electionService) Enter(enter EnterProposal) error {
 }
 
 func (e *electionService) Withdraw(withdraw WithdrawProposal) error {
+	e.watchSession(withdraw.Session())
+
 	clientID := fmt.Sprint(withdraw.Session().ID())
 	candidates := make([]string, 0, len(e.term.Candidates))
 	for _, candidate := range e.term.Candidates {
@@ -158,6 +157,8 @@ func (e *electionService) Withdraw(withdraw WithdrawProposal) error {
 }
 
 func (e *electionService) Anoint(anoint AnointProposal) error {
+	e.watchSession(anoint.Session())
+
 	clientID := fmt.Sprint(anoint.Session().ID())
 	if !sliceContains(e.term.Candidates, clientID) {
 		return errors.NewInvalid("not a candidate")
@@ -181,6 +182,8 @@ func (e *electionService) Anoint(anoint AnointProposal) error {
 }
 
 func (e *electionService) Promote(promote PromoteProposal) error {
+	e.watchSession(promote.Session())
+
 	clientID := fmt.Sprint(promote.Session().ID())
 	if !sliceContains(e.term.Candidates, clientID) {
 		return errors.NewInvalid("not a candidate")
@@ -218,6 +221,8 @@ func (e *electionService) Promote(promote PromoteProposal) error {
 }
 
 func (e *electionService) Evict(evict EvictProposal) error {
+	e.watchSession(evict.Session())
+
 	clientID := evict.Request().CandidateID
 	if !sliceContains(e.term.Candidates, clientID) {
 		return errors.NewInvalid("not a candidate")
