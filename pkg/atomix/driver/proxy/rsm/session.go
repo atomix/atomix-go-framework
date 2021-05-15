@@ -155,7 +155,9 @@ func (s *Session) DoCommandStream(ctx context.Context, service rsm.ServiceId, na
 				response := result.Value.(PartitionOutput)
 				switch response.Type {
 				case rsm.SessionResponseType_OPEN_STREAM:
-					streamState.serialize(response.Context)
+					if streamState.serialize(response.Context) {
+						outStream.Send(response.Result)
+					}
 				case rsm.SessionResponseType_CLOSE_STREAM:
 					if streamState.serialize(response.Context) {
 						outStream.Close()

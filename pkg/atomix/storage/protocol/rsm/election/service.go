@@ -29,6 +29,11 @@ func newService(context ServiceContext) Service {
 	return &electionService{
 		ServiceContext: context,
 		watchers:       make(map[SessionID]Watcher),
+		term: electionapi.Term{
+			ObjectMeta: meta.ObjectMeta{
+				Revision: &meta.Revision{},
+			},
+		},
 	}
 }
 
@@ -119,10 +124,9 @@ func (e *electionService) updateTerm(newCandidates []string) (electionapi.Term, 
 func (e *electionService) Enter(enter EnterProposal) error {
 	e.watchSession(enter.Session())
 
-	clientID := fmt.Sprint(enter.Session().ID())
 	candidates := e.term.Candidates[:]
-	if !sliceContains(candidates, clientID) {
-		candidates = append(candidates, clientID)
+	if !sliceContains(candidates, enter.Request().CandidateID) {
+		candidates = append(candidates, enter.Request().CandidateID)
 	}
 
 	term, err := e.updateTerm(candidates)
@@ -138,10 +142,9 @@ func (e *electionService) Enter(enter EnterProposal) error {
 func (e *electionService) Withdraw(withdraw WithdrawProposal) error {
 	e.watchSession(withdraw.Session())
 
-	clientID := fmt.Sprint(withdraw.Session().ID())
 	candidates := make([]string, 0, len(e.term.Candidates))
 	for _, candidate := range e.term.Candidates {
-		if candidate != clientID {
+		if candidate != withdraw.Request().CandidateID {
 			candidates = append(candidates, candidate)
 		}
 	}
@@ -159,15 +162,14 @@ func (e *electionService) Withdraw(withdraw WithdrawProposal) error {
 func (e *electionService) Anoint(anoint AnointProposal) error {
 	e.watchSession(anoint.Session())
 
-	clientID := fmt.Sprint(anoint.Session().ID())
-	if !sliceContains(e.term.Candidates, clientID) {
+	if !sliceContains(e.term.Candidates, anoint.Request().CandidateID) {
 		return errors.NewInvalid("not a candidate")
 	}
 
 	candidates := make([]string, 0, len(e.term.Candidates))
-	candidates = append(candidates, clientID)
+	candidates = append(candidates, anoint.Request().CandidateID)
 	for _, candidate := range e.term.Candidates {
-		if candidate != clientID {
+		if candidate != anoint.Request().CandidateID {
 			candidates = append(candidates, candidate)
 		}
 	}
@@ -184,26 +186,25 @@ func (e *electionService) Anoint(anoint AnointProposal) error {
 func (e *electionService) Promote(promote PromoteProposal) error {
 	e.watchSession(promote.Session())
 
-	clientID := fmt.Sprint(promote.Session().ID())
-	if !sliceContains(e.term.Candidates, clientID) {
+	if !sliceContains(e.term.Candidates, promote.Request().CandidateID) {
 		return errors.NewInvalid("not a candidate")
 	}
 
 	candidates := make([]string, 0, len(e.term.Candidates))
 	var index int
 	for i, candidate := range e.term.Candidates {
-		if candidate == clientID {
+		if candidate == promote.Request().CandidateID {
 			index = i
 			break
 		}
 	}
 
-	candidates = append(candidates, clientID)
+	candidates = append(candidates, promote.Request().CandidateID)
 	for i, candidate := range e.term.Candidates {
 		if i < index-1 {
 			candidates[i] = candidate
 		} else if i == index-1 {
-			candidates[i] = clientID
+			candidates[i] = promote.Request().CandidateID
 		} else if i == index {
 			candidates[i] = e.term.Candidates[i-1]
 		} else {
@@ -223,14 +224,13 @@ func (e *electionService) Promote(promote PromoteProposal) error {
 func (e *electionService) Evict(evict EvictProposal) error {
 	e.watchSession(evict.Session())
 
-	clientID := evict.Request().CandidateID
-	if !sliceContains(e.term.Candidates, clientID) {
+	if !sliceContains(e.term.Candidates, evict.Request().CandidateID) {
 		return errors.NewInvalid("not a candidate")
 	}
 
 	candidates := make([]string, 0, len(e.term.Candidates))
 	for _, candidate := range e.term.Candidates {
-		if candidate != clientID {
+		if candidate != evict.Request().CandidateID {
 			candidates = append(candidates, candidate)
 		}
 	}
