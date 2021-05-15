@@ -15,7 +15,6 @@
 package election
 
 import (
-	"fmt"
 	electionapi "github.com/atomix/atomix-api/go/atomix/primitive/election"
 	"github.com/atomix/atomix-api/go/atomix/primitive/meta"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
@@ -56,12 +55,12 @@ func (e *electionService) Restore(reader SnapshotReader) error {
 	return nil
 }
 
-func (e *electionService) watchSession(session Session) {
+func (e *electionService) watchSession(candidateID string, session Session) {
 	e.watchers[session.ID()] = session.Watch(func(state SessionState) {
 		if state == SessionClosed {
 			newCandidates := make([]string, 0, len(e.term.Candidates))
 			for _, candidate := range e.term.Candidates {
-				if candidate != fmt.Sprint(session.ID()) {
+				if candidate != candidateID {
 					newCandidates = append(newCandidates, candidate)
 				}
 			}
@@ -89,7 +88,19 @@ func (e *electionService) updateTerm(newCandidates []string) (electionapi.Term, 
 		return e.term, nil
 	}
 
-	newTerm := electionapi.Term{}
+	newTerm := electionapi.Term{
+		ObjectMeta: meta.ObjectMeta{
+			Timestamp: &meta.Timestamp{
+				Timestamp: &meta.Timestamp_PhysicalTimestamp{
+					PhysicalTimestamp: &meta.PhysicalTimestamp{
+						Time: e.Scheduler().Time(),
+					},
+				},
+			},
+		},
+		Candidates: newCandidates,
+	}
+
 	if len(newCandidates) == 0 {
 		newTerm.ObjectMeta.Revision = oldTerm.ObjectMeta.Revision
 	} else {
@@ -103,14 +114,8 @@ func (e *electionService) updateTerm(newCandidates []string) (electionapi.Term, 
 		}
 	}
 
-	newTerm.ObjectMeta.Timestamp = &meta.Timestamp{
-		Timestamp: &meta.Timestamp_PhysicalTimestamp{
-			PhysicalTimestamp: &meta.PhysicalTimestamp{
-				Time: e.Scheduler().Time(),
-			},
-		},
-	}
 	e.term = newTerm
+
 	err := e.notify(electionapi.Event{
 		Type: electionapi.Event_CHANGED,
 		Term: newTerm,
@@ -122,7 +127,7 @@ func (e *electionService) updateTerm(newCandidates []string) (electionapi.Term, 
 }
 
 func (e *electionService) Enter(enter EnterProposal) error {
-	e.watchSession(enter.Session())
+	e.watchSession(enter.Request().CandidateID, enter.Session())
 
 	candidates := e.term.Candidates[:]
 	if !sliceContains(candidates, enter.Request().CandidateID) {
@@ -140,8 +145,6 @@ func (e *electionService) Enter(enter EnterProposal) error {
 }
 
 func (e *electionService) Withdraw(withdraw WithdrawProposal) error {
-	e.watchSession(withdraw.Session())
-
 	candidates := make([]string, 0, len(e.term.Candidates))
 	for _, candidate := range e.term.Candidates {
 		if candidate != withdraw.Request().CandidateID {
@@ -160,8 +163,6 @@ func (e *electionService) Withdraw(withdraw WithdrawProposal) error {
 }
 
 func (e *electionService) Anoint(anoint AnointProposal) error {
-	e.watchSession(anoint.Session())
-
 	if !sliceContains(e.term.Candidates, anoint.Request().CandidateID) {
 		return errors.NewInvalid("not a candidate")
 	}
@@ -184,13 +185,10 @@ func (e *electionService) Anoint(anoint AnointProposal) error {
 }
 
 func (e *electionService) Promote(promote PromoteProposal) error {
-	e.watchSession(promote.Session())
-
 	if !sliceContains(e.term.Candidates, promote.Request().CandidateID) {
 		return errors.NewInvalid("not a candidate")
 	}
 
-	candidates := make([]string, 0, len(e.term.Candidates))
 	var index int
 	for i, candidate := range e.term.Candidates {
 		if candidate == promote.Request().CandidateID {
@@ -199,7 +197,13 @@ func (e *electionService) Promote(promote PromoteProposal) error {
 		}
 	}
 
-	candidates = append(candidates, promote.Request().CandidateID)
+	if index == 0 {
+		return promote.Reply(&electionapi.PromoteResponse{
+			Term: e.term,
+		})
+	}
+
+	candidates := make([]string, len(e.term.Candidates))
 	for i, candidate := range e.term.Candidates {
 		if i < index-1 {
 			candidates[i] = candidate
@@ -222,8 +226,6 @@ func (e *electionService) Promote(promote PromoteProposal) error {
 }
 
 func (e *electionService) Evict(evict EvictProposal) error {
-	e.watchSession(evict.Session())
-
 	if !sliceContains(e.term.Candidates, evict.Request().CandidateID) {
 		return errors.NewInvalid("not a candidate")
 	}
