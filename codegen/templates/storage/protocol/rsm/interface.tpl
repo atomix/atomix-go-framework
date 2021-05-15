@@ -15,6 +15,7 @@ package {{ .Package.Name }}
 
 import (
 	"io"
+	"fmt"
 	{{ import "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm" }}
 	{{ import "github.com/atomix/atomix-go-framework/pkg/atomix/errors" }}
 	{{ import "github.com/atomix/atomix-go-framework/pkg/atomix/util" }}
@@ -350,6 +351,7 @@ var _ {{ $serviceProposalsInt }} = &{{ $serviceProposalsImpl }}{}
 type {{ $serviceProposalID }} uint64
 
 type {{ $serviceProposalInt }} interface {
+    fmt.Stringer
 	ID() {{ $serviceProposalID }}
 	Session() {{ $serviceSessionInt }}
 }
@@ -372,6 +374,10 @@ func (p *{{ $serviceProposalImpl }}) ID() {{ $serviceProposalID }} {
 
 func (p *{{ $serviceProposalImpl }}) Session() {{ $serviceSessionInt }} {
     return p.session
+}
+
+func (p *{{ $serviceProposalImpl }}) String() string {
+    return fmt.Sprintf("ProposalID: %d, SessionID: %d", p.id, p.session.ID())
 }
 
 var _ {{ $serviceProposalInt }} = &{{ $serviceProposalImpl }}{}
@@ -461,12 +467,17 @@ func (p *{{ $proposalImpl }}) Reply(reply *{{ template "type" .Response.Type }})
     if p.res != nil {
         return errors.NewConflict("reply already sent")
     }
+    log.Debugf("Accepted {{ $proposalInt }} %s: %s", p, reply)
     p.res = reply
     return nil
 }
 
 func (p *{{ $proposalImpl }}) response() *{{ template "type" .Response.Type }} {
     return p.res
+}
+
+func (p *{{ $proposalImpl }}) String() string {
+    return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 {{- else if ( and .Response.IsUnary .Type.IsAsync ) }}
 func {{ $newProposal }}(id {{ $serviceProposalID }}, session {{ $serviceSessionInt }}, request *{{ template "type" .Request.Type }}, stream rsm.Stream) {{ $proposalInt }} {
@@ -492,6 +503,7 @@ func (p *{{ $proposalImpl }}) Reply(reply *{{ template "type" .Response.Type }})
     if p.complete {
         return errors.NewConflict("reply already sent")
     }
+    log.Debugf("Accepted {{ $proposalInt }} %s: %s", p, reply)
     p.complete = true
     bytes, err := proto.Marshal(reply)
     if err != nil {
@@ -508,6 +520,7 @@ func (p *{{ $proposalImpl }}) Fail(err error) error {
     if p.complete {
         return errors.NewConflict("reply already sent")
     }
+    log.Warnf("Rejected {{ $proposalsInt }} %s: %s", p, err)
     p.complete = true
     p.stream.Error(err)
     p.stream.Close()
@@ -521,6 +534,10 @@ func (p *{{ $proposalImpl }}) Close() error {
     p.complete = true
     p.stream.Close()
     return nil
+}
+
+func (p *{{ $proposalImpl }}) String() string {
+    return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.request)
 }
 {{- else if .Response.IsStream }}
 func {{ $newProposal }}(id {{ $serviceProposalID }}, session {{ $serviceSessionInt }}, request *{{ template "type" .Request.Type }}, stream rsm.Stream) {{ $proposalInt }} {
@@ -542,6 +559,7 @@ func (p *{{ $proposalImpl }}) Request() *{{ template "type" .Request.Type }} {
 }
 
 func (p *{{ $proposalImpl }}) Notify(notification *{{ template "type" .Response.Type }}) error {
+    log.Debugf("Notifying {{ $proposalInt }} %s: %s", p, notification)
     bytes, err := proto.Marshal(notification)
     if err != nil {
         return err
@@ -553,6 +571,10 @@ func (p *{{ $proposalImpl }}) Notify(notification *{{ template "type" .Response.
 func (p *{{ $proposalImpl }}) Close() error {
     p.stream.Close()
     return nil
+}
+
+func (p *{{ $proposalImpl }}) String() string {
+    return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.request)
 }
 {{- end }}
 

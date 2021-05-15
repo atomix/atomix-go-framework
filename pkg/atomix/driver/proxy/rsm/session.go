@@ -155,9 +155,7 @@ func (s *Session) DoCommandStream(ctx context.Context, service rsm.ServiceId, na
 				response := result.Value.(PartitionOutput)
 				switch response.Type {
 				case rsm.SessionResponseType_OPEN_STREAM:
-					if streamState.serialize(response.Context) {
-						outStream.Send(response.Result)
-					}
+					streamState.serialize(response.Context)
 				case rsm.SessionResponseType_CLOSE_STREAM:
 					if streamState.serialize(response.Context) {
 						outStream.Close()
@@ -175,6 +173,9 @@ func (s *Session) DoCommandStream(ctx context.Context, service rsm.ServiceId, na
 				}
 			case <-ctx.Done():
 				s.deleteStream(streamState.ID)
+				outStream.Error(errors.NewCanceled(ctx.Err().Error()))
+				outStream.Close()
+				return
 			}
 		}
 	}()
@@ -235,6 +236,7 @@ func (s *Session) DoQuery(ctx context.Context, service rsm.ServiceId, name strin
 	}
 	s.recordQueryResponse(requestContext, responseContext)
 	return response, nil
+
 }
 
 // doQuery submits a query to the service
@@ -267,22 +269,41 @@ func (s *Session) doQuery(ctx context.Context, name string, input []byte, servic
 }
 
 // DoQueryStream submits a streaming query to the service
-func (s *Session) DoQueryStream(ctx context.Context, service rsm.ServiceId, name string, input []byte, stream streams.WriteStream) error {
+func (s *Session) DoQueryStream(ctx context.Context, service rsm.ServiceId, name string, input []byte, outStream streams.WriteStream) error {
 	requestContext := s.getQueryContext()
-	stream = streams.NewDecodingStream(stream, func(value interface{}, err error) (interface{}, error) {
-		if err != nil {
-			return nil, err
+	ch := make(chan streams.Result)
+	inStream := streams.NewChannelStream(ch)
+	err := s.doQueryStream(context.Background(), name, input, service, requestContext, inStream)
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		for {
+			select {
+			case result, ok := <-ch:
+				if !ok {
+					return
+				}
+
+				response := result.Value.(PartitionOutput)
+				switch response.Type {
+				case rsm.SessionResponseType_OPEN_STREAM:
+				case rsm.SessionResponseType_CLOSE_STREAM:
+					outStream.Close()
+					return
+				case rsm.SessionResponseType_RESPONSE:
+					s.recordQueryResponse(requestContext, response.Context)
+					outStream.Send(response.Result)
+				}
+			case <-ctx.Done():
+				outStream.Error(errors.NewCanceled(ctx.Err().Error()))
+				outStream.Close()
+				return
+			}
 		}
-		response := value.(PartitionOutput)
-		s.recordQueryResponse(requestContext, response.Context)
-		return SessionOutput{
-			Result: streams.Result{
-				Value: response.Value,
-				Error: err,
-			},
-		}, err
-	})
-	return s.doQueryStream(ctx, name, input, service, requestContext, stream)
+	}()
+	return nil
 }
 
 // doQueryStream submits a streaming query to the service

@@ -2,6 +2,7 @@
 package lock
 
 import (
+	"fmt"
 	lock "github.com/atomix/atomix-api/go/atomix/primitive/lock"
 	errors "github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
@@ -286,6 +287,7 @@ var _ Proposals = &serviceProposals{}
 type ProposalID uint64
 
 type Proposal interface {
+	fmt.Stringer
 	ID() ProposalID
 	Session() Session
 }
@@ -308,6 +310,10 @@ func (p *serviceProposal) ID() ProposalID {
 
 func (p *serviceProposal) Session() Session {
 	return p.session
+}
+
+func (p *serviceProposal) String() string {
+	return fmt.Sprintf("ProposalID: %d, SessionID: %d", p.id, p.session.ID())
 }
 
 var _ Proposal = &serviceProposal{}
@@ -383,6 +389,7 @@ func (p *lockProposal) Reply(reply *lock.LockResponse) error {
 	if p.complete {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted LockProposal %s: %s", p, reply)
 	p.complete = true
 	bytes, err := proto.Marshal(reply)
 	if err != nil {
@@ -399,6 +406,7 @@ func (p *lockProposal) Fail(err error) error {
 	if p.complete {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Warnf("Rejected LockProposals %s: %s", p, err)
 	p.complete = true
 	p.stream.Error(err)
 	p.stream.Close()
@@ -412,6 +420,10 @@ func (p *lockProposal) Close() error {
 	p.complete = true
 	p.stream.Close()
 	return nil
+}
+
+func (p *lockProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.request)
 }
 
 var _ LockProposal = &lockProposal{}
@@ -484,12 +496,17 @@ func (p *unlockProposal) Reply(reply *lock.UnlockResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted UnlockProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *unlockProposal) response() *lock.UnlockResponse {
 	return p.res
+}
+
+func (p *unlockProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ UnlockProposal = &unlockProposal{}
@@ -562,12 +579,17 @@ func (p *getLockProposal) Reply(reply *lock.GetLockResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted GetLockProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *getLockProposal) response() *lock.GetLockResponse {
 	return p.res
+}
+
+func (p *getLockProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ GetLockProposal = &getLockProposal{}

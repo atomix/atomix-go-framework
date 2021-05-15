@@ -2,6 +2,7 @@
 package list
 
 import (
+	"fmt"
 	list "github.com/atomix/atomix-api/go/atomix/primitive/list"
 	errors "github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
@@ -334,6 +335,7 @@ var _ Proposals = &serviceProposals{}
 type ProposalID uint64
 
 type Proposal interface {
+	fmt.Stringer
 	ID() ProposalID
 	Session() Session
 }
@@ -356,6 +358,10 @@ func (p *serviceProposal) ID() ProposalID {
 
 func (p *serviceProposal) Session() Session {
 	return p.session
+}
+
+func (p *serviceProposal) String() string {
+	return fmt.Sprintf("ProposalID: %d, SessionID: %d", p.id, p.session.ID())
 }
 
 var _ Proposal = &serviceProposal{}
@@ -428,12 +434,17 @@ func (p *sizeProposal) Reply(reply *list.SizeResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted SizeProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *sizeProposal) response() *list.SizeResponse {
 	return p.res
+}
+
+func (p *sizeProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ SizeProposal = &sizeProposal{}
@@ -506,12 +517,17 @@ func (p *appendProposal) Reply(reply *list.AppendResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted AppendProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *appendProposal) response() *list.AppendResponse {
 	return p.res
+}
+
+func (p *appendProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ AppendProposal = &appendProposal{}
@@ -584,12 +600,17 @@ func (p *insertProposal) Reply(reply *list.InsertResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted InsertProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *insertProposal) response() *list.InsertResponse {
 	return p.res
+}
+
+func (p *insertProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ InsertProposal = &insertProposal{}
@@ -662,12 +683,17 @@ func (p *getProposal) Reply(reply *list.GetResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted GetProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *getProposal) response() *list.GetResponse {
 	return p.res
+}
+
+func (p *getProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ GetProposal = &getProposal{}
@@ -740,12 +766,17 @@ func (p *setProposal) Reply(reply *list.SetResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted SetProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *setProposal) response() *list.SetResponse {
 	return p.res
+}
+
+func (p *setProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ SetProposal = &setProposal{}
@@ -818,12 +849,17 @@ func (p *removeProposal) Reply(reply *list.RemoveResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted RemoveProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *removeProposal) response() *list.RemoveResponse {
 	return p.res
+}
+
+func (p *removeProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ RemoveProposal = &removeProposal{}
@@ -896,12 +932,17 @@ func (p *clearProposal) Reply(reply *list.ClearResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted ClearProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *clearProposal) response() *list.ClearResponse {
 	return p.res
+}
+
+func (p *clearProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ ClearProposal = &clearProposal{}
@@ -972,6 +1013,7 @@ func (p *eventsProposal) Request() *list.EventsRequest {
 }
 
 func (p *eventsProposal) Notify(notification *list.EventsResponse) error {
+	log.Debugf("Notifying EventsProposal %s: %s", p, notification)
 	bytes, err := proto.Marshal(notification)
 	if err != nil {
 		return err
@@ -983,6 +1025,10 @@ func (p *eventsProposal) Notify(notification *list.EventsResponse) error {
 func (p *eventsProposal) Close() error {
 	p.stream.Close()
 	return nil
+}
+
+func (p *eventsProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.request)
 }
 
 var _ EventsProposal = &eventsProposal{}
@@ -1053,6 +1099,7 @@ func (p *elementsProposal) Request() *list.ElementsRequest {
 }
 
 func (p *elementsProposal) Notify(notification *list.ElementsResponse) error {
+	log.Debugf("Notifying ElementsProposal %s: %s", p, notification)
 	bytes, err := proto.Marshal(notification)
 	if err != nil {
 		return err
@@ -1064,6 +1111,10 @@ func (p *elementsProposal) Notify(notification *list.ElementsResponse) error {
 func (p *elementsProposal) Close() error {
 	p.stream.Close()
 	return nil
+}
+
+func (p *elementsProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.request)
 }
 
 var _ ElementsProposal = &elementsProposal{}

@@ -2,6 +2,7 @@
 package leader
 
 import (
+	"fmt"
 	leader "github.com/atomix/atomix-api/go/atomix/primitive/leader"
 	errors "github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
@@ -286,6 +287,7 @@ var _ Proposals = &serviceProposals{}
 type ProposalID uint64
 
 type Proposal interface {
+	fmt.Stringer
 	ID() ProposalID
 	Session() Session
 }
@@ -308,6 +310,10 @@ func (p *serviceProposal) ID() ProposalID {
 
 func (p *serviceProposal) Session() Session {
 	return p.session
+}
+
+func (p *serviceProposal) String() string {
+	return fmt.Sprintf("ProposalID: %d, SessionID: %d", p.id, p.session.ID())
 }
 
 var _ Proposal = &serviceProposal{}
@@ -380,12 +386,17 @@ func (p *latchProposal) Reply(reply *leader.LatchResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted LatchProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *latchProposal) response() *leader.LatchResponse {
 	return p.res
+}
+
+func (p *latchProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ LatchProposal = &latchProposal{}
@@ -458,12 +469,17 @@ func (p *getProposal) Reply(reply *leader.GetResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted GetProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *getProposal) response() *leader.GetResponse {
 	return p.res
+}
+
+func (p *getProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ GetProposal = &getProposal{}
@@ -534,6 +550,7 @@ func (p *eventsProposal) Request() *leader.EventsRequest {
 }
 
 func (p *eventsProposal) Notify(notification *leader.EventsResponse) error {
+	log.Debugf("Notifying EventsProposal %s: %s", p, notification)
 	bytes, err := proto.Marshal(notification)
 	if err != nil {
 		return err
@@ -545,6 +562,10 @@ func (p *eventsProposal) Notify(notification *leader.EventsResponse) error {
 func (p *eventsProposal) Close() error {
 	p.stream.Close()
 	return nil
+}
+
+func (p *eventsProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.request)
 }
 
 var _ EventsProposal = &eventsProposal{}

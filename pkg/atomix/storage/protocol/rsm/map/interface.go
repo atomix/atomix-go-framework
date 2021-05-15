@@ -2,6 +2,7 @@
 package _map
 
 import (
+	"fmt"
 	_map "github.com/atomix/atomix-api/go/atomix/primitive/map"
 	errors "github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
@@ -318,6 +319,7 @@ var _ Proposals = &serviceProposals{}
 type ProposalID uint64
 
 type Proposal interface {
+	fmt.Stringer
 	ID() ProposalID
 	Session() Session
 }
@@ -340,6 +342,10 @@ func (p *serviceProposal) ID() ProposalID {
 
 func (p *serviceProposal) Session() Session {
 	return p.session
+}
+
+func (p *serviceProposal) String() string {
+	return fmt.Sprintf("ProposalID: %d, SessionID: %d", p.id, p.session.ID())
 }
 
 var _ Proposal = &serviceProposal{}
@@ -412,12 +418,17 @@ func (p *sizeProposal) Reply(reply *_map.SizeResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted SizeProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *sizeProposal) response() *_map.SizeResponse {
 	return p.res
+}
+
+func (p *sizeProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ SizeProposal = &sizeProposal{}
@@ -490,12 +501,17 @@ func (p *putProposal) Reply(reply *_map.PutResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted PutProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *putProposal) response() *_map.PutResponse {
 	return p.res
+}
+
+func (p *putProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ PutProposal = &putProposal{}
@@ -568,12 +584,17 @@ func (p *getProposal) Reply(reply *_map.GetResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted GetProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *getProposal) response() *_map.GetResponse {
 	return p.res
+}
+
+func (p *getProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ GetProposal = &getProposal{}
@@ -646,12 +667,17 @@ func (p *removeProposal) Reply(reply *_map.RemoveResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted RemoveProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *removeProposal) response() *_map.RemoveResponse {
 	return p.res
+}
+
+func (p *removeProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ RemoveProposal = &removeProposal{}
@@ -724,12 +750,17 @@ func (p *clearProposal) Reply(reply *_map.ClearResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted ClearProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *clearProposal) response() *_map.ClearResponse {
 	return p.res
+}
+
+func (p *clearProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ ClearProposal = &clearProposal{}
@@ -800,6 +831,7 @@ func (p *eventsProposal) Request() *_map.EventsRequest {
 }
 
 func (p *eventsProposal) Notify(notification *_map.EventsResponse) error {
+	log.Debugf("Notifying EventsProposal %s: %s", p, notification)
 	bytes, err := proto.Marshal(notification)
 	if err != nil {
 		return err
@@ -811,6 +843,10 @@ func (p *eventsProposal) Notify(notification *_map.EventsResponse) error {
 func (p *eventsProposal) Close() error {
 	p.stream.Close()
 	return nil
+}
+
+func (p *eventsProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.request)
 }
 
 var _ EventsProposal = &eventsProposal{}
@@ -881,6 +917,7 @@ func (p *entriesProposal) Request() *_map.EntriesRequest {
 }
 
 func (p *entriesProposal) Notify(notification *_map.EntriesResponse) error {
+	log.Debugf("Notifying EntriesProposal %s: %s", p, notification)
 	bytes, err := proto.Marshal(notification)
 	if err != nil {
 		return err
@@ -892,6 +929,10 @@ func (p *entriesProposal) Notify(notification *_map.EntriesResponse) error {
 func (p *entriesProposal) Close() error {
 	p.stream.Close()
 	return nil
+}
+
+func (p *entriesProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.request)
 }
 
 var _ EntriesProposal = &entriesProposal{}

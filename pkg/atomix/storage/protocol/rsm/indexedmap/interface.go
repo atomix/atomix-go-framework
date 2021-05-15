@@ -2,6 +2,7 @@
 package indexedmap
 
 import (
+	"fmt"
 	indexedmap "github.com/atomix/atomix-api/go/atomix/primitive/indexedmap"
 	errors "github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
@@ -350,6 +351,7 @@ var _ Proposals = &serviceProposals{}
 type ProposalID uint64
 
 type Proposal interface {
+	fmt.Stringer
 	ID() ProposalID
 	Session() Session
 }
@@ -372,6 +374,10 @@ func (p *serviceProposal) ID() ProposalID {
 
 func (p *serviceProposal) Session() Session {
 	return p.session
+}
+
+func (p *serviceProposal) String() string {
+	return fmt.Sprintf("ProposalID: %d, SessionID: %d", p.id, p.session.ID())
 }
 
 var _ Proposal = &serviceProposal{}
@@ -444,12 +450,17 @@ func (p *sizeProposal) Reply(reply *indexedmap.SizeResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted SizeProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *sizeProposal) response() *indexedmap.SizeResponse {
 	return p.res
+}
+
+func (p *sizeProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ SizeProposal = &sizeProposal{}
@@ -522,12 +533,17 @@ func (p *putProposal) Reply(reply *indexedmap.PutResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted PutProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *putProposal) response() *indexedmap.PutResponse {
 	return p.res
+}
+
+func (p *putProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ PutProposal = &putProposal{}
@@ -600,12 +616,17 @@ func (p *getProposal) Reply(reply *indexedmap.GetResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted GetProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *getProposal) response() *indexedmap.GetResponse {
 	return p.res
+}
+
+func (p *getProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ GetProposal = &getProposal{}
@@ -678,12 +699,17 @@ func (p *firstEntryProposal) Reply(reply *indexedmap.FirstEntryResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted FirstEntryProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *firstEntryProposal) response() *indexedmap.FirstEntryResponse {
 	return p.res
+}
+
+func (p *firstEntryProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ FirstEntryProposal = &firstEntryProposal{}
@@ -756,12 +782,17 @@ func (p *lastEntryProposal) Reply(reply *indexedmap.LastEntryResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted LastEntryProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *lastEntryProposal) response() *indexedmap.LastEntryResponse {
 	return p.res
+}
+
+func (p *lastEntryProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ LastEntryProposal = &lastEntryProposal{}
@@ -834,12 +865,17 @@ func (p *prevEntryProposal) Reply(reply *indexedmap.PrevEntryResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted PrevEntryProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *prevEntryProposal) response() *indexedmap.PrevEntryResponse {
 	return p.res
+}
+
+func (p *prevEntryProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ PrevEntryProposal = &prevEntryProposal{}
@@ -912,12 +948,17 @@ func (p *nextEntryProposal) Reply(reply *indexedmap.NextEntryResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted NextEntryProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *nextEntryProposal) response() *indexedmap.NextEntryResponse {
 	return p.res
+}
+
+func (p *nextEntryProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ NextEntryProposal = &nextEntryProposal{}
@@ -990,12 +1031,17 @@ func (p *removeProposal) Reply(reply *indexedmap.RemoveResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted RemoveProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *removeProposal) response() *indexedmap.RemoveResponse {
 	return p.res
+}
+
+func (p *removeProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ RemoveProposal = &removeProposal{}
@@ -1068,12 +1114,17 @@ func (p *clearProposal) Reply(reply *indexedmap.ClearResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted ClearProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *clearProposal) response() *indexedmap.ClearResponse {
 	return p.res
+}
+
+func (p *clearProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ ClearProposal = &clearProposal{}
@@ -1144,6 +1195,7 @@ func (p *eventsProposal) Request() *indexedmap.EventsRequest {
 }
 
 func (p *eventsProposal) Notify(notification *indexedmap.EventsResponse) error {
+	log.Debugf("Notifying EventsProposal %s: %s", p, notification)
 	bytes, err := proto.Marshal(notification)
 	if err != nil {
 		return err
@@ -1155,6 +1207,10 @@ func (p *eventsProposal) Notify(notification *indexedmap.EventsResponse) error {
 func (p *eventsProposal) Close() error {
 	p.stream.Close()
 	return nil
+}
+
+func (p *eventsProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.request)
 }
 
 var _ EventsProposal = &eventsProposal{}
@@ -1225,6 +1281,7 @@ func (p *entriesProposal) Request() *indexedmap.EntriesRequest {
 }
 
 func (p *entriesProposal) Notify(notification *indexedmap.EntriesResponse) error {
+	log.Debugf("Notifying EntriesProposal %s: %s", p, notification)
 	bytes, err := proto.Marshal(notification)
 	if err != nil {
 		return err
@@ -1236,6 +1293,10 @@ func (p *entriesProposal) Notify(notification *indexedmap.EntriesResponse) error
 func (p *entriesProposal) Close() error {
 	p.stream.Close()
 	return nil
+}
+
+func (p *entriesProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.request)
 }
 
 var _ EntriesProposal = &entriesProposal{}

@@ -2,7 +2,8 @@
 package log
 
 import (
-	log "github.com/atomix/atomix-api/go/atomix/primitive/log"
+	"fmt"
+	_log "github.com/atomix/atomix-api/go/atomix/primitive/log"
 	errors "github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	util "github.com/atomix/atomix-go-framework/pkg/atomix/util"
@@ -350,6 +351,7 @@ var _ Proposals = &serviceProposals{}
 type ProposalID uint64
 
 type Proposal interface {
+	fmt.Stringer
 	ID() ProposalID
 	Session() Session
 }
@@ -372,6 +374,10 @@ func (p *serviceProposal) ID() ProposalID {
 
 func (p *serviceProposal) Session() Session {
 	return p.session
+}
+
+func (p *serviceProposal) String() string {
+	return fmt.Sprintf("ProposalID: %d, SessionID: %d", p.id, p.session.ID())
 }
 
 var _ Proposal = &serviceProposal{}
@@ -418,12 +424,12 @@ var _ SizeProposals = &sizeProposals{}
 
 type SizeProposal interface {
 	Proposal
-	Request() *log.SizeRequest
-	Reply(*log.SizeResponse) error
-	response() *log.SizeResponse
+	Request() *_log.SizeRequest
+	Reply(*_log.SizeResponse) error
+	response() *_log.SizeResponse
 }
 
-func newSizeProposal(id ProposalID, session Session, request *log.SizeRequest) SizeProposal {
+func newSizeProposal(id ProposalID, session Session, request *_log.SizeRequest) SizeProposal {
 	return &sizeProposal{
 		Proposal: newProposal(id, session),
 		req:      request,
@@ -432,24 +438,29 @@ func newSizeProposal(id ProposalID, session Session, request *log.SizeRequest) S
 
 type sizeProposal struct {
 	Proposal
-	req *log.SizeRequest
-	res *log.SizeResponse
+	req *_log.SizeRequest
+	res *_log.SizeResponse
 }
 
-func (p *sizeProposal) Request() *log.SizeRequest {
+func (p *sizeProposal) Request() *_log.SizeRequest {
 	return p.req
 }
 
-func (p *sizeProposal) Reply(reply *log.SizeResponse) error {
+func (p *sizeProposal) Reply(reply *_log.SizeResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted SizeProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
-func (p *sizeProposal) response() *log.SizeResponse {
+func (p *sizeProposal) response() *_log.SizeResponse {
 	return p.res
+}
+
+func (p *sizeProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ SizeProposal = &sizeProposal{}
@@ -496,12 +507,12 @@ var _ AppendProposals = &appendProposals{}
 
 type AppendProposal interface {
 	Proposal
-	Request() *log.AppendRequest
-	Reply(*log.AppendResponse) error
-	response() *log.AppendResponse
+	Request() *_log.AppendRequest
+	Reply(*_log.AppendResponse) error
+	response() *_log.AppendResponse
 }
 
-func newAppendProposal(id ProposalID, session Session, request *log.AppendRequest) AppendProposal {
+func newAppendProposal(id ProposalID, session Session, request *_log.AppendRequest) AppendProposal {
 	return &appendProposal{
 		Proposal: newProposal(id, session),
 		req:      request,
@@ -510,24 +521,29 @@ func newAppendProposal(id ProposalID, session Session, request *log.AppendReques
 
 type appendProposal struct {
 	Proposal
-	req *log.AppendRequest
-	res *log.AppendResponse
+	req *_log.AppendRequest
+	res *_log.AppendResponse
 }
 
-func (p *appendProposal) Request() *log.AppendRequest {
+func (p *appendProposal) Request() *_log.AppendRequest {
 	return p.req
 }
 
-func (p *appendProposal) Reply(reply *log.AppendResponse) error {
+func (p *appendProposal) Reply(reply *_log.AppendResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted AppendProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
-func (p *appendProposal) response() *log.AppendResponse {
+func (p *appendProposal) response() *_log.AppendResponse {
 	return p.res
+}
+
+func (p *appendProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ AppendProposal = &appendProposal{}
@@ -574,12 +590,12 @@ var _ GetProposals = &getProposals{}
 
 type GetProposal interface {
 	Proposal
-	Request() *log.GetRequest
-	Reply(*log.GetResponse) error
-	response() *log.GetResponse
+	Request() *_log.GetRequest
+	Reply(*_log.GetResponse) error
+	response() *_log.GetResponse
 }
 
-func newGetProposal(id ProposalID, session Session, request *log.GetRequest) GetProposal {
+func newGetProposal(id ProposalID, session Session, request *_log.GetRequest) GetProposal {
 	return &getProposal{
 		Proposal: newProposal(id, session),
 		req:      request,
@@ -588,24 +604,29 @@ func newGetProposal(id ProposalID, session Session, request *log.GetRequest) Get
 
 type getProposal struct {
 	Proposal
-	req *log.GetRequest
-	res *log.GetResponse
+	req *_log.GetRequest
+	res *_log.GetResponse
 }
 
-func (p *getProposal) Request() *log.GetRequest {
+func (p *getProposal) Request() *_log.GetRequest {
 	return p.req
 }
 
-func (p *getProposal) Reply(reply *log.GetResponse) error {
+func (p *getProposal) Reply(reply *_log.GetResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted GetProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
-func (p *getProposal) response() *log.GetResponse {
+func (p *getProposal) response() *_log.GetResponse {
 	return p.res
+}
+
+func (p *getProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ GetProposal = &getProposal{}
@@ -652,12 +673,12 @@ var _ FirstEntryProposals = &firstEntryProposals{}
 
 type FirstEntryProposal interface {
 	Proposal
-	Request() *log.FirstEntryRequest
-	Reply(*log.FirstEntryResponse) error
-	response() *log.FirstEntryResponse
+	Request() *_log.FirstEntryRequest
+	Reply(*_log.FirstEntryResponse) error
+	response() *_log.FirstEntryResponse
 }
 
-func newFirstEntryProposal(id ProposalID, session Session, request *log.FirstEntryRequest) FirstEntryProposal {
+func newFirstEntryProposal(id ProposalID, session Session, request *_log.FirstEntryRequest) FirstEntryProposal {
 	return &firstEntryProposal{
 		Proposal: newProposal(id, session),
 		req:      request,
@@ -666,24 +687,29 @@ func newFirstEntryProposal(id ProposalID, session Session, request *log.FirstEnt
 
 type firstEntryProposal struct {
 	Proposal
-	req *log.FirstEntryRequest
-	res *log.FirstEntryResponse
+	req *_log.FirstEntryRequest
+	res *_log.FirstEntryResponse
 }
 
-func (p *firstEntryProposal) Request() *log.FirstEntryRequest {
+func (p *firstEntryProposal) Request() *_log.FirstEntryRequest {
 	return p.req
 }
 
-func (p *firstEntryProposal) Reply(reply *log.FirstEntryResponse) error {
+func (p *firstEntryProposal) Reply(reply *_log.FirstEntryResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted FirstEntryProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
-func (p *firstEntryProposal) response() *log.FirstEntryResponse {
+func (p *firstEntryProposal) response() *_log.FirstEntryResponse {
 	return p.res
+}
+
+func (p *firstEntryProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ FirstEntryProposal = &firstEntryProposal{}
@@ -730,12 +756,12 @@ var _ LastEntryProposals = &lastEntryProposals{}
 
 type LastEntryProposal interface {
 	Proposal
-	Request() *log.LastEntryRequest
-	Reply(*log.LastEntryResponse) error
-	response() *log.LastEntryResponse
+	Request() *_log.LastEntryRequest
+	Reply(*_log.LastEntryResponse) error
+	response() *_log.LastEntryResponse
 }
 
-func newLastEntryProposal(id ProposalID, session Session, request *log.LastEntryRequest) LastEntryProposal {
+func newLastEntryProposal(id ProposalID, session Session, request *_log.LastEntryRequest) LastEntryProposal {
 	return &lastEntryProposal{
 		Proposal: newProposal(id, session),
 		req:      request,
@@ -744,24 +770,29 @@ func newLastEntryProposal(id ProposalID, session Session, request *log.LastEntry
 
 type lastEntryProposal struct {
 	Proposal
-	req *log.LastEntryRequest
-	res *log.LastEntryResponse
+	req *_log.LastEntryRequest
+	res *_log.LastEntryResponse
 }
 
-func (p *lastEntryProposal) Request() *log.LastEntryRequest {
+func (p *lastEntryProposal) Request() *_log.LastEntryRequest {
 	return p.req
 }
 
-func (p *lastEntryProposal) Reply(reply *log.LastEntryResponse) error {
+func (p *lastEntryProposal) Reply(reply *_log.LastEntryResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted LastEntryProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
-func (p *lastEntryProposal) response() *log.LastEntryResponse {
+func (p *lastEntryProposal) response() *_log.LastEntryResponse {
 	return p.res
+}
+
+func (p *lastEntryProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ LastEntryProposal = &lastEntryProposal{}
@@ -808,12 +839,12 @@ var _ PrevEntryProposals = &prevEntryProposals{}
 
 type PrevEntryProposal interface {
 	Proposal
-	Request() *log.PrevEntryRequest
-	Reply(*log.PrevEntryResponse) error
-	response() *log.PrevEntryResponse
+	Request() *_log.PrevEntryRequest
+	Reply(*_log.PrevEntryResponse) error
+	response() *_log.PrevEntryResponse
 }
 
-func newPrevEntryProposal(id ProposalID, session Session, request *log.PrevEntryRequest) PrevEntryProposal {
+func newPrevEntryProposal(id ProposalID, session Session, request *_log.PrevEntryRequest) PrevEntryProposal {
 	return &prevEntryProposal{
 		Proposal: newProposal(id, session),
 		req:      request,
@@ -822,24 +853,29 @@ func newPrevEntryProposal(id ProposalID, session Session, request *log.PrevEntry
 
 type prevEntryProposal struct {
 	Proposal
-	req *log.PrevEntryRequest
-	res *log.PrevEntryResponse
+	req *_log.PrevEntryRequest
+	res *_log.PrevEntryResponse
 }
 
-func (p *prevEntryProposal) Request() *log.PrevEntryRequest {
+func (p *prevEntryProposal) Request() *_log.PrevEntryRequest {
 	return p.req
 }
 
-func (p *prevEntryProposal) Reply(reply *log.PrevEntryResponse) error {
+func (p *prevEntryProposal) Reply(reply *_log.PrevEntryResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted PrevEntryProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
-func (p *prevEntryProposal) response() *log.PrevEntryResponse {
+func (p *prevEntryProposal) response() *_log.PrevEntryResponse {
 	return p.res
+}
+
+func (p *prevEntryProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ PrevEntryProposal = &prevEntryProposal{}
@@ -886,12 +922,12 @@ var _ NextEntryProposals = &nextEntryProposals{}
 
 type NextEntryProposal interface {
 	Proposal
-	Request() *log.NextEntryRequest
-	Reply(*log.NextEntryResponse) error
-	response() *log.NextEntryResponse
+	Request() *_log.NextEntryRequest
+	Reply(*_log.NextEntryResponse) error
+	response() *_log.NextEntryResponse
 }
 
-func newNextEntryProposal(id ProposalID, session Session, request *log.NextEntryRequest) NextEntryProposal {
+func newNextEntryProposal(id ProposalID, session Session, request *_log.NextEntryRequest) NextEntryProposal {
 	return &nextEntryProposal{
 		Proposal: newProposal(id, session),
 		req:      request,
@@ -900,24 +936,29 @@ func newNextEntryProposal(id ProposalID, session Session, request *log.NextEntry
 
 type nextEntryProposal struct {
 	Proposal
-	req *log.NextEntryRequest
-	res *log.NextEntryResponse
+	req *_log.NextEntryRequest
+	res *_log.NextEntryResponse
 }
 
-func (p *nextEntryProposal) Request() *log.NextEntryRequest {
+func (p *nextEntryProposal) Request() *_log.NextEntryRequest {
 	return p.req
 }
 
-func (p *nextEntryProposal) Reply(reply *log.NextEntryResponse) error {
+func (p *nextEntryProposal) Reply(reply *_log.NextEntryResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted NextEntryProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
-func (p *nextEntryProposal) response() *log.NextEntryResponse {
+func (p *nextEntryProposal) response() *_log.NextEntryResponse {
 	return p.res
+}
+
+func (p *nextEntryProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ NextEntryProposal = &nextEntryProposal{}
@@ -964,12 +1005,12 @@ var _ RemoveProposals = &removeProposals{}
 
 type RemoveProposal interface {
 	Proposal
-	Request() *log.RemoveRequest
-	Reply(*log.RemoveResponse) error
-	response() *log.RemoveResponse
+	Request() *_log.RemoveRequest
+	Reply(*_log.RemoveResponse) error
+	response() *_log.RemoveResponse
 }
 
-func newRemoveProposal(id ProposalID, session Session, request *log.RemoveRequest) RemoveProposal {
+func newRemoveProposal(id ProposalID, session Session, request *_log.RemoveRequest) RemoveProposal {
 	return &removeProposal{
 		Proposal: newProposal(id, session),
 		req:      request,
@@ -978,24 +1019,29 @@ func newRemoveProposal(id ProposalID, session Session, request *log.RemoveReques
 
 type removeProposal struct {
 	Proposal
-	req *log.RemoveRequest
-	res *log.RemoveResponse
+	req *_log.RemoveRequest
+	res *_log.RemoveResponse
 }
 
-func (p *removeProposal) Request() *log.RemoveRequest {
+func (p *removeProposal) Request() *_log.RemoveRequest {
 	return p.req
 }
 
-func (p *removeProposal) Reply(reply *log.RemoveResponse) error {
+func (p *removeProposal) Reply(reply *_log.RemoveResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted RemoveProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
-func (p *removeProposal) response() *log.RemoveResponse {
+func (p *removeProposal) response() *_log.RemoveResponse {
 	return p.res
+}
+
+func (p *removeProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ RemoveProposal = &removeProposal{}
@@ -1042,12 +1088,12 @@ var _ ClearProposals = &clearProposals{}
 
 type ClearProposal interface {
 	Proposal
-	Request() *log.ClearRequest
-	Reply(*log.ClearResponse) error
-	response() *log.ClearResponse
+	Request() *_log.ClearRequest
+	Reply(*_log.ClearResponse) error
+	response() *_log.ClearResponse
 }
 
-func newClearProposal(id ProposalID, session Session, request *log.ClearRequest) ClearProposal {
+func newClearProposal(id ProposalID, session Session, request *_log.ClearRequest) ClearProposal {
 	return &clearProposal{
 		Proposal: newProposal(id, session),
 		req:      request,
@@ -1056,24 +1102,29 @@ func newClearProposal(id ProposalID, session Session, request *log.ClearRequest)
 
 type clearProposal struct {
 	Proposal
-	req *log.ClearRequest
-	res *log.ClearResponse
+	req *_log.ClearRequest
+	res *_log.ClearResponse
 }
 
-func (p *clearProposal) Request() *log.ClearRequest {
+func (p *clearProposal) Request() *_log.ClearRequest {
 	return p.req
 }
 
-func (p *clearProposal) Reply(reply *log.ClearResponse) error {
+func (p *clearProposal) Reply(reply *_log.ClearResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted ClearProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
-func (p *clearProposal) response() *log.ClearResponse {
+func (p *clearProposal) response() *_log.ClearResponse {
 	return p.res
+}
+
+func (p *clearProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ ClearProposal = &clearProposal{}
@@ -1120,12 +1171,12 @@ var _ EventsProposals = &eventsProposals{}
 
 type EventsProposal interface {
 	Proposal
-	Request() *log.EventsRequest
-	Notify(*log.EventsResponse) error
+	Request() *_log.EventsRequest
+	Notify(*_log.EventsResponse) error
 	Close() error
 }
 
-func newEventsProposal(id ProposalID, session Session, request *log.EventsRequest, stream rsm.Stream) EventsProposal {
+func newEventsProposal(id ProposalID, session Session, request *_log.EventsRequest, stream rsm.Stream) EventsProposal {
 	return &eventsProposal{
 		Proposal: newProposal(id, session),
 		request:  request,
@@ -1135,15 +1186,16 @@ func newEventsProposal(id ProposalID, session Session, request *log.EventsReques
 
 type eventsProposal struct {
 	Proposal
-	request *log.EventsRequest
+	request *_log.EventsRequest
 	stream  rsm.Stream
 }
 
-func (p *eventsProposal) Request() *log.EventsRequest {
+func (p *eventsProposal) Request() *_log.EventsRequest {
 	return p.request
 }
 
-func (p *eventsProposal) Notify(notification *log.EventsResponse) error {
+func (p *eventsProposal) Notify(notification *_log.EventsResponse) error {
+	log.Debugf("Notifying EventsProposal %s: %s", p, notification)
 	bytes, err := proto.Marshal(notification)
 	if err != nil {
 		return err
@@ -1155,6 +1207,10 @@ func (p *eventsProposal) Notify(notification *log.EventsResponse) error {
 func (p *eventsProposal) Close() error {
 	p.stream.Close()
 	return nil
+}
+
+func (p *eventsProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.request)
 }
 
 var _ EventsProposal = &eventsProposal{}
@@ -1201,12 +1257,12 @@ var _ EntriesProposals = &entriesProposals{}
 
 type EntriesProposal interface {
 	Proposal
-	Request() *log.EntriesRequest
-	Notify(*log.EntriesResponse) error
+	Request() *_log.EntriesRequest
+	Notify(*_log.EntriesResponse) error
 	Close() error
 }
 
-func newEntriesProposal(id ProposalID, session Session, request *log.EntriesRequest, stream rsm.Stream) EntriesProposal {
+func newEntriesProposal(id ProposalID, session Session, request *_log.EntriesRequest, stream rsm.Stream) EntriesProposal {
 	return &entriesProposal{
 		Proposal: newProposal(id, session),
 		request:  request,
@@ -1216,15 +1272,16 @@ func newEntriesProposal(id ProposalID, session Session, request *log.EntriesRequ
 
 type entriesProposal struct {
 	Proposal
-	request *log.EntriesRequest
+	request *_log.EntriesRequest
 	stream  rsm.Stream
 }
 
-func (p *entriesProposal) Request() *log.EntriesRequest {
+func (p *entriesProposal) Request() *_log.EntriesRequest {
 	return p.request
 }
 
-func (p *entriesProposal) Notify(notification *log.EntriesResponse) error {
+func (p *entriesProposal) Notify(notification *_log.EntriesResponse) error {
+	log.Debugf("Notifying EntriesProposal %s: %s", p, notification)
 	bytes, err := proto.Marshal(notification)
 	if err != nil {
 		return err
@@ -1236,6 +1293,10 @@ func (p *entriesProposal) Notify(notification *log.EntriesResponse) error {
 func (p *entriesProposal) Close() error {
 	p.stream.Close()
 	return nil
+}
+
+func (p *entriesProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.request)
 }
 
 var _ EntriesProposal = &entriesProposal{}

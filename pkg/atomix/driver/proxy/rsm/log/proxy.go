@@ -3,7 +3,7 @@ package log
 
 import (
 	"context"
-	log "github.com/atomix/atomix-api/go/atomix/primitive/log"
+	_log "github.com/atomix/atomix-api/go/atomix/primitive/log"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
@@ -29,7 +29,7 @@ const (
 )
 
 // NewProxyServer creates a new ProxyServer
-func NewProxyServer(client *rsm.Client) log.LogServiceServer {
+func NewProxyServer(client *rsm.Client) _log.LogServiceServer {
 	return &ProxyServer{
 		Client: client,
 		log:    logging.GetLogger("atomix", "counter"),
@@ -41,7 +41,7 @@ type ProxyServer struct {
 	log logging.Logger
 }
 
-func (s *ProxyServer) Size(ctx context.Context, request *log.SizeRequest) (*log.SizeResponse, error) {
+func (s *ProxyServer) Size(ctx context.Context, request *_log.SizeRequest) (*_log.SizeResponse, error) {
 	s.log.Debugf("Received SizeRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -61,7 +61,7 @@ func (s *ProxyServer) Size(ctx context.Context, request *log.SizeRequest) (*log.
 		return nil, errors.Proto(err)
 	}
 
-	response := &log.SizeResponse{}
+	response := &_log.SizeResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
 		s.log.Errorf("Request SizeRequest failed: %v", err)
@@ -71,7 +71,7 @@ func (s *ProxyServer) Size(ctx context.Context, request *log.SizeRequest) (*log.
 	return response, nil
 }
 
-func (s *ProxyServer) Append(ctx context.Context, request *log.AppendRequest) (*log.AppendResponse, error) {
+func (s *ProxyServer) Append(ctx context.Context, request *_log.AppendRequest) (*_log.AppendResponse, error) {
 	s.log.Debugf("Received AppendRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -91,7 +91,7 @@ func (s *ProxyServer) Append(ctx context.Context, request *log.AppendRequest) (*
 		return nil, errors.Proto(err)
 	}
 
-	response := &log.AppendResponse{}
+	response := &_log.AppendResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
 		s.log.Errorf("Request AppendRequest failed: %v", err)
@@ -101,7 +101,7 @@ func (s *ProxyServer) Append(ctx context.Context, request *log.AppendRequest) (*
 	return response, nil
 }
 
-func (s *ProxyServer) Get(ctx context.Context, request *log.GetRequest) (*log.GetResponse, error) {
+func (s *ProxyServer) Get(ctx context.Context, request *_log.GetRequest) (*_log.GetResponse, error) {
 	s.log.Debugf("Received GetRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -121,7 +121,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *log.GetRequest) (*log.Ge
 		return nil, errors.Proto(err)
 	}
 
-	response := &log.GetResponse{}
+	response := &_log.GetResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
@@ -131,7 +131,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *log.GetRequest) (*log.Ge
 	return response, nil
 }
 
-func (s *ProxyServer) FirstEntry(ctx context.Context, request *log.FirstEntryRequest) (*log.FirstEntryResponse, error) {
+func (s *ProxyServer) FirstEntry(ctx context.Context, request *_log.FirstEntryRequest) (*_log.FirstEntryResponse, error) {
 	s.log.Debugf("Received FirstEntryRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -151,7 +151,7 @@ func (s *ProxyServer) FirstEntry(ctx context.Context, request *log.FirstEntryReq
 		return nil, errors.Proto(err)
 	}
 
-	response := &log.FirstEntryResponse{}
+	response := &_log.FirstEntryResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
 		s.log.Errorf("Request FirstEntryRequest failed: %v", err)
@@ -161,7 +161,7 @@ func (s *ProxyServer) FirstEntry(ctx context.Context, request *log.FirstEntryReq
 	return response, nil
 }
 
-func (s *ProxyServer) LastEntry(ctx context.Context, request *log.LastEntryRequest) (*log.LastEntryResponse, error) {
+func (s *ProxyServer) LastEntry(ctx context.Context, request *_log.LastEntryRequest) (*_log.LastEntryResponse, error) {
 	s.log.Debugf("Received LastEntryRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -181,7 +181,7 @@ func (s *ProxyServer) LastEntry(ctx context.Context, request *log.LastEntryReque
 		return nil, errors.Proto(err)
 	}
 
-	response := &log.LastEntryResponse{}
+	response := &_log.LastEntryResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
 		s.log.Errorf("Request LastEntryRequest failed: %v", err)
@@ -191,7 +191,7 @@ func (s *ProxyServer) LastEntry(ctx context.Context, request *log.LastEntryReque
 	return response, nil
 }
 
-func (s *ProxyServer) PrevEntry(ctx context.Context, request *log.PrevEntryRequest) (*log.PrevEntryResponse, error) {
+func (s *ProxyServer) PrevEntry(ctx context.Context, request *_log.PrevEntryRequest) (*_log.PrevEntryResponse, error) {
 	s.log.Debugf("Received PrevEntryRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -211,7 +211,7 @@ func (s *ProxyServer) PrevEntry(ctx context.Context, request *log.PrevEntryReque
 		return nil, errors.Proto(err)
 	}
 
-	response := &log.PrevEntryResponse{}
+	response := &_log.PrevEntryResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
 		s.log.Errorf("Request PrevEntryRequest failed: %v", err)
@@ -221,7 +221,7 @@ func (s *ProxyServer) PrevEntry(ctx context.Context, request *log.PrevEntryReque
 	return response, nil
 }
 
-func (s *ProxyServer) NextEntry(ctx context.Context, request *log.NextEntryRequest) (*log.NextEntryResponse, error) {
+func (s *ProxyServer) NextEntry(ctx context.Context, request *_log.NextEntryRequest) (*_log.NextEntryResponse, error) {
 	s.log.Debugf("Received NextEntryRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -241,7 +241,7 @@ func (s *ProxyServer) NextEntry(ctx context.Context, request *log.NextEntryReque
 		return nil, errors.Proto(err)
 	}
 
-	response := &log.NextEntryResponse{}
+	response := &_log.NextEntryResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
 		s.log.Errorf("Request NextEntryRequest failed: %v", err)
@@ -251,7 +251,7 @@ func (s *ProxyServer) NextEntry(ctx context.Context, request *log.NextEntryReque
 	return response, nil
 }
 
-func (s *ProxyServer) Remove(ctx context.Context, request *log.RemoveRequest) (*log.RemoveResponse, error) {
+func (s *ProxyServer) Remove(ctx context.Context, request *_log.RemoveRequest) (*_log.RemoveResponse, error) {
 	s.log.Debugf("Received RemoveRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -271,7 +271,7 @@ func (s *ProxyServer) Remove(ctx context.Context, request *log.RemoveRequest) (*
 		return nil, errors.Proto(err)
 	}
 
-	response := &log.RemoveResponse{}
+	response := &_log.RemoveResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
 		s.log.Errorf("Request RemoveRequest failed: %v", err)
@@ -281,7 +281,7 @@ func (s *ProxyServer) Remove(ctx context.Context, request *log.RemoveRequest) (*
 	return response, nil
 }
 
-func (s *ProxyServer) Clear(ctx context.Context, request *log.ClearRequest) (*log.ClearResponse, error) {
+func (s *ProxyServer) Clear(ctx context.Context, request *_log.ClearRequest) (*_log.ClearResponse, error) {
 	s.log.Debugf("Received ClearRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -301,7 +301,7 @@ func (s *ProxyServer) Clear(ctx context.Context, request *log.ClearRequest) (*lo
 		return nil, errors.Proto(err)
 	}
 
-	response := &log.ClearResponse{}
+	response := &_log.ClearResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
 		s.log.Errorf("Request ClearRequest failed: %v", err)
@@ -311,7 +311,7 @@ func (s *ProxyServer) Clear(ctx context.Context, request *log.ClearRequest) (*lo
 	return response, nil
 }
 
-func (s *ProxyServer) Events(request *log.EventsRequest, srv log.LogService_EventsServer) error {
+func (s *ProxyServer) Events(request *_log.EventsRequest, srv _log.LogService_EventsServer) error {
 	s.log.Debugf("Received EventsRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -344,7 +344,7 @@ func (s *ProxyServer) Events(request *log.EventsRequest, srv log.LogService_Even
 			return errors.Proto(result.Error)
 		}
 
-		response := &log.EventsResponse{}
+		response := &_log.EventsResponse{}
 		err = proto.Unmarshal(result.Value.([]byte), response)
 		if err != nil {
 			s.log.Errorf("Request EventsRequest failed: %v", err)
@@ -361,7 +361,7 @@ func (s *ProxyServer) Events(request *log.EventsRequest, srv log.LogService_Even
 	return nil
 }
 
-func (s *ProxyServer) Entries(request *log.EntriesRequest, srv log.LogService_EntriesServer) error {
+func (s *ProxyServer) Entries(request *_log.EntriesRequest, srv _log.LogService_EntriesServer) error {
 	s.log.Debugf("Received EntriesRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
@@ -394,7 +394,7 @@ func (s *ProxyServer) Entries(request *log.EntriesRequest, srv log.LogService_En
 			return errors.Proto(result.Error)
 		}
 
-		response := &log.EntriesResponse{}
+		response := &_log.EntriesResponse{}
 		err = proto.Unmarshal(result.Value.([]byte), response)
 		if err != nil {
 			s.log.Errorf("Request EntriesRequest failed: %v", err)

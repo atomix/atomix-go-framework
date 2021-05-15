@@ -3,13 +3,13 @@ package log
 
 import (
 	"context"
-	log "github.com/atomix/atomix-api/go/atomix/primitive/log"
+	_log "github.com/atomix/atomix-api/go/atomix/primitive/log"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 )
 
 // NewProxyServer creates a new ProxyServer
-func NewProxyServer(registry *ProxyRegistry, env env.DriverEnv) log.LogServiceServer {
+func NewProxyServer(registry *ProxyRegistry, env env.DriverEnv) _log.LogServiceServer {
 	return &ProxyServer{
 		registry: registry,
 		env:      env,
@@ -23,7 +23,7 @@ type ProxyServer struct {
 	log      logging.Logger
 }
 
-func (s *ProxyServer) Size(ctx context.Context, request *log.SizeRequest) (*log.SizeResponse, error) {
+func (s *ProxyServer) Size(ctx context.Context, request *_log.SizeRequest) (*_log.SizeResponse, error) {
 	if request.Headers.PrimitiveID.Namespace == "" {
 		request.Headers.PrimitiveID.Namespace = s.env.Namespace
 	}
@@ -35,7 +35,7 @@ func (s *ProxyServer) Size(ctx context.Context, request *log.SizeRequest) (*log.
 	return proxy.Size(ctx, request)
 }
 
-func (s *ProxyServer) Append(ctx context.Context, request *log.AppendRequest) (*log.AppendResponse, error) {
+func (s *ProxyServer) Append(ctx context.Context, request *_log.AppendRequest) (*_log.AppendResponse, error) {
 	if request.Headers.PrimitiveID.Namespace == "" {
 		request.Headers.PrimitiveID.Namespace = s.env.Namespace
 	}
@@ -47,7 +47,7 @@ func (s *ProxyServer) Append(ctx context.Context, request *log.AppendRequest) (*
 	return proxy.Append(ctx, request)
 }
 
-func (s *ProxyServer) Get(ctx context.Context, request *log.GetRequest) (*log.GetResponse, error) {
+func (s *ProxyServer) Get(ctx context.Context, request *_log.GetRequest) (*_log.GetResponse, error) {
 	if request.Headers.PrimitiveID.Namespace == "" {
 		request.Headers.PrimitiveID.Namespace = s.env.Namespace
 	}
@@ -59,7 +59,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *log.GetRequest) (*log.Ge
 	return proxy.Get(ctx, request)
 }
 
-func (s *ProxyServer) FirstEntry(ctx context.Context, request *log.FirstEntryRequest) (*log.FirstEntryResponse, error) {
+func (s *ProxyServer) FirstEntry(ctx context.Context, request *_log.FirstEntryRequest) (*_log.FirstEntryResponse, error) {
 	if request.Headers.PrimitiveID.Namespace == "" {
 		request.Headers.PrimitiveID.Namespace = s.env.Namespace
 	}
@@ -71,7 +71,7 @@ func (s *ProxyServer) FirstEntry(ctx context.Context, request *log.FirstEntryReq
 	return proxy.FirstEntry(ctx, request)
 }
 
-func (s *ProxyServer) LastEntry(ctx context.Context, request *log.LastEntryRequest) (*log.LastEntryResponse, error) {
+func (s *ProxyServer) LastEntry(ctx context.Context, request *_log.LastEntryRequest) (*_log.LastEntryResponse, error) {
 	if request.Headers.PrimitiveID.Namespace == "" {
 		request.Headers.PrimitiveID.Namespace = s.env.Namespace
 	}
@@ -83,7 +83,7 @@ func (s *ProxyServer) LastEntry(ctx context.Context, request *log.LastEntryReque
 	return proxy.LastEntry(ctx, request)
 }
 
-func (s *ProxyServer) PrevEntry(ctx context.Context, request *log.PrevEntryRequest) (*log.PrevEntryResponse, error) {
+func (s *ProxyServer) PrevEntry(ctx context.Context, request *_log.PrevEntryRequest) (*_log.PrevEntryResponse, error) {
 	if request.Headers.PrimitiveID.Namespace == "" {
 		request.Headers.PrimitiveID.Namespace = s.env.Namespace
 	}
@@ -95,7 +95,7 @@ func (s *ProxyServer) PrevEntry(ctx context.Context, request *log.PrevEntryReque
 	return proxy.PrevEntry(ctx, request)
 }
 
-func (s *ProxyServer) NextEntry(ctx context.Context, request *log.NextEntryRequest) (*log.NextEntryResponse, error) {
+func (s *ProxyServer) NextEntry(ctx context.Context, request *_log.NextEntryRequest) (*_log.NextEntryResponse, error) {
 	if request.Headers.PrimitiveID.Namespace == "" {
 		request.Headers.PrimitiveID.Namespace = s.env.Namespace
 	}
@@ -107,7 +107,7 @@ func (s *ProxyServer) NextEntry(ctx context.Context, request *log.NextEntryReque
 	return proxy.NextEntry(ctx, request)
 }
 
-func (s *ProxyServer) Remove(ctx context.Context, request *log.RemoveRequest) (*log.RemoveResponse, error) {
+func (s *ProxyServer) Remove(ctx context.Context, request *_log.RemoveRequest) (*_log.RemoveResponse, error) {
 	if request.Headers.PrimitiveID.Namespace == "" {
 		request.Headers.PrimitiveID.Namespace = s.env.Namespace
 	}
@@ -119,7 +119,7 @@ func (s *ProxyServer) Remove(ctx context.Context, request *log.RemoveRequest) (*
 	return proxy.Remove(ctx, request)
 }
 
-func (s *ProxyServer) Clear(ctx context.Context, request *log.ClearRequest) (*log.ClearResponse, error) {
+func (s *ProxyServer) Clear(ctx context.Context, request *_log.ClearRequest) (*_log.ClearResponse, error) {
 	if request.Headers.PrimitiveID.Namespace == "" {
 		request.Headers.PrimitiveID.Namespace = s.env.Namespace
 	}
@@ -131,7 +131,7 @@ func (s *ProxyServer) Clear(ctx context.Context, request *log.ClearRequest) (*lo
 	return proxy.Clear(ctx, request)
 }
 
-func (s *ProxyServer) Events(request *log.EventsRequest, srv log.LogService_EventsServer) error {
+func (s *ProxyServer) Events(request *_log.EventsRequest, srv _log.LogService_EventsServer) error {
 	if request.Headers.PrimitiveID.Namespace == "" {
 		request.Headers.PrimitiveID.Namespace = s.env.Namespace
 	}
@@ -143,7 +143,7 @@ func (s *ProxyServer) Events(request *log.EventsRequest, srv log.LogService_Even
 	return proxy.Events(request, srv)
 }
 
-func (s *ProxyServer) Entries(request *log.EntriesRequest, srv log.LogService_EntriesServer) error {
+func (s *ProxyServer) Entries(request *_log.EntriesRequest, srv _log.LogService_EntriesServer) error {
 	if request.Headers.PrimitiveID.Namespace == "" {
 		request.Headers.PrimitiveID.Namespace = s.env.Namespace
 	}

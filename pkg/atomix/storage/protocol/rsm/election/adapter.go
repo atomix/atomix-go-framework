@@ -10,6 +10,8 @@ import (
 	"io"
 )
 
+var log = logging.GetLogger("atomix", "election", "service")
+
 const Type = "Election"
 
 const (
@@ -29,7 +31,6 @@ func registerServiceFunc(rsmf NewServiceFunc) {
 		service := &ServiceAdaptor{
 			Service: rsm.NewService(scheduler, context),
 			rsm:     rsmf(newServiceContext(scheduler)),
-			log:     logging.GetLogger("atomix", "election", "service"),
 		}
 		service.init()
 		return service
@@ -46,7 +47,6 @@ func RegisterService(node *rsm.Node) {
 type ServiceAdaptor struct {
 	rsm.Service
 	rsm Service
-	log logging.Logger
 }
 
 func (s *ServiceAdaptor) init() {
@@ -72,7 +72,7 @@ func (s *ServiceAdaptor) SessionClosed(session rsm.Session) {
 func (s *ServiceAdaptor) Backup(writer io.Writer) error {
 	err := s.rsm.Backup(newSnapshotWriter(writer))
 	if err != nil {
-		s.log.Error(err)
+		log.Error(err)
 		return err
 	}
 	return nil
@@ -81,7 +81,7 @@ func (s *ServiceAdaptor) Backup(writer io.Writer) error {
 func (s *ServiceAdaptor) Restore(reader io.Reader) error {
 	err := s.rsm.Restore(newSnapshotReader(reader))
 	if err != nil {
-		s.log.Error(err)
+		log.Error(err)
 		return err
 	}
 	return nil
@@ -90,14 +90,14 @@ func (s *ServiceAdaptor) enter(input []byte, rsmSession rsm.Session) ([]byte, er
 	request := &election.EnterRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 
@@ -111,15 +111,16 @@ func (s *ServiceAdaptor) enter(input []byte, rsmSession rsm.Session) ([]byte, er
 		s.rsm.Proposals().Enter().unregister(proposal.ID())
 	}()
 
+	log.Debugf("Proposing EnterProposal %s", proposal)
 	err = s.rsm.Enter(proposal)
 	if err != nil {
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 
 	output, err := proto.Marshal(proposal.response())
 	if err != nil {
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 	return output, nil
@@ -128,14 +129,14 @@ func (s *ServiceAdaptor) withdraw(input []byte, rsmSession rsm.Session) ([]byte,
 	request := &election.WithdrawRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 
@@ -149,15 +150,16 @@ func (s *ServiceAdaptor) withdraw(input []byte, rsmSession rsm.Session) ([]byte,
 		s.rsm.Proposals().Withdraw().unregister(proposal.ID())
 	}()
 
+	log.Debugf("Proposing WithdrawProposal %s", proposal)
 	err = s.rsm.Withdraw(proposal)
 	if err != nil {
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 
 	output, err := proto.Marshal(proposal.response())
 	if err != nil {
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 	return output, nil
@@ -166,14 +168,14 @@ func (s *ServiceAdaptor) anoint(input []byte, rsmSession rsm.Session) ([]byte, e
 	request := &election.AnointRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 
@@ -187,15 +189,16 @@ func (s *ServiceAdaptor) anoint(input []byte, rsmSession rsm.Session) ([]byte, e
 		s.rsm.Proposals().Anoint().unregister(proposal.ID())
 	}()
 
+	log.Debugf("Proposing AnointProposal %s", proposal)
 	err = s.rsm.Anoint(proposal)
 	if err != nil {
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 
 	output, err := proto.Marshal(proposal.response())
 	if err != nil {
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 	return output, nil
@@ -204,14 +207,14 @@ func (s *ServiceAdaptor) promote(input []byte, rsmSession rsm.Session) ([]byte, 
 	request := &election.PromoteRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 
@@ -225,15 +228,16 @@ func (s *ServiceAdaptor) promote(input []byte, rsmSession rsm.Session) ([]byte, 
 		s.rsm.Proposals().Promote().unregister(proposal.ID())
 	}()
 
+	log.Debugf("Proposing PromoteProposal %s", proposal)
 	err = s.rsm.Promote(proposal)
 	if err != nil {
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 
 	output, err := proto.Marshal(proposal.response())
 	if err != nil {
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 	return output, nil
@@ -242,14 +246,14 @@ func (s *ServiceAdaptor) evict(input []byte, rsmSession rsm.Session) ([]byte, er
 	request := &election.EvictRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 
@@ -263,15 +267,16 @@ func (s *ServiceAdaptor) evict(input []byte, rsmSession rsm.Session) ([]byte, er
 		s.rsm.Proposals().Evict().unregister(proposal.ID())
 	}()
 
+	log.Debugf("Proposing EvictProposal %s", proposal)
 	err = s.rsm.Evict(proposal)
 	if err != nil {
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 
 	output, err := proto.Marshal(proposal.response())
 	if err != nil {
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 	return output, nil
@@ -280,14 +285,14 @@ func (s *ServiceAdaptor) getTerm(input []byte, rsmSession rsm.Session) ([]byte, 
 	request := &election.GetTermRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 
@@ -301,15 +306,16 @@ func (s *ServiceAdaptor) getTerm(input []byte, rsmSession rsm.Session) ([]byte, 
 		s.rsm.Proposals().GetTerm().unregister(proposal.ID())
 	}()
 
+	log.Debugf("Proposing GetTermProposal %s", proposal)
 	err = s.rsm.GetTerm(proposal)
 	if err != nil {
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 
 	output, err := proto.Marshal(proposal.response())
 	if err != nil {
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 	return output, nil
@@ -318,14 +324,14 @@ func (s *ServiceAdaptor) events(input []byte, rsmSession rsm.Session, stream rsm
 	request := &election.EventsRequest{}
 	err := proto.Unmarshal(input, request)
 	if err != nil {
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 
@@ -334,9 +340,10 @@ func (s *ServiceAdaptor) events(input []byte, rsmSession rsm.Session, stream rsm
 	s.rsm.Proposals().Events().register(proposal)
 	session.Proposals().Events().register(proposal)
 
+	log.Debugf("Proposing EventsProposal %s", proposal)
 	err = s.rsm.Events(proposal)
 	if err != nil {
-		s.log.Error(err)
+		log.Error(err)
 		return nil, err
 	}
 	return func() {

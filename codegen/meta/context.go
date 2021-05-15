@@ -65,11 +65,15 @@ func (c *Context) GetPackageMeta(entity pgs.Entity) PackageMeta {
 	if pkgName == "map" {
 		pkgName = "_map"
 	}
+	alias := pkgName
+	if alias == "log" {
+		alias = "_log"
+	}
 	imported := pkgPath != pgsgo.ImportPath(c.ctx.Params())
 	return PackageMeta{
 		Name:   pkgName,
 		Path:   pkgPath,
-		Alias:  pkgName,
+		Alias:  alias,
 		Import: imported,
 	}
 }

@@ -2,6 +2,7 @@
 package election
 
 import (
+	"fmt"
 	election "github.com/atomix/atomix-api/go/atomix/primitive/election"
 	errors "github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
@@ -318,6 +319,7 @@ var _ Proposals = &serviceProposals{}
 type ProposalID uint64
 
 type Proposal interface {
+	fmt.Stringer
 	ID() ProposalID
 	Session() Session
 }
@@ -340,6 +342,10 @@ func (p *serviceProposal) ID() ProposalID {
 
 func (p *serviceProposal) Session() Session {
 	return p.session
+}
+
+func (p *serviceProposal) String() string {
+	return fmt.Sprintf("ProposalID: %d, SessionID: %d", p.id, p.session.ID())
 }
 
 var _ Proposal = &serviceProposal{}
@@ -412,12 +418,17 @@ func (p *enterProposal) Reply(reply *election.EnterResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted EnterProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *enterProposal) response() *election.EnterResponse {
 	return p.res
+}
+
+func (p *enterProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ EnterProposal = &enterProposal{}
@@ -490,12 +501,17 @@ func (p *withdrawProposal) Reply(reply *election.WithdrawResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted WithdrawProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *withdrawProposal) response() *election.WithdrawResponse {
 	return p.res
+}
+
+func (p *withdrawProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ WithdrawProposal = &withdrawProposal{}
@@ -568,12 +584,17 @@ func (p *anointProposal) Reply(reply *election.AnointResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted AnointProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *anointProposal) response() *election.AnointResponse {
 	return p.res
+}
+
+func (p *anointProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ AnointProposal = &anointProposal{}
@@ -646,12 +667,17 @@ func (p *promoteProposal) Reply(reply *election.PromoteResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted PromoteProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *promoteProposal) response() *election.PromoteResponse {
 	return p.res
+}
+
+func (p *promoteProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ PromoteProposal = &promoteProposal{}
@@ -724,12 +750,17 @@ func (p *evictProposal) Reply(reply *election.EvictResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted EvictProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *evictProposal) response() *election.EvictResponse {
 	return p.res
+}
+
+func (p *evictProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ EvictProposal = &evictProposal{}
@@ -802,12 +833,17 @@ func (p *getTermProposal) Reply(reply *election.GetTermResponse) error {
 	if p.res != nil {
 		return errors.NewConflict("reply already sent")
 	}
+	log.Debugf("Accepted GetTermProposal %s: %s", p, reply)
 	p.res = reply
 	return nil
 }
 
 func (p *getTermProposal) response() *election.GetTermResponse {
 	return p.res
+}
+
+func (p *getTermProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
 }
 
 var _ GetTermProposal = &getTermProposal{}
@@ -878,6 +914,7 @@ func (p *eventsProposal) Request() *election.EventsRequest {
 }
 
 func (p *eventsProposal) Notify(notification *election.EventsResponse) error {
+	log.Debugf("Notifying EventsProposal %s: %s", p, notification)
 	bytes, err := proto.Marshal(notification)
 	if err != nil {
 		return err
@@ -889,6 +926,10 @@ func (p *eventsProposal) Notify(notification *election.EventsResponse) error {
 func (p *eventsProposal) Close() error {
 	p.stream.Close()
 	return nil
+}
+
+func (p *eventsProposal) String() string {
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.request)
 }
 
 var _ EventsProposal = &eventsProposal{}

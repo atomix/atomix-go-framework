@@ -15,7 +15,7 @@
 package log
 
 import (
-	"github.com/atomix/atomix-api/go/atomix/primitive/log"
+	logapi "github.com/atomix/atomix-api/go/atomix/primitive/log"
 )
 
 func init() {
@@ -50,7 +50,7 @@ func (l *logService) Restore(reader SnapshotReader) error {
 	return nil
 }
 
-func (l *logService) notify(event *log.EventsResponse) error {
+func (l *logService) notify(event *logapi.EventsResponse) error {
 	for _, events := range l.Proposals().Events().List() {
 		if err := events.Notify(event); err != nil {
 			return err
@@ -60,7 +60,7 @@ func (l *logService) notify(event *log.EventsResponse) error {
 }
 
 func (l *logService) Size(size SizeProposal) error {
-	return size.Reply(&log.SizeResponse{
+	return size.Reply(&logapi.SizeResponse{
 		Size_: int32(len(l.indexes)),
 	})
 }
@@ -107,7 +107,7 @@ func (l *logService) Entries(entries EntriesProposal) error {
 
 // LinkedEntry is a doubly linked Entry
 type LinkedEntry struct {
-	*log.Entry
+	*logapi.Entry
 	Prev *LinkedEntry
 	Next *LinkedEntry
 }

@@ -50,18 +50,27 @@ type indexedMapService struct {
 }
 
 func (m *indexedMapService) Backup(writer SnapshotWriter) error {
-	return writer.WriteState(&IndexedMapState{})
+	listeners := make([]IndexedMapStateListener, 0, len(m.listeners))
+	for _, listener := range m.listeners {
+		listeners = append(listeners, *listener)
+	}
+	entries := make([]IndexedMapEntry, 0, len(m.entries))
+	entry := m.firstEntry
+	for entry != nil {
+		entries = append(entries, *entry.IndexedMapEntry)
+		entry = entry.Next
+	}
+	return writer.WriteState(&IndexedMapState{
+		Listeners: listeners,
+		Entries:   entries,
+	})
 }
 
 func (m *indexedMapService) Restore(reader SnapshotReader) error {
-	_, err := reader.ReadState()
+	state, err := reader.ReadState()
 	if err != nil {
 		return err
 	}
-	return nil
-}
-
-func (m *indexedMapService) SetState(state *IndexedMapState) error {
 	m.listeners = make(map[ProposalID]*IndexedMapStateListener)
 	for _, state := range state.Listeners {
 		listener := state
@@ -92,23 +101,6 @@ func (m *indexedMapService) SetState(state *IndexedMapState) error {
 		m.scheduleTTL(entry.Key, &entry)
 	}
 	return nil
-}
-
-func (m *indexedMapService) GetState() (*IndexedMapState, error) {
-	listeners := make([]IndexedMapStateListener, 0, len(m.listeners))
-	for _, listener := range m.listeners {
-		listeners = append(listeners, *listener)
-	}
-	entries := make([]IndexedMapEntry, 0, len(m.entries))
-	entry := m.firstEntry
-	for entry != nil {
-		entries = append(entries, *entry.IndexedMapEntry)
-		entry = entry.Next
-	}
-	return &IndexedMapState{
-		Listeners: listeners,
-		Entries:   entries,
-	}, nil
 }
 
 func (m *indexedMapService) notify(event *indexedmapapi.EventsResponse) error {

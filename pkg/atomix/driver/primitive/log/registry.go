@@ -3,7 +3,7 @@ package log
 
 import (
 	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
-	log "github.com/atomix/atomix-api/go/atomix/primitive/log"
+	_log "github.com/atomix/atomix-api/go/atomix/primitive/log"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"sync"
 )
@@ -11,16 +11,16 @@ import (
 // NewProxyRegistry creates a new ProxyRegistry
 func NewProxyRegistry() *ProxyRegistry {
 	return &ProxyRegistry{
-		proxies: make(map[primitiveapi.PrimitiveId]log.LogServiceServer),
+		proxies: make(map[primitiveapi.PrimitiveId]_log.LogServiceServer),
 	}
 }
 
 type ProxyRegistry struct {
-	proxies map[primitiveapi.PrimitiveId]log.LogServiceServer
+	proxies map[primitiveapi.PrimitiveId]_log.LogServiceServer
 	mu      sync.RWMutex
 }
 
-func (r *ProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server log.LogServiceServer) error {
+func (r *ProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server _log.LogServiceServer) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.proxies[id]; ok {
@@ -40,7 +40,7 @@ func (r *ProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error {
 	return nil
 }
 
-func (r *ProxyRegistry) GetProxy(id primitiveapi.PrimitiveId) (log.LogServiceServer, error) {
+func (r *ProxyRegistry) GetProxy(id primitiveapi.PrimitiveId) (_log.LogServiceServer, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	proxy, ok := r.proxies[id]
