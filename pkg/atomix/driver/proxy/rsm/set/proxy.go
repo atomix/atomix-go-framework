@@ -30,7 +30,7 @@ const (
 func NewProxyServer(client *rsm.Client) set.SetServiceServer {
 	return &ProxyServer{
 		Client: client,
-		log:    logging.GetLogger("atomix", "counter"),
+		log:    logging.GetLogger("atomix", "proxy", "set"),
 	}
 }
 

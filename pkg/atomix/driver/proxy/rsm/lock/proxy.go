@@ -23,7 +23,7 @@ const (
 func NewProxyServer(client *rsm.Client) lock.LockServiceServer {
 	return &ProxyServer{
 		Client: client,
-		log:    logging.GetLogger("atomix", "counter"),
+		log:    logging.GetLogger("atomix", "proxy", "lock"),
 	}
 }
 

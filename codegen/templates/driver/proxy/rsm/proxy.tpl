@@ -105,7 +105,7 @@ const (
 func New{{ $proxy }}(client *rsm.Client) {{ $service }} {
 	return &{{ $proxy }}{
 		Client: client,
-		log:    logging.GetLogger("atomix", "counter"),
+		log:    logging.GetLogger("atomix", "proxy", {{ .Primitive.Name | lower | quote }}),
 	}
 }
 

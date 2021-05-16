@@ -30,7 +30,7 @@ const (
 func NewProxyServer(client *rsm.Client) _map.MapServiceServer {
 	return &ProxyServer{
 		Client: client,
-		log:    logging.GetLogger("atomix", "counter"),
+		log:    logging.GetLogger("atomix", "proxy", "map"),
 	}
 }
 
