@@ -38,7 +38,7 @@ func (s *ProxyServer) Size(ctx context.Context, request *set.SizeRequest) (*set.
 			return nil, err
 		}
 		client := set.NewSetServiceClient(conn)
-		partition.AddRequestHeaders(&prequest.Headers)
+		ctx := partition.AddRequestHeaders(ctx, &prequest.Headers)
 		presponse, err := client.Size(ctx, prequest)
 		if err != nil {
 			return nil, err
@@ -71,7 +71,7 @@ func (s *ProxyServer) Contains(ctx context.Context, request *set.ContainsRequest
 	}
 
 	client := set.NewSetServiceClient(conn)
-	partition.AddRequestHeaders(&request.Headers)
+	ctx = partition.AddRequestHeaders(ctx, &request.Headers)
 	response, err := client.Contains(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request ContainsRequest failed: %v", err)
@@ -93,7 +93,7 @@ func (s *ProxyServer) Add(ctx context.Context, request *set.AddRequest) (*set.Ad
 	}
 
 	client := set.NewSetServiceClient(conn)
-	partition.AddRequestHeaders(&request.Headers)
+	ctx = partition.AddRequestHeaders(ctx, &request.Headers)
 	response, err := client.Add(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request AddRequest failed: %v", err)
@@ -115,7 +115,7 @@ func (s *ProxyServer) Remove(ctx context.Context, request *set.RemoveRequest) (*
 	}
 
 	client := set.NewSetServiceClient(conn)
-	partition.AddRequestHeaders(&request.Headers)
+	ctx = partition.AddRequestHeaders(ctx, &request.Headers)
 	response, err := client.Remove(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request RemoveRequest failed: %v", err)
@@ -138,7 +138,7 @@ func (s *ProxyServer) Clear(ctx context.Context, request *set.ClearRequest) (*se
 			return err
 		}
 		client := set.NewSetServiceClient(conn)
-		partition.AddRequestHeaders(&prequest.Headers)
+		ctx := partition.AddRequestHeaders(ctx, &prequest.Headers)
 		_, err = client.Clear(ctx, prequest)
 		return err
 	})
@@ -169,8 +169,8 @@ func (s *ProxyServer) Events(request *set.EventsRequest, srv set.SetService_Even
 			return err
 		}
 		client := set.NewSetServiceClient(conn)
-		partition.AddRequestHeaders(&prequest.Headers)
-		stream, err := client.Events(srv.Context(), prequest)
+		ctx := partition.AddRequestHeaders(srv.Context(), &prequest.Headers)
+		stream, err := client.Events(ctx, prequest)
 		if err != nil {
 			s.log.Errorf("Request EventsRequest failed: %v", err)
 			return err
@@ -241,8 +241,8 @@ func (s *ProxyServer) Elements(request *set.ElementsRequest, srv set.SetService_
 			return err
 		}
 		client := set.NewSetServiceClient(conn)
-		partition.AddRequestHeaders(&prequest.Headers)
-		stream, err := client.Elements(srv.Context(), prequest)
+		ctx := partition.AddRequestHeaders(srv.Context(), &prequest.Headers)
+		stream, err := client.Elements(ctx, prequest)
 		if err != nil {
 			s.log.Errorf("Request ElementsRequest failed: %v", err)
 			return err

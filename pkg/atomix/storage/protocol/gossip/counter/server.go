@@ -32,16 +32,16 @@ type Server struct {
 func (s *Server) Set(ctx context.Context, request *counter.SetRequest) (*counter.SetResponse, error) {
 	s.log.Debugf("Received SetRequest %+v", request)
 	s.manager.AddRequestHeaders(&request.Headers)
-	partition, err := s.manager.Partition(gossip.PartitionID(request.Headers.PartitionID))
+	partition, err := s.manager.PartitionFrom(ctx)
 	if err != nil {
 		s.log.Errorf("Request SetRequest %+v failed: %v", request, err)
 		return nil, err
 	}
 
 	serviceID := gossip.ServiceId{
-		Type:      gossip.ServiceType(request.Headers.PrimitiveID.Type),
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    gossip.ServiceType(request.Headers.PrimitiveID.Type),
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 
 	service, err := partition.GetService(ctx, serviceID)
@@ -63,16 +63,16 @@ func (s *Server) Set(ctx context.Context, request *counter.SetRequest) (*counter
 func (s *Server) Get(ctx context.Context, request *counter.GetRequest) (*counter.GetResponse, error) {
 	s.log.Debugf("Received GetRequest %+v", request)
 	s.manager.AddRequestHeaders(&request.Headers)
-	partition, err := s.manager.Partition(gossip.PartitionID(request.Headers.PartitionID))
+	partition, err := s.manager.PartitionFrom(ctx)
 	if err != nil {
 		s.log.Errorf("Request GetRequest %+v failed: %v", request, err)
 		return nil, err
 	}
 
 	serviceID := gossip.ServiceId{
-		Type:      gossip.ServiceType(request.Headers.PrimitiveID.Type),
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    gossip.ServiceType(request.Headers.PrimitiveID.Type),
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 
 	service, err := partition.GetService(ctx, serviceID)
@@ -94,16 +94,16 @@ func (s *Server) Get(ctx context.Context, request *counter.GetRequest) (*counter
 func (s *Server) Increment(ctx context.Context, request *counter.IncrementRequest) (*counter.IncrementResponse, error) {
 	s.log.Debugf("Received IncrementRequest %+v", request)
 	s.manager.AddRequestHeaders(&request.Headers)
-	partition, err := s.manager.Partition(gossip.PartitionID(request.Headers.PartitionID))
+	partition, err := s.manager.PartitionFrom(ctx)
 	if err != nil {
 		s.log.Errorf("Request IncrementRequest %+v failed: %v", request, err)
 		return nil, err
 	}
 
 	serviceID := gossip.ServiceId{
-		Type:      gossip.ServiceType(request.Headers.PrimitiveID.Type),
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    gossip.ServiceType(request.Headers.PrimitiveID.Type),
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 
 	service, err := partition.GetService(ctx, serviceID)
@@ -125,16 +125,16 @@ func (s *Server) Increment(ctx context.Context, request *counter.IncrementReques
 func (s *Server) Decrement(ctx context.Context, request *counter.DecrementRequest) (*counter.DecrementResponse, error) {
 	s.log.Debugf("Received DecrementRequest %+v", request)
 	s.manager.AddRequestHeaders(&request.Headers)
-	partition, err := s.manager.Partition(gossip.PartitionID(request.Headers.PartitionID))
+	partition, err := s.manager.PartitionFrom(ctx)
 	if err != nil {
 		s.log.Errorf("Request DecrementRequest %+v failed: %v", request, err)
 		return nil, err
 	}
 
 	serviceID := gossip.ServiceId{
-		Type:      gossip.ServiceType(request.Headers.PrimitiveID.Type),
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    gossip.ServiceType(request.Headers.PrimitiveID.Type),
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 
 	service, err := partition.GetService(ctx, serviceID)

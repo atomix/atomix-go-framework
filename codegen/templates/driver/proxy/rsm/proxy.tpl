@@ -141,13 +141,17 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	{{- else if .Request.PartitionRange }}
 	partitionRange := {{ template "val" .Request.PartitionRange }}request{{ template "field" .Request.PartitionRange }}
 	{{- else }}
-    partition := s.PartitionBy([]byte(request{{ template "field" .Request.Headers }}.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+	    clusterKey = request{{ template "field" .Request.Headers }}.PrimitiveID.String()
+	}
+    partition := s.PartitionBy([]byte(clusterKey))
 	{{- end }}
 
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request{{ template "field" .Request.Headers }}.PrimitiveID.Namespace,
-		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request{{ template "field" .Request.Headers }}.ClusterKey,
+		Name:    request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
 	output, err := partition.Do{{ template "optype" . }}(ctx, service, {{ $name }}, input)
 	if err != nil {
@@ -169,9 +173,9 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
     {{- end }}
 
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request{{ template "field" .Request.Headers }}.PrimitiveID.Namespace,
-		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request{{ template "field" .Request.Headers }}.ClusterKey,
+		Name:    request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
 	{{- if .Response.Aggregates }}
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
@@ -244,20 +248,24 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	{{- else if .Request.PartitionRange }}
 	partitionRange := {{ template "val" .Request.PartitionRange }}request{{ template "field" .Request.PartitionRange }}
 	{{- else }}
-    partition := s.PartitionBy([]byte(request{{ template "field" .Request.Headers }}.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+	    clusterKey = request{{ template "field" .Request.Headers }}.PrimitiveID.String()
+	}
+    partition := s.PartitionBy([]byte(clusterKey))
 	{{- end }}
 
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request{{ template "field" .Request.Headers }}.PrimitiveID.Namespace,
-		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request{{ template "field" .Request.Headers }}.ClusterKey,
+		Name:    request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
 	err = partition.Do{{ template "optype" . }}Stream(srv.Context(), service, {{ $name }}, input, stream)
 	{{- else if .Scope.IsGlobal }}
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request{{ template "field" .Request.Headers }}.PrimitiveID.Namespace,
-		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request{{ template "field" .Request.Headers }}.ClusterKey,
+		Name:    request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
 	partitions := s.Partitions()
 	err = async.IterAsync(len(partitions), func(i int) error {

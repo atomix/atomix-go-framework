@@ -121,7 +121,7 @@ type MethodMeta struct {
 	Response    ResponseMeta
 }
 
-// ScopeMeta is the metadata for a method scope
+// MethodScopeMeta is the metadata for a method scope
 type MethodScopeMeta struct {
 	IsPartition bool
 	IsGlobal    bool

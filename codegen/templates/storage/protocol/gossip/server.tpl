@@ -110,16 +110,16 @@ Query
 func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "type" .Request.Type }}) (*{{ template "type" .Response.Type }}, error) {
 	s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
 	s.manager.AddRequestHeaders({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
-	partition, err := s.manager.Partition(gossip.PartitionID(request{{ template "field" .Request.Headers }}.PartitionID))
+	partition, err := s.manager.PartitionFrom(ctx)
     if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
         return nil, err
     }
 
     serviceID := gossip.ServiceId{
-        Type:      gossip.ServiceType(request{{ template "field" .Request.Headers }}.PrimitiveID.Type),
-        Namespace: request{{ template "field" .Request.Headers }}.PrimitiveID.Namespace,
-        Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
+        Type:    gossip.ServiceType(request{{ template "field" .Request.Headers }}.PrimitiveID.Type),
+        Cluster: request{{ template "field" .Request.Headers }}.ClusterKey,
+        Name:    request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
     }
 
     service, err := partition.GetService(ctx, serviceID)
@@ -142,16 +142,16 @@ func (s *{{ $server }}) {{ .Name }}(request *{{ template "type" .Request.Type }}
     s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
 	s.manager.AddRequestHeaders({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
 
-	partition, err := s.manager.Partition(gossip.PartitionID(request{{ template "field" .Request.Headers }}.PartitionID))
+	partition, err := s.manager.PartitionFrom(srv.Context())
     if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
         return errors.Proto(err)
     }
 
     serviceID := gossip.ServiceId{
-        Type:      gossip.ServiceType(request{{ template "field" .Request.Headers }}.PrimitiveID.Type),
-        Namespace: request{{ template "field" .Request.Headers }}.PrimitiveID.Namespace,
-        Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
+        Type:    gossip.ServiceType(request{{ template "field" .Request.Headers }}.PrimitiveID.Type),
+        Cluster: request{{ template "field" .Request.Headers }}.ClusterKey,
+        Name:    request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
     }
 
     service, err := partition.GetService(srv.Context(), serviceID)

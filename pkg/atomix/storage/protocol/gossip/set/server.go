@@ -32,16 +32,16 @@ type Server struct {
 func (s *Server) Size(ctx context.Context, request *set.SizeRequest) (*set.SizeResponse, error) {
 	s.log.Debugf("Received SizeRequest %+v", request)
 	s.manager.AddRequestHeaders(&request.Headers)
-	partition, err := s.manager.Partition(gossip.PartitionID(request.Headers.PartitionID))
+	partition, err := s.manager.PartitionFrom(ctx)
 	if err != nil {
 		s.log.Errorf("Request SizeRequest %+v failed: %v", request, err)
 		return nil, err
 	}
 
 	serviceID := gossip.ServiceId{
-		Type:      gossip.ServiceType(request.Headers.PrimitiveID.Type),
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    gossip.ServiceType(request.Headers.PrimitiveID.Type),
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 
 	service, err := partition.GetService(ctx, serviceID)
@@ -63,16 +63,16 @@ func (s *Server) Size(ctx context.Context, request *set.SizeRequest) (*set.SizeR
 func (s *Server) Contains(ctx context.Context, request *set.ContainsRequest) (*set.ContainsResponse, error) {
 	s.log.Debugf("Received ContainsRequest %+v", request)
 	s.manager.AddRequestHeaders(&request.Headers)
-	partition, err := s.manager.Partition(gossip.PartitionID(request.Headers.PartitionID))
+	partition, err := s.manager.PartitionFrom(ctx)
 	if err != nil {
 		s.log.Errorf("Request ContainsRequest %+v failed: %v", request, err)
 		return nil, err
 	}
 
 	serviceID := gossip.ServiceId{
-		Type:      gossip.ServiceType(request.Headers.PrimitiveID.Type),
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    gossip.ServiceType(request.Headers.PrimitiveID.Type),
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 
 	service, err := partition.GetService(ctx, serviceID)
@@ -94,16 +94,16 @@ func (s *Server) Contains(ctx context.Context, request *set.ContainsRequest) (*s
 func (s *Server) Add(ctx context.Context, request *set.AddRequest) (*set.AddResponse, error) {
 	s.log.Debugf("Received AddRequest %+v", request)
 	s.manager.AddRequestHeaders(&request.Headers)
-	partition, err := s.manager.Partition(gossip.PartitionID(request.Headers.PartitionID))
+	partition, err := s.manager.PartitionFrom(ctx)
 	if err != nil {
 		s.log.Errorf("Request AddRequest %+v failed: %v", request, err)
 		return nil, err
 	}
 
 	serviceID := gossip.ServiceId{
-		Type:      gossip.ServiceType(request.Headers.PrimitiveID.Type),
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    gossip.ServiceType(request.Headers.PrimitiveID.Type),
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 
 	service, err := partition.GetService(ctx, serviceID)
@@ -125,16 +125,16 @@ func (s *Server) Add(ctx context.Context, request *set.AddRequest) (*set.AddResp
 func (s *Server) Remove(ctx context.Context, request *set.RemoveRequest) (*set.RemoveResponse, error) {
 	s.log.Debugf("Received RemoveRequest %+v", request)
 	s.manager.AddRequestHeaders(&request.Headers)
-	partition, err := s.manager.Partition(gossip.PartitionID(request.Headers.PartitionID))
+	partition, err := s.manager.PartitionFrom(ctx)
 	if err != nil {
 		s.log.Errorf("Request RemoveRequest %+v failed: %v", request, err)
 		return nil, err
 	}
 
 	serviceID := gossip.ServiceId{
-		Type:      gossip.ServiceType(request.Headers.PrimitiveID.Type),
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    gossip.ServiceType(request.Headers.PrimitiveID.Type),
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 
 	service, err := partition.GetService(ctx, serviceID)
@@ -156,16 +156,16 @@ func (s *Server) Remove(ctx context.Context, request *set.RemoveRequest) (*set.R
 func (s *Server) Clear(ctx context.Context, request *set.ClearRequest) (*set.ClearResponse, error) {
 	s.log.Debugf("Received ClearRequest %+v", request)
 	s.manager.AddRequestHeaders(&request.Headers)
-	partition, err := s.manager.Partition(gossip.PartitionID(request.Headers.PartitionID))
+	partition, err := s.manager.PartitionFrom(ctx)
 	if err != nil {
 		s.log.Errorf("Request ClearRequest %+v failed: %v", request, err)
 		return nil, err
 	}
 
 	serviceID := gossip.ServiceId{
-		Type:      gossip.ServiceType(request.Headers.PrimitiveID.Type),
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    gossip.ServiceType(request.Headers.PrimitiveID.Type),
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 
 	service, err := partition.GetService(ctx, serviceID)
@@ -188,16 +188,16 @@ func (s *Server) Events(request *set.EventsRequest, srv set.SetService_EventsSer
 	s.log.Debugf("Received EventsRequest %+v", request)
 	s.manager.AddRequestHeaders(&request.Headers)
 
-	partition, err := s.manager.Partition(gossip.PartitionID(request.Headers.PartitionID))
+	partition, err := s.manager.PartitionFrom(srv.Context())
 	if err != nil {
 		s.log.Errorf("Request EventsRequest %+v failed: %v", request, err)
 		return errors.Proto(err)
 	}
 
 	serviceID := gossip.ServiceId{
-		Type:      gossip.ServiceType(request.Headers.PrimitiveID.Type),
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    gossip.ServiceType(request.Headers.PrimitiveID.Type),
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 
 	service, err := partition.GetService(srv.Context(), serviceID)
@@ -242,16 +242,16 @@ func (s *Server) Elements(request *set.ElementsRequest, srv set.SetService_Eleme
 	s.log.Debugf("Received ElementsRequest %+v", request)
 	s.manager.AddRequestHeaders(&request.Headers)
 
-	partition, err := s.manager.Partition(gossip.PartitionID(request.Headers.PartitionID))
+	partition, err := s.manager.PartitionFrom(srv.Context())
 	if err != nil {
 		s.log.Errorf("Request ElementsRequest %+v failed: %v", request, err)
 		return errors.Proto(err)
 	}
 
 	serviceID := gossip.ServiceId{
-		Type:      gossip.ServiceType(request.Headers.PrimitiveID.Type),
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    gossip.ServiceType(request.Headers.PrimitiveID.Type),
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 
 	service, err := partition.GetService(srv.Context(), serviceID)

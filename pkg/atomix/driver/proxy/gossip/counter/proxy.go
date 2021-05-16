@@ -24,7 +24,11 @@ type ProxyServer struct {
 
 func (s *ProxyServer) Set(ctx context.Context, request *counter.SetRequest) (*counter.SetResponse, error) {
 	s.log.Debugf("Received SetRequest %+v", request)
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+		clusterKey = request.Headers.PrimitiveID.String()
+	}
+	partition := s.PartitionBy([]byte(clusterKey))
 
 	conn, err := partition.Connect()
 	if err != nil {
@@ -32,7 +36,7 @@ func (s *ProxyServer) Set(ctx context.Context, request *counter.SetRequest) (*co
 	}
 
 	client := counter.NewCounterServiceClient(conn)
-	partition.AddRequestHeaders(&request.Headers)
+	ctx = partition.AddRequestHeaders(ctx, &request.Headers)
 	response, err := client.Set(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request SetRequest failed: %v", err)
@@ -45,7 +49,11 @@ func (s *ProxyServer) Set(ctx context.Context, request *counter.SetRequest) (*co
 
 func (s *ProxyServer) Get(ctx context.Context, request *counter.GetRequest) (*counter.GetResponse, error) {
 	s.log.Debugf("Received GetRequest %+v", request)
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+		clusterKey = request.Headers.PrimitiveID.String()
+	}
+	partition := s.PartitionBy([]byte(clusterKey))
 
 	conn, err := partition.Connect()
 	if err != nil {
@@ -53,7 +61,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *counter.GetRequest) (*co
 	}
 
 	client := counter.NewCounterServiceClient(conn)
-	partition.AddRequestHeaders(&request.Headers)
+	ctx = partition.AddRequestHeaders(ctx, &request.Headers)
 	response, err := client.Get(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
@@ -66,7 +74,11 @@ func (s *ProxyServer) Get(ctx context.Context, request *counter.GetRequest) (*co
 
 func (s *ProxyServer) Increment(ctx context.Context, request *counter.IncrementRequest) (*counter.IncrementResponse, error) {
 	s.log.Debugf("Received IncrementRequest %+v", request)
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+		clusterKey = request.Headers.PrimitiveID.String()
+	}
+	partition := s.PartitionBy([]byte(clusterKey))
 
 	conn, err := partition.Connect()
 	if err != nil {
@@ -74,7 +86,7 @@ func (s *ProxyServer) Increment(ctx context.Context, request *counter.IncrementR
 	}
 
 	client := counter.NewCounterServiceClient(conn)
-	partition.AddRequestHeaders(&request.Headers)
+	ctx = partition.AddRequestHeaders(ctx, &request.Headers)
 	response, err := client.Increment(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request IncrementRequest failed: %v", err)
@@ -87,7 +99,11 @@ func (s *ProxyServer) Increment(ctx context.Context, request *counter.IncrementR
 
 func (s *ProxyServer) Decrement(ctx context.Context, request *counter.DecrementRequest) (*counter.DecrementResponse, error) {
 	s.log.Debugf("Received DecrementRequest %+v", request)
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+		clusterKey = request.Headers.PrimitiveID.String()
+	}
+	partition := s.PartitionBy([]byte(clusterKey))
 
 	conn, err := partition.Connect()
 	if err != nil {
@@ -95,7 +111,7 @@ func (s *ProxyServer) Decrement(ctx context.Context, request *counter.DecrementR
 	}
 
 	client := counter.NewCounterServiceClient(conn)
-	partition.AddRequestHeaders(&request.Headers)
+	ctx = partition.AddRequestHeaders(ctx, &request.Headers)
 	response, err := client.Decrement(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request DecrementRequest failed: %v", err)

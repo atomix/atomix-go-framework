@@ -115,7 +115,11 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	{{- else if .Request.PartitionRange }}
 	partitionRange := {{ template "val" .Request.PartitionRange }}request{{ template "field" .Request.PartitionRange }}
 	{{- else }}
-    partition := s.PartitionBy([]byte(request{{ template "field" .Request.Headers }}.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+	    clusterKey = request{{ template "field" .Request.Headers }}.PrimitiveID.String()
+	}
+    partition := s.PartitionBy([]byte(clusterKey))
 	{{- end }}
 
 	conn, err := partition.Connect()
@@ -124,7 +128,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	}
 
 	client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-	partition.AddRequestHeaders({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
+	ctx = partition.AddRequestHeaders(ctx, {{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
 	response, err := client.{{ .Name }}(ctx, request)
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
@@ -143,7 +147,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
             return nil, err
         }
         client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-    	partition.AddRequestHeaders({{ template "ref" .Request.Headers }}prequest{{ template "field" .Request.Headers }})
+    	ctx := partition.AddRequestHeaders(ctx, {{ template "ref" .Request.Headers }}prequest{{ template "field" .Request.Headers }})
 		presponse, err := client.{{ .Name }}(ctx, prequest)
 		if err != nil {
 		    return nil, err
@@ -161,7 +165,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
             return err
         }
         client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-    	partition.AddRequestHeaders({{ template "ref" .Request.Headers }}prequest{{ template "field" .Request.Headers }})
+    	ctx := partition.AddRequestHeaders(ctx, {{ template "ref" .Request.Headers }}prequest{{ template "field" .Request.Headers }})
 		_, err = client.{{ .Name }}(ctx, prequest)
 		return err
 	})
@@ -208,7 +212,11 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	{{- else if .Request.PartitionRange }}
 	partitionRange := {{ template "val" .Request.PartitionRange }}request{{ template "field" .Request.PartitionRange }}
 	{{- else }}
-    partition := s.PartitionBy([]byte(request{{ template "field" .Request.Headers }}.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+	    clusterKey = request{{ template "field" .Request.Headers }}.PrimitiveID.String()
+	}
+    partition := s.PartitionBy([]byte(clusterKey))
 	{{- end }}
 
 	conn, err := partition.Connect()
@@ -218,8 +226,8 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	}
 
 	client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-	partition.AddRequestHeaders({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
-	stream, err := client.{{ .Name }}(srv.Context(), request)
+	ctx := partition.AddRequestHeaders(srv.Context(), {{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
+	stream, err := client.{{ .Name }}(ctx, request)
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 		return errors.Proto(err)
@@ -256,8 +264,8 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
             return err
         }
         client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-	    partition.AddRequestHeaders({{ template "ref" .Request.Headers }}prequest{{ template "field" .Request.Headers }})
-        stream, err := client.{{ .Name }}(srv.Context(), prequest)
+	    ctx := partition.AddRequestHeaders(srv.Context(), {{ template "ref" .Request.Headers }}prequest{{ template "field" .Request.Headers }})
+        stream, err := client.{{ .Name }}(ctx, prequest)
         if err != nil {
             s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
             return err

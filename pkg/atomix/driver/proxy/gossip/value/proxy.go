@@ -25,7 +25,11 @@ type ProxyServer struct {
 
 func (s *ProxyServer) Set(ctx context.Context, request *value.SetRequest) (*value.SetResponse, error) {
 	s.log.Debugf("Received SetRequest %+v", request)
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+		clusterKey = request.Headers.PrimitiveID.String()
+	}
+	partition := s.PartitionBy([]byte(clusterKey))
 
 	conn, err := partition.Connect()
 	if err != nil {
@@ -33,7 +37,7 @@ func (s *ProxyServer) Set(ctx context.Context, request *value.SetRequest) (*valu
 	}
 
 	client := value.NewValueServiceClient(conn)
-	partition.AddRequestHeaders(&request.Headers)
+	ctx = partition.AddRequestHeaders(ctx, &request.Headers)
 	response, err := client.Set(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request SetRequest failed: %v", err)
@@ -46,7 +50,11 @@ func (s *ProxyServer) Set(ctx context.Context, request *value.SetRequest) (*valu
 
 func (s *ProxyServer) Get(ctx context.Context, request *value.GetRequest) (*value.GetResponse, error) {
 	s.log.Debugf("Received GetRequest %+v", request)
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+		clusterKey = request.Headers.PrimitiveID.String()
+	}
+	partition := s.PartitionBy([]byte(clusterKey))
 
 	conn, err := partition.Connect()
 	if err != nil {
@@ -54,7 +62,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *value.GetRequest) (*valu
 	}
 
 	client := value.NewValueServiceClient(conn)
-	partition.AddRequestHeaders(&request.Headers)
+	ctx = partition.AddRequestHeaders(ctx, &request.Headers)
 	response, err := client.Get(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
@@ -67,7 +75,11 @@ func (s *ProxyServer) Get(ctx context.Context, request *value.GetRequest) (*valu
 
 func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueService_EventsServer) error {
 	s.log.Debugf("Received EventsRequest %+v", request)
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+		clusterKey = request.Headers.PrimitiveID.String()
+	}
+	partition := s.PartitionBy([]byte(clusterKey))
 
 	conn, err := partition.Connect()
 	if err != nil {
@@ -76,8 +88,8 @@ func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueServic
 	}
 
 	client := value.NewValueServiceClient(conn)
-	partition.AddRequestHeaders(&request.Headers)
-	stream, err := client.Events(srv.Context(), request)
+	ctx := partition.AddRequestHeaders(srv.Context(), &request.Headers)
+	stream, err := client.Events(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)

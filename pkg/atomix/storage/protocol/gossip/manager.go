@@ -15,12 +15,15 @@
 package gossip
 
 import (
+	"context"
 	"github.com/atomix/atomix-api/go/atomix/primitive"
 	"github.com/atomix/atomix-api/go/atomix/primitive/meta"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/util"
+	"google.golang.org/grpc/metadata"
+	"strconv"
 )
 
 // newManager creates a new CRDT manager
@@ -79,6 +82,23 @@ func (m *Manager) PartitionBy(partitionKey []byte) (*Partition, error) {
 		return nil, errors.NewInternal("could not compute partition index: %v", err)
 	}
 	return m.partitions[i], nil
+}
+
+func (m *Manager) PartitionFrom(ctx context.Context) (*Partition, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.NewInvalid("cannot retrieve headers from context")
+	}
+	ids := md.Get("Partition-ID")
+	if len(ids) != 1 {
+		return nil, errors.NewInvalid("cannot retrieve partition ID from headers")
+	}
+	id := ids[0]
+	i, err := strconv.Atoi(id)
+	if err != nil {
+		return nil, err
+	}
+	return m.Partition(PartitionID(i))
 }
 
 func (m *Manager) PartitionFor(serviceID ServiceId) (*Partition, error) {

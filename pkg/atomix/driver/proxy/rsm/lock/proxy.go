@@ -39,12 +39,16 @@ func (s *ProxyServer) Lock(ctx context.Context, request *lock.LockRequest) (*loc
 		s.log.Errorf("Request LockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+		clusterKey = request.Headers.PrimitiveID.String()
+	}
+	partition := s.PartitionBy([]byte(clusterKey))
 
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	output, err := partition.DoCommand(ctx, service, lockOp, input)
 	if err != nil {
@@ -69,12 +73,16 @@ func (s *ProxyServer) Unlock(ctx context.Context, request *lock.UnlockRequest) (
 		s.log.Errorf("Request UnlockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+		clusterKey = request.Headers.PrimitiveID.String()
+	}
+	partition := s.PartitionBy([]byte(clusterKey))
 
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	output, err := partition.DoCommand(ctx, service, unlockOp, input)
 	if err != nil {
@@ -99,12 +107,16 @@ func (s *ProxyServer) GetLock(ctx context.Context, request *lock.GetLockRequest)
 		s.log.Errorf("Request GetLockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+		clusterKey = request.Headers.PrimitiveID.String()
+	}
+	partition := s.PartitionBy([]byte(clusterKey))
 
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	output, err := partition.DoQuery(ctx, service, getLockOp, input)
 	if err != nil {

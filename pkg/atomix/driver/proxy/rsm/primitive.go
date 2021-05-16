@@ -50,9 +50,9 @@ func (s *PrimitiveServer) Create(ctx context.Context, request *primitiveapi.Crea
 	}
 	partitions := s.Partitions()
 	service := storage.ServiceId{
-		Type:      request.Headers.PrimitiveID.Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    request.Headers.PrimitiveID.Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	err := async.IterAsync(len(partitions), func(i int) error {
 		return partitions[i].DoCreateService(ctx, service)
@@ -73,9 +73,9 @@ func (s *PrimitiveServer) Close(ctx context.Context, request *primitiveapi.Close
 	}
 	partitions := s.Partitions()
 	service := storage.ServiceId{
-		Type:      request.Headers.PrimitiveID.Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    request.Headers.PrimitiveID.Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	err := async.IterAsync(len(partitions), func(i int) error {
 		return partitions[i].DoCloseService(ctx, service)
@@ -96,9 +96,9 @@ func (s *PrimitiveServer) Delete(ctx context.Context, request *primitiveapi.Dele
 	}
 	partitions := s.Partitions()
 	service := storage.ServiceId{
-		Type:      request.Headers.PrimitiveID.Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    request.Headers.PrimitiveID.Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	err := async.IterAsync(len(partitions), func(i int) error {
 		return partitions[i].DoDeleteService(ctx, service)

@@ -46,12 +46,16 @@ func (s *ProxyServer) Size(ctx context.Context, request *list.SizeRequest) (*lis
 		s.log.Errorf("Request SizeRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+		clusterKey = request.Headers.PrimitiveID.String()
+	}
+	partition := s.PartitionBy([]byte(clusterKey))
 
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	output, err := partition.DoQuery(ctx, service, sizeOp, input)
 	if err != nil {
@@ -76,12 +80,16 @@ func (s *ProxyServer) Append(ctx context.Context, request *list.AppendRequest) (
 		s.log.Errorf("Request AppendRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+		clusterKey = request.Headers.PrimitiveID.String()
+	}
+	partition := s.PartitionBy([]byte(clusterKey))
 
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	output, err := partition.DoCommand(ctx, service, appendOp, input)
 	if err != nil {
@@ -106,12 +114,16 @@ func (s *ProxyServer) Insert(ctx context.Context, request *list.InsertRequest) (
 		s.log.Errorf("Request InsertRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+		clusterKey = request.Headers.PrimitiveID.String()
+	}
+	partition := s.PartitionBy([]byte(clusterKey))
 
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	output, err := partition.DoCommand(ctx, service, insertOp, input)
 	if err != nil {
@@ -136,12 +148,16 @@ func (s *ProxyServer) Get(ctx context.Context, request *list.GetRequest) (*list.
 		s.log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+		clusterKey = request.Headers.PrimitiveID.String()
+	}
+	partition := s.PartitionBy([]byte(clusterKey))
 
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	output, err := partition.DoQuery(ctx, service, getOp, input)
 	if err != nil {
@@ -166,12 +182,16 @@ func (s *ProxyServer) Set(ctx context.Context, request *list.SetRequest) (*list.
 		s.log.Errorf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+		clusterKey = request.Headers.PrimitiveID.String()
+	}
+	partition := s.PartitionBy([]byte(clusterKey))
 
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	output, err := partition.DoCommand(ctx, service, setOp, input)
 	if err != nil {
@@ -196,12 +216,16 @@ func (s *ProxyServer) Remove(ctx context.Context, request *list.RemoveRequest) (
 		s.log.Errorf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+		clusterKey = request.Headers.PrimitiveID.String()
+	}
+	partition := s.PartitionBy([]byte(clusterKey))
 
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	output, err := partition.DoCommand(ctx, service, removeOp, input)
 	if err != nil {
@@ -226,12 +250,16 @@ func (s *ProxyServer) Clear(ctx context.Context, request *list.ClearRequest) (*l
 		s.log.Errorf("Request ClearRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+		clusterKey = request.Headers.PrimitiveID.String()
+	}
+	partition := s.PartitionBy([]byte(clusterKey))
 
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	output, err := partition.DoCommand(ctx, service, clearOp, input)
 	if err != nil {
@@ -258,12 +286,16 @@ func (s *ProxyServer) Events(request *list.EventsRequest, srv list.ListService_E
 	}
 
 	stream := streams.NewBufferedStream()
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+		clusterKey = request.Headers.PrimitiveID.String()
+	}
+	partition := s.PartitionBy([]byte(clusterKey))
 
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	err = partition.DoCommandStream(srv.Context(), service, eventsOp, input, stream)
 	if err != nil {
@@ -308,12 +340,16 @@ func (s *ProxyServer) Elements(request *list.ElementsRequest, srv list.ListServi
 	}
 
 	stream := streams.NewBufferedStream()
-	partition := s.PartitionBy([]byte(request.Headers.PrimitiveID.String()))
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+		clusterKey = request.Headers.PrimitiveID.String()
+	}
+	partition := s.PartitionBy([]byte(clusterKey))
 
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	err = partition.DoQueryStream(srv.Context(), service, elementsOp, input, stream)
 	if err != nil {

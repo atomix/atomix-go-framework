@@ -49,9 +49,9 @@ func (s *ProxyServer) Size(ctx context.Context, request *_map.SizeRequest) (*_ma
 	partitions := s.Partitions()
 
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
 		return partitions[i].DoQuery(ctx, service, sizeOp, input)
@@ -90,9 +90,9 @@ func (s *ProxyServer) Put(ctx context.Context, request *_map.PutRequest) (*_map.
 	partition := s.PartitionBy([]byte(partitionKey))
 
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	output, err := partition.DoCommand(ctx, service, putOp, input)
 	if err != nil {
@@ -121,9 +121,9 @@ func (s *ProxyServer) Get(ctx context.Context, request *_map.GetRequest) (*_map.
 	partition := s.PartitionBy([]byte(partitionKey))
 
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	output, err := partition.DoQuery(ctx, service, getOp, input)
 	if err != nil {
@@ -152,9 +152,9 @@ func (s *ProxyServer) Remove(ctx context.Context, request *_map.RemoveRequest) (
 	partition := s.PartitionBy([]byte(partitionKey))
 
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	output, err := partition.DoCommand(ctx, service, removeOp, input)
 	if err != nil {
@@ -182,9 +182,9 @@ func (s *ProxyServer) Clear(ctx context.Context, request *_map.ClearRequest) (*_
 	partitions := s.Partitions()
 
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	err = async.IterAsync(len(partitions), func(i int) error {
 		_, err := partitions[i].DoCommand(ctx, service, clearOp, input)
@@ -210,9 +210,9 @@ func (s *ProxyServer) Events(request *_map.EventsRequest, srv _map.MapService_Ev
 
 	stream := streams.NewBufferedStream()
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	partitions := s.Partitions()
 	err = async.IterAsync(len(partitions), func(i int) error {
@@ -261,9 +261,9 @@ func (s *ProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_
 
 	stream := streams.NewBufferedStream()
 	service := storage.ServiceId{
-		Type:      Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	partitions := s.Partitions()
 	err = async.IterAsync(len(partitions), func(i int) error {

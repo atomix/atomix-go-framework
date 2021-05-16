@@ -26,7 +26,7 @@ import (
 	"sync"
 )
 
-var log = logging.GetLogger("atomix", "grpc")
+var log = logging.GetLogger("atomix", "grpc", "retry")
 
 var defaultOptions = &callOptions{
 	codes: []codes.Code{
@@ -49,10 +49,13 @@ func RetryingUnaryClientInterceptor(callOpts ...CallOption) func(ctx context.Con
 			b.MaxInterval = *callOpts.maxInterval
 		}
 		return backoff.Retry(func() error {
+			log.Debugf("Sending %s", req)
 			if err := invoker(ctx, method, req, reply, cc, grpcOpts...); err != nil {
 				if isRetryable(err, callOpts.codes) {
+					log.Debugf("Sending %s failed", req, err)
 					return err
 				}
+				log.Warnf("Sending %s failed", req, err)
 				return backoff.Permanent(err)
 			}
 			return nil
@@ -210,6 +213,7 @@ func (s *retryingClientStream) Context() context.Context {
 }
 
 func (s *retryingClientStream) CloseSend() error {
+	log.Debug("CloseSend")
 	s.mu.Lock()
 	s.closed = true
 	s.mu.Unlock()
@@ -229,6 +233,7 @@ func (s *retryingClientStream) Trailer() metadata.MD {
 }
 
 func (s *retryingClientStream) SendMsg(m interface{}) error {
+	log.Debugf("SendMsg %s", m)
 	err := s.getStream().SendMsg(m)
 	if err == nil {
 		s.buffer.append(m)
@@ -240,29 +245,31 @@ func (s *retryingClientStream) SendMsg(m interface{}) error {
 		closed := s.closed
 		s.mu.RUnlock()
 		if closed {
-			log.Debug("Received stream end")
+			log.Debugf("SendMsg %s: EOF", m)
 			return err
 		}
 	} else if !isRetryable(err, s.opts.codes) {
-		log.Warn("Received stream error", err)
+		log.Warnf("SendMsg %s: error", m, err)
 		return err
 	}
 
+	log.Debugf("SendMsg %s: error", err)
 	err = backoff.Retry(func() error {
+		log.Debugf("SendMsg %s: retry", m)
 		if err := s.retryStream(); err != nil {
 			if err == io.EOF {
 				s.mu.RLock()
 				closed := s.closed
 				s.mu.RUnlock()
 				if !closed {
-					log.Debug("Received stream end")
+					log.Debugf("SendMsg %s: EOF", m)
 					return err
 				}
 			} else if isRetryable(err, s.opts.codes) {
-				log.Debug("Received stream error", err)
+				log.Debugf("SendMsg %s: error", m, err)
 				return err
 			}
-			log.Warn("Received stream error", err)
+			log.Warnf("SendMsg %s: error", m, err)
 			return backoff.Permanent(err)
 		}
 		if err := s.getStream().SendMsg(m); err != nil {
@@ -271,14 +278,14 @@ func (s *retryingClientStream) SendMsg(m interface{}) error {
 				closed := s.closed
 				s.mu.RUnlock()
 				if !closed {
-					log.Debug("Received stream end")
+					log.Debugf("SendMsg %s: EOF", m)
 					return err
 				}
 			} else if isRetryable(err, s.opts.codes) {
-				log.Debug("Received stream error", err)
+				log.Debugf("SendMsg %s: error", m, err)
 				return err
 			}
-			log.Warn("Received stream error", err)
+			log.Warnf("SendMsg %s: error", m, err)
 			return backoff.Permanent(err)
 		}
 		return nil
@@ -293,29 +300,30 @@ func (s *retryingClientStream) SendMsg(m interface{}) error {
 func (s *retryingClientStream) RecvMsg(m interface{}) error {
 	if err := s.getStream().RecvMsg(m); err != nil {
 		if err == io.EOF {
-			log.Debug("Received stream end")
+			log.Debug("RecvMsg: EOF")
 			return err
 		}
 		return backoff.Retry(func() error {
 			if err := s.retryStream(); err != nil {
 				if isRetryable(err, s.opts.codes) {
-					log.Debug("Received stream error", err)
+					log.Debug("RecvMsg: error", err)
 					return err
 				}
-				log.Warn("Received stream error", err)
+				log.Warn("RecvMsg: error", err)
 				return backoff.Permanent(err)
 			}
 			if err := s.getStream().RecvMsg(m); err != nil {
 				if isRetryable(err, s.opts.codes) {
-					log.Debug("Received stream error", err)
+					log.Debugf("RecvMsg: error", err)
 					return err
 				}
-				log.Warn("Received stream error", err)
+				log.Warn("RecvMsg: error", err)
 				return backoff.Permanent(err)
 			}
 			return nil
 		}, backoff.WithContext(backoff.NewExponentialBackOff(), s.ctx))
 	}
+	log.Debugf("RecvMsg %s", m)
 	return nil
 }
 

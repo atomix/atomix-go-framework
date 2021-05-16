@@ -47,7 +47,7 @@ message SessionStreamSnapshot {
 
 message ServiceId {
     string type = 1;
-    string namespace = 2;
+    string cluster = 2;
     string name = 3;
 }
 

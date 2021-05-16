@@ -834,9 +834,9 @@ func (m *Manager) applyServiceQueryMetadata(request ServiceQueryRequest, context
 	for name, service := range m.services {
 		if serviceType == "" || service.ServiceType() == serviceType {
 			services = append(services, &ServiceId{
-				Type:      service.ServiceType(),
-				Namespace: name.Namespace,
-				Name:      name.Name,
+				Type:    service.ServiceType(),
+				Cluster: name.Cluster,
+				Name:    name.Name,
 			})
 		}
 	}

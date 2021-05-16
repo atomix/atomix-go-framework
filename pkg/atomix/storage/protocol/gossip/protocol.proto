@@ -24,7 +24,7 @@ import "gogoproto/gogo.proto";
 
 message ServiceId {
     string type = 1 [(gogoproto.casttype) = "ServiceType"];
-    string namespace = 2;
+    string cluster = 2;
     string name = 3;
 }
 

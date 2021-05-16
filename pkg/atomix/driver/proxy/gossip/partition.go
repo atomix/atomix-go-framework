@@ -16,11 +16,13 @@ package gossip
 
 import (
 	"context"
+	"fmt"
 	"github.com/atomix/atomix-api/go/atomix/primitive"
 	"github.com/atomix/atomix-api/go/atomix/primitive/meta"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"math/rand"
 	"sync"
 )
@@ -59,9 +61,9 @@ func (p *Partition) addTimestamp(timestamp *meta.Timestamp) *meta.Timestamp {
 	return &proto
 }
 
-func (p *Partition) AddRequestHeaders(headers *primitive.RequestHeaders) {
-	headers.PartitionID = uint32(p.ID)
+func (p *Partition) AddRequestHeaders(ctx context.Context, headers *primitive.RequestHeaders) context.Context {
 	headers.Timestamp = p.addTimestamp(headers.Timestamp)
+	return metadata.AppendToOutgoingContext(ctx, "Partition-ID", fmt.Sprint(p.ID))
 }
 
 func (p *Partition) AddResponseHeaders(headers *primitive.ResponseHeaders) {
