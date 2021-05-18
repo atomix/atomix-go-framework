@@ -366,7 +366,11 @@ func (m *indexedMapService) Remove(remove RemoveProposal) error {
 	}
 
 	if entry == nil {
-		return remove.Reply(&indexedmapapi.RemoveResponse{})
+		return errors.NewNotFound("entry not found")
+	}
+
+	if err := checkPreconditions(entry.IndexedMapEntry, remove.Request().Preconditions); err != nil {
+		return err
 	}
 
 	// Delete the entry from the map.
