@@ -175,7 +175,7 @@ func (s *Session) DoCommandStream(ctx context.Context, service rsm.ServiceId, na
 				}
 			case <-ctx.Done():
 				s.deleteStream(streamState.ID)
-				outStream.Error(errors.NewCanceled(ctx.Err().Error()))
+				outStream.Error(ctx.Err())
 				outStream.Close()
 				return
 			}
@@ -223,7 +223,7 @@ func (s *Session) doCommandStream(ctx context.Context, name string, input []byte
 				Value: result,
 			},
 		}, nil
-	}))
+	}), true)
 }
 
 // DoQuery submits a query to the service
@@ -299,7 +299,7 @@ func (s *Session) DoQueryStream(ctx context.Context, service rsm.ServiceId, name
 					outStream.Send(response.Result)
 				}
 			case <-ctx.Done():
-				outStream.Error(errors.NewCanceled(ctx.Err().Error()))
+				outStream.Error(ctx.Err())
 				outStream.Close()
 				return
 			}
@@ -347,7 +347,7 @@ func (s *Session) doQueryStream(ctx context.Context, name string, input []byte, 
 				Value: result,
 			},
 		}, nil
-	}))
+	}), false)
 }
 
 // doMetadata submits a metadata query to the service
@@ -640,16 +640,27 @@ func (s *Session) tryRequest(ctx context.Context, request *rsm.StorageRequest) (
 }
 
 // doStream submits a streaming request to the service
-func (s *Session) doStream(ctx context.Context, request *rsm.StorageRequest, stream streams.WriteStream) error {
-	go s.tryStream(ctx, request, stream, false)
+func (s *Session) doStream(ctx context.Context, request *rsm.StorageRequest, stream streams.WriteStream, idempotent bool) error {
+	go s.tryStream(ctx, request, stream, idempotent,0, false)
 	return nil
 }
 
 // tryStream submits a stream request to the service recursively
-func (s *Session) tryStream(ctx context.Context, request *rsm.StorageRequest, stream streams.WriteStream, open bool) error {
+func (s *Session) tryStream(ctx context.Context, request *rsm.StorageRequest, stream streams.WriteStream, idempotent bool, attempts int, open bool) {
 	conn, err := s.connect()
-	if err != nil {
-		return err
+	if err == context.Canceled {
+		stream.Error(err)
+		stream.Close()
+		return
+	} else if err != nil {
+		s.log.Warnf("StorageRequest %+v failed", request, err)
+		if idempotent || !open {
+			go s.retryStream(ctx, request, stream, idempotent, attempts, open)
+		} else {
+			stream.Error(errors.From(err))
+			stream.Close()
+		}
+		return
 	}
 	client := rsm.NewStorageServiceClient(conn)
 
@@ -659,35 +670,66 @@ func (s *Session) tryStream(ctx context.Context, request *rsm.StorageRequest, st
 		s.log.Warnf("Sending StorageRequest %+v failed: %s", request, err)
 		stream.Error(err)
 		stream.Close()
-		return err
+		return
 	}
 
 	for {
 		response, err := responseStream.Recv()
 		if err == io.EOF {
 			stream.Close()
-			return nil
+			return
+		} else if err == context.Canceled {
+			stream.Error(err)
+			stream.Close()
+			return
 		} else if err != nil {
-			go s.tryStream(ctx, request, stream, open)
+			s.log.Warnf("StorageRequest %+v failed", request, err)
+			if idempotent || !open {
+				go s.retryStream(ctx, request, stream, idempotent, attempts, open)
+			} else {
+				stream.Error(errors.From(err))
+				stream.Close()
+			}
+			return
 		} else {
 			s.log.Debugf("Received StorageResponse %+v", response)
-			if response.Response.Status.Code == rsm.SessionResponseCode_OK {
+			switch response.Response.Status.Code {
+			case rsm.SessionResponseCode_OK:
 				stream.Value(response)
-			} else {
 				switch response.Response.Type {
 				case rsm.SessionResponseType_OPEN_STREAM:
 					if !open {
-						stream.Value(response)
 						open = true
 					}
 				case rsm.SessionResponseType_CLOSE_STREAM:
 					stream.Close()
-					return nil
-				case rsm.SessionResponseType_RESPONSE:
-					stream.Value(response)
+					return
 				}
+			case rsm.SessionResponseCode_NOT_LEADER:
+				if response.Response.Status.Leader != "" {
+					s.log.Debugf("Reconnecting to leader %s", response.Response.Status.Leader)
+					s.reconnect(cluster.ReplicaID(response.Response.Status.Leader))
+				}
+				go s.retryStream(ctx, request, stream, idempotent, attempts, open)
+				return
+			default:
+				stream.Error(rsm.GetErrorFromStatus(response.Response.Status))
+				stream.Close()
+				return
 			}
+			attempts = 0
 		}
+	}
+}
+
+func (s *Session) retryStream(ctx context.Context, request *rsm.StorageRequest, stream streams.WriteStream, idempotent bool, attempts int, open bool) {
+	attempts++
+	select {
+	case <-time.After(10 * time.Millisecond * time.Duration(math.Min(math.Pow(2, float64(attempts)), 1000))):
+		s.tryStream(ctx, request, stream, idempotent, attempts, open)
+	case <-ctx.Done():
+		stream.Error(errors.NewTimeout(ctx.Err().Error()))
+		stream.Close()
 	}
 }
 

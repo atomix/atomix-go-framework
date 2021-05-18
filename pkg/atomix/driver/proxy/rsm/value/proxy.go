@@ -134,6 +134,9 @@ func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueServic
 		}
 
 		if result.Failed() {
+			if result.Error == context.Canceled {
+				return nil
+			}
 			s.log.Errorf("Request EventsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}

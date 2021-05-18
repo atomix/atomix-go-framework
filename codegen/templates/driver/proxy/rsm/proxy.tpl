@@ -284,6 +284,9 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 		}
 
 		if result.Failed() {
+		    if result.Error == context.Canceled {
+				return nil
+			}
 			s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}

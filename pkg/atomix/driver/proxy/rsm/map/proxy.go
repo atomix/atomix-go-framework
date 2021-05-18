@@ -230,6 +230,9 @@ func (s *ProxyServer) Events(request *_map.EventsRequest, srv _map.MapService_Ev
 		}
 
 		if result.Failed() {
+			if result.Error == context.Canceled {
+				return nil
+			}
 			s.log.Errorf("Request EventsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
@@ -281,6 +284,9 @@ func (s *ProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_
 		}
 
 		if result.Failed() {
+			if result.Error == context.Canceled {
+				return nil
+			}
 			s.log.Errorf("Request EntriesRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}

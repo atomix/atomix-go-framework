@@ -310,6 +310,9 @@ func (s *ProxyServer) Events(request *list.EventsRequest, srv list.ListService_E
 		}
 
 		if result.Failed() {
+			if result.Error == context.Canceled {
+				return nil
+			}
 			s.log.Errorf("Request EventsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
@@ -364,6 +367,9 @@ func (s *ProxyServer) Elements(request *list.ElementsRequest, srv list.ListServi
 		}
 
 		if result.Failed() {
+			if result.Error == context.Canceled {
+				return nil
+			}
 			s.log.Errorf("Request ElementsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}

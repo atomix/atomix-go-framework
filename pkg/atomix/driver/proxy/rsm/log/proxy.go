@@ -380,6 +380,9 @@ func (s *ProxyServer) Events(request *_log.EventsRequest, srv _log.LogService_Ev
 		}
 
 		if result.Failed() {
+			if result.Error == context.Canceled {
+				return nil
+			}
 			s.log.Errorf("Request EventsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
@@ -434,6 +437,9 @@ func (s *ProxyServer) Entries(request *_log.EntriesRequest, srv _log.LogService_
 		}
 
 		if result.Failed() {
+			if result.Error == context.Canceled {
+				return nil
+			}
 			s.log.Errorf("Request EntriesRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
