@@ -167,6 +167,11 @@ func (m *indexedMapService) Put(put PutProposal) error {
 					Key:   put.Request().Entry.Key,
 				},
 				IndexedMapEntryValue: IndexedMapEntryValue{
+					ObjectMeta: metaapi.ObjectMeta{
+						Revision: &metaapi.Revision{
+							Num: metaapi.RevisionNum(put.ID()),
+						},
+					},
 					Value: put.Request().Entry.Value.Value,
 				},
 			},
@@ -232,6 +237,11 @@ func (m *indexedMapService) Put(put PutProposal) error {
 				Key:   oldEntry.Key,
 			},
 			IndexedMapEntryValue: IndexedMapEntryValue{
+				ObjectMeta: metaapi.ObjectMeta{
+					Revision: &metaapi.Revision{
+						Num: metaapi.RevisionNum(put.ID()),
+					},
+				},
 				Value: put.Request().Entry.Value.Value,
 			},
 		},
@@ -459,23 +469,6 @@ func (m *indexedMapService) cancelTTL(key string) {
 	if ok {
 		timer.Cancel()
 	}
-}
-
-func (m *indexedMapService) newEntryState(entry *indexedmapapi.Entry) *IndexedMapEntry {
-	state := &IndexedMapEntry{
-		IndexedMapEntryPosition: IndexedMapEntryPosition{
-			Index: entry.Position.Index,
-			Key:   entry.Position.Key,
-		},
-		IndexedMapEntryValue: IndexedMapEntryValue{
-			Value: entry.Value.Value,
-		},
-	}
-	if entry.Value.TTL != nil {
-		expire := m.Scheduler().Time().Add(*entry.Value.TTL)
-		state.Expire = &expire
-	}
-	return state
 }
 
 func (m *indexedMapService) newEntry(state *IndexedMapEntry) *indexedmapapi.Entry {
