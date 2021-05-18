@@ -804,7 +804,7 @@ func (s *Session) getStateContexts() (rsm.SessionCommandContext, []rsm.SessionSt
 	defer s.mu.RUnlock()
 	return rsm.SessionCommandContext{
 		SessionID:      s.SessionID,
-		SequenceNumber: s.requestID,
+		SequenceNumber: s.responseID,
 	}, s.getStreamContexts()
 }
 
