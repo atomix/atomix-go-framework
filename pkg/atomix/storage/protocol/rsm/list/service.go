@@ -193,7 +193,7 @@ func (l *listService) Remove(remove RemoveProposal) error {
 	l.items = append(l.items[:index], l.items[index+1:]...)
 
 	err := l.notify(listapi.Event{
-		Type: listapi.Event_REPLAY,
+		Type: listapi.Event_REMOVE,
 		Item: listapi.Item{
 			Index: uint32(index),
 			Value: value,

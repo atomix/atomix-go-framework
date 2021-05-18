@@ -124,7 +124,7 @@ func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte, rsmSession
     session, ok := s.rsm.Sessions().Get({{ $serviceSessionID }}(rsmSession.ID()))
     if !ok {
         err := errors.NewConflict("session %d not found", rsmSession.ID())
-        log.Error(err.Error())
+        log.Warn(err)
         return nil, err
     }
 
@@ -141,7 +141,7 @@ func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte, rsmSession
     log.Debugf("Proposing {{ $proposalInt }} %s", proposal)
 	err = s.rsm.{{ .Name }}(proposal)
 	if err !=  nil {
-	    log.Error(err.Error())
+	    log.Warn(err)
     	return nil, err
 	}
 
@@ -164,7 +164,7 @@ func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte, rsmSession
     session, ok := s.rsm.Sessions().Get({{ $serviceSessionID }}(rsmSession.ID()))
     if !ok {
         err := errors.NewConflict("session %d not found", rsmSession.ID())
-        log.Error(err.Error())
+        log.Warn(err)
         return nil, err
     }
 
@@ -176,7 +176,7 @@ func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte, rsmSession
     log.Debugf("Proposing {{ $proposalInt }} %s", proposal)
     err = s.rsm.{{ .Name }}(proposal)
     if err != nil {
-        log.Error(err.Error())
+        log.Warn(err)
         return nil, err
     }
     return func() {

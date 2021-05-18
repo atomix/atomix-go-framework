@@ -89,7 +89,7 @@ func (s *ServiceAdaptor) lock(input []byte, rsmSession rsm.Session, stream rsm.S
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Error(err.Error())
+		log.Warn(err)
 		return nil, err
 	}
 
@@ -101,7 +101,7 @@ func (s *ServiceAdaptor) lock(input []byte, rsmSession rsm.Session, stream rsm.S
 	log.Debugf("Proposing LockProposal %s", proposal)
 	err = s.rsm.Lock(proposal)
 	if err != nil {
-		log.Error(err.Error())
+		log.Warn(err)
 		return nil, err
 	}
 	return func() {
@@ -121,7 +121,7 @@ func (s *ServiceAdaptor) unlock(input []byte, rsmSession rsm.Session) ([]byte, e
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Error(err.Error())
+		log.Warn(err)
 		return nil, err
 	}
 
@@ -138,7 +138,7 @@ func (s *ServiceAdaptor) unlock(input []byte, rsmSession rsm.Session) ([]byte, e
 	log.Debugf("Proposing UnlockProposal %s", proposal)
 	err = s.rsm.Unlock(proposal)
 	if err != nil {
-		log.Error(err.Error())
+		log.Warn(err)
 		return nil, err
 	}
 
@@ -160,7 +160,7 @@ func (s *ServiceAdaptor) getLock(input []byte, rsmSession rsm.Session) ([]byte, 
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Error(err.Error())
+		log.Warn(err)
 		return nil, err
 	}
 
@@ -177,7 +177,7 @@ func (s *ServiceAdaptor) getLock(input []byte, rsmSession rsm.Session) ([]byte, 
 	log.Debugf("Proposing GetLockProposal %s", proposal)
 	err = s.rsm.GetLock(proposal)
 	if err != nil {
-		log.Error(err.Error())
+		log.Warn(err)
 		return nil, err
 	}
 

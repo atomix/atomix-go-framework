@@ -91,7 +91,7 @@ func (s *ServiceAdaptor) set(input []byte, rsmSession rsm.Session) ([]byte, erro
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Error(err.Error())
+		log.Warn(err)
 		return nil, err
 	}
 
@@ -108,7 +108,7 @@ func (s *ServiceAdaptor) set(input []byte, rsmSession rsm.Session) ([]byte, erro
 	log.Debugf("Proposing SetProposal %s", proposal)
 	err = s.rsm.Set(proposal)
 	if err != nil {
-		log.Error(err.Error())
+		log.Warn(err)
 		return nil, err
 	}
 
@@ -130,7 +130,7 @@ func (s *ServiceAdaptor) get(input []byte, rsmSession rsm.Session) ([]byte, erro
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Error(err.Error())
+		log.Warn(err)
 		return nil, err
 	}
 
@@ -147,7 +147,7 @@ func (s *ServiceAdaptor) get(input []byte, rsmSession rsm.Session) ([]byte, erro
 	log.Debugf("Proposing GetProposal %s", proposal)
 	err = s.rsm.Get(proposal)
 	if err != nil {
-		log.Error(err.Error())
+		log.Warn(err)
 		return nil, err
 	}
 
@@ -169,7 +169,7 @@ func (s *ServiceAdaptor) increment(input []byte, rsmSession rsm.Session) ([]byte
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Error(err.Error())
+		log.Warn(err)
 		return nil, err
 	}
 
@@ -186,7 +186,7 @@ func (s *ServiceAdaptor) increment(input []byte, rsmSession rsm.Session) ([]byte
 	log.Debugf("Proposing IncrementProposal %s", proposal)
 	err = s.rsm.Increment(proposal)
 	if err != nil {
-		log.Error(err.Error())
+		log.Warn(err)
 		return nil, err
 	}
 
@@ -208,7 +208,7 @@ func (s *ServiceAdaptor) decrement(input []byte, rsmSession rsm.Session) ([]byte
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Error(err.Error())
+		log.Warn(err)
 		return nil, err
 	}
 
@@ -225,7 +225,7 @@ func (s *ServiceAdaptor) decrement(input []byte, rsmSession rsm.Session) ([]byte
 	log.Debugf("Proposing DecrementProposal %s", proposal)
 	err = s.rsm.Decrement(proposal)
 	if err != nil {
-		log.Error(err.Error())
+		log.Warn(err)
 		return nil, err
 	}
 
