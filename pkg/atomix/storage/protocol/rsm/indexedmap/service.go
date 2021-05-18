@@ -21,6 +21,7 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
+	"time"
 )
 
 func init() {
@@ -98,7 +99,7 @@ func (m *indexedMapService) Restore(reader SnapshotReader) error {
 		}
 		prevEntry = linkedEntry
 		m.lastEntry = linkedEntry
-		m.scheduleTTL(entry.Key, &entry)
+		m.scheduleTTL(entry.Key, entry.Expire)
 	}
 	return nil
 }
@@ -132,7 +133,7 @@ func (m *indexedMapService) Put(put PutProposal) error {
 	if put.Request().Entry.Index > 0 {
 		oldEntry = m.indexes[put.Request().Entry.Index]
 		if oldEntry != nil && oldEntry.Key != put.Request().Entry.Key {
-			return errors.NewConflict("indexes do not match")
+			return errors.NewAlreadyExists("entry already exists at index %d with key %s", put.Request().Entry.Index, put.Request().Entry.Key)
 		}
 	} else {
 		oldEntry = m.entries[put.Request().Entry.Key]
@@ -208,7 +209,7 @@ func (m *indexedMapService) Put(put PutProposal) error {
 		m.lastEntry = newEntry
 
 		// Schedule the timeout for the value if necessary.
-		m.scheduleTTL(put.Request().Entry.Key, newEntry.IndexedMapEntry)
+		m.scheduleTTL(put.Request().Entry.Key, newEntry.IndexedMapEntry.Expire)
 
 		m.notify(&indexedmapapi.EventsResponse{
 			Event: indexedmapapi.Event{
@@ -268,7 +269,7 @@ func (m *indexedMapService) Put(put PutProposal) error {
 	}
 
 	// Schedule the timeout for the value if necessary.
-	m.scheduleTTL(newEntry.Key, newEntry.IndexedMapEntry)
+	m.scheduleTTL(newEntry.Key, newEntry.IndexedMapEntry.Expire)
 
 	m.notify(&indexedmapapi.EventsResponse{
 		Event: indexedmapapi.Event{
@@ -287,12 +288,18 @@ func (m *indexedMapService) Get(get GetProposal) error {
 	var ok bool
 	if get.Request().Position.Index > 0 {
 		entry, ok = m.indexes[get.Request().Position.Index]
+		if entry == nil {
+			return errors.NewNotFound("no entry found at index %d", get.Request().Position.Index)
+		}
 	} else {
 		entry, ok = m.entries[get.Request().Position.Key]
+		if entry == nil {
+			return errors.NewNotFound("no entry found at key %s", get.Request().Position.Key)
+		}
 	}
 
 	if !ok {
-		return get.Reply(&indexedmapapi.GetResponse{})
+		return errors.NewNotFound("entry not found")
 	}
 	return get.Reply(&indexedmapapi.GetResponse{
 		Entry: m.newEntry(entry.IndexedMapEntry),
@@ -301,7 +308,7 @@ func (m *indexedMapService) Get(get GetProposal) error {
 
 func (m *indexedMapService) FirstEntry(firstEntry FirstEntryProposal) error {
 	if m.firstEntry == nil {
-		return firstEntry.Reply(&indexedmapapi.FirstEntryResponse{})
+		return errors.NewNotFound("map is empty")
 	}
 	return firstEntry.Reply(&indexedmapapi.FirstEntryResponse{
 		Entry: m.newEntry(m.firstEntry.IndexedMapEntry),
@@ -310,7 +317,7 @@ func (m *indexedMapService) FirstEntry(firstEntry FirstEntryProposal) error {
 
 func (m *indexedMapService) LastEntry(lastEntry LastEntryProposal) error {
 	if m.lastEntry == nil {
-		return lastEntry.Reply(&indexedmapapi.LastEntryResponse{})
+		return errors.NewNotFound("map is empty")
 	}
 	return lastEntry.Reply(&indexedmapapi.LastEntryResponse{
 		Entry: m.newEntry(m.lastEntry.IndexedMapEntry),
@@ -330,7 +337,7 @@ func (m *indexedMapService) PrevEntry(prevEntry PrevEntryProposal) error {
 	}
 
 	if entry == nil {
-		return prevEntry.Reply(&indexedmapapi.PrevEntryResponse{})
+		return errors.NewNotFound("no entry found prior to index %d", prevEntry.Request().Index)
 	}
 	return prevEntry.Reply(&indexedmapapi.PrevEntryResponse{
 		Entry: m.newEntry(entry.IndexedMapEntry),
@@ -350,7 +357,7 @@ func (m *indexedMapService) NextEntry(nextEntry NextEntryProposal) error {
 	}
 
 	if entry == nil {
-		return nextEntry.Reply(&indexedmapapi.NextEntryResponse{})
+		return errors.NewNotFound("no entry found after index %d", nextEntry.Request().Index)
 	}
 	return nextEntry.Reply(&indexedmapapi.NextEntryResponse{
 		Entry: m.newEntry(entry.IndexedMapEntry),
@@ -361,12 +368,14 @@ func (m *indexedMapService) Remove(remove RemoveProposal) error {
 	var entry *LinkedMapEntryValue
 	if remove.Request().Entry.Index > 0 {
 		entry = m.indexes[remove.Request().Entry.Index]
+		if entry == nil {
+			return errors.NewNotFound("no entry found at index %d", remove.Request().Entry.Index)
+		}
 	} else {
 		entry = m.entries[remove.Request().Entry.Key]
-	}
-
-	if entry == nil {
-		return errors.NewNotFound("entry not found")
+		if entry == nil {
+			return errors.NewNotFound("no entry found at key %s", remove.Request().Entry.Key)
+		}
 	}
 
 	if err := checkPreconditions(entry.IndexedMapEntry, remove.Request().Preconditions); err != nil {
@@ -442,28 +451,47 @@ func (m *indexedMapService) Events(events EventsProposal) error {
 
 func (m *indexedMapService) Entries(entries EntriesProposal) error {
 	defer entries.Close()
-	for _, entry := range m.entries {
+	entry := m.firstEntry
+	for entry != nil {
 		err := entries.Notify(&indexedmapapi.EntriesResponse{
 			Entry: *m.newEntry(entry.IndexedMapEntry),
 		})
 		if err != nil {
 			return err
 		}
+		entry = entry.Next
 	}
 	return nil
 }
 
-func (m *indexedMapService) scheduleTTL(key string, entry *IndexedMapEntry) {
+func (m *indexedMapService) scheduleTTL(key string, expire *time.Time) {
 	m.cancelTTL(key)
-	if entry.Expire != nil {
-		m.timers[key] = m.Scheduler().RunAt(*entry.Expire, func() {
-			delete(m.entries, key)
-			m.notify(&indexedmapapi.EventsResponse{
-				Event: indexedmapapi.Event{
-					Type:  indexedmapapi.Event_REMOVE,
-					Entry: *m.newEntry(entry),
-				},
-			})
+	if expire != nil {
+		m.timers[key] = m.Scheduler().RunAt(*expire, func() {
+			entry, ok := m.entries[key]
+			if ok {
+				delete(m.entries, key)
+				delete(m.indexes, entry.Index)
+
+				// Update links for previous and next entries
+				if entry.Prev != nil {
+					entry.Prev.Next = entry.Next
+				} else {
+					m.firstEntry = entry.Next
+				}
+				if entry.Next != nil {
+					entry.Next.Prev = entry.Prev
+				} else {
+					m.lastEntry = entry.Prev
+				}
+
+				m.notify(&indexedmapapi.EventsResponse{
+					Event: indexedmapapi.Event{
+						Type:  indexedmapapi.Event_REMOVE,
+						Entry: *m.newEntry(entry.IndexedMapEntry),
+					},
+				})
+			}
 		})
 	}
 }
