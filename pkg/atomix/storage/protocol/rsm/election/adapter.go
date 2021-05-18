@@ -97,7 +97,7 @@ func (s *ServiceAdaptor) enter(input []byte, rsmSession rsm.Session) ([]byte, er
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 
@@ -114,7 +114,7 @@ func (s *ServiceAdaptor) enter(input []byte, rsmSession rsm.Session) ([]byte, er
 	log.Debugf("Proposing EnterProposal %s", proposal)
 	err = s.rsm.Enter(proposal)
 	if err != nil {
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 
@@ -136,7 +136,7 @@ func (s *ServiceAdaptor) withdraw(input []byte, rsmSession rsm.Session) ([]byte,
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 
@@ -153,7 +153,7 @@ func (s *ServiceAdaptor) withdraw(input []byte, rsmSession rsm.Session) ([]byte,
 	log.Debugf("Proposing WithdrawProposal %s", proposal)
 	err = s.rsm.Withdraw(proposal)
 	if err != nil {
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 
@@ -175,7 +175,7 @@ func (s *ServiceAdaptor) anoint(input []byte, rsmSession rsm.Session) ([]byte, e
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 
@@ -192,7 +192,7 @@ func (s *ServiceAdaptor) anoint(input []byte, rsmSession rsm.Session) ([]byte, e
 	log.Debugf("Proposing AnointProposal %s", proposal)
 	err = s.rsm.Anoint(proposal)
 	if err != nil {
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 
@@ -214,7 +214,7 @@ func (s *ServiceAdaptor) promote(input []byte, rsmSession rsm.Session) ([]byte, 
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 
@@ -231,7 +231,7 @@ func (s *ServiceAdaptor) promote(input []byte, rsmSession rsm.Session) ([]byte, 
 	log.Debugf("Proposing PromoteProposal %s", proposal)
 	err = s.rsm.Promote(proposal)
 	if err != nil {
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 
@@ -253,7 +253,7 @@ func (s *ServiceAdaptor) evict(input []byte, rsmSession rsm.Session) ([]byte, er
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 
@@ -270,7 +270,7 @@ func (s *ServiceAdaptor) evict(input []byte, rsmSession rsm.Session) ([]byte, er
 	log.Debugf("Proposing EvictProposal %s", proposal)
 	err = s.rsm.Evict(proposal)
 	if err != nil {
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 
@@ -292,7 +292,7 @@ func (s *ServiceAdaptor) getTerm(input []byte, rsmSession rsm.Session) ([]byte, 
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 
@@ -309,7 +309,7 @@ func (s *ServiceAdaptor) getTerm(input []byte, rsmSession rsm.Session) ([]byte, 
 	log.Debugf("Proposing GetTermProposal %s", proposal)
 	err = s.rsm.GetTerm(proposal)
 	if err != nil {
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 
@@ -331,7 +331,7 @@ func (s *ServiceAdaptor) events(input []byte, rsmSession rsm.Session, stream rsm
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 
@@ -343,7 +343,7 @@ func (s *ServiceAdaptor) events(input []byte, rsmSession rsm.Session, stream rsm
 	log.Debugf("Proposing EventsProposal %s", proposal)
 	err = s.rsm.Events(proposal)
 	if err != nil {
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 	return func() {

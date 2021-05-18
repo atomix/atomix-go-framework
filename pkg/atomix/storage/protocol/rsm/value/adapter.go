@@ -89,7 +89,7 @@ func (s *ServiceAdaptor) set(input []byte, rsmSession rsm.Session) ([]byte, erro
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 
@@ -106,7 +106,7 @@ func (s *ServiceAdaptor) set(input []byte, rsmSession rsm.Session) ([]byte, erro
 	log.Debugf("Proposing SetProposal %s", proposal)
 	err = s.rsm.Set(proposal)
 	if err != nil {
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 
@@ -128,7 +128,7 @@ func (s *ServiceAdaptor) get(input []byte, rsmSession rsm.Session) ([]byte, erro
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 
@@ -145,7 +145,7 @@ func (s *ServiceAdaptor) get(input []byte, rsmSession rsm.Session) ([]byte, erro
 	log.Debugf("Proposing GetProposal %s", proposal)
 	err = s.rsm.Get(proposal)
 	if err != nil {
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 
@@ -167,7 +167,7 @@ func (s *ServiceAdaptor) events(input []byte, rsmSession rsm.Session, stream rsm
 	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
 	if !ok {
 		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 
@@ -179,7 +179,7 @@ func (s *ServiceAdaptor) events(input []byte, rsmSession rsm.Session, stream rsm
 	log.Debugf("Proposing EventsProposal %s", proposal)
 	err = s.rsm.Events(proposal)
 	if err != nil {
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 	return func() {
