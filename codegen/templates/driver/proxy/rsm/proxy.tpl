@@ -232,7 +232,8 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
         return errors.Proto(err)
 	}
 
-	stream := streams.NewBufferedStream()
+    ch := make(chan streams.Result)
+	stream := streams.NewChannelStream(ch)
 	{{- if .Scope.IsPartition }}
 	{{- if .Request.PartitionKey }}
 	partitionKey := {{ template "val" .Request.PartitionKey }}request{{ template "field" .Request.PartitionKey }}
@@ -277,15 +278,10 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	    return errors.Proto(err)
 	}
 
-	for {
-		result, ok := stream.Receive()
-		if !ok {
-			break
-		}
-
+    for result := range ch {
 		if result.Failed() {
 		    if result.Error == context.Canceled {
-				return nil
+		        break
 			}
 			s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", result.Error)
 			return errors.Proto(result.Error)
@@ -301,7 +297,7 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 		s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
 		if err = srv.Send(response); err != nil {
             s.log.Errorf("Response {{ .Response.Type.Name }} failed: %v", err)
-			return errors.Proto(err)
+			return err
 		}
 	}
 	s.log.Debugf("Finished {{ .Request.Type.Name }} %+v", request)

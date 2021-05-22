@@ -355,7 +355,8 @@ func (s *ProxyServer) Events(request *indexedmap.EventsRequest, srv indexedmap.I
 		return errors.Proto(err)
 	}
 
-	stream := streams.NewBufferedStream()
+	ch := make(chan streams.Result)
+	stream := streams.NewChannelStream(ch)
 	clusterKey := request.Headers.ClusterKey
 	if clusterKey == "" {
 		clusterKey = request.Headers.PrimitiveID.String()
@@ -373,15 +374,10 @@ func (s *ProxyServer) Events(request *indexedmap.EventsRequest, srv indexedmap.I
 		return errors.Proto(err)
 	}
 
-	for {
-		result, ok := stream.Receive()
-		if !ok {
-			break
-		}
-
+	for result := range ch {
 		if result.Failed() {
 			if result.Error == context.Canceled {
-				return nil
+				break
 			}
 			s.log.Errorf("Request EventsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
@@ -397,7 +393,7 @@ func (s *ProxyServer) Events(request *indexedmap.EventsRequest, srv indexedmap.I
 		s.log.Debugf("Sending EventsResponse %+v", response)
 		if err = srv.Send(response); err != nil {
 			s.log.Errorf("Response EventsResponse failed: %v", err)
-			return errors.Proto(err)
+			return err
 		}
 	}
 	s.log.Debugf("Finished EventsRequest %+v", request)
@@ -412,7 +408,8 @@ func (s *ProxyServer) Entries(request *indexedmap.EntriesRequest, srv indexedmap
 		return errors.Proto(err)
 	}
 
-	stream := streams.NewBufferedStream()
+	ch := make(chan streams.Result)
+	stream := streams.NewChannelStream(ch)
 	clusterKey := request.Headers.ClusterKey
 	if clusterKey == "" {
 		clusterKey = request.Headers.PrimitiveID.String()
@@ -430,15 +427,10 @@ func (s *ProxyServer) Entries(request *indexedmap.EntriesRequest, srv indexedmap
 		return errors.Proto(err)
 	}
 
-	for {
-		result, ok := stream.Receive()
-		if !ok {
-			break
-		}
-
+	for result := range ch {
 		if result.Failed() {
 			if result.Error == context.Canceled {
-				return nil
+				break
 			}
 			s.log.Errorf("Request EntriesRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
@@ -454,7 +446,7 @@ func (s *ProxyServer) Entries(request *indexedmap.EntriesRequest, srv indexedmap
 		s.log.Debugf("Sending EntriesResponse %+v", response)
 		if err = srv.Send(response); err != nil {
 			s.log.Errorf("Response EntriesResponse failed: %v", err)
-			return errors.Proto(err)
+			return err
 		}
 	}
 	s.log.Debugf("Finished EntriesRequest %+v", request)

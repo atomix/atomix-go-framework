@@ -208,7 +208,8 @@ func (s *ProxyServer) Events(request *_map.EventsRequest, srv _map.MapService_Ev
 		return errors.Proto(err)
 	}
 
-	stream := streams.NewBufferedStream()
+	ch := make(chan streams.Result)
+	stream := streams.NewChannelStream(ch)
 	service := storage.ServiceId{
 		Type:    Type,
 		Cluster: request.Headers.ClusterKey,
@@ -223,15 +224,10 @@ func (s *ProxyServer) Events(request *_map.EventsRequest, srv _map.MapService_Ev
 		return errors.Proto(err)
 	}
 
-	for {
-		result, ok := stream.Receive()
-		if !ok {
-			break
-		}
-
+	for result := range ch {
 		if result.Failed() {
 			if result.Error == context.Canceled {
-				return nil
+				break
 			}
 			s.log.Errorf("Request EventsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
@@ -247,7 +243,7 @@ func (s *ProxyServer) Events(request *_map.EventsRequest, srv _map.MapService_Ev
 		s.log.Debugf("Sending EventsResponse %+v", response)
 		if err = srv.Send(response); err != nil {
 			s.log.Errorf("Response EventsResponse failed: %v", err)
-			return errors.Proto(err)
+			return err
 		}
 	}
 	s.log.Debugf("Finished EventsRequest %+v", request)
@@ -262,7 +258,8 @@ func (s *ProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_
 		return errors.Proto(err)
 	}
 
-	stream := streams.NewBufferedStream()
+	ch := make(chan streams.Result)
+	stream := streams.NewChannelStream(ch)
 	service := storage.ServiceId{
 		Type:    Type,
 		Cluster: request.Headers.ClusterKey,
@@ -277,15 +274,10 @@ func (s *ProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_
 		return errors.Proto(err)
 	}
 
-	for {
-		result, ok := stream.Receive()
-		if !ok {
-			break
-		}
-
+	for result := range ch {
 		if result.Failed() {
 			if result.Error == context.Canceled {
-				return nil
+				break
 			}
 			s.log.Errorf("Request EntriesRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
@@ -301,7 +293,7 @@ func (s *ProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_
 		s.log.Debugf("Sending EntriesResponse %+v", response)
 		if err = srv.Send(response); err != nil {
 			s.log.Errorf("Response EntriesResponse failed: %v", err)
-			return errors.Proto(err)
+			return err
 		}
 	}
 	s.log.Debugf("Finished EntriesRequest %+v", request)

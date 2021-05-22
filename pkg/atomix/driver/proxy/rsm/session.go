@@ -152,6 +152,13 @@ func (s *Session) DoCommandStream(ctx context.Context, service rsm.ServiceId, na
 					return
 				}
 
+				if result.Failed() {
+					s.deleteStream(streamState.ID)
+					outStream.Error(result.Error)
+					outStream.Close()
+					return
+				}
+
 				response := result.Value.(PartitionOutput)
 				switch response.Type {
 				case rsm.SessionResponseType_OPEN_STREAM:
@@ -238,7 +245,6 @@ func (s *Session) DoQuery(ctx context.Context, service rsm.ServiceId, name strin
 	}
 	s.recordQueryResponse(requestContext, responseContext)
 	return response, nil
-
 }
 
 // doQuery submits a query to the service
@@ -285,6 +291,12 @@ func (s *Session) DoQueryStream(ctx context.Context, service rsm.ServiceId, name
 			select {
 			case result, ok := <-ch:
 				if !ok {
+					return
+				}
+
+				if result.Failed() {
+					outStream.Error(result.Error)
+					outStream.Close()
 					return
 				}
 
