@@ -429,7 +429,8 @@ func (m *indexedMapService) Events(events EventsProposal) error {
 	}
 	m.listeners[events.ID()] = listener
 	if events.Request().Replay {
-		for _, entry := range m.entries {
+		entry := m.firstEntry
+		for entry != nil {
 			if (listener.Key == "" && listener.Index == 0) ||
 				(listener.Key != "" && listener.Key == entry.Key) ||
 				(listener.Index != 0 && listener.Index == entry.Index) {
@@ -444,6 +445,7 @@ func (m *indexedMapService) Events(events EventsProposal) error {
 					return err
 				}
 			}
+			entry = entry.Next
 		}
 	}
 	return nil
