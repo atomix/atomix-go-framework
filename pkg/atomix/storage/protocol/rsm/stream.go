@@ -109,6 +109,7 @@ type sessionStream struct {
 	*opStream
 	cluster    cluster.Cluster
 	member     *cluster.Member
+	sn         uint64
 	responseID uint64
 	completeID uint64
 	lastIndex  Index
@@ -136,7 +137,7 @@ func (s *sessionStream) open() {
 			Command: &SessionCommandResponse{
 				Context: SessionResponseContext{
 					SessionID: uint64(s.session.ID()),
-					StreamID:  uint64(s.ID()),
+					StreamID:  s.sn,
 					Index:     uint64(s.lastIndex),
 					Sequence:  s.responseID,
 				},
@@ -194,7 +195,7 @@ func (s *sessionStream) Send(result streams.Result) {
 			Command: &SessionCommandResponse{
 				Context: SessionResponseContext{
 					SessionID: uint64(s.session.ID()),
-					StreamID:  uint64(s.ID()),
+					StreamID:  s.sn,
 					Index:     uint64(s.lastIndex),
 					Sequence:  s.responseID,
 				},
@@ -282,7 +283,7 @@ func (s *sessionStream) Close() {
 			Command: &SessionCommandResponse{
 				Context: SessionResponseContext{
 					SessionID: uint64(s.session.ID()),
-					StreamID:  uint64(s.ID()),
+					StreamID:  s.sn,
 					Index:     uint64(s.lastIndex),
 					Sequence:  s.responseID,
 				},

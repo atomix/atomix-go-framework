@@ -42,7 +42,8 @@ message SessionStreamSnapshot {
     uint64 stream_id = 1;
     string type = 2;
     uint64 sequence_number = 3;
-    uint64 last_completed = 4;
+    uint64 response_id = 4;
+    uint64 complete_id = 5;
 }
 
 message ServiceId {

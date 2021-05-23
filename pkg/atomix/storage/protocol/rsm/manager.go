@@ -24,7 +24,6 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/util"
 	"github.com/gogo/protobuf/proto"
 	"io"
-	"time"
 )
 
 // NewManager returns an initialized Manager
@@ -72,8 +71,9 @@ func (m *Manager) snapshotSessions(writer io.Writer) error {
 				streams = append(streams, &SessionStreamSnapshot{
 					StreamId:       uint64(stream.id),
 					Type:           string(stream.op),
-					SequenceNumber: stream.responseID,
-					LastCompleted:  stream.completeID,
+					SequenceNumber: stream.sn,
+					ResponseId:     stream.responseID,
+					CompleteId:     stream.completeID,
 				})
 			}
 			services = append(services, &SessionServiceSnapshot{
@@ -149,7 +149,7 @@ func (m *Manager) installSessions(reader io.Reader) error {
 
 		sessionManager := &sessionManager{
 			id:               SessionID(snapshot.SessionID),
-			timeout:          time.Duration(snapshot.Timeout),
+			timeout:          snapshot.Timeout,
 			lastUpdated:      snapshot.Timestamp,
 			ctx:              m.context,
 			commandSequence:  snapshot.CommandSequence,
@@ -176,8 +176,9 @@ func (m *Manager) installSessions(reader io.Reader) error {
 					},
 					cluster:    m.cluster,
 					member:     m.member,
-					responseID: stream.SequenceNumber,
-					completeID: stream.LastCompleted,
+					sn:         stream.SequenceNumber,
+					responseID: stream.ResponseId,
+					completeID: stream.CompleteId,
 					ctx:        m.context,
 					results:    list.New(),
 				}
@@ -364,7 +365,7 @@ func (m *Manager) applyServiceCommandOperation(request ServiceCommandRequest, co
 		stream.Send(result)
 		stream.Close()
 	} else if streamOp, ok := operation.(StreamingOperation); ok {
-		sessionStream := session.addStream(StreamID(context.SequenceNumber), operationID, stream)
+		sessionStream := session.addStream(StreamID(m.context.Index()), operationID, context.SequenceNumber, stream)
 		closer, err := streamOp.Execute(request.GetOperation().Value, session, sessionStream)
 		if err != nil {
 			stream.Error(err)

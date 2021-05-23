@@ -254,7 +254,7 @@ func (s *serviceSession) StreamsOf(op OperationID) []Stream {
 }
 
 // addStream adds a stream at the given sequence number
-func (s *serviceSession) addStream(id StreamID, op OperationID, outStream streams.WriteStream) *sessionStream {
+func (s *serviceSession) addStream(id StreamID, op OperationID, sn uint64, outStream streams.WriteStream) *sessionStream {
 	stream := &sessionStream{
 		opStream: &opStream{
 			id:      id,
@@ -262,6 +262,7 @@ func (s *serviceSession) addStream(id StreamID, op OperationID, outStream stream
 			session: s,
 			stream:  outStream,
 		},
+		sn:      sn,
 		cluster: s.cluster,
 		member:  s.member,
 		ctx:     s.ctx,
@@ -279,9 +280,9 @@ func (s *serviceSession) getStream(id StreamID) *sessionStream {
 }
 
 // ack acknowledges response streams up to the given request sequence number
-func (s *serviceSession) ack(id uint64, streams []SessionStreamContext) {
+func (s *serviceSession) ack(sn uint64, streams []SessionStreamContext) {
 	for responseID := range s.results {
-		if responseID > id {
+		if responseID > sn {
 			continue
 		}
 		delete(s.results, responseID)
@@ -294,13 +295,13 @@ func (s *serviceSession) ack(id uint64, streams []SessionStreamContext) {
 
 	for streamID, stream := range s.streams {
 		// If the stream ID is greater than the acknowledged sequence number, skip it
-		if uint64(stream.ID()) > id {
+		if stream.sn > sn {
 			continue
 		}
 
 		// If the stream is still held by the client, ack the stream.
 		// Otherwise, close the stream.
-		streamAck, open := streamAcks[uint64(stream.ID())]
+		streamAck, open := streamAcks[stream.sn]
 		if open {
 			stream.ack(streamAck)
 		} else {
