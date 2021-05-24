@@ -212,7 +212,11 @@ func (l *zapLogger) getChild(name string) (*zapLogger, error) {
 	}
 
 	// Create the child logger.
-	logger, err := newZapLogger(l.config, loggerConfig, l.Level())
+	level := l.defaultLevel
+	if l.level != nil {
+		level = *l.level
+	}
+	logger, err := newZapLogger(l.config, loggerConfig, level)
 	if err != nil {
 		return nil, err
 	}
