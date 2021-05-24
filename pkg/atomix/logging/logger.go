@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"sync/atomic"
 )
 
 var root *zapLogger
@@ -145,7 +144,6 @@ type zapLogger struct {
 	children     map[string]*zapLogger
 	outputs      []*zapOutput
 	mu           *sync.RWMutex
-	atomicLevel  atomic.Value
 	level        *Level
 	defaultLevel Level
 }
@@ -225,9 +223,10 @@ func (l *zapLogger) getChild(name string) (*zapLogger, error) {
 }
 
 func (l *zapLogger) Level() Level {
-	level := l.atomicLevel.Load()
-	if level != nil {
-		return *level.(*Level)
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	if l.level != nil {
+		return *l.level
 	}
 	return l.defaultLevel
 }
@@ -236,7 +235,6 @@ func (l *zapLogger) SetLevel(level Level) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.level = &level
-	l.atomicLevel.Store(&level)
 	for _, child := range l.children {
 		child.setDefaultLevel(level)
 	}
@@ -247,7 +245,6 @@ func (l *zapLogger) setDefaultLevel(level Level) {
 	defer l.mu.Unlock()
 	l.defaultLevel = level
 	if l.level == nil {
-		l.atomicLevel.Store(&level)
 		for _, child := range l.children {
 			child.setDefaultLevel(level)
 		}
@@ -265,7 +262,6 @@ func (l *zapLogger) WithFields(fields ...Field) Logger {
 		children:     l.children,
 		outputs:      outputs,
 		mu:           l.mu,
-		atomicLevel:  l.atomicLevel,
 		level:        l.level,
 		defaultLevel: l.defaultLevel,
 	}
