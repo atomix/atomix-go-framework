@@ -87,7 +87,7 @@ import (
 	{{- if .Request.IsStream }}
 	{{ import "io" }}
 	{{- end }}
-	{{- if .Response.IsStream }}
+	{{- if or .Type.IsAsync .Response.IsStream }}
 	{{ import "streams" "github.com/atomix/atomix-go-framework/pkg/atomix/stream" }}
 	{{- end }}
 	{{- end }}
@@ -117,7 +117,7 @@ type {{ $proxy }} struct {
 {{- range .Primitive.Methods }}
 {{- $name := ((printf "%s%sOp" $root.Generator.Prefix .Name) | toLowerCamel) }}
 {{- $method := . }}
-{{ if and .Request.IsUnary .Response.IsUnary }}
+{{ if and .Response.IsUnary .Type.IsSync }}
 func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "type" .Request.Type }}) (*{{ template "type" .Response.Type }}, error) {
 	s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
 	input, err := proto.Marshal(request)
@@ -191,6 +191,131 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
+
+	{{- if .Response.Aggregates }}
+	responses := make([]{{ template "type" $method.Response.Type }}, 0, len(outputs))
+	for _, output := range outputs {
+	    var response {{ template "type" $method.Response.Type }}
+        err := proto.Unmarshal(output.([]byte), &response)
+        if err != nil {
+            s.log.Errorf("Request {{ $method.Request.Type.Name }} failed: %v", err)
+            return nil, errors.Proto(err)
+        }
+        responses = append(responses, response)
+	}
+	{{- end }}
+
+	response := &{{ template "type" $method.Response.Type }}{}
+    {{- range .Response.Aggregates }}
+    {{- if .IsChooseFirst }}
+    response{{ template "field" . }} = responses[0]{{ template "field" . }}
+    {{- else if .IsAppend }}
+    for _, r := range responses {
+        response{{ template "field" . }} = append(response{{ template "field" . }}, r{{ template "field" . }}...)
+    }
+    {{- else if .IsSum }}
+    for _, r := range responses {
+        response{{ template "field" . }} += r{{ template "field" . }}
+    }
+    {{- end }}
+	{{- end }}
+	{{- end }}
+	s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
+	return response, nil
+}
+{{ else if .Type.IsAsync }}
+func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "type" .Request.Type }}) (*{{ template "type" .Response.Type }}, error) {
+	s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
+	input, err := proto.Marshal(request)
+	if err != nil {
+        s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
+	    return nil, errors.Proto(err)
+	}
+
+	{{- if .Scope.IsPartition }}
+	{{- if .Request.PartitionKey }}
+	partitionKey := {{ template "val" .Request.PartitionKey }}request{{ template "field" .Request.PartitionKey }}
+	{{- if and .Request.PartitionKey.Field.Type.IsBytes (not .Request.PartitionKey.Field.Type.IsCast) }}
+	partition := s.PartitionBy(partitionKey)
+	{{- else }}
+	{{- if .Request.PartitionKey.Field.Type.IsString }}
+    partition := s.PartitionBy([]byte(partitionKey))
+    {{- else }}
+    partition := s.PartitionBy([]byte(partitionKey.String()))
+    {{- end }}
+	{{- end }}
+	{{- else if .Request.PartitionRange }}
+	partitionRange := {{ template "val" .Request.PartitionRange }}request{{ template "field" .Request.PartitionRange }}
+	{{- else }}
+	clusterKey := request.Headers.ClusterKey
+	if clusterKey == "" {
+	    clusterKey = request{{ template "field" .Request.Headers }}.PrimitiveID.String()
+	}
+    partition := s.PartitionBy([]byte(clusterKey))
+	{{- end }}
+
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request{{ template "field" .Request.Headers }}.ClusterKey,
+		Name:    request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
+	}
+
+    ch := make(chan streams.Result)
+	stream := streams.NewChannelStream(ch)
+	err = partition.Do{{ template "optype" . }}Stream(ctx, service, {{ $name }}, input, stream)
+	if err != nil {
+        s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
+	    return nil, errors.Proto(err)
+	}
+
+	result, ok := <- ch
+	if !ok {
+	    return nil, context.Canceled
+	}
+
+    if result.Failed() {
+        s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", result.Error)
+        return nil, errors.Proto(result.Error)
+    }
+
+    response := &{{ template "type" .Response.Type }}{}
+    err = proto.Unmarshal(result.Value.([]byte), response)
+    if err != nil {
+        s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
+        return nil, errors.Proto(err)
+    }
+	{{- else if .Scope.IsGlobal }}
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request{{ template "field" .Request.Headers }}.ClusterKey,
+		Name:    request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
+	}
+	partitions := s.Partitions()
+	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
+        ch := make(chan streams.Result)
+        stream := streams.NewChannelStream(ch)
+		err := partitions[i].Do{{ template "optype" . }}Stream(srv.Context(), service, {{ $name }}, input, stream)
+		if err != nil {
+		    return nil, err
+		}
+
+        result, ok := <- ch
+        if !ok {
+            return nil, context.Canceled
+        }
+
+        if result.Failed() {
+            return nil, errors.Proto(result.Error)
+        }
+
+        response := &{{ template "type" .Response.Type }}{}
+        err = proto.Unmarshal(result.Value.([]byte), response)
+        if err != nil {
+            s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
+            return nil, errors.Proto(err)
+        }
+        return response, nil
+	})
 
 	{{- if .Response.Aggregates }}
 	responses := make([]{{ template "type" $method.Response.Type }}, 0, len(outputs))

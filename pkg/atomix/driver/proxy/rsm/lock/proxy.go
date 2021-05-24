@@ -8,6 +8,7 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	storage "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
+	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 )
 
@@ -50,14 +51,27 @@ func (s *ProxyServer) Lock(ctx context.Context, request *lock.LockRequest) (*loc
 		Cluster: request.Headers.ClusterKey,
 		Name:    request.Headers.PrimitiveID.Name,
 	}
-	output, err := partition.DoCommand(ctx, service, lockOp, input)
+
+	ch := make(chan streams.Result)
+	stream := streams.NewChannelStream(ch)
+	err = partition.DoCommandStream(ctx, service, lockOp, input, stream)
 	if err != nil {
 		s.log.Errorf("Request LockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
+	result, ok := <-ch
+	if !ok {
+		return nil, context.Canceled
+	}
+
+	if result.Failed() {
+		s.log.Errorf("Request LockRequest failed: %v", result.Error)
+		return nil, errors.Proto(result.Error)
+	}
+
 	response := &lock.LockResponse{}
-	err = proto.Unmarshal(output, response)
+	err = proto.Unmarshal(result.Value.([]byte), response)
 	if err != nil {
 		s.log.Errorf("Request LockRequest failed: %v", err)
 		return nil, errors.Proto(err)

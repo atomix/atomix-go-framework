@@ -29,6 +29,7 @@ func init() {
 func newService(context ServiceContext) Service {
 	return &lockService{
 		ServiceContext: context,
+		queue:          list.New(),
 		watchers:       make(map[ProposalID]Watcher),
 		timers:         make(map[ProposalID]rsm.Timer),
 	}
