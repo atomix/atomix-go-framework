@@ -155,7 +155,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	}
 	output, err := partition.Do{{ template "optype" . }}(ctx, service, {{ $name }}, input)
 	if err != nil {
-        s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
+        s.log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
 
@@ -188,7 +188,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	})
 	{{- end }}
 	if err != nil {
-        s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
+        s.log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
 
@@ -264,7 +264,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	stream := streams.NewChannelStream(ch)
 	err = partition.Do{{ template "optype" . }}Stream(ctx, service, {{ $name }}, input, stream)
 	if err != nil {
-        s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
+        s.log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
 
@@ -274,7 +274,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	}
 
     if result.Failed() {
-        s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", result.Error)
+        s.log.Warnf("Request {{ .Request.Type.Name }} failed: %v", result.Error)
         return nil, errors.Proto(result.Error)
     }
 
@@ -399,7 +399,7 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	})
 	{{- end }}
 	if err != nil {
-        s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
+        s.log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return errors.Proto(err)
 	}
 
@@ -408,7 +408,7 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 		    if result.Error == context.Canceled {
 		        break
 			}
-			s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", result.Error)
+			s.log.Warnf("Request {{ .Request.Type.Name }} failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 

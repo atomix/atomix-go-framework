@@ -53,7 +53,7 @@ func (s *ProxyServer) Set(ctx context.Context, request *value.SetRequest) (*valu
 	}
 	output, err := partition.DoCommand(ctx, service, setOp, input)
 	if err != nil {
-		s.log.Errorf("Request SetRequest failed: %v", err)
+		s.log.Warnf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -87,7 +87,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *value.GetRequest) (*valu
 	}
 	output, err := partition.DoQuery(ctx, service, getOp, input)
 	if err != nil {
-		s.log.Errorf("Request GetRequest failed: %v", err)
+		s.log.Warnf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -124,7 +124,7 @@ func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueServic
 	}
 	err = partition.DoCommandStream(srv.Context(), service, eventsOp, input, stream)
 	if err != nil {
-		s.log.Errorf("Request EventsRequest failed: %v", err)
+		s.log.Warnf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
@@ -133,7 +133,7 @@ func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueServic
 			if result.Error == context.Canceled {
 				break
 			}
-			s.log.Errorf("Request EventsRequest failed: %v", result.Error)
+			s.log.Warnf("Request EventsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 

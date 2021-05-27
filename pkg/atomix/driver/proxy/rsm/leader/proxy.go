@@ -53,7 +53,7 @@ func (s *ProxyServer) Latch(ctx context.Context, request *leader.LatchRequest) (
 	}
 	output, err := partition.DoCommand(ctx, service, latchOp, input)
 	if err != nil {
-		s.log.Errorf("Request LatchRequest failed: %v", err)
+		s.log.Warnf("Request LatchRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -87,7 +87,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *leader.GetRequest) (*lea
 	}
 	output, err := partition.DoQuery(ctx, service, getOp, input)
 	if err != nil {
-		s.log.Errorf("Request GetRequest failed: %v", err)
+		s.log.Warnf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -124,7 +124,7 @@ func (s *ProxyServer) Events(request *leader.EventsRequest, srv leader.LeaderLat
 	}
 	err = partition.DoCommandStream(srv.Context(), service, eventsOp, input, stream)
 	if err != nil {
-		s.log.Errorf("Request EventsRequest failed: %v", err)
+		s.log.Warnf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
@@ -133,7 +133,7 @@ func (s *ProxyServer) Events(request *leader.EventsRequest, srv leader.LeaderLat
 			if result.Error == context.Canceled {
 				break
 			}
-			s.log.Errorf("Request EventsRequest failed: %v", result.Error)
+			s.log.Warnf("Request EventsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 

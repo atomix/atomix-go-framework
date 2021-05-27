@@ -57,7 +57,7 @@ func (s *ProxyServer) Size(ctx context.Context, request *_map.SizeRequest) (*_ma
 		return partitions[i].DoQuery(ctx, service, sizeOp, input)
 	})
 	if err != nil {
-		s.log.Errorf("Request SizeRequest failed: %v", err)
+		s.log.Warnf("Request SizeRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	responses := make([]_map.SizeResponse, 0, len(outputs))
@@ -96,7 +96,7 @@ func (s *ProxyServer) Put(ctx context.Context, request *_map.PutRequest) (*_map.
 	}
 	output, err := partition.DoCommand(ctx, service, putOp, input)
 	if err != nil {
-		s.log.Errorf("Request PutRequest failed: %v", err)
+		s.log.Warnf("Request PutRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -127,7 +127,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *_map.GetRequest) (*_map.
 	}
 	output, err := partition.DoQuery(ctx, service, getOp, input)
 	if err != nil {
-		s.log.Errorf("Request GetRequest failed: %v", err)
+		s.log.Warnf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -158,7 +158,7 @@ func (s *ProxyServer) Remove(ctx context.Context, request *_map.RemoveRequest) (
 	}
 	output, err := partition.DoCommand(ctx, service, removeOp, input)
 	if err != nil {
-		s.log.Errorf("Request RemoveRequest failed: %v", err)
+		s.log.Warnf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -191,7 +191,7 @@ func (s *ProxyServer) Clear(ctx context.Context, request *_map.ClearRequest) (*_
 		return err
 	})
 	if err != nil {
-		s.log.Errorf("Request ClearRequest failed: %v", err)
+		s.log.Warnf("Request ClearRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -220,7 +220,7 @@ func (s *ProxyServer) Events(request *_map.EventsRequest, srv _map.MapService_Ev
 		return partitions[i].DoCommandStream(srv.Context(), service, eventsOp, input, stream)
 	})
 	if err != nil {
-		s.log.Errorf("Request EventsRequest failed: %v", err)
+		s.log.Warnf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
@@ -229,7 +229,7 @@ func (s *ProxyServer) Events(request *_map.EventsRequest, srv _map.MapService_Ev
 			if result.Error == context.Canceled {
 				break
 			}
-			s.log.Errorf("Request EventsRequest failed: %v", result.Error)
+			s.log.Warnf("Request EventsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 
@@ -270,7 +270,7 @@ func (s *ProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_
 		return partitions[i].DoQueryStream(srv.Context(), service, entriesOp, input, stream)
 	})
 	if err != nil {
-		s.log.Errorf("Request EntriesRequest failed: %v", err)
+		s.log.Warnf("Request EntriesRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
@@ -279,7 +279,7 @@ func (s *ProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_
 			if result.Error == context.Canceled {
 				break
 			}
-			s.log.Errorf("Request EntriesRequest failed: %v", result.Error)
+			s.log.Warnf("Request EntriesRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 

@@ -53,7 +53,7 @@ func (s *ProxyServer) Set(ctx context.Context, request *counter.SetRequest) (*co
 	}
 	output, err := partition.DoCommand(ctx, service, setOp, input)
 	if err != nil {
-		s.log.Errorf("Request SetRequest failed: %v", err)
+		s.log.Warnf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -87,7 +87,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *counter.GetRequest) (*co
 	}
 	output, err := partition.DoQuery(ctx, service, getOp, input)
 	if err != nil {
-		s.log.Errorf("Request GetRequest failed: %v", err)
+		s.log.Warnf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -121,7 +121,7 @@ func (s *ProxyServer) Increment(ctx context.Context, request *counter.IncrementR
 	}
 	output, err := partition.DoCommand(ctx, service, incrementOp, input)
 	if err != nil {
-		s.log.Errorf("Request IncrementRequest failed: %v", err)
+		s.log.Warnf("Request IncrementRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -155,7 +155,7 @@ func (s *ProxyServer) Decrement(ctx context.Context, request *counter.DecrementR
 	}
 	output, err := partition.DoCommand(ctx, service, decrementOp, input)
 	if err != nil {
-		s.log.Errorf("Request DecrementRequest failed: %v", err)
+		s.log.Warnf("Request DecrementRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 

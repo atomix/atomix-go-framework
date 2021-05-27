@@ -61,7 +61,7 @@ func (s *ProxyServer) Size(ctx context.Context, request *_log.SizeRequest) (*_lo
 	}
 	output, err := partition.DoQuery(ctx, service, sizeOp, input)
 	if err != nil {
-		s.log.Errorf("Request SizeRequest failed: %v", err)
+		s.log.Warnf("Request SizeRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -95,7 +95,7 @@ func (s *ProxyServer) Append(ctx context.Context, request *_log.AppendRequest) (
 	}
 	output, err := partition.DoCommand(ctx, service, appendOp, input)
 	if err != nil {
-		s.log.Errorf("Request AppendRequest failed: %v", err)
+		s.log.Warnf("Request AppendRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -129,7 +129,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *_log.GetRequest) (*_log.
 	}
 	output, err := partition.DoQuery(ctx, service, getOp, input)
 	if err != nil {
-		s.log.Errorf("Request GetRequest failed: %v", err)
+		s.log.Warnf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -163,7 +163,7 @@ func (s *ProxyServer) FirstEntry(ctx context.Context, request *_log.FirstEntryRe
 	}
 	output, err := partition.DoQuery(ctx, service, firstEntryOp, input)
 	if err != nil {
-		s.log.Errorf("Request FirstEntryRequest failed: %v", err)
+		s.log.Warnf("Request FirstEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -197,7 +197,7 @@ func (s *ProxyServer) LastEntry(ctx context.Context, request *_log.LastEntryRequ
 	}
 	output, err := partition.DoQuery(ctx, service, lastEntryOp, input)
 	if err != nil {
-		s.log.Errorf("Request LastEntryRequest failed: %v", err)
+		s.log.Warnf("Request LastEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -231,7 +231,7 @@ func (s *ProxyServer) PrevEntry(ctx context.Context, request *_log.PrevEntryRequ
 	}
 	output, err := partition.DoQuery(ctx, service, prevEntryOp, input)
 	if err != nil {
-		s.log.Errorf("Request PrevEntryRequest failed: %v", err)
+		s.log.Warnf("Request PrevEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -265,7 +265,7 @@ func (s *ProxyServer) NextEntry(ctx context.Context, request *_log.NextEntryRequ
 	}
 	output, err := partition.DoQuery(ctx, service, nextEntryOp, input)
 	if err != nil {
-		s.log.Errorf("Request NextEntryRequest failed: %v", err)
+		s.log.Warnf("Request NextEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -299,7 +299,7 @@ func (s *ProxyServer) Remove(ctx context.Context, request *_log.RemoveRequest) (
 	}
 	output, err := partition.DoCommand(ctx, service, removeOp, input)
 	if err != nil {
-		s.log.Errorf("Request RemoveRequest failed: %v", err)
+		s.log.Warnf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -333,7 +333,7 @@ func (s *ProxyServer) Clear(ctx context.Context, request *_log.ClearRequest) (*_
 	}
 	output, err := partition.DoCommand(ctx, service, clearOp, input)
 	if err != nil {
-		s.log.Errorf("Request ClearRequest failed: %v", err)
+		s.log.Warnf("Request ClearRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -370,7 +370,7 @@ func (s *ProxyServer) Events(request *_log.EventsRequest, srv _log.LogService_Ev
 	}
 	err = partition.DoCommandStream(srv.Context(), service, eventsOp, input, stream)
 	if err != nil {
-		s.log.Errorf("Request EventsRequest failed: %v", err)
+		s.log.Warnf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
@@ -379,7 +379,7 @@ func (s *ProxyServer) Events(request *_log.EventsRequest, srv _log.LogService_Ev
 			if result.Error == context.Canceled {
 				break
 			}
-			s.log.Errorf("Request EventsRequest failed: %v", result.Error)
+			s.log.Warnf("Request EventsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 
@@ -423,7 +423,7 @@ func (s *ProxyServer) Entries(request *_log.EntriesRequest, srv _log.LogService_
 	}
 	err = partition.DoQueryStream(srv.Context(), service, entriesOp, input, stream)
 	if err != nil {
-		s.log.Errorf("Request EntriesRequest failed: %v", err)
+		s.log.Warnf("Request EntriesRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
@@ -432,7 +432,7 @@ func (s *ProxyServer) Entries(request *_log.EntriesRequest, srv _log.LogService_
 			if result.Error == context.Canceled {
 				break
 			}
-			s.log.Errorf("Request EntriesRequest failed: %v", result.Error)
+			s.log.Warnf("Request EntriesRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 

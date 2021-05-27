@@ -56,7 +56,7 @@ func (s *ProxyServer) Lock(ctx context.Context, request *lock.LockRequest) (*loc
 	stream := streams.NewChannelStream(ch)
 	err = partition.DoCommandStream(ctx, service, lockOp, input, stream)
 	if err != nil {
-		s.log.Errorf("Request LockRequest failed: %v", err)
+		s.log.Warnf("Request LockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -66,7 +66,7 @@ func (s *ProxyServer) Lock(ctx context.Context, request *lock.LockRequest) (*loc
 	}
 
 	if result.Failed() {
-		s.log.Errorf("Request LockRequest failed: %v", result.Error)
+		s.log.Warnf("Request LockRequest failed: %v", result.Error)
 		return nil, errors.Proto(result.Error)
 	}
 
@@ -100,7 +100,7 @@ func (s *ProxyServer) Unlock(ctx context.Context, request *lock.UnlockRequest) (
 	}
 	output, err := partition.DoCommand(ctx, service, unlockOp, input)
 	if err != nil {
-		s.log.Errorf("Request UnlockRequest failed: %v", err)
+		s.log.Warnf("Request UnlockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -134,7 +134,7 @@ func (s *ProxyServer) GetLock(ctx context.Context, request *lock.GetLockRequest)
 	}
 	output, err := partition.DoQuery(ctx, service, getLockOp, input)
 	if err != nil {
-		s.log.Errorf("Request GetLockRequest failed: %v", err)
+		s.log.Warnf("Request GetLockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 

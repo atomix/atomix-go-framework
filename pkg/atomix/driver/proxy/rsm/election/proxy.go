@@ -57,7 +57,7 @@ func (s *ProxyServer) Enter(ctx context.Context, request *election.EnterRequest)
 	}
 	output, err := partition.DoCommand(ctx, service, enterOp, input)
 	if err != nil {
-		s.log.Errorf("Request EnterRequest failed: %v", err)
+		s.log.Warnf("Request EnterRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -91,7 +91,7 @@ func (s *ProxyServer) Withdraw(ctx context.Context, request *election.WithdrawRe
 	}
 	output, err := partition.DoCommand(ctx, service, withdrawOp, input)
 	if err != nil {
-		s.log.Errorf("Request WithdrawRequest failed: %v", err)
+		s.log.Warnf("Request WithdrawRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -125,7 +125,7 @@ func (s *ProxyServer) Anoint(ctx context.Context, request *election.AnointReques
 	}
 	output, err := partition.DoCommand(ctx, service, anointOp, input)
 	if err != nil {
-		s.log.Errorf("Request AnointRequest failed: %v", err)
+		s.log.Warnf("Request AnointRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -159,7 +159,7 @@ func (s *ProxyServer) Promote(ctx context.Context, request *election.PromoteRequ
 	}
 	output, err := partition.DoCommand(ctx, service, promoteOp, input)
 	if err != nil {
-		s.log.Errorf("Request PromoteRequest failed: %v", err)
+		s.log.Warnf("Request PromoteRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -193,7 +193,7 @@ func (s *ProxyServer) Evict(ctx context.Context, request *election.EvictRequest)
 	}
 	output, err := partition.DoCommand(ctx, service, evictOp, input)
 	if err != nil {
-		s.log.Errorf("Request EvictRequest failed: %v", err)
+		s.log.Warnf("Request EvictRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -227,7 +227,7 @@ func (s *ProxyServer) GetTerm(ctx context.Context, request *election.GetTermRequ
 	}
 	output, err := partition.DoQuery(ctx, service, getTermOp, input)
 	if err != nil {
-		s.log.Errorf("Request GetTermRequest failed: %v", err)
+		s.log.Warnf("Request GetTermRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -264,7 +264,7 @@ func (s *ProxyServer) Events(request *election.EventsRequest, srv election.Leade
 	}
 	err = partition.DoCommandStream(srv.Context(), service, eventsOp, input, stream)
 	if err != nil {
-		s.log.Errorf("Request EventsRequest failed: %v", err)
+		s.log.Warnf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
@@ -273,7 +273,7 @@ func (s *ProxyServer) Events(request *election.EventsRequest, srv election.Leade
 			if result.Error == context.Canceled {
 				break
 			}
-			s.log.Errorf("Request EventsRequest failed: %v", result.Error)
+			s.log.Warnf("Request EventsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 

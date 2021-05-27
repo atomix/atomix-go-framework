@@ -28,6 +28,11 @@ func init() {
 func newService(context ServiceContext) Service {
 	return &leaderService{
 		ServiceContext: context,
+		latch: leaderapi.Latch{
+			ObjectMeta: meta.ObjectMeta{
+				Revision: &meta.Revision{},
+			},
+		},
 	}
 }
 
@@ -88,7 +93,19 @@ func (l *leaderService) updateLatch(newParticipants []string) (leaderapi.Latch, 
 		return l.latch, nil
 	}
 
-	var newLatch leaderapi.Latch
+	newLatch := leaderapi.Latch{
+		ObjectMeta: meta.ObjectMeta{
+			Timestamp: &meta.Timestamp{
+				Timestamp: &meta.Timestamp_PhysicalTimestamp{
+					PhysicalTimestamp: &meta.PhysicalTimestamp{
+						Time: l.Scheduler().Time(),
+					},
+				},
+			},
+		},
+		Participants: newParticipants,
+	}
+
 	if len(newParticipants) == 0 {
 		newLatch.ObjectMeta.Revision = oldLatch.ObjectMeta.Revision
 	} else {
@@ -102,13 +119,6 @@ func (l *leaderService) updateLatch(newParticipants []string) (leaderapi.Latch, 
 		}
 	}
 
-	newLatch.ObjectMeta.Timestamp = &meta.Timestamp{
-		Timestamp: &meta.Timestamp_PhysicalTimestamp{
-			PhysicalTimestamp: &meta.PhysicalTimestamp{
-				Time: l.Scheduler().Time(),
-			},
-		},
-	}
 	l.latch = newLatch
 	err := l.notify(leaderapi.Event{
 		Type:  leaderapi.Event_CHANGE,
