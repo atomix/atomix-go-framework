@@ -11,15 +11,15 @@ import (
 )
 
 // NewProxyServer creates a new ProxyServer
-func NewProxyServer(client *gossip.Client) value.ValueServiceServer {
+func NewProxyServer(server *gossip.Server) value.ValueServiceServer {
 	return &ProxyServer{
-		Client: client,
+		Server: server,
 		log:    logging.GetLogger("atomix", "value"),
 	}
 }
 
 type ProxyServer struct {
-	*gossip.Client
+	*gossip.Server
 	log logging.Logger
 }
 

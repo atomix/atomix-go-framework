@@ -103,14 +103,13 @@ func (p *Peer) connect() error {
 				return
 			} else {
 				log.Debugf("Received GossipMessage %s->%s %+v", p.ID, p.group.memberID, msg)
-				replica, err := p.group.partition.getReplica(ctx, p.group.serviceID)
-				if err != nil {
-					log.Error(err)
-					return
-				}
-
 				switch m := msg.Message.(type) {
 				case *GossipMessage_Advertise:
+					replica, err := p.group.partition.getReplica(ctx, p.group.serviceID, &m.Advertise.Header.Timestamp)
+					if err != nil {
+						log.Error(err)
+						return
+					}
 					p.clock.Update(time.NewTimestamp(m.Advertise.Header.Timestamp))
 					object, err := replica.Read(stream.Context(), m.Advertise.Key)
 					if err != nil {
@@ -155,6 +154,11 @@ func (p *Peer) connect() error {
 						}
 					}
 				case *GossipMessage_Update:
+					replica, err := p.group.partition.getReplica(ctx, p.group.serviceID, &m.Update.Header.Timestamp)
+					if err != nil {
+						log.Error(err)
+						return
+					}
 					p.clock.Update(time.NewTimestamp(m.Update.Header.Timestamp))
 					err = replica.Update(stream.Context(), &m.Update.Object)
 					if err != nil {

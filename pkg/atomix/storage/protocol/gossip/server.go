@@ -16,11 +16,14 @@ package gossip
 
 import (
 	"context"
+	metaapi "github.com/atomix/atomix-api/go/atomix/primitive/meta"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"io"
+	"strconv"
 )
 
 func RegisterGossipServer(server *grpc.Server, manager *Manager) {
@@ -50,7 +53,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 	init := msg.GetInitialize()
 	senderID := init.Header.MemberID
 	log.Debugf("Received GossipMessage %s->%s %+v", senderID, localID, msg)
-	replica, err := s.getReplica(stream.Context(), init.Header.PartitionID, init.Header.ServiceID)
+	replica, err := s.getReplica(stream.Context(), init.Header.PartitionID, init.Header.ServiceID, &init.Header.Timestamp)
 	if err != nil {
 		return errors.Proto(err)
 	}
@@ -66,7 +69,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 		log.Debugf("Received GossipMessage %s->%s %+v", senderID, localID, msg)
 		switch m := msg.Message.(type) {
 		case *GossipMessage_Advertise:
-			s.manager.clock.Update(time.NewTimestamp(m.Advertise.Header.Timestamp))
+			replica.Clock().Update(time.NewTimestamp(m.Advertise.Header.Timestamp))
 			object, err := replica.Read(stream.Context(), m.Advertise.Key)
 			if err != nil {
 				return err
@@ -76,7 +79,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 						Message: &GossipMessage_Update{
 							Update: &Update{
 								Header: GossipHeader{
-									Timestamp: s.manager.clock.Scheme().Codec().EncodeTimestamp(s.manager.clock.Increment()),
+									Timestamp: replica.Clock().Scheme().Codec().EncodeTimestamp(replica.Clock().Increment()),
 								},
 								Object: *object,
 							},
@@ -92,7 +95,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 						Message: &GossipMessage_Advertise{
 							Advertise: &Advertise{
 								Header: GossipHeader{
-									Timestamp: s.manager.clock.Scheme().Codec().EncodeTimestamp(s.manager.clock.Increment()),
+									Timestamp: replica.Clock().Scheme().Codec().EncodeTimestamp(replica.Clock().Increment()),
 								},
 								ObjectMeta: object.ObjectMeta,
 								Key:        object.Key,
@@ -107,7 +110,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 				}
 			}
 		case *GossipMessage_Update:
-			s.manager.clock.Update(time.NewTimestamp(m.Update.Header.Timestamp))
+			replica.Clock().Update(time.NewTimestamp(m.Update.Header.Timestamp))
 			err := replica.Update(stream.Context(), &m.Update.Object)
 			if err != nil {
 				return err
@@ -119,18 +122,18 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 func (s *GossipServer) Read(ctx context.Context, request *ReadRequest) (*ReadResponse, error) {
 	member, _ := s.manager.Cluster.Member()
 	log.Debugf("Received ReadRequest %s->%s %+v", request.Header.MemberID, member.ID, request)
-	timestamp := s.manager.clock.Update(time.NewTimestamp(request.Header.Timestamp))
-	replica, err := s.getReplica(ctx, request.Header.PartitionID, request.Header.ServiceID)
+	replica, err := s.getReplica(ctx, request.Header.PartitionID, request.Header.ServiceID, &request.Header.Timestamp)
 	if err != nil {
 		return nil, errors.Proto(err)
 	}
+	timestamp := replica.Clock().Update(time.NewTimestamp(request.Header.Timestamp))
 	object, err := replica.Read(ctx, request.Key)
 	if err != nil {
 		return nil, errors.Proto(err)
 	}
 	response := &ReadResponse{
 		Header: ResponseHeader{
-			Timestamp: s.manager.clock.Scheme().Codec().EncodeTimestamp(timestamp),
+			Timestamp: replica.Clock().Scheme().Codec().EncodeTimestamp(timestamp),
 		},
 		Object: object,
 	}
@@ -141,11 +144,11 @@ func (s *GossipServer) Read(ctx context.Context, request *ReadRequest) (*ReadRes
 func (s *GossipServer) ReadAll(request *ReadAllRequest, stream GossipProtocol_ReadAllServer) error {
 	member, _ := s.manager.Cluster.Member()
 	log.Debugf("Received ReadAllRequest %s->%s %+v", request.Header.MemberID, member.ID, request)
-	timestamp := s.manager.clock.Update(time.NewTimestamp(request.Header.Timestamp))
-	replica, err := s.getReplica(stream.Context(), request.Header.PartitionID, request.Header.ServiceID)
+	replica, err := s.getReplica(stream.Context(), request.Header.PartitionID, request.Header.ServiceID, &request.Header.Timestamp)
 	if err != nil {
 		return errors.Proto(err)
 	}
+	timestamp := replica.Clock().Update(time.NewTimestamp(request.Header.Timestamp))
 
 	objectCh := make(chan Object)
 	errCh := make(chan error)
@@ -163,7 +166,7 @@ func (s *GossipServer) ReadAll(request *ReadAllRequest, stream GossipProtocol_Re
 			if ok {
 				response := &ReadAllResponse{
 					Header: ResponseHeader{
-						Timestamp: s.manager.clock.Scheme().Codec().EncodeTimestamp(timestamp),
+						Timestamp: replica.Clock().Scheme().Codec().EncodeTimestamp(timestamp),
 					},
 					Object: object,
 				}
@@ -189,10 +192,36 @@ func (s *GossipServer) ReadAll(request *ReadAllRequest, stream GossipProtocol_Re
 	}
 }
 
-func (s *GossipServer) getReplica(ctx context.Context, partitionID PartitionID, serviceID ServiceId) (Replica, error) {
+func (s *GossipServer) getReplica(ctx context.Context, partitionID PartitionID, serviceID ServiceId, timestamp *metaapi.Timestamp) (Replica, error) {
 	partition, err := s.manager.Partition(partitionID)
 	if err != nil {
 		return nil, err
 	}
-	return partition.getReplica(ctx, serviceID)
+	return partition.getReplica(ctx, serviceID, timestamp)
+}
+
+func getClockFromTimestamp(timestamp metaapi.Timestamp) time.Clock {
+	switch timestamp.Timestamp.(type) {
+	case *metaapi.Timestamp_LogicalTimestamp:
+		return time.NewLogicalClock()
+	case *metaapi.Timestamp_PhysicalTimestamp:
+		return time.NewPhysicalClock()
+	}
+	return time.NewLogicalClock()
+}
+
+func getReplicationFactorFromContext(ctx context.Context) int {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return 0
+	}
+	replicas := md.Get("Replication-Factor")
+	if len(replicas) == 0 {
+		return 0
+	}
+	i, err := strconv.Atoi(replicas[0])
+	if err != nil {
+		return 0
+	}
+	return i
 }

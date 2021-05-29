@@ -114,6 +114,10 @@ type mapService struct {
 	mu       sync.RWMutex
 }
 
+func (s *mapService) Protocol() GossipProtocol {
+	return s.protocol
+}
+
 func (s *mapService) Size(ctx context.Context, _ *mapapi.SizeRequest) (*mapapi.SizeResponse, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

@@ -3,10 +3,12 @@ package set
 
 import (
 	"context"
+	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
 	set "github.com/atomix/atomix-api/go/atomix/primitive/set"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/gossip"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
 	"google.golang.org/grpc"
 )
 
@@ -29,9 +31,30 @@ type Server struct {
 	log     logging.Logger
 }
 
+func (s *Server) addRequestHeaders(service Service, headers *primitiveapi.RequestHeaders) {
+	var timestamp time.Timestamp
+	if headers.Timestamp != nil {
+		timestamp = service.Protocol().Clock().Update(time.NewTimestamp(*headers.Timestamp))
+	} else {
+		timestamp = service.Protocol().Clock().Increment()
+	}
+	timestampProto := service.Protocol().Clock().Scheme().Codec().EncodeTimestamp(timestamp)
+	headers.Timestamp = &timestampProto
+}
+
+func (s *Server) addResponseHeaders(service Service, headers *primitiveapi.ResponseHeaders) {
+	var timestamp time.Timestamp
+	if headers.Timestamp != nil {
+		timestamp = service.Protocol().Clock().Update(time.NewTimestamp(*headers.Timestamp))
+	} else {
+		timestamp = service.Protocol().Clock().Increment()
+	}
+	timestampProto := service.Protocol().Clock().Scheme().Codec().EncodeTimestamp(timestamp)
+	headers.Timestamp = &timestampProto
+}
+
 func (s *Server) Size(ctx context.Context, request *set.SizeRequest) (*set.SizeResponse, error) {
 	s.log.Debugf("Received SizeRequest %+v", request)
-	s.manager.AddRequestHeaders(&request.Headers)
 	partition, err := s.manager.PartitionFrom(ctx)
 	if err != nil {
 		s.log.Errorf("Request SizeRequest %+v failed: %v", request, err)
@@ -44,25 +67,25 @@ func (s *Server) Size(ctx context.Context, request *set.SizeRequest) (*set.SizeR
 		Name:    request.Headers.PrimitiveID.Name,
 	}
 
-	service, err := partition.GetService(ctx, serviceID)
+	service, err := partition.GetService(ctx, serviceID, request.Headers.Timestamp)
 	if err != nil {
 		s.log.Errorf("Request SizeRequest %+v failed: %v", request, err)
 		return nil, errors.Proto(err)
 	}
 
+	s.addRequestHeaders(service.(Service), &request.Headers)
 	response, err := service.(Service).Size(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request SizeRequest %+v failed: %v", request, err)
 		return nil, errors.Proto(err)
 	}
-	s.manager.AddResponseHeaders(&response.Headers)
+	s.addResponseHeaders(service.(Service), &response.Headers)
 	s.log.Debugf("Sending SizeResponse %+v", response)
 	return response, nil
 }
 
 func (s *Server) Contains(ctx context.Context, request *set.ContainsRequest) (*set.ContainsResponse, error) {
 	s.log.Debugf("Received ContainsRequest %+v", request)
-	s.manager.AddRequestHeaders(&request.Headers)
 	partition, err := s.manager.PartitionFrom(ctx)
 	if err != nil {
 		s.log.Errorf("Request ContainsRequest %+v failed: %v", request, err)
@@ -75,25 +98,25 @@ func (s *Server) Contains(ctx context.Context, request *set.ContainsRequest) (*s
 		Name:    request.Headers.PrimitiveID.Name,
 	}
 
-	service, err := partition.GetService(ctx, serviceID)
+	service, err := partition.GetService(ctx, serviceID, request.Headers.Timestamp)
 	if err != nil {
 		s.log.Errorf("Request ContainsRequest %+v failed: %v", request, err)
 		return nil, errors.Proto(err)
 	}
 
+	s.addRequestHeaders(service.(Service), &request.Headers)
 	response, err := service.(Service).Contains(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request ContainsRequest %+v failed: %v", request, err)
 		return nil, errors.Proto(err)
 	}
-	s.manager.AddResponseHeaders(&response.Headers)
+	s.addResponseHeaders(service.(Service), &response.Headers)
 	s.log.Debugf("Sending ContainsResponse %+v", response)
 	return response, nil
 }
 
 func (s *Server) Add(ctx context.Context, request *set.AddRequest) (*set.AddResponse, error) {
 	s.log.Debugf("Received AddRequest %+v", request)
-	s.manager.AddRequestHeaders(&request.Headers)
 	partition, err := s.manager.PartitionFrom(ctx)
 	if err != nil {
 		s.log.Errorf("Request AddRequest %+v failed: %v", request, err)
@@ -106,25 +129,25 @@ func (s *Server) Add(ctx context.Context, request *set.AddRequest) (*set.AddResp
 		Name:    request.Headers.PrimitiveID.Name,
 	}
 
-	service, err := partition.GetService(ctx, serviceID)
+	service, err := partition.GetService(ctx, serviceID, request.Headers.Timestamp)
 	if err != nil {
 		s.log.Errorf("Request AddRequest %+v failed: %v", request, err)
 		return nil, errors.Proto(err)
 	}
 
+	s.addRequestHeaders(service.(Service), &request.Headers)
 	response, err := service.(Service).Add(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request AddRequest %+v failed: %v", request, err)
 		return nil, errors.Proto(err)
 	}
-	s.manager.AddResponseHeaders(&response.Headers)
+	s.addResponseHeaders(service.(Service), &response.Headers)
 	s.log.Debugf("Sending AddResponse %+v", response)
 	return response, nil
 }
 
 func (s *Server) Remove(ctx context.Context, request *set.RemoveRequest) (*set.RemoveResponse, error) {
 	s.log.Debugf("Received RemoveRequest %+v", request)
-	s.manager.AddRequestHeaders(&request.Headers)
 	partition, err := s.manager.PartitionFrom(ctx)
 	if err != nil {
 		s.log.Errorf("Request RemoveRequest %+v failed: %v", request, err)
@@ -137,25 +160,25 @@ func (s *Server) Remove(ctx context.Context, request *set.RemoveRequest) (*set.R
 		Name:    request.Headers.PrimitiveID.Name,
 	}
 
-	service, err := partition.GetService(ctx, serviceID)
+	service, err := partition.GetService(ctx, serviceID, request.Headers.Timestamp)
 	if err != nil {
 		s.log.Errorf("Request RemoveRequest %+v failed: %v", request, err)
 		return nil, errors.Proto(err)
 	}
 
+	s.addRequestHeaders(service.(Service), &request.Headers)
 	response, err := service.(Service).Remove(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request RemoveRequest %+v failed: %v", request, err)
 		return nil, errors.Proto(err)
 	}
-	s.manager.AddResponseHeaders(&response.Headers)
+	s.addResponseHeaders(service.(Service), &response.Headers)
 	s.log.Debugf("Sending RemoveResponse %+v", response)
 	return response, nil
 }
 
 func (s *Server) Clear(ctx context.Context, request *set.ClearRequest) (*set.ClearResponse, error) {
 	s.log.Debugf("Received ClearRequest %+v", request)
-	s.manager.AddRequestHeaders(&request.Headers)
 	partition, err := s.manager.PartitionFrom(ctx)
 	if err != nil {
 		s.log.Errorf("Request ClearRequest %+v failed: %v", request, err)
@@ -168,26 +191,25 @@ func (s *Server) Clear(ctx context.Context, request *set.ClearRequest) (*set.Cle
 		Name:    request.Headers.PrimitiveID.Name,
 	}
 
-	service, err := partition.GetService(ctx, serviceID)
+	service, err := partition.GetService(ctx, serviceID, request.Headers.Timestamp)
 	if err != nil {
 		s.log.Errorf("Request ClearRequest %+v failed: %v", request, err)
 		return nil, errors.Proto(err)
 	}
 
+	s.addRequestHeaders(service.(Service), &request.Headers)
 	response, err := service.(Service).Clear(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request ClearRequest %+v failed: %v", request, err)
 		return nil, errors.Proto(err)
 	}
-	s.manager.AddResponseHeaders(&response.Headers)
+	s.addResponseHeaders(service.(Service), &response.Headers)
 	s.log.Debugf("Sending ClearResponse %+v", response)
 	return response, nil
 }
 
 func (s *Server) Events(request *set.EventsRequest, srv set.SetService_EventsServer) error {
 	s.log.Debugf("Received EventsRequest %+v", request)
-	s.manager.AddRequestHeaders(&request.Headers)
-
 	partition, err := s.manager.PartitionFrom(srv.Context())
 	if err != nil {
 		s.log.Errorf("Request EventsRequest %+v failed: %v", request, err)
@@ -200,11 +222,13 @@ func (s *Server) Events(request *set.EventsRequest, srv set.SetService_EventsSer
 		Name:    request.Headers.PrimitiveID.Name,
 	}
 
-	service, err := partition.GetService(srv.Context(), serviceID)
+	service, err := partition.GetService(srv.Context(), serviceID, request.Headers.Timestamp)
 	if err != nil {
 		s.log.Errorf("Request EventsRequest %+v failed: %v", request, err)
 		return err
 	}
+
+	s.addRequestHeaders(service.(Service), &request.Headers)
 
 	responseCh := make(chan set.EventsResponse)
 	errCh := make(chan error)
@@ -220,7 +244,7 @@ func (s *Server) Events(request *set.EventsRequest, srv set.SetService_EventsSer
 		select {
 		case response, ok := <-responseCh:
 			if ok {
-				s.manager.AddResponseHeaders(&response.Headers)
+				s.addResponseHeaders(service.(Service), &response.Headers)
 				s.log.Debugf("Sending EventsResponse %v", response)
 				err = srv.Send(&response)
 				if err != nil {
@@ -240,8 +264,6 @@ func (s *Server) Events(request *set.EventsRequest, srv set.SetService_EventsSer
 
 func (s *Server) Elements(request *set.ElementsRequest, srv set.SetService_ElementsServer) error {
 	s.log.Debugf("Received ElementsRequest %+v", request)
-	s.manager.AddRequestHeaders(&request.Headers)
-
 	partition, err := s.manager.PartitionFrom(srv.Context())
 	if err != nil {
 		s.log.Errorf("Request ElementsRequest %+v failed: %v", request, err)
@@ -254,11 +276,13 @@ func (s *Server) Elements(request *set.ElementsRequest, srv set.SetService_Eleme
 		Name:    request.Headers.PrimitiveID.Name,
 	}
 
-	service, err := partition.GetService(srv.Context(), serviceID)
+	service, err := partition.GetService(srv.Context(), serviceID, request.Headers.Timestamp)
 	if err != nil {
 		s.log.Errorf("Request ElementsRequest %+v failed: %v", request, err)
 		return err
 	}
+
+	s.addRequestHeaders(service.(Service), &request.Headers)
 
 	responseCh := make(chan set.ElementsResponse)
 	errCh := make(chan error)
@@ -274,7 +298,7 @@ func (s *Server) Elements(request *set.ElementsRequest, srv set.SetService_Eleme
 		select {
 		case response, ok := <-responseCh:
 			if ok {
-				s.manager.AddResponseHeaders(&response.Headers)
+				s.addResponseHeaders(service.(Service), &response.Headers)
 				s.log.Debugf("Sending ElementsResponse %v", response)
 				err = srv.Send(&response)
 				if err != nil {

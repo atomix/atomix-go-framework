@@ -21,6 +21,7 @@ import (
 	valueproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive/value"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/gossip"
 	valuero "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/ro/value"
+	"github.com/gogo/protobuf/jsonpb"
 	"google.golang.org/grpc"
 )
 
@@ -51,7 +52,11 @@ func (p *valueType) RegisterServer(s *grpc.Server) {
 }
 
 func (p *valueType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
-	server := NewProxyServer(p.protocol.Client)
+	config := gossip.GossipConfig{}
+	if err := jsonpb.UnmarshalString(string(options.Config), &config); err != nil {
+		return err
+	}
+	server := NewProxyServer(gossip.NewServer(p.protocol.Client, config))
 	if !options.Write {
 		server = valuero.NewProxyServer(server)
 	}

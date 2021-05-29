@@ -27,9 +27,9 @@ type PartitionID uint32
 // NewPartition returns a new replica
 func NewPartition(config protocolapi.ProtocolPartition, cluster Cluster) Partition {
 	return &partition{
-		id:       PartitionID(config.PartitionID),
-		cluster:  cluster,
-		replicas: make(map[ReplicaID]*Replica),
+		id:           PartitionID(config.PartitionID),
+		cluster:      cluster,
+		replicasByID: make(map[ReplicaID]*Replica),
 	}
 }
 
@@ -42,7 +42,7 @@ type Partition interface {
 	// Replica looks up a replica in the partition
 	Replica(id ReplicaID) (*Replica, bool)
 	// Replicas returns the set of all replicas in the partition
-	Replicas() ReplicaSet
+	Replicas() []*Replica
 	// Watch watches the partition for changes
 	Watch(ctx context.Context, ch chan<- ReplicaSet) error
 }
@@ -54,12 +54,13 @@ type ConfigurablePartition interface {
 
 // partition is a cluster partition
 type partition struct {
-	id       PartitionID
-	cluster  Cluster
-	replicas map[ReplicaID]*Replica
-	watchers []chan<- ReplicaSet
-	configMu sync.RWMutex
-	updateMu sync.Mutex
+	id           PartitionID
+	cluster      Cluster
+	replicas     ReplicaSet
+	replicasByID map[ReplicaID]*Replica
+	watchers     []chan<- ReplicaSet
+	configMu     sync.RWMutex
+	updateMu     sync.Mutex
 }
 
 func (p *partition) ID() PartitionID {
@@ -81,19 +82,17 @@ func (p *partition) Member() (*Member, bool) {
 
 // Replica returns a replica by ID
 func (p *partition) Replica(id ReplicaID) (*Replica, bool) {
-	replica, ok := p.replicas[id]
+	replica, ok := p.replicasByID[id]
 	return replica, ok
 }
 
 // Replicas returns the current replicas
-func (p *partition) Replicas() ReplicaSet {
+func (p *partition) Replicas() []*Replica {
 	p.configMu.RLock()
 	defer p.configMu.RUnlock()
-	copy := make(ReplicaSet)
-	for id, replica := range p.replicas {
-		copy[id] = replica
-	}
-	return copy
+	replicas := make([]*Replica, 0, len(p.replicas))
+	copy(replicas, p.replicas)
+	return replicas
 }
 
 // Update updates the partition configuration
@@ -102,27 +101,30 @@ func (p *partition) Update(config protocolapi.ProtocolPartition) error {
 	defer p.updateMu.Unlock()
 	p.configMu.Lock()
 
-	replicas := make(map[ReplicaID]*Replica)
+	replicas := make(ReplicaSet, 0, len(config.Replicas))
+	replicasByID := make(map[ReplicaID]*Replica)
 	for _, id := range config.Replicas {
 		replicaID := ReplicaID(id)
 		replica, ok := p.cluster.Replica(replicaID)
 		if !ok {
 			return errors.NewNotFound("replica '%s' not a member of the cluster", replicaID)
 		}
-		replicas[ReplicaID(replicaID)] = replica
+		replicas = append(replicas, replica)
+		replicasByID[replicaID] = replica
 	}
 
-	for id := range p.replicas {
-		if _, ok := replicas[id]; !ok {
-			delete(p.replicas, id)
+	for id := range p.replicasByID {
+		if _, ok := replicasByID[id]; !ok {
+			delete(p.replicasByID, id)
 		}
 	}
 
-	for id, replica := range replicas {
-		if _, ok := p.replicas[id]; !ok {
-			p.replicas[id] = replica
+	for id, replica := range replicasByID {
+		if _, ok := p.replicasByID[id]; !ok {
+			p.replicasByID[id] = replica
 		}
 	}
+	p.replicas = replicas
 	p.configMu.Unlock()
 
 	p.configMu.RLock()

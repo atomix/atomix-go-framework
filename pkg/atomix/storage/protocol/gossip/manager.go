@@ -16,24 +16,20 @@ package gossip
 
 import (
 	"context"
-	"github.com/atomix/atomix-api/go/atomix/primitive"
-	"github.com/atomix/atomix-api/go/atomix/primitive/meta"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/util"
 	"google.golang.org/grpc/metadata"
 	"strconv"
 )
 
 // newManager creates a new CRDT manager
-func newManager(cluster cluster.Cluster, scheme time.Scheme, registry *Registry) *Manager {
-	clock := scheme.NewClock()
+func newManager(cluster cluster.Cluster, registry *Registry) *Manager {
 	partitions := cluster.Partitions()
 	proxyPartitions := make([]*Partition, 0, len(partitions))
 	proxyPartitionsByID := make(map[PartitionID]*Partition)
 	for _, partition := range partitions {
-		proxyPartition := NewPartition(partition, clock, registry)
+		proxyPartition := NewPartition(partition, registry)
 		proxyPartitions = append(proxyPartitions, proxyPartition)
 		proxyPartitionsByID[proxyPartition.ID] = proxyPartition
 	}
@@ -41,7 +37,6 @@ func newManager(cluster cluster.Cluster, scheme time.Scheme, registry *Registry)
 		Cluster:        cluster,
 		partitions:     proxyPartitions,
 		partitionsByID: proxyPartitionsByID,
-		clock:          clock,
 	}
 }
 
@@ -50,26 +45,6 @@ type Manager struct {
 	Cluster        cluster.Cluster
 	partitions     []*Partition
 	partitionsByID map[PartitionID]*Partition
-	clock          time.Clock
-}
-
-func (m *Manager) addTimestamp(timestamp *meta.Timestamp) *meta.Timestamp {
-	var t time.Timestamp
-	if timestamp != nil {
-		t = m.clock.Update(time.NewTimestamp(*timestamp))
-	} else {
-		t = m.clock.Increment()
-	}
-	proto := m.clock.Scheme().Codec().EncodeTimestamp(t)
-	return &proto
-}
-
-func (m *Manager) AddRequestHeaders(headers *primitive.RequestHeaders) {
-	headers.Timestamp = m.addTimestamp(headers.Timestamp)
-}
-
-func (m *Manager) AddResponseHeaders(headers *primitive.ResponseHeaders) {
-	headers.Timestamp = m.addTimestamp(headers.Timestamp)
 }
 
 func (m *Manager) Partition(partitionID PartitionID) (*Partition, error) {

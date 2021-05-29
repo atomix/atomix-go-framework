@@ -96,6 +96,10 @@ type setService struct {
 	mu       sync.RWMutex
 }
 
+func (s *setService) Protocol() GossipProtocol {
+	return s.protocol
+}
+
 func (s *setService) Size(ctx context.Context, _ *setapi.SizeRequest) (*setapi.SizeResponse, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

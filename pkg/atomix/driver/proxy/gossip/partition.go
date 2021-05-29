@@ -27,51 +27,29 @@ import (
 	"sync"
 )
 
-// NewPartition creates a new proxy partition
-func NewPartition(c cluster.Cluster, p cluster.Partition, clock time.Clock) *Partition {
-	return &Partition{
+// newPartitionClient creates a new proxy partition client
+func newPartitionClient(c cluster.Cluster, p cluster.Partition) *PartitionClient {
+	return &PartitionClient{
 		ID:        PartitionID(p.ID()),
 		Partition: p,
 		cluster:   c,
-		clock:     clock,
 	}
 }
 
 // PartitionID is a partition identifier
 type PartitionID int
 
-// Partition is a proxy partition
-type Partition struct {
+// partitionClient is a proxy partition client
+type PartitionClient struct {
 	cluster.Partition
 	cluster cluster.Cluster
-	clock   time.Clock
 	ID      PartitionID
 	conn    *grpc.ClientConn
 	mu      sync.RWMutex
 }
 
-func (p *Partition) addTimestamp(timestamp *meta.Timestamp) *meta.Timestamp {
-	var t time.Timestamp
-	if timestamp != nil {
-		t = p.clock.Update(time.NewTimestamp(*timestamp))
-	} else {
-		t = p.clock.Increment()
-	}
-	proto := p.clock.Scheme().Codec().EncodeTimestamp(t)
-	return &proto
-}
-
-func (p *Partition) AddRequestHeaders(ctx context.Context, headers *primitive.RequestHeaders) context.Context {
-	headers.Timestamp = p.addTimestamp(headers.Timestamp)
-	return metadata.AppendToOutgoingContext(ctx, "Partition-ID", fmt.Sprint(p.ID))
-}
-
-func (p *Partition) AddResponseHeaders(headers *primitive.ResponseHeaders) {
-	headers.Timestamp = p.addTimestamp(headers.Timestamp)
-}
-
 // Connect gets the connection to the partition
-func (p *Partition) Connect() (*grpc.ClientConn, error) {
+func (p *PartitionClient) Connect() (*grpc.ClientConn, error) {
 	p.mu.RLock()
 	conn := p.conn
 	p.mu.RUnlock()
@@ -110,8 +88,8 @@ func (p *Partition) Connect() (*grpc.ClientConn, error) {
 	return conn, nil
 }
 
-// close closes the connections
-func (p *Partition) Close() error {
+// Close closes the connections
+func (p *PartitionClient) Close() error {
 	p.mu.Lock()
 	conn := p.conn
 	p.conn = nil
@@ -120,4 +98,41 @@ func (p *Partition) Close() error {
 		return conn.Close()
 	}
 	return nil
+}
+
+func newPartition(client *PartitionClient, clock time.Clock, replicas int) *Partition {
+	return &Partition{
+		PartitionClient: client,
+		clock:           clock,
+		replicas:        replicas,
+	}
+}
+
+type Partition struct {
+	*PartitionClient
+	clock    time.Clock
+	replicas int
+}
+
+func (p *Partition) addTimestamp(timestamp *meta.Timestamp) *meta.Timestamp {
+	var t time.Timestamp
+	if timestamp != nil {
+		t = p.clock.Update(time.NewTimestamp(*timestamp))
+	} else {
+		t = p.clock.Increment()
+	}
+	proto := p.clock.Scheme().Codec().EncodeTimestamp(t)
+	return &proto
+}
+
+func (p *Partition) AddRequestHeaders(ctx context.Context, headers *primitive.RequestHeaders) context.Context {
+	headers.Timestamp = p.addTimestamp(headers.Timestamp)
+	return metadata.AppendToOutgoingContext(
+		ctx,
+		"Partition-ID", fmt.Sprint(p.ID),
+		"Replication-Factor", fmt.Sprint(p.replicas))
+}
+
+func (p *Partition) AddResponseHeaders(headers *primitive.ResponseHeaders) {
+	headers.Timestamp = p.addTimestamp(headers.Timestamp)
 }

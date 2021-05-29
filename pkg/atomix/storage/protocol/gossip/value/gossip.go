@@ -15,15 +15,15 @@ import (
 
 const antiEntropyPeriod = time.Second
 
-func newGossipProtocol(serviceID gossip.ServiceId, partition *gossip.Partition, clock atime.Clock) (GossipProtocol, error) {
-	peers, err := gossip.NewPeerGroup(partition, serviceID)
+func newGossipProtocol(serviceID gossip.ServiceId, partition *gossip.Partition, clock atime.Clock, replicas int) (GossipProtocol, error) {
+	peers, err := gossip.NewPeerGroup(partition, serviceID, clock, replicas)
 	if err != nil {
 		return nil, err
 	}
 	return &gossipProtocol{
 		clock:  clock,
 		group:  newGossipGroup(peers),
-		server: newGossipServer(serviceID, partition),
+		server: newGossipServer(serviceID, partition, clock),
 	}, nil
 }
 
@@ -179,22 +179,24 @@ func (p *gossipGroup) Update(ctx context.Context, state *ValueState) error {
 
 var _ GossipGroup = &gossipGroup{}
 
-func newGossipServer(serviceID gossip.ServiceId, partition *gossip.Partition) GossipServer {
+func newGossipServer(serviceID gossip.ServiceId, partition *gossip.Partition, clock atime.Clock) GossipServer {
 	return &gossipServer{
 		serviceID: serviceID,
 		partition: partition,
+		clock:     clock,
 	}
 }
 
 type gossipServer struct {
 	serviceID     gossip.ServiceId
 	partition     *gossip.Partition
+	clock         atime.Clock
 	gossipHandler GossipHandler
 }
 
 func (s *gossipServer) Register(handler GossipHandler) error {
 	s.gossipHandler = handler
-	return s.partition.RegisterReplica(newReplica(s.serviceID, handler))
+	return s.partition.RegisterReplica(newReplica(s.serviceID, s.clock, handler))
 }
 
 func (s *gossipServer) handler() GossipHandler {
@@ -270,20 +272,26 @@ func (p *gossipMember) Update(ctx context.Context, state *ValueState) error {
 
 var _ GossipMember = &gossipMember{}
 
-func newReplica(serviceID gossip.ServiceId, handler GossipHandler) gossip.Replica {
+func newReplica(serviceID gossip.ServiceId, clock atime.Clock, handler GossipHandler) gossip.Replica {
 	return &gossipReplica{
 		serviceID: serviceID,
+		clock:     clock,
 		handler:   handler,
 	}
 }
 
 type gossipReplica struct {
 	serviceID gossip.ServiceId
+	clock     atime.Clock
 	handler   GossipHandler
 }
 
 func (s *gossipReplica) ID() gossip.ServiceId {
 	return s.serviceID
+}
+
+func (s *gossipReplica) Clock() atime.Clock {
+	return s.clock
 }
 
 func (s *gossipReplica) Type() gossip.ServiceType {

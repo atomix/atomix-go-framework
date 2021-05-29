@@ -29,16 +29,16 @@ import (
 {{ $root := . }}
 
 // New{{ $proxy }} creates a new {{ $proxy }}
-func New{{ $proxy }}(client *gossip.Client) {{ $service }} {
+func New{{ $proxy }}(server *gossip.Server) {{ $service }} {
 	return &{{ $proxy }}{
-        Client: client,
+        Server: server,
         log:    logging.GetLogger("atomix", {{ .Primitive.Name | lower | quote }}),
     }
 }
 
 {{- $primitive := .Primitive }}
 type {{ $proxy }} struct {
-	*gossip.Client
+	*gossip.Server
 	log logging.Logger
 }
 

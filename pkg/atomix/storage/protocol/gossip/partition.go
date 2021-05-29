@@ -16,18 +16,17 @@ package gossip
 
 import (
 	"context"
+	"github.com/atomix/atomix-api/go/atomix/primitive/meta"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
 	"sync"
 )
 
 // NewPartition creates a new proxy partition
-func NewPartition(p cluster.Partition, clock time.Clock, registry *Registry) *Partition {
+func NewPartition(p cluster.Partition, registry *Registry) *Partition {
 	return &Partition{
 		ID:        PartitionID(p.ID()),
 		Partition: p,
-		clock:     clock,
 		registry:  registry,
 		services:  make(map[ServiceId]Service),
 		replicas:  make(map[ServiceId]Replica),
@@ -40,7 +39,6 @@ type PartitionID int
 // Partition is a proxy partition
 type Partition struct {
 	cluster.Partition
-	clock      time.Clock
 	registry   *Registry
 	ID         PartitionID
 	services   map[ServiceId]Service
@@ -49,7 +47,7 @@ type Partition struct {
 	replicasMu sync.RWMutex
 }
 
-func (p *Partition) GetService(ctx context.Context, serviceID ServiceId) (Service, error) {
+func (p *Partition) GetService(ctx context.Context, serviceID ServiceId, timestamp *meta.Timestamp) (Service, error) {
 	p.servicesMu.RLock()
 	service, ok := p.services[serviceID]
 	p.servicesMu.RUnlock()
@@ -68,7 +66,7 @@ func (p *Partition) GetService(ctx context.Context, serviceID ServiceId) (Servic
 	if err != nil {
 		return nil, err
 	}
-	service, err = f(ctx, serviceID, p, p.clock)
+	service, err = f(ctx, serviceID, p, getClockFromTimestamp(*timestamp), getReplicationFactorFromContext(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -86,12 +84,12 @@ func (p *Partition) RegisterReplica(replica Replica) error {
 	return nil
 }
 
-func (p *Partition) getReplica(ctx context.Context, serviceID ServiceId) (Replica, error) {
+func (p *Partition) getReplica(ctx context.Context, serviceID ServiceId, timestamp *meta.Timestamp) (Replica, error) {
 	p.replicasMu.RLock()
 	replica, ok := p.replicas[serviceID]
 	p.replicasMu.RUnlock()
 	if !ok {
-		_, err := p.GetService(ctx, serviceID)
+		_, err := p.GetService(ctx, serviceID, timestamp)
 		if err != nil {
 			return nil, err
 		}

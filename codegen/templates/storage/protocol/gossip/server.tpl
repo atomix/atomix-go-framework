@@ -7,8 +7,10 @@ package {{ .Package.Name }}
 
 import (
 	"context"
+	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/gossip"
 	"google.golang.org/grpc"
 	{{- $package := .Package }}
@@ -41,6 +43,28 @@ func new{{ $server }}(manager *gossip.Manager) {{ .Primitive.Type.Package.Alias 
 type {{ $server }} struct {
     manager *gossip.Manager
 	log logging.Logger
+}
+
+func (s *{{ $server }}) addRequestHeaders(service Service, headers *primitiveapi.RequestHeaders) {
+	var timestamp time.Timestamp
+	if headers.Timestamp != nil {
+		timestamp = service.Protocol().Clock().Update(time.NewTimestamp(*headers.Timestamp))
+	} else {
+		timestamp = service.Protocol().Clock().Increment()
+	}
+	timestampProto := service.Protocol().Clock().Scheme().Codec().EncodeTimestamp(timestamp)
+	headers.Timestamp = &timestampProto
+}
+
+func (s *{{ $server }}) addResponseHeaders(service Service, headers *primitiveapi.ResponseHeaders) {
+	var timestamp time.Timestamp
+	if headers.Timestamp != nil {
+		timestamp = service.Protocol().Clock().Update(time.NewTimestamp(*headers.Timestamp))
+	} else {
+		timestamp = service.Protocol().Clock().Increment()
+	}
+	timestampProto := service.Protocol().Clock().Scheme().Codec().EncodeTimestamp(timestamp)
+	headers.Timestamp = &timestampProto
 }
 
 {{- define "type" -}}
@@ -109,7 +133,6 @@ Query
 {{ if and .Request.IsUnary .Response.IsUnary }}
 func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "type" .Request.Type }}) (*{{ template "type" .Response.Type }}, error) {
 	s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
-	s.manager.AddRequestHeaders({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
 	partition, err := s.manager.PartitionFrom(ctx)
     if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
@@ -122,26 +145,25 @@ func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "t
         Name:    request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
     }
 
-    service, err := partition.GetService(ctx, serviceID)
+    service, err := partition.GetService(ctx, serviceID, request.Headers.Timestamp)
     if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
         return nil, errors.Proto(err)
     }
 
+	s.addRequestHeaders(service.({{ $service }}), {{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
     response, err := service.({{ $service }}).{{ .Name }}(ctx, request)
     if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
         return nil, errors.Proto(err)
     }
-    s.manager.AddResponseHeaders({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
+    s.addResponseHeaders(service.({{ $service }}), {{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
 	s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
 	return response, nil
 }
 {{ else if .Response.IsStream }}
 func (s *{{ $server }}) {{ .Name }}(request *{{ template "type" .Request.Type }}, srv {{ template "type" $primitive.Type }}_{{ .Name }}Server) error {
     s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
-	s.manager.AddRequestHeaders({{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
-
 	partition, err := s.manager.PartitionFrom(srv.Context())
     if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
@@ -154,11 +176,13 @@ func (s *{{ $server }}) {{ .Name }}(request *{{ template "type" .Request.Type }}
         Name:    request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
     }
 
-    service, err := partition.GetService(srv.Context(), serviceID)
+    service, err := partition.GetService(srv.Context(), serviceID, request.Headers.Timestamp)
     if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} %+v failed: %v", request, err)
         return err
     }
+
+	s.addRequestHeaders(service.({{ $service }}), {{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
 
     responseCh := make(chan {{ template "type" .Response.Type }})
     errCh := make(chan error)
@@ -174,7 +198,7 @@ func (s *{{ $server }}) {{ .Name }}(request *{{ template "type" .Request.Type }}
         select {
         case response, ok := <-responseCh:
             if ok {
-                s.manager.AddResponseHeaders({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
+                s.addResponseHeaders(service.({{ $service }}), {{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
                 s.log.Debugf("Sending {{ .Response.Type.Name }} %v", response)
                 err = srv.Send(&response)
                 if err != nil {

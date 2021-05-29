@@ -20,15 +20,14 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/server"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
 	"google.golang.org/grpc"
 )
 
 // NewProtocol creates a new state machine protocol
-func NewProtocol(cluster cluster.Cluster, env env.DriverEnv, scheme time.Scheme) *Protocol {
+func NewProtocol(cluster cluster.Cluster, env env.DriverEnv) *Protocol {
 	return &Protocol{
 		Server:     server.NewServer(cluster),
-		Client:     NewClient(cluster, scheme),
+		Client:     NewClient(cluster),
 		Env:        env,
 		primitives: primitive.NewPrimitiveTypeRegistry(),
 	}

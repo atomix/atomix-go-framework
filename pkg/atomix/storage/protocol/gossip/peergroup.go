@@ -19,11 +19,12 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/util/async"
 	"sync"
 )
 
-func NewPeerGroup(partition *Partition, serviceID ServiceId) (*PeerGroup, error) {
+func NewPeerGroup(partition *Partition, serviceID ServiceId, clock time.Clock, replicas int) (*PeerGroup, error) {
 	var localMemberID MemberID
 	member, ok := partition.Partition.Member()
 	if ok {
@@ -33,6 +34,8 @@ func NewPeerGroup(partition *Partition, serviceID ServiceId) (*PeerGroup, error)
 		memberID:  localMemberID,
 		partition: partition,
 		serviceID: serviceID,
+		clock:     clock,
+		replicas:  replicas,
 	}
 	if err := group.start(); err != nil {
 		return nil, err
@@ -47,6 +50,8 @@ type PeerGroup struct {
 	peersByID map[PeerID]*Peer
 	peers     []*Peer
 	peersMu   sync.RWMutex
+	clock     time.Clock
+	replicas  int
 	cancel    context.CancelFunc
 }
 
@@ -78,19 +83,25 @@ func (g *PeerGroup) watchReplicas(watchCh <-chan cluster.ReplicaSet) {
 	}
 }
 
-func (g *PeerGroup) updatePeers(replicaSet cluster.ReplicaSet) error {
+func (g *PeerGroup) updatePeers(replicas cluster.ReplicaSet) error {
 	g.peersMu.Lock()
 	defer g.peersMu.Unlock()
 
+	replicationFactor := g.replicas
+	if replicationFactor == 0 || replicationFactor > len(replicas) {
+		replicationFactor = len(replicas)
+	}
+
 	peers := make([]*Peer, 0, len(g.peers)+1)
 	peersByID := make(map[PeerID]*Peer)
-	for replicaID, replica := range replicaSet {
+	for i := 0; i < replicationFactor; i++ {
+		replica := replicas[i]
 		if member, ok := g.partition.Member(); !ok || replica.ID == member.ID {
 			continue
 		}
-		peer, ok := g.peersByID[PeerID(replicaID)]
+		peer, ok := g.peersByID[PeerID(replica.ID)]
 		if !ok {
-			p, err := newPeer(g, replica, g.partition.clock)
+			p, err := newPeer(g, replica, g.clock)
 			if err != nil {
 				return err
 			}

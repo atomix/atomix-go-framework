@@ -21,6 +21,7 @@ import (
 	counterdriver "github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive/counter"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/gossip"
 	counterro "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/ro/counter"
+	"github.com/gogo/protobuf/jsonpb"
 	"google.golang.org/grpc"
 )
 
@@ -51,7 +52,11 @@ func (p *counterType) RegisterServer(s *grpc.Server) {
 }
 
 func (p *counterType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
-	server := NewProxyServer(p.protocol.Client)
+	config := gossip.GossipConfig{}
+	if err := jsonpb.UnmarshalString(string(options.Config), &config); err != nil {
+		return err
+	}
+	server := NewProxyServer(gossip.NewServer(p.protocol.Client, config))
 	if !options.Write {
 		server = counterro.NewProxyServer(server)
 	}

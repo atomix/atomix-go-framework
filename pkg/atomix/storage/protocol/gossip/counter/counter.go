@@ -81,6 +81,10 @@ type counterService struct {
 	mu       sync.RWMutex
 }
 
+func (s *counterService) Protocol() GossipProtocol {
+	return s.protocol
+}
+
 func (s *counterService) getValue() int64 {
 	var value int64
 	for _, delta := range s.state.Increments {

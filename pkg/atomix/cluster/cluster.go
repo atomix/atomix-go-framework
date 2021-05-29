@@ -57,11 +57,11 @@ func NewCluster(config protocolapi.ProtocolConfig, opts ...Option) Cluster {
 	}
 
 	c := &cluster{
-		member:     member,
-		replicas:   make(ReplicaSet),
-		partitions: make(PartitionSet),
-		options:    *options,
-		watchers:   make([]chan<- PartitionSet, 0),
+		member:       member,
+		replicasByID: make(map[ReplicaID]*Replica),
+		partitions:   make(PartitionSet),
+		options:      *options,
+		watchers:     make([]chan<- PartitionSet, 0),
 	}
 	_ = c.Update(config)
 	return c
@@ -89,13 +89,14 @@ type ConfigurableCluster interface {
 
 // cluster manages the peer group for a client
 type cluster struct {
-	member     *Member
-	options    options
-	replicas   ReplicaSet
-	partitions PartitionSet
-	watchers   []chan<- PartitionSet
-	configMu   sync.RWMutex
-	updateMu   sync.Mutex
+	member       *Member
+	options      options
+	replicas     ReplicaSet
+	replicasByID map[ReplicaID]*Replica
+	partitions   PartitionSet
+	watchers     []chan<- PartitionSet
+	configMu     sync.RWMutex
+	updateMu     sync.Mutex
 }
 
 // Member returns the local group member
@@ -112,7 +113,7 @@ func (c *cluster) Member() (*Member, bool) {
 func (c *cluster) Replica(id ReplicaID) (*Replica, bool) {
 	c.configMu.RLock()
 	defer c.configMu.RUnlock()
-	replica, ok := c.replicas[id]
+	replica, ok := c.replicasByID[id]
 	return replica, ok
 }
 
@@ -120,11 +121,9 @@ func (c *cluster) Replica(id ReplicaID) (*Replica, bool) {
 func (c *cluster) Replicas() ReplicaSet {
 	c.configMu.RLock()
 	defer c.configMu.RUnlock()
-	copy := make(ReplicaSet)
-	for id, replica := range c.replicas {
-		copy[id] = replica
-	}
-	return copy
+	replicas := make([]*Replica, 0, len(c.replicas))
+	copy(replicas, c.replicas)
+	return replicas
 }
 
 // Partition returns the given partition
@@ -157,16 +156,20 @@ func (c *cluster) Update(config protocolapi.ProtocolConfig) error {
 	}
 
 	c.configMu.Lock()
-	for id := range c.replicas {
+	for id := range c.replicasByID {
 		if _, ok := replicaConfigs[id]; !ok {
-			delete(c.replicas, id)
+			delete(c.replicasByID, id)
 		}
 	}
 
+	replicas := make(ReplicaSet, 0, len(config.Replicas))
 	for id, replicaConfig := range replicaConfigs {
-		if _, ok := c.replicas[id]; !ok {
-			c.replicas[id] = NewReplica(replicaConfig)
+		replica, ok := c.replicasByID[id]
+		if !ok {
+			replica = NewReplica(replicaConfig)
+			c.replicasByID[id] = replica
 		}
+		replicas = append(replicas, replica)
 	}
 
 	partitionConfigs := make(map[PartitionID]protocolapi.ProtocolPartition)
@@ -189,6 +192,8 @@ func (c *cluster) Update(config protocolapi.ProtocolConfig) error {
 		}
 		partitions = append(partitions, partition)
 	}
+
+	c.replicas = replicas
 	c.configMu.Unlock()
 
 	for _, partition := range partitions {
@@ -259,7 +264,7 @@ var _ ConfigurableCluster = &cluster{}
 type NodeID string
 
 // ReplicaSet is a set of replicas
-type ReplicaSet map[ReplicaID]*Replica
+type ReplicaSet []*Replica
 
 // PartitionSet is a set of partitions
 type PartitionSet map[PartitionID]Partition

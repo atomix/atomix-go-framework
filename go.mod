@@ -3,7 +3,7 @@ module github.com/atomix/atomix-go-framework
 go 1.13
 
 require (
-	github.com/atomix/atomix-api/go v0.4.4
+	github.com/atomix/atomix-api/go v0.4.5
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.4.2

@@ -25,7 +25,7 @@ import (
 type RegisterServerFunc func(server *grpc.Server, manager *Manager)
 
 // NewServiceFunc is a function for creating a replica
-type NewServiceFunc func(ctx context.Context, serviceID ServiceId, partition *Partition, clock time.Clock) (Service, error)
+type NewServiceFunc func(ctx context.Context, serviceID ServiceId, partition *Partition, clock time.Clock, replicas int) (Service, error)
 
 // Registry is the default primitive registry
 type Registry struct {

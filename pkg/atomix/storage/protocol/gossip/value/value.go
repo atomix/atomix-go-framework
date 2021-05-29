@@ -73,6 +73,10 @@ type valueService struct {
 	mu       sync.RWMutex
 }
 
+func (s *valueService) Protocol() GossipProtocol {
+	return s.protocol
+}
+
 func (s *valueService) Set(ctx context.Context, request *valueapi.SetRequest) (*valueapi.SetResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -29,14 +29,14 @@ func RegisterPrimitiveServer(server *grpc.Server, client *Client, env env.Driver
 
 func newPrimitiveServer(client *Client, env env.DriverEnv) primitiveapi.PrimitiveServer {
 	return &PrimitiveServer{
-		Client: client,
+		Server: NewServer(client, GossipConfig{}),
 		env:    env,
 		log:    logging.GetLogger("atomix", "primitive"),
 	}
 }
 
 type PrimitiveServer struct {
-	*Client
+	*Server
 	env env.DriverEnv
 	log logging.Logger
 }

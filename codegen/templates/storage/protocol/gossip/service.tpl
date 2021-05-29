@@ -28,8 +28,8 @@ const {{ $serviceType }} gossip.ServiceType = {{ .Primitive.Name | quote }}
 
 // RegisterService registers the service on the given node
 func RegisterService(node *gossip.Node) {
-	node.RegisterService(ServiceType, func(ctx context.Context, serviceID gossip.ServiceId, partition *gossip.Partition, clock time.Clock) (gossip.Service, error) {
-		protocol, err := newGossipProtocol(serviceID, partition, clock)
+	node.RegisterService(ServiceType, func(ctx context.Context, serviceID gossip.ServiceId, partition *gossip.Partition, clock time.Clock, replicas int) (gossip.Service, error) {
+		protocol, err := newGossipProtocol(serviceID, partition, clock, replicas)
 		if err != nil {
 			return nil, err
 		}
@@ -51,6 +51,7 @@ func registerService(f func(protocol GossipProtocol) (Service, error)) {
 
 type Service interface {
 	gossip.Service
+	Protocol() GossipProtocol
     {{- range .Primitive.Methods }}
 
     {{- $comments := split .Comment "\n" }}
