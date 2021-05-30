@@ -57,11 +57,11 @@ func NewCluster(config protocolapi.ProtocolConfig, opts ...Option) Cluster {
 	}
 
 	c := &cluster{
-		member:       member,
-		replicasByID: make(map[ReplicaID]*Replica),
-		partitions:   make(PartitionSet),
-		options:      *options,
-		watchers:     make([]chan<- PartitionSet, 0),
+		member:         member,
+		replicasByID:   make(map[ReplicaID]*Replica),
+		partitionsByID: make(map[PartitionID]Partition),
+		options:        *options,
+		watchers:       make([]chan<- PartitionSet, 0),
 	}
 	_ = c.Update(config)
 	return c
@@ -89,14 +89,15 @@ type ConfigurableCluster interface {
 
 // cluster manages the peer group for a client
 type cluster struct {
-	member       *Member
-	options      options
-	replicas     ReplicaSet
-	replicasByID map[ReplicaID]*Replica
-	partitions   PartitionSet
-	watchers     []chan<- PartitionSet
-	configMu     sync.RWMutex
-	updateMu     sync.Mutex
+	member         *Member
+	options        options
+	replicas       ReplicaSet
+	replicasByID   map[ReplicaID]*Replica
+	partitions     PartitionSet
+	partitionsByID map[PartitionID]Partition
+	watchers       []chan<- PartitionSet
+	configMu       sync.RWMutex
+	updateMu       sync.Mutex
 }
 
 // Member returns the local group member
@@ -130,7 +131,7 @@ func (c *cluster) Replicas() ReplicaSet {
 func (c *cluster) Partition(id PartitionID) (Partition, bool) {
 	c.configMu.RLock()
 	defer c.configMu.RUnlock()
-	partition, ok := c.partitions[id]
+	partition, ok := c.partitionsByID[id]
 	return partition, ok
 }
 
@@ -138,11 +139,9 @@ func (c *cluster) Partition(id PartitionID) (Partition, bool) {
 func (c *cluster) Partitions() PartitionSet {
 	c.configMu.RLock()
 	defer c.configMu.RUnlock()
-	copy := make(PartitionSet)
-	for id, partition := range c.partitions {
-		copy[id] = partition
-	}
-	return copy
+	partitions := make([]Partition, len(c.partitions))
+	copy(partitions, c.partitions)
+	return partitions
 }
 
 // Update updates the cluster configuration
@@ -177,23 +176,24 @@ func (c *cluster) Update(config protocolapi.ProtocolConfig) error {
 		partitionConfigs[PartitionID(partition.PartitionID)] = partition
 	}
 
-	for id := range c.partitions {
+	partitions := make(PartitionSet, 0, len(config.Partitions))
+	for id := range c.partitionsByID {
 		if _, ok := partitionConfigs[id]; !ok {
-			delete(c.partitions, id)
+			delete(c.partitionsByID, id)
 		}
 	}
 
-	partitions := make([]Partition, 0, len(partitionConfigs))
 	for id, partitionConfig := range partitionConfigs {
-		partition, ok := c.partitions[id]
+		partition, ok := c.partitionsByID[id]
 		if !ok {
 			partition = NewPartition(partitionConfig, c)
-			c.partitions[id] = partition
+			c.partitionsByID[id] = partition
 		}
 		partitions = append(partitions, partition)
 	}
 
 	c.replicas = replicas
+	c.partitions = partitions
 	c.configMu.Unlock()
 
 	for _, partition := range partitions {
@@ -267,4 +267,4 @@ type NodeID string
 type ReplicaSet []*Replica
 
 // PartitionSet is a set of partitions
-type PartitionSet map[PartitionID]Partition
+type PartitionSet []Partition

@@ -72,6 +72,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 			replica.Clock().Update(time.NewTimestamp(m.Advertise.Header.Timestamp))
 			object, err := replica.Read(stream.Context(), m.Advertise.Key)
 			if err != nil {
+				log.Error(err)
 				return err
 			} else if object != nil {
 				if meta.FromProto(object.ObjectMeta).After(meta.FromProto(m.Advertise.ObjectMeta)) {
@@ -88,6 +89,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 					log.Debugf("Sending GossipMessage %s->%s %+v", localID, senderID, msg)
 					err := stream.Send(msg)
 					if err != nil {
+						log.Error(err)
 						return err
 					}
 				} else if meta.FromProto(m.Advertise.ObjectMeta).After(meta.FromProto(object.ObjectMeta)) {
@@ -105,6 +107,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 					log.Debugf("Sending GossipMessage %s->%s %+v", localID, senderID, msg)
 					err := stream.Send(msg)
 					if err != nil {
+						log.Error(err)
 						return err
 					}
 				}
@@ -113,6 +116,7 @@ func (s *GossipServer) Gossip(stream GossipProtocol_GossipServer) error {
 			replica.Clock().Update(time.NewTimestamp(m.Update.Header.Timestamp))
 			err := replica.Update(stream.Context(), &m.Update.Object)
 			if err != nil {
+				log.Error(err)
 				return err
 			}
 		}

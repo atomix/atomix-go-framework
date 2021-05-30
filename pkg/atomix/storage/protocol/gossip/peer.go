@@ -63,8 +63,10 @@ type Peer struct {
 }
 
 func (p *Peer) connect() error {
+	log.Debugf("Connecting to %s", p.replica.ID)
 	conn, err := p.replica.Connect(context.Background(), cluster.WithDialOption(grpc.WithInsecure()))
 	if err != nil {
+		log.Warnf("Connecting to %s failed: %v", p.replica.ID, err)
 		return err
 	}
 	p.client = NewGossipProtocolClient(conn)
@@ -72,6 +74,7 @@ func (p *Peer) connect() error {
 	stream, err := p.client.Gossip(ctx)
 	if err != nil {
 		cancel()
+		log.Warnf("Connecting to %s failed: %v", p.replica.ID, err)
 		return err
 	}
 	p.cancel = cancel
@@ -90,6 +93,7 @@ func (p *Peer) connect() error {
 	log.Debugf("Sending GossipMessage %s->%s %+v", p.group.memberID, p.ID, msg)
 	err = stream.Send(msg)
 	if err != nil {
+		log.Warnf("Sending GossipMessage %s->%s %+v failed: %v", p.group.memberID, p.ID, msg, err)
 		return err
 	}
 
@@ -185,6 +189,7 @@ func (p *Peer) connect() error {
 				log.Debugf("Sending GossipMessage %s->%s %+v", p.group.memberID, p.ID, msg)
 				err := stream.Send(msg)
 				if err != nil {
+					log.Error(err)
 					return
 				}
 			case update := <-p.updateCh:
@@ -197,6 +202,7 @@ func (p *Peer) connect() error {
 				log.Debugf("Sending GossipMessage %s->%s %+v", p.group.memberID, p.ID, msg)
 				err := stream.Send(msg)
 				if err != nil {
+					log.Error(err)
 					return
 				}
 			case <-ctx.Done():
