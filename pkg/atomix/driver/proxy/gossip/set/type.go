@@ -53,8 +53,10 @@ func (p *setType) RegisterServer(s *grpc.Server) {
 
 func (p *setType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
 	config := gossip.GossipConfig{}
-	if err := jsonpb.UnmarshalString(string(options.Config), &config); err != nil {
-		return err
+	if options.Config != nil {
+		if err := jsonpb.UnmarshalString(string(options.Config), &config); err != nil {
+			return err
+		}
 	}
 	server := NewProxyServer(gossip.NewServer(p.protocol.Client, config))
 	if !options.Write {
