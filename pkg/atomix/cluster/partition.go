@@ -90,7 +90,7 @@ func (p *partition) Replica(id ReplicaID) (*Replica, bool) {
 func (p *partition) Replicas() []*Replica {
 	p.configMu.RLock()
 	defer p.configMu.RUnlock()
-	replicas := make([]*Replica, 0, len(p.replicas))
+	replicas := make([]*Replica, len(p.replicas))
 	copy(replicas, p.replicas)
 	return replicas
 }

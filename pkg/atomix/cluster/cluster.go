@@ -121,7 +121,7 @@ func (c *cluster) Replica(id ReplicaID) (*Replica, bool) {
 func (c *cluster) Replicas() ReplicaSet {
 	c.configMu.RLock()
 	defer c.configMu.RUnlock()
-	replicas := make([]*Replica, 0, len(c.replicas))
+	replicas := make([]*Replica, len(c.replicas))
 	copy(replicas, c.replicas)
 	return replicas
 }
