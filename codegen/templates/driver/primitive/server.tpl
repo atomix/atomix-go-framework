@@ -44,6 +44,7 @@ package {{ .Package.Name }}
 
 import (
 	"context"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
 	{{- $package := .Package }}
@@ -52,12 +53,13 @@ import (
 	{{- end }}
 )
 
+var log = logging.GetLogger("atomix", {{ .Primitive.Name | lower | quote }})
+
 // New{{ $server }} creates a new {{ $server }}
 func New{{ $server }}(registry *{{ $registry }}, env env.DriverEnv) {{ $service }} {
 	return &{{ $server }}{
 		registry: registry,
 		env:      env,
-		log:      logging.GetLogger("atomix", {{ .Primitive.Name | lower | quote }}),
 	}
 }
 
@@ -65,7 +67,6 @@ func New{{ $server }}(registry *{{ $registry }}, env env.DriverEnv) {{ $service 
 type {{ $server }} struct {
 	registry *{{ $registry }}
 	env      env.DriverEnv
-	log      logging.Logger
 }
 
 {{- range .Primitive.Methods }}
@@ -77,7 +78,10 @@ func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "t
 	}
 	proxy, err := s.registry.GetProxy(request{{ template "field" .Request.Headers }}.PrimitiveID)
 	if err != nil {
-	    s.log.Warnf("{{ .Request.Type.Name }} %+v failed: %v", request, err)
+	    log.Warnf("{{ .Request.Type.Name }} %+v failed: %v", request, err)
+	    if errors.IsNotFound(err) {
+	        return nil, errors.NewUnavailable(err.Error())
+	    }
 		return nil, err
 	}
 	return proxy.{{ .Name }}(ctx, request)
@@ -89,7 +93,10 @@ func (s *{{ $server }}) {{ .Name }}(request *{{ template "type" .Request.Type }}
 	}
 	proxy, err := s.registry.GetProxy(request{{ template "field" .Request.Headers }}.PrimitiveID)
 	if err != nil {
-	    s.log.Warnf("{{ .Request.Type.Name }} %+v failed: %v", request, err)
+	    log.Warnf("{{ .Request.Type.Name }} %+v failed: %v", request, err)
+	    if errors.IsNotFound(err) {
+	        return errors.NewUnavailable(err.Error())
+	    }
 		return err
 	}
 	return proxy.{{ .Name }}(request, srv)

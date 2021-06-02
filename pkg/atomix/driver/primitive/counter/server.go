@@ -5,22 +5,23 @@ import (
 	"context"
 	counter "github.com/atomix/atomix-api/go/atomix/primitive/counter"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 )
+
+var log = logging.GetLogger("atomix", "counter")
 
 // NewProxyServer creates a new ProxyServer
 func NewProxyServer(registry *ProxyRegistry, env env.DriverEnv) counter.CounterServiceServer {
 	return &ProxyServer{
 		registry: registry,
 		env:      env,
-		log:      logging.GetLogger("atomix", "counter"),
 	}
 }
 
 type ProxyServer struct {
 	registry *ProxyRegistry
 	env      env.DriverEnv
-	log      logging.Logger
 }
 
 func (s *ProxyServer) Set(ctx context.Context, request *counter.SetRequest) (*counter.SetResponse, error) {
@@ -29,7 +30,10 @@ func (s *ProxyServer) Set(ctx context.Context, request *counter.SetRequest) (*co
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		s.log.Warnf("SetRequest %+v failed: %v", request, err)
+		log.Warnf("SetRequest %+v failed: %v", request, err)
+		if errors.IsNotFound(err) {
+			return nil, errors.NewUnavailable(err.Error())
+		}
 		return nil, err
 	}
 	return proxy.Set(ctx, request)
@@ -41,7 +45,10 @@ func (s *ProxyServer) Get(ctx context.Context, request *counter.GetRequest) (*co
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		s.log.Warnf("GetRequest %+v failed: %v", request, err)
+		log.Warnf("GetRequest %+v failed: %v", request, err)
+		if errors.IsNotFound(err) {
+			return nil, errors.NewUnavailable(err.Error())
+		}
 		return nil, err
 	}
 	return proxy.Get(ctx, request)
@@ -53,7 +60,10 @@ func (s *ProxyServer) Increment(ctx context.Context, request *counter.IncrementR
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		s.log.Warnf("IncrementRequest %+v failed: %v", request, err)
+		log.Warnf("IncrementRequest %+v failed: %v", request, err)
+		if errors.IsNotFound(err) {
+			return nil, errors.NewUnavailable(err.Error())
+		}
 		return nil, err
 	}
 	return proxy.Increment(ctx, request)
@@ -65,7 +75,10 @@ func (s *ProxyServer) Decrement(ctx context.Context, request *counter.DecrementR
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		s.log.Warnf("DecrementRequest %+v failed: %v", request, err)
+		log.Warnf("DecrementRequest %+v failed: %v", request, err)
+		if errors.IsNotFound(err) {
+			return nil, errors.NewUnavailable(err.Error())
+		}
 		return nil, err
 	}
 	return proxy.Decrement(ctx, request)

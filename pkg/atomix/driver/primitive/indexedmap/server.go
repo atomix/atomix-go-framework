@@ -5,22 +5,23 @@ import (
 	"context"
 	indexedmap "github.com/atomix/atomix-api/go/atomix/primitive/indexedmap"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 )
+
+var log = logging.GetLogger("atomix", "indexedmap")
 
 // NewProxyServer creates a new ProxyServer
 func NewProxyServer(registry *ProxyRegistry, env env.DriverEnv) indexedmap.IndexedMapServiceServer {
 	return &ProxyServer{
 		registry: registry,
 		env:      env,
-		log:      logging.GetLogger("atomix", "indexedmap"),
 	}
 }
 
 type ProxyServer struct {
 	registry *ProxyRegistry
 	env      env.DriverEnv
-	log      logging.Logger
 }
 
 func (s *ProxyServer) Size(ctx context.Context, request *indexedmap.SizeRequest) (*indexedmap.SizeResponse, error) {
@@ -29,7 +30,10 @@ func (s *ProxyServer) Size(ctx context.Context, request *indexedmap.SizeRequest)
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		s.log.Warnf("SizeRequest %+v failed: %v", request, err)
+		log.Warnf("SizeRequest %+v failed: %v", request, err)
+		if errors.IsNotFound(err) {
+			return nil, errors.NewUnavailable(err.Error())
+		}
 		return nil, err
 	}
 	return proxy.Size(ctx, request)
@@ -41,7 +45,10 @@ func (s *ProxyServer) Put(ctx context.Context, request *indexedmap.PutRequest) (
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		s.log.Warnf("PutRequest %+v failed: %v", request, err)
+		log.Warnf("PutRequest %+v failed: %v", request, err)
+		if errors.IsNotFound(err) {
+			return nil, errors.NewUnavailable(err.Error())
+		}
 		return nil, err
 	}
 	return proxy.Put(ctx, request)
@@ -53,7 +60,10 @@ func (s *ProxyServer) Get(ctx context.Context, request *indexedmap.GetRequest) (
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		s.log.Warnf("GetRequest %+v failed: %v", request, err)
+		log.Warnf("GetRequest %+v failed: %v", request, err)
+		if errors.IsNotFound(err) {
+			return nil, errors.NewUnavailable(err.Error())
+		}
 		return nil, err
 	}
 	return proxy.Get(ctx, request)
@@ -65,7 +75,10 @@ func (s *ProxyServer) FirstEntry(ctx context.Context, request *indexedmap.FirstE
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		s.log.Warnf("FirstEntryRequest %+v failed: %v", request, err)
+		log.Warnf("FirstEntryRequest %+v failed: %v", request, err)
+		if errors.IsNotFound(err) {
+			return nil, errors.NewUnavailable(err.Error())
+		}
 		return nil, err
 	}
 	return proxy.FirstEntry(ctx, request)
@@ -77,7 +90,10 @@ func (s *ProxyServer) LastEntry(ctx context.Context, request *indexedmap.LastEnt
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		s.log.Warnf("LastEntryRequest %+v failed: %v", request, err)
+		log.Warnf("LastEntryRequest %+v failed: %v", request, err)
+		if errors.IsNotFound(err) {
+			return nil, errors.NewUnavailable(err.Error())
+		}
 		return nil, err
 	}
 	return proxy.LastEntry(ctx, request)
@@ -89,7 +105,10 @@ func (s *ProxyServer) PrevEntry(ctx context.Context, request *indexedmap.PrevEnt
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		s.log.Warnf("PrevEntryRequest %+v failed: %v", request, err)
+		log.Warnf("PrevEntryRequest %+v failed: %v", request, err)
+		if errors.IsNotFound(err) {
+			return nil, errors.NewUnavailable(err.Error())
+		}
 		return nil, err
 	}
 	return proxy.PrevEntry(ctx, request)
@@ -101,7 +120,10 @@ func (s *ProxyServer) NextEntry(ctx context.Context, request *indexedmap.NextEnt
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		s.log.Warnf("NextEntryRequest %+v failed: %v", request, err)
+		log.Warnf("NextEntryRequest %+v failed: %v", request, err)
+		if errors.IsNotFound(err) {
+			return nil, errors.NewUnavailable(err.Error())
+		}
 		return nil, err
 	}
 	return proxy.NextEntry(ctx, request)
@@ -113,7 +135,10 @@ func (s *ProxyServer) Remove(ctx context.Context, request *indexedmap.RemoveRequ
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		s.log.Warnf("RemoveRequest %+v failed: %v", request, err)
+		log.Warnf("RemoveRequest %+v failed: %v", request, err)
+		if errors.IsNotFound(err) {
+			return nil, errors.NewUnavailable(err.Error())
+		}
 		return nil, err
 	}
 	return proxy.Remove(ctx, request)
@@ -125,7 +150,10 @@ func (s *ProxyServer) Clear(ctx context.Context, request *indexedmap.ClearReques
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		s.log.Warnf("ClearRequest %+v failed: %v", request, err)
+		log.Warnf("ClearRequest %+v failed: %v", request, err)
+		if errors.IsNotFound(err) {
+			return nil, errors.NewUnavailable(err.Error())
+		}
 		return nil, err
 	}
 	return proxy.Clear(ctx, request)
@@ -137,7 +165,10 @@ func (s *ProxyServer) Events(request *indexedmap.EventsRequest, srv indexedmap.I
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		s.log.Warnf("EventsRequest %+v failed: %v", request, err)
+		log.Warnf("EventsRequest %+v failed: %v", request, err)
+		if errors.IsNotFound(err) {
+			return errors.NewUnavailable(err.Error())
+		}
 		return err
 	}
 	return proxy.Events(request, srv)
@@ -149,7 +180,10 @@ func (s *ProxyServer) Entries(request *indexedmap.EntriesRequest, srv indexedmap
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		s.log.Warnf("EntriesRequest %+v failed: %v", request, err)
+		log.Warnf("EntriesRequest %+v failed: %v", request, err)
+		if errors.IsNotFound(err) {
+			return errors.NewUnavailable(err.Error())
+		}
 		return err
 	}
 	return proxy.Entries(request, srv)

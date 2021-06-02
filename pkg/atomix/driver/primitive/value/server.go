@@ -5,22 +5,23 @@ import (
 	"context"
 	value "github.com/atomix/atomix-api/go/atomix/primitive/value"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 )
+
+var log = logging.GetLogger("atomix", "value")
 
 // NewProxyServer creates a new ProxyServer
 func NewProxyServer(registry *ProxyRegistry, env env.DriverEnv) value.ValueServiceServer {
 	return &ProxyServer{
 		registry: registry,
 		env:      env,
-		log:      logging.GetLogger("atomix", "value"),
 	}
 }
 
 type ProxyServer struct {
 	registry *ProxyRegistry
 	env      env.DriverEnv
-	log      logging.Logger
 }
 
 func (s *ProxyServer) Set(ctx context.Context, request *value.SetRequest) (*value.SetResponse, error) {
@@ -29,7 +30,10 @@ func (s *ProxyServer) Set(ctx context.Context, request *value.SetRequest) (*valu
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		s.log.Warnf("SetRequest %+v failed: %v", request, err)
+		log.Warnf("SetRequest %+v failed: %v", request, err)
+		if errors.IsNotFound(err) {
+			return nil, errors.NewUnavailable(err.Error())
+		}
 		return nil, err
 	}
 	return proxy.Set(ctx, request)
@@ -41,7 +45,10 @@ func (s *ProxyServer) Get(ctx context.Context, request *value.GetRequest) (*valu
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		s.log.Warnf("GetRequest %+v failed: %v", request, err)
+		log.Warnf("GetRequest %+v failed: %v", request, err)
+		if errors.IsNotFound(err) {
+			return nil, errors.NewUnavailable(err.Error())
+		}
 		return nil, err
 	}
 	return proxy.Get(ctx, request)
@@ -53,7 +60,10 @@ func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueServic
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		s.log.Warnf("EventsRequest %+v failed: %v", request, err)
+		log.Warnf("EventsRequest %+v failed: %v", request, err)
+		if errors.IsNotFound(err) {
+			return errors.NewUnavailable(err.Error())
+		}
 		return err
 	}
 	return proxy.Events(request, srv)

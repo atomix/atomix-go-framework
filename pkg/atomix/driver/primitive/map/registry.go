@@ -27,6 +27,7 @@ func (r *ProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server _map.MapSer
 		return errors.NewAlreadyExists("proxy '%s' already exists", id)
 	}
 	r.proxies[id] = server
+	log.Debugf("Added proxy %s to registry", id)
 	return nil
 }
 
@@ -37,6 +38,7 @@ func (r *ProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error {
 		return errors.NewNotFound("proxy '%s' not found", id)
 	}
 	delete(r.proxies, id)
+	log.Debugf("Removed proxy %s from registry", id)
 	return nil
 }
 
