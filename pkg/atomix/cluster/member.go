@@ -18,13 +18,12 @@ import (
 	"fmt"
 	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
 	"google.golang.org/grpc"
-	"net"
 )
 
 // NewMember returns a new local group member
-func NewMember(config protocolapi.ProtocolReplica) *Member {
+func NewMember(network Network, config protocolapi.ProtocolReplica) *Member {
 	return &Member{
-		Replica: NewReplica(config),
+		Replica: NewReplica(network, config),
 	}
 }
 
@@ -46,7 +45,7 @@ func (m *Member) Serve(opts ...ServeOption) error {
 		service(m.server)
 	}
 
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", m.Port))
+	lis, err := m.network.Listen(fmt.Sprintf(":%d", m.Port))
 	if err != nil {
 		return err
 	}

@@ -22,19 +22,10 @@ const (
 	nodeEnv      = "ATOMIX_BROKER_NODE"
 )
 
-const (
-	defaultID   = "atomix-broker"
-	defaultHost = ""
-	defaultPort = 5678
-)
-
 type brokerOptions struct {
 	namespace string
 	name      string
 	node      string
-	id        string
-	host      string
-	port      int
 }
 
 func applyOptions(opts ...Option) brokerOptions {
@@ -42,9 +33,6 @@ func applyOptions(opts ...Option) brokerOptions {
 		namespace: os.Getenv(namespaceEnv),
 		name:      os.Getenv(nameEnv),
 		node:      os.Getenv(nodeEnv),
-		id:        defaultID,
-		host:      defaultHost,
-		port:      defaultPort,
 	}
 	for _, opt := range opts {
 		opt(&options)
@@ -73,26 +61,5 @@ func WithName(name string) Option {
 func WithNode(node string) Option {
 	return func(opts *brokerOptions) {
 		opts.node = node
-	}
-}
-
-// WithID sets the broker identifier
-func WithID(id string) Option {
-	return func(opts *brokerOptions) {
-		opts.id = id
-	}
-}
-
-// WithHost sets the host to which the broker should bind
-func WithHost(host string) Option {
-	return func(opts *brokerOptions) {
-		opts.host = host
-	}
-}
-
-// WithPort sets the port to which the broker should bind
-func WithPort(port int) Option {
-	return func(opts *brokerOptions) {
-		opts.port = port
 	}
 }

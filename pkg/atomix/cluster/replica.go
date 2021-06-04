@@ -26,12 +26,13 @@ import (
 type ReplicaID string
 
 // NewReplica returns a new replica
-func NewReplica(config protocolapi.ProtocolReplica) *Replica {
+func NewReplica(network Network, config protocolapi.ProtocolReplica) *Replica {
 	extraPorts := make(map[string]int)
 	for name, port := range config.ExtraPorts {
 		extraPorts[name] = int(port)
 	}
 	return &Replica{
+		network:    network,
 		ID:         ReplicaID(config.ID),
 		NodeID:     NodeID(config.NodeID),
 		Host:       config.Host,
@@ -42,6 +43,7 @@ func NewReplica(config protocolapi.ProtocolReplica) *Replica {
 
 // Replica is a replicas group peer
 type Replica struct {
+	network    Network
 	ID         ReplicaID
 	NodeID     NodeID
 	Host       string
@@ -73,7 +75,9 @@ func (m *Replica) Connect(ctx context.Context, opts ...ConnectOption) (*grpc.Cli
 		return m.conn, nil
 	}
 
-	conn, err := grpc.DialContext(ctx, fmt.Sprintf("%s:%d", m.Host, m.Port), options.dialOptions...)
+	dialOpts := options.dialOptions
+	dialOpts = append(dialOpts, grpc.WithContextDialer(m.network.Connect))
+	conn, err := grpc.DialContext(ctx, fmt.Sprintf("%s:%d", m.Host, m.Port), dialOpts...)
 	if err != nil {
 		return nil, err
 	}

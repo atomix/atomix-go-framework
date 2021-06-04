@@ -16,7 +16,6 @@ package driver
 
 import (
 	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
-	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/agent"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
@@ -30,18 +29,15 @@ import (
 )
 
 // NewDriver creates a new driver node
-func NewDriver(protocol proxy.ProtocolFunc, opts ...Option) *Driver {
+func NewDriver(cluster cluster.Cluster, protocol proxy.ProtocolFunc, opts ...Option) *Driver {
 	options := applyOptions(opts...)
+	member, _ := cluster.Member()
 	return &Driver{
-		Server: server.NewServer(cluster.NewCluster(
-			protocolapi.ProtocolConfig{},
-			cluster.WithMemberID(options.driverID),
-			cluster.WithHost(options.host),
-			cluster.WithPort(options.port))),
+		Server:   server.NewServer(cluster),
 		Env:      options.DriverEnv,
 		protocol: protocol,
 		agents:   make(map[driverapi.AgentId]*agent.Agent),
-		log:      logging.GetLogger("atomix", "driver", strings.ToLower(options.driverID)),
+		log:      logging.GetLogger("atomix", "driver", strings.ToLower(string(member.ID))),
 	}
 }
 
@@ -89,6 +85,7 @@ func (d *Driver) startAgent(id driverapi.AgentId, address driverapi.AgentAddress
 
 	m, _ := d.Cluster.Member()
 	c := cluster.NewCluster(
+		d.Cluster.Network(),
 		config.Protocol,
 		cluster.WithMemberID(id.Name),
 		cluster.WithNodeID(string(m.NodeID)),

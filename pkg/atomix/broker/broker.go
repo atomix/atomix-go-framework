@@ -16,7 +16,6 @@ package broker
 
 import (
 	brokerapi "github.com/atomix/atomix-api/go/atomix/management/broker"
-	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/server"
@@ -26,14 +25,10 @@ import (
 var log = logging.GetLogger("atomix", "broker")
 
 // NewBroker creates a new broker node
-func NewBroker(opts ...Option) *Broker {
+func NewBroker(cluster cluster.Cluster, opts ...Option) *Broker {
 	options := applyOptions(opts...)
 	return &Broker{
-		Server: server.NewServer(cluster.NewCluster(
-			protocolapi.ProtocolConfig{},
-			cluster.WithMemberID(options.id),
-			cluster.WithHost(options.host),
-			cluster.WithPort(options.port))),
+		Server: server.NewServer(cluster),
 		namespace: options.namespace,
 	}
 }

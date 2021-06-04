@@ -22,7 +22,7 @@ import (
 )
 
 // NewCluster creates a new cluster
-func NewCluster(config protocolapi.ProtocolConfig, opts ...Option) Cluster {
+func NewCluster(network Network, config protocolapi.ProtocolConfig, opts ...Option) Cluster {
 	options := applyOptions(opts...)
 
 	var member *Member
@@ -53,10 +53,11 @@ func NewCluster(config protocolapi.ProtocolConfig, opts ...Option) Cluster {
 				ExtraPorts: map[string]int32{},
 			}
 		}
-		member = NewMember(*replica)
+		member = NewMember(network, *replica)
 	}
 
 	c := &cluster{
+		network:        network,
 		member:         member,
 		replicasByID:   make(map[ReplicaID]*Replica),
 		partitionsByID: make(map[PartitionID]Partition),
@@ -70,6 +71,8 @@ func NewCluster(config protocolapi.ProtocolConfig, opts ...Option) Cluster {
 // Cluster manages the peer group for a client
 type Cluster interface {
 	io.Closer
+	// Network returns the cluster Network
+	Network() Network
 	// Member returns the local cluster member
 	Member() (*Member, bool)
 	// Replica looks up a replica by ID
@@ -89,6 +92,7 @@ type ConfigurableCluster interface {
 
 // cluster manages the peer group for a client
 type cluster struct {
+	network        Network
 	member         *Member
 	options        options
 	replicas       ReplicaSet
@@ -98,6 +102,11 @@ type cluster struct {
 	watchers       []chan<- PartitionSet
 	configMu       sync.RWMutex
 	updateMu       sync.Mutex
+}
+
+// Network returns the cluster Network
+func (c *cluster) Network() Network {
+	return c.network
 }
 
 // Member returns the local group member
@@ -165,7 +174,7 @@ func (c *cluster) Update(config protocolapi.ProtocolConfig) error {
 	for id, replicaConfig := range replicaConfigs {
 		replica, ok := c.replicasByID[id]
 		if !ok {
-			replica = NewReplica(replicaConfig)
+			replica = NewReplica(c.network, replicaConfig)
 			c.replicasByID[id] = replica
 		}
 		replicas = append(replicas, replica)

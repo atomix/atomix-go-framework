@@ -16,24 +16,12 @@ package driver
 
 import "github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
 
-const (
-	defaultID   = "atomix-driver"
-	defaultHost = ""
-	defaultPort = 5252
-)
-
 type driverOptions struct {
 	env.DriverEnv
-	driverID string
-	host     string
-	port     int
 }
 
 func applyOptions(opts ...Option) driverOptions {
 	options := driverOptions{
-		driverID:  defaultID,
-		host:      defaultHost,
-		port:      defaultPort,
 		DriverEnv: env.GetDriverEnv(),
 	}
 	for _, opt := range opts {
@@ -63,26 +51,5 @@ func WithName(name string) Option {
 func WithNode(node string) Option {
 	return func(opts *driverOptions) {
 		opts.Node = node
-	}
-}
-
-// WithDriverID sets the driver identifier
-func WithDriverID(id string) Option {
-	return func(opts *driverOptions) {
-		opts.driverID = id
-	}
-}
-
-// WithHost sets the host to which the driver should bind
-func WithHost(host string) Option {
-	return func(opts *driverOptions) {
-		opts.host = host
-	}
-}
-
-// WithPort sets the port to which the driver should bind
-func WithPort(port int) Option {
-	return func(opts *driverOptions) {
-		opts.port = port
 	}
 }
