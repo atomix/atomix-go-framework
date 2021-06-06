@@ -168,8 +168,10 @@ func (s *bufferedStream) Error(err error) {
 func (s *bufferedStream) Close() {
 	s.cond.L.Lock()
 	defer s.cond.L.Unlock()
-	s.closed = true
-	s.cond.Signal()
+	if !s.closed {
+		s.closed = true
+		s.cond.Signal()
+	}
 }
 
 // NewChannelStream returns a new channel-based stream

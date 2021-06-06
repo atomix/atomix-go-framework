@@ -24,7 +24,7 @@ type Server struct {
 	Protocol Protocol
 }
 
-func (s *Server) Request(request *StorageRequest, stream StorageService_RequestServer) error {
+func (s *Server) Request(request *StorageRequest, srv StorageService_RequestServer) error {
 	log.Debugf("Received StorageRequest %+v", request)
 
 	// If the client requires a leader and is not the leader, return an error
@@ -41,7 +41,7 @@ func (s *Server) Request(request *StorageRequest, stream StorageService_RequestS
 			},
 		}
 		log.Debugf("Sending StorageResponse %+v", response)
-		return stream.Send(response)
+		return srv.Send(response)
 	}
 
 	bytes, err := proto.Marshal(request.Request)
@@ -50,24 +50,35 @@ func (s *Server) Request(request *StorageRequest, stream StorageService_RequestS
 		return err
 	}
 
-	ch := make(chan streams.Result)
-	inStream := streams.NewChannelStream(ch)
-
+	stream := streams.NewBufferedStream()
 	switch request.Request.Request.(type) {
-	case *SessionRequest_Command:
-		go partition.ExecuteCommand(stream.Context(), bytes, inStream)
+	case *SessionRequest_Command,
+		*SessionRequest_OpenSession,
+		*SessionRequest_KeepAlive,
+		*SessionRequest_CloseSession:
+		go func() {
+			err := partition.ExecuteCommand(srv.Context(), bytes, stream)
+			if err != nil {
+				log.Error(err)
+			}
+		}()
 	case *SessionRequest_Query:
-		go partition.ExecuteQuery(stream.Context(), bytes, inStream)
-	case *SessionRequest_OpenSession:
-		go partition.ExecuteCommand(stream.Context(), bytes, inStream)
-	case *SessionRequest_KeepAlive:
-		go partition.ExecuteCommand(stream.Context(), bytes, inStream)
-	case *SessionRequest_CloseSession:
-		go partition.ExecuteCommand(stream.Context(), bytes, inStream)
+		go func() {
+			err := partition.ExecuteQuery(srv.Context(), bytes, stream)
+			if err != nil {
+				log.Error(err)
+			}
+		}()
 	}
 
-	for result := range ch {
+	for {
+		result, ok := stream.Receive()
+		if !ok {
+			break
+		}
+
 		if result.Failed() {
+			log.Warnf("StorageRequest %+v failed: %v", request, result.Error)
 			return result.Error
 		}
 
@@ -81,10 +92,11 @@ func (s *Server) Request(request *StorageRequest, stream StorageService_RequestS
 			Response:    sessionResponse,
 		}
 		log.Debugf("Sending StorageResponse %+v", response)
-		if err := stream.Send(response); err != nil {
+		if err := srv.Send(response); err != nil {
 			return err
 		}
 	}
+	log.Debugf("Completed StorageRequest %+v", request)
 	return nil
 }
 
