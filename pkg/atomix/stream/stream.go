@@ -23,6 +23,9 @@ import (
 type ReadStream interface {
 	// Receive receives the next result
 	Receive() (Result, bool)
+
+	// Drain drains the stream
+	Drain()
 }
 
 // WriteStream is a state machine write stream
@@ -66,7 +69,13 @@ type unaryStream struct {
 func (s *unaryStream) Receive() (Result, bool) {
 	s.cond.L.Lock()
 	defer s.cond.L.Unlock()
+	if s.closed {
+		return Result{}, false
+	}
 	if s.result == nil {
+		if s.closed {
+			return Result{}, false
+		}
 		s.cond.Wait()
 	}
 	result := s.result
@@ -74,14 +83,17 @@ func (s *unaryStream) Receive() (Result, bool) {
 	return *result, true
 }
 
+func (s *unaryStream) Drain() {
+	s.Close()
+}
+
 func (s *unaryStream) Send(result Result) {
 	s.cond.L.Lock()
 	defer s.cond.L.Unlock()
-	if s.closed {
-		panic("stream closed")
+	if !s.closed {
+		s.result = &result
+		s.closed = true
 	}
-	s.result = &result
-	s.closed = true
 	s.cond.Signal()
 }
 
@@ -128,6 +140,9 @@ type bufferedStream struct {
 func (s *bufferedStream) Receive() (Result, bool) {
 	s.cond.L.Lock()
 	defer s.cond.L.Unlock()
+	if s.buffer == nil {
+		return Result{}, false
+	}
 	for s.buffer.Len() == 0 {
 		if s.closed {
 			return Result{}, false
@@ -139,11 +154,19 @@ func (s *bufferedStream) Receive() (Result, bool) {
 	return result, true
 }
 
+func (s *bufferedStream) Drain() {
+	s.cond.L.Lock()
+	defer s.cond.L.Lock()
+	s.buffer = nil
+}
+
 func (s *bufferedStream) Send(result Result) {
 	s.cond.L.Lock()
 	defer s.cond.L.Unlock()
-	s.buffer.PushBack(result)
-	s.cond.Signal()
+	if s.buffer != nil {
+		s.buffer.PushBack(result)
+		s.cond.Signal()
+	}
 }
 
 func (s *bufferedStream) Result(value interface{}, err error) {
@@ -175,7 +198,7 @@ func (s *bufferedStream) Close() {
 }
 
 // NewChannelStream returns a new channel-based stream
-func NewChannelStream(ch chan<- Result) WriteStream {
+func NewChannelStream(ch chan Result) Stream {
 	return &channelStream{
 		ch: ch,
 	}
@@ -183,12 +206,30 @@ func NewChannelStream(ch chan<- Result) WriteStream {
 
 // channelStream is a channel-based stream
 type channelStream struct {
-	ch     chan<- Result
+	ch     chan Result
 	closed bool
+	mu     sync.RWMutex
+}
+
+func (s *channelStream) Receive() (Result, bool) {
+	result, ok := <-s.ch
+	return result, ok
+}
+
+func (s *channelStream) Drain() {
+	s.Close()
+	go func() {
+		for range s.ch {
+		}
+	}()
 }
 
 func (s *channelStream) Send(result Result) {
-	s.ch <- result
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if !s.closed {
+		s.ch <- result
+	}
 }
 
 func (s *channelStream) Result(value interface{}, err error) {
@@ -207,6 +248,8 @@ func (s *channelStream) Error(err error) {
 }
 
 func (s *channelStream) Close() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if !s.closed {
 		close(s.ch)
 		s.closed = true
@@ -309,27 +352,41 @@ func NewCloserStream(stream WriteStream, f func(WriteStream)) WriteStream {
 type closerStream struct {
 	stream WriteStream
 	closer func(WriteStream)
+	closed bool
+	mu     sync.RWMutex
 }
 
 func (s *closerStream) Send(result Result) {
-	s.stream.Send(result)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if !s.closed {
+		s.stream.Send(result)
+	}
 }
 
 func (s *closerStream) Result(value interface{}, err error) {
-	s.stream.Result(value, err)
+	s.Send(Result{
+		Value: value,
+		Error: err,
+	})
 }
 
 func (s *closerStream) Value(value interface{}) {
-	s.stream.Value(value)
+	s.Result(value, nil)
 }
 
 func (s *closerStream) Error(err error) {
-	s.stream.Error(err)
+	s.Result(nil, err)
 }
 
 func (s *closerStream) Close() {
-	s.closer(s)
-	s.stream.Close()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.closed {
+		s.closer(s)
+		s.stream.Close()
+		s.closed = true
+	}
 }
 
 // Result is a stream result
