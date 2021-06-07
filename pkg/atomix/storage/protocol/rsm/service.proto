@@ -259,5 +259,6 @@ enum SessionResponseCode {
 }
 
 service StorageService {
-    rpc Request (StorageRequest) returns (stream StorageResponse);
+    rpc Request (StorageRequest) returns (StorageResponse);
+    rpc Stream (StorageRequest) returns (stream StorageResponse);
 }

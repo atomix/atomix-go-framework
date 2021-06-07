@@ -15,6 +15,7 @@
 package errors
 
 import (
+	"context"
 	"fmt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -72,6 +73,13 @@ func From(err error) error {
 
 	if _, ok := err.(*TypedError); ok {
 		return err
+	}
+
+	if err == context.Canceled {
+		return NewCanceled(err.Error())
+	}
+	if err == context.DeadlineExceeded {
+		return NewTimeout(err.Error())
 	}
 
 	status, ok := status.FromError(err)
@@ -244,7 +252,7 @@ func IsUnknown(err error) bool {
 
 // IsCanceled checks whether the given error is an Canceled error
 func IsCanceled(err error) bool {
-	return IsType(err, Canceled)
+	return IsType(err, Canceled) || err == context.Canceled
 }
 
 // IsNotFound checks whether the given error is a NotFound error
@@ -289,7 +297,7 @@ func IsNotSupported(err error) bool {
 
 // IsTimeout checks whether the given error is a Timeout error
 func IsTimeout(err error) bool {
-	return IsType(err, Timeout)
+	return IsType(err, Timeout) || err == context.DeadlineExceeded
 }
 
 // IsInternal checks whether the given error is an Internal error

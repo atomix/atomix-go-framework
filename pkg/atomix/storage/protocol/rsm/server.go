@@ -15,6 +15,8 @@
 package rsm
 
 import (
+	"context"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
 )
@@ -24,7 +26,87 @@ type Server struct {
 	Protocol Protocol
 }
 
-func (s *Server) Request(request *StorageRequest, srv StorageService_RequestServer) error {
+func (s *Server) Request(ctx context.Context, request *StorageRequest) (*StorageResponse, error) {
+	log.Debugf("Received StorageRequest %+v", request)
+
+	// If the client requires a leader and is not the leader, return an error
+	partition := s.Protocol.Partition(PartitionID(request.PartitionID))
+	if partition.MustLeader() && !partition.IsLeader() {
+		response := &StorageResponse{
+			PartitionID: request.PartitionID,
+			Response: &SessionResponse{
+				Type: SessionResponseType_RESPONSE,
+				Status: SessionResponseStatus{
+					Code:   SessionResponseCode_NOT_LEADER,
+					Leader: partition.Leader(),
+				},
+			},
+		}
+		log.Debugf("Sending StorageResponse %+v", response)
+		return response, nil
+	}
+
+	bytes, err := proto.Marshal(request.Request)
+	if err != nil {
+		log.Debugf("StorageRequest %+v failed: %s", request, err)
+		return nil, err
+	}
+
+	resultCh := make(chan streams.Result, 1)
+	errCh := make(chan error, 1)
+	switch request.Request.Request.(type) {
+	case *SessionRequest_Command,
+		*SessionRequest_OpenSession,
+		*SessionRequest_KeepAlive,
+		*SessionRequest_CloseSession:
+		go func() {
+			err := partition.ExecuteCommand(context.Background(), bytes, streams.NewChannelStream(resultCh))
+			if err != nil {
+				errCh <- err
+			}
+		}()
+	case *SessionRequest_Query:
+		go func() {
+			err := partition.ExecuteQuery(context.Background(), bytes, streams.NewChannelStream(resultCh))
+			if err != nil {
+				errCh <- err
+			}
+		}()
+	}
+
+	select {
+	case result, ok := <-resultCh:
+		if !ok {
+			err = errors.NewCanceled("stream closed")
+			log.Debugf("StorageRequest %+v failed: %s", request, err)
+			return nil, err
+		}
+
+		if result.Failed() {
+			log.Warnf("StorageRequest %+v failed: %v", request, result.Error)
+			return nil, result.Error
+		}
+
+		sessionResponse := &SessionResponse{}
+		if err := proto.Unmarshal(result.Value.([]byte), sessionResponse); err != nil {
+			return nil, err
+		}
+
+		response := &StorageResponse{
+			PartitionID: request.PartitionID,
+			Response:    sessionResponse,
+		}
+		log.Debugf("Sending StorageResponse %+v", response)
+		return response, nil
+	case err := <-errCh:
+		log.Debugf("StorageRequest %+v failed: %s", request, err)
+		return nil, err
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+func (s *Server) Stream(request *StorageRequest, srv StorageService_StreamServer) error {
 	log.Debugf("Received StorageRequest %+v", request)
 
 	// If the client requires a leader and is not the leader, return an error
@@ -50,54 +132,62 @@ func (s *Server) Request(request *StorageRequest, srv StorageService_RequestServ
 		return err
 	}
 
-	stream := streams.NewBufferedStream()
+	resultCh := make(chan streams.Result)
+	errCh := make(chan error)
+	stream := streams.NewChannelStream(resultCh)
+	defer stream.Drain()
 	switch request.Request.Request.(type) {
-	case *SessionRequest_Command,
-		*SessionRequest_OpenSession,
-		*SessionRequest_KeepAlive,
-		*SessionRequest_CloseSession:
+	case *SessionRequest_Command:
 		go func() {
 			err := partition.ExecuteCommand(srv.Context(), bytes, stream)
 			if err != nil {
-				log.Error(err)
+				errCh <- err
 			}
 		}()
 	case *SessionRequest_Query:
 		go func() {
 			err := partition.ExecuteQuery(srv.Context(), bytes, stream)
 			if err != nil {
-				log.Error(err)
+				errCh <- err
 			}
 		}()
 	}
 
 	for {
-		result, ok := stream.Receive()
-		if !ok {
-			break
-		}
+		select {
+		case result, ok := <-resultCh:
+			if !ok {
+				log.Debugf("Finished StorageRequest %+v", request)
+				return nil
+			}
 
-		if result.Failed() {
-			log.Warnf("StorageRequest %+v failed: %v", request, result.Error)
-			return result.Error
-		}
+			if result.Failed() {
+				log.Warnf("StorageRequest %+v failed: %v", request, result.Error)
+				return result.Error
+			}
 
-		sessionResponse := &SessionResponse{}
-		if err := proto.Unmarshal(result.Value.([]byte), sessionResponse); err != nil {
+			sessionResponse := &SessionResponse{}
+			if err := proto.Unmarshal(result.Value.([]byte), sessionResponse); err != nil {
+				return err
+			}
+
+			response := &StorageResponse{
+				PartitionID: request.PartitionID,
+				Response:    sessionResponse,
+			}
+			log.Debugf("Sending StorageResponse %+v", response)
+			if err := srv.Send(response); err != nil {
+				return err
+			}
+		case err := <-errCh:
+			log.Warnf("StorageRequest %+v failed: %v", request, err)
 			return err
-		}
-
-		response := &StorageResponse{
-			PartitionID: request.PartitionID,
-			Response:    sessionResponse,
-		}
-		log.Debugf("Sending StorageResponse %+v", response)
-		if err := srv.Send(response); err != nil {
+		case <-srv.Context().Done():
+			err := srv.Context().Err()
+			log.Debugf("Finished StorageRequest %+v: %v", request, err)
 			return err
 		}
 	}
-	log.Debugf("Completed StorageRequest %+v", request)
-	return nil
 }
 
 var _ StorageServiceServer = &Server{}

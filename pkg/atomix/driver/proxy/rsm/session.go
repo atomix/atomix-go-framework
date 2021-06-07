@@ -51,6 +51,7 @@ func (o sessionTimeoutOption) prepare(options *sessionOptions) {
 type sessionOptions struct {
 	id      string
 	timeout time.Duration
+	retry   time.Duration
 }
 
 // NewSession creates a new Session for the given partition
@@ -59,35 +60,38 @@ type sessionOptions struct {
 func NewSession(partition cluster.Partition, log logging.Logger, opts ...SessionOption) *Session {
 	options := &sessionOptions{
 		id:      uuid.New().String(),
-		timeout: 30 * time.Second,
+		retry:   15 * time.Second,
+		timeout: time.Minute,
 	}
 	for i := range opts {
 		opts[i].prepare(options)
 	}
 	return &Session{
-		partition: partition,
-		Timeout:   options.timeout,
-		streams:   make(map[uint64]*StreamState),
-		log:       log,
-		mu:        sync.RWMutex{},
-		ticker:    time.NewTicker(options.timeout / 2),
+		partition:     partition,
+		Timeout:       options.timeout,
+		retryInterval: options.retry,
+		streams:       make(map[uint64]*StreamState),
+		log:           log,
+		mu:            sync.RWMutex{},
+		ticker:        time.NewTicker(options.timeout / 4),
 	}
 }
 
 // Session maintains the session for a primitive
 type Session struct {
-	partition  cluster.Partition
-	Timeout    time.Duration
-	SessionID  uint64
-	lastIndex  uint64
-	requestID  uint64
-	responseID uint64
-	streams    map[uint64]*StreamState
-	log        logging.Logger
-	conn       *grpc.ClientConn
-	leader     *cluster.Replica
-	mu         sync.RWMutex
-	ticker     *time.Ticker
+	partition     cluster.Partition
+	Timeout       time.Duration
+	SessionID     uint64
+	lastIndex     uint64
+	requestID     uint64
+	responseID    uint64
+	streams       map[uint64]*StreamState
+	log           logging.Logger
+	retryInterval time.Duration
+	conn          *grpc.ClientConn
+	leader        *cluster.Replica
+	mu            sync.RWMutex
+	ticker        *time.Ticker
 }
 
 // DoCommand submits a command to the service
@@ -524,7 +528,7 @@ func (s *Session) open(ctx context.Context) error {
 
 	go func() {
 		for range s.ticker.C {
-			_ = s.keepAlive(context.TODO())
+			go s.keepAlive(context.Background())
 		}
 	}()
 	return nil
@@ -596,7 +600,8 @@ func (s *Session) doRequest(ctx context.Context, request *rsm.StorageRequest) (*
 	i := 1
 	for {
 		s.log.Debugf("Sending StorageRequest %+v", request)
-		response, err := s.tryRequest(ctx, request)
+		requestCtx, _ := context.WithTimeout(ctx, s.retryInterval)
+		response, err := s.tryRequest(requestCtx, request)
 		if err == nil {
 			s.log.Debugf("Received StorageResponse %+v", response)
 			switch response.Response.Status.Code {
@@ -604,8 +609,10 @@ func (s *Session) doRequest(ctx context.Context, request *rsm.StorageRequest) (*
 				return response, err
 			case rsm.SessionResponseCode_NOT_LEADER:
 				if response.Response.Status.Leader != "" {
+					s.log.Debugf("Reconnecting to leader %s", response.Response.Status.Leader)
 					s.reconnect(cluster.ReplicaID(response.Response.Status.Leader))
 				} else {
+					s.log.Debug("Failed to locate leader, retrying...")
 					select {
 					case <-time.After(10 * time.Millisecond * time.Duration(math.Min(math.Pow(2, float64(i)), 1000))):
 						i++
@@ -616,8 +623,10 @@ func (s *Session) doRequest(ctx context.Context, request *rsm.StorageRequest) (*
 			default:
 				return response, rsm.GetErrorFromStatus(response.Response.Status)
 			}
-		} else if err == context.Canceled {
-			return nil, errors.NewCanceled(err.Error())
+		} else if errors.IsTimeout(err) {
+			s.log.Warnf("StorageRequest %+v timed out. Retrying...", request, err)
+		} else if errors.IsCanceled(err) {
+			return nil, err
 		} else {
 			s.log.Warnf("Sending StorageRequest %+v failed: %s", request, err)
 			select {
@@ -637,23 +646,16 @@ func (s *Session) tryRequest(ctx context.Context, request *rsm.StorageRequest) (
 		return nil, err
 	}
 	client := rsm.NewStorageServiceClient(conn)
-
-	stream, err := client.Request(ctx, request)
+	response, err := client.Request(ctx, request)
 	if err != nil {
-		return nil, err
-	}
-
-	// Wait for the result
-	response, err := stream.Recv()
-	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return response, nil
 }
 
 // doStream submits a streaming request to the service
 func (s *Session) doStream(ctx context.Context, request *rsm.StorageRequest, stream streams.WriteStream, idempotent bool) error {
-	go s.tryStream(ctx, request, stream, idempotent,0, false)
+	go s.tryStream(ctx, request, stream, idempotent, 0, false)
 	return nil
 }
 
@@ -677,7 +679,7 @@ func (s *Session) tryStream(ctx context.Context, request *rsm.StorageRequest, st
 	client := rsm.NewStorageServiceClient(conn)
 
 	s.log.Debugf("Sending StorageRequest %+v", request)
-	responseStream, err := client.Request(ctx, request)
+	responseStream, err := client.Stream(ctx, request)
 	if err != nil {
 		s.log.Warnf("Sending StorageRequest %+v failed: %s", request, err)
 		stream.Error(err)
