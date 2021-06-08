@@ -553,7 +553,7 @@ func (s *Session) doOpenSession(ctx context.Context, context rsm.SessionCommandC
 	sessionID := response.Response.GetOpenSession().SessionID
 	return response.Response.Status, rsm.SessionResponseContext{
 		SessionID: sessionID,
-		StreamID:  sessionID,
+		RequestID: sessionID,
 		Index:     sessionID,
 	}, nil
 }
@@ -581,9 +581,9 @@ func (s *Session) doKeepAliveSession(ctx context.Context, context rsm.SessionCom
 		Request: &rsm.SessionRequest{
 			Request: &rsm.SessionRequest_KeepAlive{
 				KeepAlive: &rsm.KeepAliveRequest{
-					SessionID:       context.SessionID,
-					CommandSequence: context.SequenceNumber,
-					Streams:         streams,
+					SessionID:    context.SessionID,
+					AckRequestID: context.RequestID,
+					Streams:      streams,
 				},
 			},
 		},
@@ -859,8 +859,8 @@ func (s *Session) getStateContexts() (rsm.SessionCommandContext, []rsm.SessionSt
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return rsm.SessionCommandContext{
-		SessionID:      s.SessionID,
-		SequenceNumber: s.responseID,
+		SessionID: s.SessionID,
+		RequestID: s.responseID,
 	}, s.getStreamContexts()
 }
 
@@ -869,9 +869,9 @@ func (s *Session) getQueryContext() rsm.SessionQueryContext {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return rsm.SessionQueryContext{
-		SessionID:          s.SessionID,
-		LastSequenceNumber: s.responseID,
-		LastIndex:          s.lastIndex,
+		SessionID:     s.SessionID,
+		LastRequestID: s.responseID,
+		LastIndex:     s.lastIndex,
 	}
 }
 
@@ -881,8 +881,8 @@ func (s *Session) nextCommandContext() rsm.SessionCommandContext {
 	defer s.mu.Unlock()
 	s.requestID = s.requestID + 1
 	return rsm.SessionCommandContext{
-		SessionID:      s.SessionID,
-		SequenceNumber: s.requestID,
+		SessionID: s.SessionID,
+		RequestID: s.requestID,
 	}
 }
 
@@ -897,8 +897,8 @@ func (s *Session) nextStream() (*StreamState, rsm.SessionCommandContext) {
 	}
 	s.streams[s.requestID] = stream
 	command := rsm.SessionCommandContext{
-		SessionID:      s.SessionID,
-		SequenceNumber: s.requestID,
+		SessionID: s.SessionID,
+		RequestID: s.requestID,
 	}
 	return stream, command
 }
@@ -912,8 +912,8 @@ func (s *Session) recordCommandResponse(requestContext rsm.SessionCommandContext
 		s.mu.Lock()
 
 		// If the request ID is greater than the highest response ID, update the response ID.
-		if requestContext.SequenceNumber > s.responseID {
-			s.responseID = requestContext.SequenceNumber
+		if requestContext.RequestID > s.responseID {
+			s.responseID = requestContext.RequestID
 		}
 
 		// If the response index has increased, update the last received index
@@ -975,8 +975,8 @@ func (s *StreamState) getHeader() rsm.SessionStreamContext {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return rsm.SessionStreamContext{
-		StreamID:   s.ID,
-		ResponseID: s.responseID,
+		RequestID:     s.ID,
+		AckResponseID: s.responseID,
 	}
 }
 

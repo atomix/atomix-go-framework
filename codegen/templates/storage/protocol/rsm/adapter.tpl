@@ -168,7 +168,7 @@ func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte, rsmSession
         return nil, err
     }
 
-    proposal := {{ $newProposal }}({{ $serviceProposalID }}(stream.ID()), session, request, stream)
+    proposal := {{ $newProposal }}({{ $serviceProposalID }}(s.Index()), session, request, stream)
 
     s.rsm.Proposals().{{ .Name }}().register(proposal)
     session.Proposals().{{ .Name }}().register(proposal)

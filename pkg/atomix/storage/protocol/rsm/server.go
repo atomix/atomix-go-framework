@@ -19,6 +19,7 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
 	"github.com/golang/protobuf/proto"
+	"time"
 )
 
 // Server is a base server for servers that support sessions
@@ -46,7 +47,12 @@ func (s *Server) Request(ctx context.Context, request *StorageRequest) (*Storage
 		return response, nil
 	}
 
-	bytes, err := proto.Marshal(request.Request)
+	smRequest := &StateMachineRequest{
+		Timestamp: time.Now(),
+		Request:   request.Request,
+	}
+
+	bytes, err := proto.Marshal(smRequest)
 	if err != nil {
 		log.Debugf("StorageRequest %+v failed: %s", request, err)
 		return nil, err
@@ -87,14 +93,14 @@ func (s *Server) Request(ctx context.Context, request *StorageRequest) (*Storage
 			return nil, result.Error
 		}
 
-		sessionResponse := &SessionResponse{}
-		if err := proto.Unmarshal(result.Value.([]byte), sessionResponse); err != nil {
+		smResponse := &StateMachineResponse{}
+		if err := proto.Unmarshal(result.Value.([]byte), smResponse); err != nil {
 			return nil, err
 		}
 
 		response := &StorageResponse{
 			PartitionID: request.PartitionID,
-			Response:    sessionResponse,
+			Response:    smResponse.Response,
 		}
 		log.Debugf("Sending StorageResponse %+v", response)
 		return response, nil
@@ -126,7 +132,12 @@ func (s *Server) Stream(request *StorageRequest, srv StorageService_StreamServer
 		return srv.Send(response)
 	}
 
-	bytes, err := proto.Marshal(request.Request)
+	smRequest := &StateMachineRequest{
+		Timestamp: time.Now(),
+		Request:   request.Request,
+	}
+
+	bytes, err := proto.Marshal(smRequest)
 	if err != nil {
 		log.Debugf("StorageRequest %+v failed: %s", request, err)
 		return err
@@ -166,14 +177,14 @@ func (s *Server) Stream(request *StorageRequest, srv StorageService_StreamServer
 				return result.Error
 			}
 
-			sessionResponse := &SessionResponse{}
-			if err := proto.Unmarshal(result.Value.([]byte), sessionResponse); err != nil {
+			smResponse := &StateMachineResponse{}
+			if err := proto.Unmarshal(result.Value.([]byte), smResponse); err != nil {
 				return err
 			}
 
 			response := &StorageResponse{
 				PartitionID: request.PartitionID,
-				Response:    sessionResponse,
+				Response:    smResponse.Response,
 			}
 			log.Debugf("Sending StorageResponse %+v", response)
 			if err := srv.Send(response); err != nil {

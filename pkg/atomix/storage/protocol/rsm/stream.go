@@ -19,7 +19,6 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
-	"github.com/gogo/protobuf/proto"
 )
 
 // StreamID is a stream identifier
@@ -109,26 +108,26 @@ type sessionStream struct {
 	*opStream
 	cluster    cluster.Cluster
 	member     *cluster.Member
-	sn         uint64
+	requestID  uint64
 	responseID uint64
 	completeID uint64
 	lastIndex  Index
-	ctx        PartitionContext
+	ctx        *managerContext
 	results    *list.List
 }
 
 // sessionStreamResult contains a single stream result
 type sessionStreamResult struct {
-	id     uint64
-	index  Index
-	result streams.Result
+	id       uint64
+	index    Index
+	response *SessionResponse
 }
 
 // open opens the stream
 func (s *sessionStream) open() {
 	s.updateClock()
 
-	bytes, err := proto.Marshal(&SessionResponse{
+	response := &SessionResponse{
 		Type: SessionResponseType_OPEN_STREAM,
 		Status: SessionResponseStatus{
 			Code: SessionResponseCode_OK,
@@ -137,22 +136,18 @@ func (s *sessionStream) open() {
 			Command: &SessionCommandResponse{
 				Context: SessionResponseContext{
 					SessionID: uint64(s.session.ID()),
-					StreamID:  s.sn,
+					RequestID: s.requestID,
 					Index:     uint64(s.lastIndex),
 					Sequence:  s.responseID,
 				},
 			},
 		},
-	})
-	result := streams.Result{
-		Value: bytes,
-		Error: err,
 	}
 
 	out := sessionStreamResult{
-		id:     s.responseID,
-		index:  s.ctx.Index(),
-		result: result,
+		id:       s.responseID,
+		index:    s.ctx.index,
+		response: response,
 	}
 	s.results.PushBack(out)
 
@@ -160,8 +155,8 @@ func (s *sessionStream) open() {
 		logging.String("NodeID", string(s.member.NodeID)),
 		logging.Uint64("SessionID", uint64(s.session.ID())),
 		logging.Uint64("StreamID", uint64(s.ID()))).
-		Debugf("Sending stream open %d %v", s.responseID, out.result)
-	s.stream.Send(out.result)
+		Debugf("Sending stream open %d %v", s.responseID, out.response)
+	s.stream.Value(out.response)
 }
 
 func (s *sessionStream) updateClock() {
@@ -178,14 +173,14 @@ func (s *sessionStream) updateClock() {
 	}
 
 	// Record the last index sent on the stream
-	s.lastIndex = s.ctx.Index()
+	s.lastIndex = s.ctx.index
 }
 
 func (s *sessionStream) Send(result streams.Result) {
 	s.updateClock()
 
 	// Create the stream result and add it to the results list.
-	bytes, err := proto.Marshal(&SessionResponse{
+	response := &SessionResponse{
 		Type: SessionResponseType_RESPONSE,
 		Status: SessionResponseStatus{
 			Code:    getCode(result.Error),
@@ -195,7 +190,7 @@ func (s *sessionStream) Send(result streams.Result) {
 			Command: &SessionCommandResponse{
 				Context: SessionResponseContext{
 					SessionID: uint64(s.session.ID()),
-					StreamID:  s.sn,
+					RequestID: s.requestID,
 					Index:     uint64(s.lastIndex),
 					Sequence:  s.responseID,
 				},
@@ -208,15 +203,12 @@ func (s *sessionStream) Send(result streams.Result) {
 				},
 			},
 		},
-	})
+	}
 
 	out := sessionStreamResult{
-		id:    s.responseID,
-		index: s.ctx.Index(),
-		result: streams.Result{
-			Value: bytes,
-			Error: err,
-		},
+		id:       s.responseID,
+		index:    s.ctx.index,
+		response: response,
 	}
 	s.results.PushBack(out)
 	log.WithFields(
@@ -230,8 +222,8 @@ func (s *sessionStream) Send(result streams.Result) {
 		logging.String("NodeID", string(s.member.NodeID)),
 		logging.Uint64("SessionID", uint64(s.session.ID())),
 		logging.Uint64("StreamID", uint64(s.ID()))).
-		Debugf("Sending response %d %v", s.responseID, out.result)
-	s.stream.Send(out.result)
+		Debugf("Sending response %d %v", s.responseID, out.response)
+	s.stream.Value(out.response)
 }
 
 func (s *sessionStream) Result(value interface{}, err error) {
@@ -274,7 +266,7 @@ func (s *sessionStream) Close() {
 		Debug("Stream closed")
 	s.updateClock()
 
-	bytes, err := proto.Marshal(&SessionResponse{
+	response := &SessionResponse{
 		Type: SessionResponseType_CLOSE_STREAM,
 		Status: SessionResponseStatus{
 			Code: SessionResponseCode_OK,
@@ -283,22 +275,18 @@ func (s *sessionStream) Close() {
 			Command: &SessionCommandResponse{
 				Context: SessionResponseContext{
 					SessionID: uint64(s.session.ID()),
-					StreamID:  s.sn,
+					RequestID: s.requestID,
 					Index:     uint64(s.lastIndex),
 					Sequence:  s.responseID,
 				},
 			},
 		},
-	})
-	result := streams.Result{
-		Value: bytes,
-		Error: err,
 	}
 
 	out := sessionStreamResult{
-		id:     s.responseID,
-		index:  s.ctx.Index(),
-		result: result,
+		id:       s.responseID,
+		index:    s.ctx.index,
+		response: response,
 	}
 	s.results.PushBack(out)
 
@@ -306,8 +294,8 @@ func (s *sessionStream) Close() {
 		logging.String("NodeID", string(s.member.NodeID)),
 		logging.Uint64("SessionID", uint64(s.session.ID())),
 		logging.Uint64("StreamID", uint64(s.ID()))).
-		Debugf("Sending stream close %d %v", s.responseID, out.result)
-	s.stream.Send(out.result)
+		Debugf("Sending stream close %d %v", s.responseID, out.response)
+	s.stream.Value(out.response)
 	s.stream.Close()
 }
 
@@ -338,8 +326,8 @@ func (s *sessionStream) replay(stream streams.WriteStream) {
 			logging.String("NodeID", string(s.member.NodeID)),
 			logging.Uint64("SessionID", uint64(s.session.ID())),
 			logging.Uint64("StreamID", uint64(s.ID()))).
-			Debugf("Sending response %d %v", response.id, response.result)
-		stream.Send(response.result)
+			Debugf("Sending response %d %v", response.id, response.response)
+		stream.Value(response.response)
 		result = result.Next()
 	}
 	s.stream = stream

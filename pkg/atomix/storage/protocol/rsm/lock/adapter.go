@@ -93,7 +93,7 @@ func (s *ServiceAdaptor) lock(input []byte, rsmSession rsm.Session, stream rsm.S
 		return nil, err
 	}
 
-	proposal := newLockProposal(ProposalID(stream.ID()), session, request, stream)
+	proposal := newLockProposal(ProposalID(s.Index()), session, request, stream)
 
 	s.rsm.Proposals().Lock().register(proposal)
 	session.Proposals().Lock().register(proposal)

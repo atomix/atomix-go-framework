@@ -296,7 +296,7 @@ func (s *ServiceAdaptor) events(input []byte, rsmSession rsm.Session, stream rsm
 		return nil, err
 	}
 
-	proposal := newEventsProposal(ProposalID(stream.ID()), session, request, stream)
+	proposal := newEventsProposal(ProposalID(s.Index()), session, request, stream)
 
 	s.rsm.Proposals().Events().register(proposal)
 	session.Proposals().Events().register(proposal)
@@ -328,7 +328,7 @@ func (s *ServiceAdaptor) elements(input []byte, rsmSession rsm.Session, stream r
 		return nil, err
 	}
 
-	proposal := newElementsProposal(ProposalID(stream.ID()), session, request, stream)
+	proposal := newElementsProposal(ProposalID(s.Index()), session, request, stream)
 
 	s.rsm.Proposals().Elements().register(proposal)
 	session.Proposals().Elements().register(proposal)

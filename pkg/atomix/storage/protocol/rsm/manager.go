@@ -15,8 +15,8 @@
 package rsm
 
 import (
+	"bytes"
 	"container/list"
-	"encoding/binary"
 	"fmt"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
@@ -24,20 +24,27 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/util"
 	"github.com/gogo/protobuf/proto"
 	"io"
+	"time"
 )
 
 // NewManager returns an initialized Manager
-func NewManager(cluster cluster.Cluster, registry *Registry, context PartitionContext) *Manager {
+func NewManager(cluster cluster.Cluster, registry *Registry) *Manager {
 	member, _ := cluster.Member()
 	return &Manager{
 		cluster:   cluster,
 		member:    member,
 		registry:  registry,
-		context:   context,
+		context:   &managerContext{},
 		scheduler: newScheduler(),
 		sessions:  make(map[SessionID]*sessionManager),
 		services:  make(map[ServiceID]Service),
 	}
+}
+
+// managerContext is the state machine manager context
+type managerContext struct {
+	index     Index
+	timestamp time.Time
 }
 
 // Manager is a Manager implementation for primitives that support sessions
@@ -45,7 +52,7 @@ type Manager struct {
 	cluster   cluster.Cluster
 	member    *cluster.Member
 	registry  *Registry
-	context   PartitionContext
+	context   *managerContext
 	sessions  map[SessionID]*sessionManager
 	services  map[ServiceID]Service
 	scheduler *scheduler
@@ -53,27 +60,24 @@ type Manager struct {
 
 // Snapshot takes a snapshot of the service
 func (m *Manager) Snapshot(writer io.Writer) error {
-	if err := m.snapshotSessions(writer); err != nil {
-		return err
+	snapshot := &StateMachineSnapshot{
+		Index:     uint64(m.context.index),
+		Timestamp: m.context.timestamp,
+		Sessions:  make([]SessionSnapshot, 0, len(m.sessions)),
+		Services:  make([]ServiceSnapshot, 0, len(m.services)),
 	}
-	if err := m.snapshotServices(writer); err != nil {
-		return err
-	}
-	return nil
-}
 
-func (m *Manager) snapshotSessions(writer io.Writer) error {
-	return util.WriteMap(writer, m.sessions, func(id SessionID, session *sessionManager) ([]byte, error) {
+	for _, session := range m.sessions {
 		services := make([]*SessionServiceSnapshot, 0, len(session.services))
 		for _, service := range session.services {
 			streams := make([]*SessionStreamSnapshot, 0, len(service.streams))
 			for _, stream := range service.streams {
 				streams = append(streams, &SessionStreamSnapshot{
-					StreamId:       uint64(stream.id),
-					Type:           string(stream.op),
-					SequenceNumber: stream.sn,
-					ResponseId:     stream.responseID,
-					CompleteId:     stream.completeID,
+					StreamID:   uint64(stream.id),
+					RequestID:  stream.requestID,
+					Type:       string(stream.op),
+					ResponseID: stream.responseID,
+					CompleteID: stream.completeID,
 				})
 			}
 			services = append(services, &SessionServiceSnapshot{
@@ -81,171 +85,134 @@ func (m *Manager) snapshotSessions(writer io.Writer) error {
 				Streams:   streams,
 			})
 		}
-		snapshot := &SessionSnapshot{
-			SessionID:       uint64(session.id),
-			Timeout:         session.timeout,
-			Timestamp:       session.lastUpdated,
-			CommandSequence: session.commandSequence,
-			Services:        services,
-		}
-		return proto.Marshal(snapshot)
-	})
-}
+		snapshot.Sessions = append(snapshot.Sessions, SessionSnapshot{
+			SessionID:     uint64(session.id),
+			Timeout:       session.timeout,
+			Timestamp:     session.lastUpdated,
+			LastRequestID: session.commandID,
+			Services:      services,
+		})
+	}
 
-func (m *Manager) snapshotServices(writer io.Writer) error {
-	count := make([]byte, 4)
-	binary.BigEndian.PutUint32(count, uint32(len(m.services)))
-	_, err := writer.Write(count)
+	for _, service := range m.services {
+		var b bytes.Buffer
+		if err := service.Backup(&b); err != nil {
+			return err
+		}
+		snapshot.Services = append(snapshot.Services, ServiceSnapshot{
+			ServiceID: ServiceId(service.ServiceID()),
+			Index:     uint64(service.Index()),
+			Data:      b.Bytes(),
+		})
+	}
+
+	bytes, err := proto.Marshal(snapshot)
 	if err != nil {
 		return err
 	}
 
-	for id, service := range m.services {
-		serviceID := ServiceId(id)
-		bytes, err := proto.Marshal(&serviceID)
-		if err != nil {
-			return err
-		}
-
-		length := make([]byte, 4)
-		binary.BigEndian.PutUint32(length, uint32(len(bytes)))
-
-		_, err = writer.Write(length)
-		if err != nil {
-			return err
-		}
-
-		_, err = writer.Write(bytes)
-		if err != nil {
-			return err
-		}
-
-		err = service.Backup(writer)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return util.WriteBytes(writer, bytes)
 }
 
 // Install installs a snapshot of the service
 func (m *Manager) Install(reader io.Reader) error {
-	if err := m.installSessions(reader); err != nil {
+	data, err := util.ReadBytes(reader)
+	if err != nil {
 		return err
 	}
-	if err := m.installServices(reader); err != nil {
+
+	snapshot := &StateMachineSnapshot{}
+	err = proto.Unmarshal(data, snapshot)
+	if err != nil {
 		return err
 	}
-	return nil
-}
 
-func (m *Manager) installSessions(reader io.Reader) error {
-	m.sessions = make(map[SessionID]*sessionManager)
-	return util.ReadMap(reader, m.sessions, func(data []byte) (SessionID, *sessionManager, error) {
-		snapshot := &SessionSnapshot{}
-		if err := proto.Unmarshal(data, snapshot); err != nil {
-			return 0, nil, err
-		}
+	m.context.index = Index(snapshot.Index)
+	m.context.timestamp = snapshot.Timestamp
 
+	for _, sessionSnapshot := range snapshot.Sessions {
 		sessionManager := &sessionManager{
-			id:               SessionID(snapshot.SessionID),
-			timeout:          snapshot.Timeout,
-			lastUpdated:      snapshot.Timestamp,
+			id:               SessionID(sessionSnapshot.SessionID),
+			timeout:          sessionSnapshot.Timeout,
+			lastUpdated:      sessionSnapshot.Timestamp,
 			ctx:              m.context,
-			commandSequence:  snapshot.CommandSequence,
+			commandID:        sessionSnapshot.LastRequestID,
 			commandCallbacks: make(map[uint64]func()),
 			queryCallbacks:   make(map[uint64]*list.List),
 			results:          make(map[uint64]streams.Result),
 			services:         make(map[ServiceID]*serviceSession),
 		}
 
-		for _, service := range snapshot.Services {
+		for _, service := range sessionSnapshot.Services {
 			session := &serviceSession{
 				sessionManager: sessionManager,
 				service:        ServiceID(service.ServiceId),
-				streams:        make(map[StreamID]*sessionStream),
+				streams:        make(map[uint64]*sessionStream),
 			}
 
 			for _, stream := range service.Streams {
-				session.streams[StreamID(stream.StreamId)] = &sessionStream{
+				session.streams[stream.RequestID] = &sessionStream{
 					opStream: &opStream{
-						id:      StreamID(stream.StreamId),
+						id:      StreamID(stream.StreamID),
 						op:      OperationID(stream.Type),
 						session: session,
 						stream:  streams.NewNilStream(),
 					},
 					cluster:    m.cluster,
 					member:     m.member,
-					sn:         stream.SequenceNumber,
-					responseID: stream.ResponseId,
-					completeID: stream.CompleteId,
+					requestID:  stream.RequestID,
+					responseID: stream.ResponseID,
+					completeID: stream.CompleteID,
 					ctx:        m.context,
 					results:    list.New(),
 				}
 			}
 			sessionManager.services[ServiceID(service.ServiceId)] = session
 		}
-		return sessionManager.id, sessionManager, nil
-	})
-}
-
-func (m *Manager) installServices(reader io.Reader) error {
-	services := make(map[ServiceID]Service)
-
-	countBytes := make([]byte, 4)
-	n, err := reader.Read(countBytes)
-	if err != nil {
-		return err
-	} else if n <= 0 {
-		return nil
+		m.sessions[sessionManager.id] = sessionManager
 	}
 
-	lengthBytes := make([]byte, 4)
-	count := int(binary.BigEndian.Uint32(countBytes))
-	for i := 0; i < count; i++ {
-		n, err = reader.Read(lengthBytes)
-		if err != nil {
+	for _, serviceSnapshot := range snapshot.Services {
+		serviceID := ServiceID(serviceSnapshot.ServiceID)
+		f := m.registry.GetService(serviceID.Type)
+		service := f(m.scheduler, newServiceContext(serviceID, m.context))
+		service.setIndex(Index(serviceSnapshot.Index))
+		for _, sessionMgr := range m.sessions {
+			if session, ok := sessionMgr.services[serviceID]; ok {
+				service.addSession(session)
+			}
+		}
+		if err := service.Restore(bytes.NewReader(serviceSnapshot.Data)); err != nil {
 			return err
 		}
-		if n > 0 {
-			length := binary.BigEndian.Uint32(lengthBytes)
-			bytes := make([]byte, length)
-			_, err = reader.Read(bytes)
-			if err != nil {
-				return err
-			}
-
-			serviceID := ServiceId{}
-			if err = proto.Unmarshal(bytes, &serviceID); err != nil {
-				return err
-			}
-			f := m.registry.GetService(serviceID.Type)
-			service := f(m.scheduler, newServiceContext(m.context, ServiceID(serviceID)))
-			services[ServiceID(serviceID)] = service
-			for _, sessionMgr := range m.sessions {
-				if session, ok := sessionMgr.services[ServiceID(serviceID)]; ok {
-					service.addSession(session)
-				}
-			}
-			if err := service.Restore(reader); err != nil {
-				return err
-			}
-		}
+		m.services[serviceID] = service
 	}
-	m.services = services
 	return nil
 }
 
 // Command handles a service command
 func (m *Manager) Command(bytes []byte, stream streams.WriteStream) {
-	request := &SessionRequest{}
+	request := &StateMachineRequest{}
 	if err := proto.Unmarshal(bytes, request); err != nil {
 		stream.Error(err)
 		stream.Close()
 	} else {
-		m.scheduler.runScheduledTasks(m.context.Timestamp())
+		stream = streams.NewEncodingStream(stream, func(value interface{}, err error) (interface{}, error) {
+			if err != nil {
+				return nil, err
+			}
+			return proto.Marshal(&StateMachineResponse{
+				Response: value.(*SessionResponse),
+			})
+		})
 
-		switch r := request.Request.(type) {
+		m.context.index++
+		if request.Timestamp.After(m.context.timestamp) {
+			m.context.timestamp = request.Timestamp
+		}
+		m.scheduler.runScheduledTasks(m.context.timestamp)
+
+		switch r := request.Request.Request.(type) {
 		case *SessionRequest_Command:
 			m.applyCommand(r.Command, stream)
 		case *SessionRequest_OpenSession:
@@ -257,7 +224,7 @@ func (m *Manager) Command(bytes []byte, stream streams.WriteStream) {
 		}
 
 		m.scheduler.runImmediateTasks()
-		m.scheduler.runIndex(m.context.Index())
+		m.scheduler.runIndex(m.context.index)
 	}
 }
 
@@ -271,8 +238,8 @@ func (m *Manager) applyCommand(request *SessionCommandRequest, stream streams.Wr
 		stream.Error(fmt.Errorf("unknown session %d", request.Context.SessionID))
 		stream.Close()
 	} else {
-		sequenceNumber := request.Context.SequenceNumber
-		if sequenceNumber != 0 && sequenceNumber <= sessionManager.commandSequence {
+		requestID := request.Context.RequestID
+		if requestID != 0 && requestID <= sessionManager.commandID {
 			serviceID := ServiceID(request.Command.Service)
 
 			session := sessionManager.getService(serviceID)
@@ -282,32 +249,32 @@ func (m *Manager) applyCommand(request *SessionCommandRequest, stream streams.Wr
 				return
 			}
 
-			result, ok := session.getUnaryResult(sequenceNumber)
+			result, ok := session.getUnaryResult(requestID)
 			if ok {
 				stream.Send(result)
 				stream.Close()
 			} else {
-				streamCtx := session.getStream(StreamID(sequenceNumber))
+				streamCtx := session.getStream(requestID)
 				if streamCtx != nil {
 					streamCtx.replay(stream)
 				} else {
-					stream.Error(fmt.Errorf("sequence number %d has already been acknowledged", sequenceNumber))
+					stream.Error(fmt.Errorf("sequence number %d has already been acknowledged", requestID))
 					stream.Close()
 				}
 			}
-		} else if sequenceNumber > sessionManager.nextCommandSequence() {
-			sessionManager.scheduleCommand(sequenceNumber, func() {
+		} else if requestID > sessionManager.nextCommandID() {
+			sessionManager.scheduleCommand(requestID, func() {
 				log.WithFields(
 					logging.String("NodeID", string(m.member.NodeID)),
 					logging.Uint64("SessionID", request.Context.SessionID)).
-					Debugf("Executing command %d", sequenceNumber)
+					Debugf("Executing command %d", requestID)
 				m.applySessionCommand(request, sessionManager, stream)
 			})
 		} else {
 			log.WithFields(
 				logging.String("NodeID", string(m.member.NodeID)),
 				logging.Uint64("SessionID", request.Context.SessionID)).
-				Debugf("Executing command %d", sequenceNumber)
+				Debugf("Executing command %d", requestID)
 			m.applySessionCommand(request, sessionManager, stream)
 		}
 	}
@@ -315,7 +282,7 @@ func (m *Manager) applyCommand(request *SessionCommandRequest, stream streams.Wr
 
 func (m *Manager) applySessionCommand(request *SessionCommandRequest, session *sessionManager, stream streams.WriteStream) {
 	m.applyServiceCommand(request.Command, request.Context, session, stream)
-	session.completeCommand(request.Context.SequenceNumber)
+	session.completeCommand(request.Context.RequestID)
 }
 
 func (m *Manager) applyServiceCommand(request ServiceCommandRequest, context SessionCommandContext, sessionManager *sessionManager, stream streams.WriteStream) {
@@ -352,20 +319,18 @@ func (m *Manager) applyServiceCommandOperation(request ServiceCommandRequest, co
 	}
 
 	operationID := OperationID(request.GetOperation().Method)
-	service.setCurrentSession(session)
-	service.setCurrentOperation(operationID)
-
+	service.setIndex(service.Index() + 1)
 	operation := service.GetOperation(operationID)
 	if unaryOp, ok := operation.(UnaryOperation); ok {
 		output, err := unaryOp.Execute(request.GetOperation().Value, session)
-		result := session.addUnaryResult(context.SequenceNumber, streams.Result{
+		result := session.addUnaryResult(context.RequestID, streams.Result{
 			Value: output,
 			Error: err,
 		})
 		stream.Send(result)
 		stream.Close()
 	} else if streamOp, ok := operation.(StreamingOperation); ok {
-		sessionStream := session.addStream(StreamID(m.context.Index()), operationID, context.SequenceNumber, stream)
+		sessionStream := session.addStream(context.RequestID, operationID, stream)
 		closer, err := streamOp.Execute(request.GetOperation().Value, session, sessionStream)
 		if err != nil {
 			stream.Error(err)
@@ -387,7 +352,7 @@ func (m *Manager) applyServiceCommandCreate(request ServiceCommandRequest, conte
 	if !ok {
 		f := m.registry.GetService(request.Service.Type)
 		if f == nil {
-			stream.Result(proto.Marshal(&SessionResponse{
+			stream.Value(&SessionResponse{
 				Type: SessionResponseType_RESPONSE,
 				Status: SessionResponseStatus{
 					Code:    SessionResponseCode_INVALID,
@@ -397,8 +362,8 @@ func (m *Manager) applyServiceCommandCreate(request ServiceCommandRequest, conte
 					Command: &SessionCommandResponse{
 						Context: SessionResponseContext{
 							SessionID: context.SessionID,
-							Index:     uint64(m.context.Index()),
-							Sequence:  context.SequenceNumber,
+							RequestID: context.RequestID,
+							Index:     uint64(m.context.index),
 						},
 						Response: ServiceCommandResponse{
 							Response: &ServiceCommandResponse_Create{
@@ -407,10 +372,10 @@ func (m *Manager) applyServiceCommandCreate(request ServiceCommandRequest, conte
 						},
 					},
 				},
-			}))
+			})
 			return
 		}
-		service = f(m.scheduler, newServiceContext(m.context, serviceID))
+		service = f(m.scheduler, newServiceContext(serviceID, m.context))
 		m.services[serviceID] = service
 	}
 
@@ -418,13 +383,12 @@ func (m *Manager) applyServiceCommandCreate(request ServiceCommandRequest, conte
 	if session == nil {
 		session = sessionManager.addService(serviceID)
 		service.addSession(session)
-		service.setCurrentSession(session)
 		if open, ok := service.(SessionOpenService); ok {
 			open.SessionOpen(session)
 		}
 	}
 
-	stream.Result(proto.Marshal(&SessionResponse{
+	stream.Value(&SessionResponse{
 		Type: SessionResponseType_RESPONSE,
 		Status: SessionResponseStatus{
 			Code: SessionResponseCode_OK,
@@ -433,8 +397,8 @@ func (m *Manager) applyServiceCommandCreate(request ServiceCommandRequest, conte
 			Command: &SessionCommandResponse{
 				Context: SessionResponseContext{
 					SessionID: context.SessionID,
-					Index:     uint64(m.context.Index()),
-					Sequence:  context.SequenceNumber,
+					RequestID: context.RequestID,
+					Index:     uint64(m.context.index),
 				},
 				Response: ServiceCommandResponse{
 					Response: &ServiceCommandResponse_Create{
@@ -443,7 +407,7 @@ func (m *Manager) applyServiceCommandCreate(request ServiceCommandRequest, conte
 				},
 			},
 		},
-	}))
+	})
 }
 
 func (m *Manager) applyServiceCommandClose(request ServiceCommandRequest, context SessionCommandContext, sessionManager *sessionManager, stream streams.WriteStream) {
@@ -453,7 +417,6 @@ func (m *Manager) applyServiceCommandClose(request ServiceCommandRequest, contex
 	if ok {
 		session := sessionManager.removeService(serviceID)
 		if session != nil {
-			service.setCurrentSession(session)
 			service.removeSession(session)
 			if closed, ok := service.(SessionClosedService); ok {
 				closed.SessionClosed(session)
@@ -461,7 +424,7 @@ func (m *Manager) applyServiceCommandClose(request ServiceCommandRequest, contex
 		}
 	}
 
-	stream.Result(proto.Marshal(&SessionResponse{
+	stream.Value(&SessionResponse{
 		Type: SessionResponseType_RESPONSE,
 		Status: SessionResponseStatus{
 			Code: SessionResponseCode_OK,
@@ -470,8 +433,8 @@ func (m *Manager) applyServiceCommandClose(request ServiceCommandRequest, contex
 			Command: &SessionCommandResponse{
 				Context: SessionResponseContext{
 					SessionID: context.SessionID,
-					Index:     uint64(m.context.Index()),
-					Sequence:  context.SequenceNumber,
+					RequestID: context.RequestID,
+					Index:     uint64(m.context.index),
 				},
 				Response: ServiceCommandResponse{
 					Response: &ServiceCommandResponse_Close{
@@ -480,7 +443,7 @@ func (m *Manager) applyServiceCommandClose(request ServiceCommandRequest, contex
 				},
 			},
 		},
-	}))
+	})
 	stream.Close()
 }
 
@@ -491,7 +454,7 @@ func (m *Manager) applyServiceCommandDelete(request ServiceCommandRequest, conte
 
 	_, ok := m.services[serviceID]
 	if !ok {
-		stream.Result(proto.Marshal(&SessionResponse{
+		stream.Value(&SessionResponse{
 			Type: SessionResponseType_RESPONSE,
 			Status: SessionResponseStatus{
 				Code:    SessionResponseCode_NOT_FOUND,
@@ -501,8 +464,8 @@ func (m *Manager) applyServiceCommandDelete(request ServiceCommandRequest, conte
 				Command: &SessionCommandResponse{
 					Context: SessionResponseContext{
 						SessionID: context.SessionID,
-						Index:     uint64(m.context.Index()),
-						Sequence:  context.SequenceNumber,
+						RequestID: context.RequestID,
+						Index:     uint64(m.context.index),
 					},
 					Response: ServiceCommandResponse{
 						Response: &ServiceCommandResponse_Delete{
@@ -511,14 +474,14 @@ func (m *Manager) applyServiceCommandDelete(request ServiceCommandRequest, conte
 					},
 				},
 			},
-		}))
+		})
 	} else {
 		delete(m.services, serviceID)
 		for _, session := range m.sessions {
 			session.removeService(serviceID)
 		}
 
-		stream.Result(proto.Marshal(&SessionResponse{
+		stream.Value(&SessionResponse{
 			Type: SessionResponseType_RESPONSE,
 			Status: SessionResponseStatus{
 				Code: SessionResponseCode_OK,
@@ -527,8 +490,8 @@ func (m *Manager) applyServiceCommandDelete(request ServiceCommandRequest, conte
 				Command: &SessionCommandResponse{
 					Context: SessionResponseContext{
 						SessionID: context.SessionID,
-						Index:     uint64(m.context.Index()),
-						Sequence:  context.SequenceNumber,
+						RequestID: context.RequestID,
+						Index:     uint64(m.context.index),
 					},
 					Response: ServiceCommandResponse{
 						Response: &ServiceCommandResponse_Delete{
@@ -537,20 +500,20 @@ func (m *Manager) applyServiceCommandDelete(request ServiceCommandRequest, conte
 					},
 				},
 			},
-		}))
+		})
 	}
 }
 
 func (m *Manager) applyOpenSession(request *OpenSessionRequest, stream streams.WriteStream) {
 	session := newSessionManager(m.cluster, m.context, ClientID(request.ClientID), request.Timeout)
 	m.sessions[session.id] = session
-	stream.Result(proto.Marshal(&SessionResponse{
+	stream.Value(&SessionResponse{
 		Response: &SessionResponse_OpenSession{
 			OpenSession: &OpenSessionResponse{
 				SessionID: uint64(session.id),
 			},
 		},
-	}))
+	})
 	stream.Close()
 }
 
@@ -570,22 +533,22 @@ func (m *Manager) applyKeepAlive(request *KeepAliveRequest, stream streams.Write
 			Debugf("Recording keep-alive %v", request)
 
 		// Update the session's last updated timestamp to prevent it from expiring
-		session.lastUpdated = m.context.Timestamp()
+		session.lastUpdated = m.context.timestamp
 
 		// Clear the results up to the given command sequence number
 		for _, service := range session.services {
-			service.ack(request.CommandSequence, request.Streams)
+			service.ack(request.AckRequestID, request.Streams)
 		}
 
 		// Expire sessions that have not been kept alive
 		m.expireSessions()
 
 		// Send the response
-		stream.Result(proto.Marshal(&SessionResponse{
+		stream.Value(&SessionResponse{
 			Response: &SessionResponse_KeepAlive{
 				KeepAlive: &KeepAliveResponse{},
 			},
-		}))
+		})
 	}
 	stream.Close()
 }
@@ -593,7 +556,7 @@ func (m *Manager) applyKeepAlive(request *KeepAliveRequest, stream streams.Write
 // expireSessions expires sessions that have not been kept alive within their timeout
 func (m *Manager) expireSessions() {
 	for id, sessionManager := range m.sessions {
-		if sessionManager.timedOut(m.context.Timestamp()) {
+		if sessionManager.timedOut(m.context.timestamp) {
 			sessionManager.close()
 			delete(m.sessions, id)
 			for _, session := range sessionManager.services {
@@ -632,35 +595,42 @@ func (m *Manager) applyCloseSession(request *CloseSessionRequest, stream streams
 		}
 
 		// Send the response
-		stream.Result(proto.Marshal(&SessionResponse{
+		stream.Value(&SessionResponse{
 			Response: &SessionResponse_CloseSession{
 				CloseSession: &CloseSessionResponse{},
 			},
-		}))
+		})
 	}
 	stream.Close()
 }
 
 // Query handles a service query
 func (m *Manager) Query(bytes []byte, stream streams.WriteStream) {
-	request := &SessionRequest{}
-	err := proto.Unmarshal(bytes, request)
-	if err != nil {
+	request := &StateMachineRequest{}
+	if err := proto.Unmarshal(bytes, request); err != nil {
 		stream.Error(err)
 		stream.Close()
 	} else {
-		query := request.GetQuery()
-		if Index(query.Context.LastIndex) > m.context.Index() {
+		stream = streams.NewEncodingStream(stream, func(value interface{}, err error) (interface{}, error) {
+			if err != nil {
+				return nil, err
+			}
+			return proto.Marshal(&StateMachineResponse{
+				Response: value.(*SessionResponse),
+			})
+		})
+		query := request.Request.GetQuery()
+		if Index(query.Context.LastIndex) > m.context.index {
 			log.WithFields(
 				logging.String("NodeID", string(m.member.NodeID))).
-				Debugf("Query index %d greater than last index %d", query.Context.LastIndex, m.context.Index())
+				Debugf("Query index %d greater than last index %d", query.Context.LastIndex, m.context.index)
 			m.scheduler.RunAtIndex(Index(query.Context.LastIndex), func() {
 				m.sequenceQuery(query, stream)
 			})
 		} else {
 			log.WithFields(
 				logging.String("NodeID", string(m.member.NodeID))).
-				Debugf("Sequencing query %d <= %d", query.Context.LastIndex, m.context.Index())
+				Debugf("Sequencing query %d <= %d", query.Context.LastIndex, m.context.index)
 			m.sequenceQuery(query, stream)
 		}
 	}
@@ -676,12 +646,12 @@ func (m *Manager) sequenceQuery(request *SessionQueryRequest, stream streams.Wri
 		stream.Error(fmt.Errorf("unknown session %d", request.Context.SessionID))
 		stream.Close()
 	} else {
-		sequenceNumber := request.Context.LastSequenceNumber
-		if sequenceNumber > sessionManager.commandSequence {
+		sequenceNumber := request.Context.LastRequestID
+		if sequenceNumber > sessionManager.commandID {
 			log.WithFields(
 				logging.String("NodeID", string(m.member.NodeID)),
 				logging.Uint64("SessionID", request.Context.SessionID)).
-				Debugf("Query ID %d greater than last ID %d", sequenceNumber, sessionManager.commandSequence)
+				Debugf("Query ID %d greater than last ID %d", sequenceNumber, sessionManager.commandID)
 			sessionManager.scheduleQuery(sequenceNumber, func() {
 				log.WithFields(
 					logging.String("NodeID", string(m.member.NodeID)),
@@ -730,12 +700,8 @@ func (m *Manager) applyServiceQueryOperation(request ServiceQueryRequest, contex
 		return
 	}
 
-	// Set the current session on the service
-	operationID := OperationID(request.GetOperation().Method)
-	service.setCurrentSession(session)
-	service.setCurrentOperation(operationID)
-
 	// Get the service operation
+	operationID := OperationID(request.GetOperation().Method)
 	operation := service.GetOperation(operationID)
 	if operation == nil {
 		stream.Error(fmt.Errorf("unknown operation: %s", request.GetOperation().Method))
@@ -743,9 +709,9 @@ func (m *Manager) applyServiceQueryOperation(request ServiceQueryRequest, contex
 		return
 	}
 
-	index := m.context.Index()
+	index := m.context.index
 	responseStream := streams.NewEncodingStream(stream, func(value interface{}, err error) (interface{}, error) {
-		return proto.Marshal(&SessionResponse{
+		return &SessionResponse{
 			Type: SessionResponseType_RESPONSE,
 			Status: SessionResponseStatus{
 				Code:    getCode(err),
@@ -756,7 +722,6 @@ func (m *Manager) applyServiceQueryOperation(request ServiceQueryRequest, contex
 					Context: SessionResponseContext{
 						SessionID: context.SessionID,
 						Index:     uint64(index),
-						Sequence:  context.LastSequenceNumber,
 					},
 					Response: ServiceQueryResponse{
 						Response: &ServiceQueryResponse_Operation{
@@ -767,14 +732,14 @@ func (m *Manager) applyServiceQueryOperation(request ServiceQueryRequest, contex
 					},
 				},
 			},
-		})
+		}, nil
 	})
 
 	if unaryOp, ok := operation.(UnaryOperation); ok {
 		responseStream.Result(unaryOp.Execute(request.GetOperation().Value, session))
 		responseStream.Close()
 	} else if streamOp, ok := operation.(StreamingOperation); ok {
-		stream.Result(proto.Marshal(&SessionResponse{
+		stream.Value(&SessionResponse{
 			Type: SessionResponseType_OPEN_STREAM,
 			Status: SessionResponseStatus{
 				Code: SessionResponseCode_OK,
@@ -787,10 +752,10 @@ func (m *Manager) applyServiceQueryOperation(request ServiceQueryRequest, contex
 					},
 				},
 			},
-		}))
+		})
 
 		responseStream = streams.NewCloserStream(responseStream, func(_ streams.WriteStream) {
-			stream.Result(proto.Marshal(&SessionResponse{
+			stream.Value(&SessionResponse{
 				Type: SessionResponseType_CLOSE_STREAM,
 				Status: SessionResponseStatus{
 					Code: SessionResponseCode_OK,
@@ -803,13 +768,13 @@ func (m *Manager) applyServiceQueryOperation(request ServiceQueryRequest, contex
 						},
 					},
 				},
-			}))
+			})
 		})
 
 		queryStream := &queryStream{
 			opStream: &opStream{
 				stream:  responseStream,
-				id:      StreamID(m.context.Index()),
+				id:      StreamID(m.context.index),
 				op:      operationID,
 				session: session,
 			},
@@ -842,7 +807,7 @@ func (m *Manager) applyServiceQueryMetadata(request ServiceQueryRequest, context
 		}
 	}
 
-	stream.Result(proto.Marshal(&SessionResponse{
+	stream.Value(&SessionResponse{
 		Type: SessionResponseType_RESPONSE,
 		Status: SessionResponseStatus{
 			Code: SessionResponseCode_OK,
@@ -851,8 +816,8 @@ func (m *Manager) applyServiceQueryMetadata(request ServiceQueryRequest, context
 			Query: &SessionQueryResponse{
 				Context: SessionResponseContext{
 					SessionID: context.SessionID,
-					Index:     uint64(m.context.Index()),
-					Sequence:  context.LastSequenceNumber,
+					RequestID: context.LastRequestID,
+					Index:     uint64(m.context.index),
 				},
 				Response: ServiceQueryResponse{
 					Response: &ServiceQueryResponse_Metadata{
@@ -863,5 +828,5 @@ func (m *Manager) applyServiceQueryMetadata(request ServiceQueryRequest, context
 				},
 			},
 		},
-	}))
+	})
 }

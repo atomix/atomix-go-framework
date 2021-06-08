@@ -19,7 +19,6 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
-	"github.com/gogo/protobuf/proto"
 	"time"
 )
 
@@ -36,19 +35,10 @@ type Session interface {
 
 	// ClientID returns the client identifier
 	ClientID() ClientID
-
-	// Streams returns all open streams
-	Streams() []Stream
-
-	// Stream returns a stream by ID
-	Stream(id StreamID) Stream
-
-	// StreamsOf returns all open streams for the given operation
-	StreamsOf(op OperationID) []Stream
 }
 
 // newSessionManager creates a new session manager
-func newSessionManager(cluster cluster.Cluster, ctx PartitionContext, clientID ClientID, timeout *time.Duration) *sessionManager {
+func newSessionManager(cluster cluster.Cluster, ctx *managerContext, clientID ClientID, timeout *time.Duration) *sessionManager {
 	if timeout == nil {
 		defaultTimeout := 30 * time.Second
 		timeout = &defaultTimeout
@@ -56,15 +46,15 @@ func newSessionManager(cluster cluster.Cluster, ctx PartitionContext, clientID C
 	member, _ := cluster.Member()
 	log := log.WithFields(
 		logging.String("NodeID", string(member.NodeID)),
-		logging.Uint64("SessionID", uint64(ctx.Index())))
+		logging.Uint64("SessionID", uint64(ctx.index)))
 	session := &sessionManager{
 		cluster:          cluster,
 		member:           member,
 		log:              log,
-		id:               SessionID(ctx.Index()),
+		id:               SessionID(ctx.index),
 		clientID:         clientID,
 		timeout:          *timeout,
-		lastUpdated:      ctx.Timestamp(),
+		lastUpdated:      ctx.timestamp,
 		ctx:              ctx,
 		commandCallbacks: make(map[uint64]func()),
 		queryCallbacks:   make(map[uint64]*list.List),
@@ -84,8 +74,8 @@ type sessionManager struct {
 	clientID         ClientID
 	timeout          time.Duration
 	lastUpdated      time.Time
-	ctx              PartitionContext
-	commandSequence  uint64
+	ctx              *managerContext
+	commandID        uint64
 	commandCallbacks map[uint64]func()
 	queryCallbacks   map[uint64]*list.List
 	results          map[uint64]streams.Result
@@ -123,8 +113,8 @@ func (s *sessionManager) getUnaryResult(id uint64) (streams.Result, bool) {
 }
 
 // addUnaryResult adds a unary result
-func (s *sessionManager) addUnaryResult(id uint64, result streams.Result) streams.Result {
-	bytes, err := proto.Marshal(&SessionResponse{
+func (s *sessionManager) addUnaryResult(requestID uint64, result streams.Result) streams.Result {
+	response := &SessionResponse{
 		Type: SessionResponseType_RESPONSE,
 		Status: SessionResponseStatus{
 			Code:    getCode(result.Error),
@@ -134,8 +124,8 @@ func (s *sessionManager) addUnaryResult(id uint64, result streams.Result) stream
 			Command: &SessionCommandResponse{
 				Context: SessionResponseContext{
 					SessionID: uint64(s.id),
-					StreamID:  uint64(id),
-					Index:     uint64(s.ctx.Index()),
+					RequestID: requestID,
+					Index:     uint64(s.ctx.index),
 					Sequence:  1,
 				},
 				Response: ServiceCommandResponse{
@@ -147,12 +137,11 @@ func (s *sessionManager) addUnaryResult(id uint64, result streams.Result) stream
 				},
 			},
 		},
-	})
-	result = streams.Result{
-		Value: bytes,
-		Error: err,
 	}
-	s.results[id] = result
+	result = streams.Result{
+		Value: response,
+	}
+	s.results[requestID] = result
 	return result
 }
 
@@ -171,16 +160,16 @@ func (s *sessionManager) scheduleCommand(sequenceNumber uint64, f func()) {
 	s.commandCallbacks[sequenceNumber] = f
 }
 
-// nextCommandSequence returns the next command sequence number for the session
-func (s *sessionManager) nextCommandSequence() uint64 {
-	return s.commandSequence + 1
+// nextCommandID returns the next command sequence number for the session
+func (s *sessionManager) nextCommandID() uint64 {
+	return s.commandID + 1
 }
 
 // completeCommand completes operations up to the given sequence number and executes commands and
 // queries pending for the sequence number to be completed
 func (s *sessionManager) completeCommand(sequenceNumber uint64) {
-	for i := s.commandSequence + 1; i <= sequenceNumber; i++ {
-		s.commandSequence = i
+	for i := s.commandID + 1; i <= sequenceNumber; i++ {
+		s.commandID = i
 		queries, ok := s.queryCallbacks[i]
 		if ok {
 			query := queries.Front()
@@ -191,7 +180,7 @@ func (s *sessionManager) completeCommand(sequenceNumber uint64) {
 			delete(s.queryCallbacks, i)
 		}
 
-		command, ok := s.commandCallbacks[s.nextCommandSequence()]
+		command, ok := s.commandCallbacks[s.nextCommandID()]
 		if ok {
 			command()
 			delete(s.commandCallbacks, i)
@@ -212,7 +201,7 @@ func newServiceSession(session *sessionManager, service ServiceID) *serviceSessi
 	return &serviceSession{
 		sessionManager: session,
 		service:        service,
-		streams:        make(map[StreamID]*sessionStream),
+		streams:        make(map[uint64]*sessionStream),
 	}
 }
 
@@ -220,7 +209,7 @@ func newServiceSession(session *sessionManager, service ServiceID) *serviceSessi
 type serviceSession struct {
 	*sessionManager
 	service ServiceID
-	streams map[StreamID]*sessionStream
+	streams map[uint64]*sessionStream
 }
 
 func (s *serviceSession) ID() SessionID {
@@ -231,77 +220,54 @@ func (s *serviceSession) ClientID() ClientID {
 	return s.clientID
 }
 
-func (s *serviceSession) Streams() []Stream {
-	streams := make([]Stream, 0, len(s.streams))
-	for _, stream := range s.streams {
-		streams = append(streams, stream)
-	}
-	return streams
-}
-
-func (s *serviceSession) Stream(id StreamID) Stream {
-	return s.streams[id]
-}
-
-func (s *serviceSession) StreamsOf(op OperationID) []Stream {
-	streams := make([]Stream, 0, len(s.streams))
-	for _, stream := range s.streams {
-		if stream.OperationID() == op {
-			streams = append(streams, stream)
-		}
-	}
-	return streams
-}
-
 // addStream adds a stream at the given sequence number
-func (s *serviceSession) addStream(id StreamID, op OperationID, sn uint64, outStream streams.WriteStream) *sessionStream {
+func (s *serviceSession) addStream(requestID uint64, op OperationID, outStream streams.WriteStream) *sessionStream {
 	stream := &sessionStream{
 		opStream: &opStream{
-			id:      id,
+			id:      StreamID(requestID),
 			op:      op,
 			session: s,
 			stream:  outStream,
 		},
-		sn:      sn,
-		cluster: s.cluster,
-		member:  s.member,
-		ctx:     s.ctx,
-		results: list.New(),
+		requestID: requestID,
+		cluster:   s.cluster,
+		member:    s.member,
+		ctx:       s.ctx,
+		results:   list.New(),
 	}
-	s.streams[id] = stream
+	s.streams[requestID] = stream
 	stream.open()
 	s.log.Debugf("Stream open")
 	return stream
 }
 
 // getStream returns a stream by the request sequence number
-func (s *serviceSession) getStream(id StreamID) *sessionStream {
-	return s.streams[id]
+func (s *serviceSession) getStream(requestID uint64) *sessionStream {
+	return s.streams[requestID]
 }
 
 // ack acknowledges response streams up to the given request sequence number
-func (s *serviceSession) ack(sn uint64, streams []SessionStreamContext) {
-	for responseID := range s.results {
-		if responseID > sn {
-			continue
+func (s *serviceSession) ack(ackRequestID uint64, streams []SessionStreamContext) {
+	for requestID := range s.results {
+		if requestID <= ackRequestID {
+			delete(s.results, requestID)
 		}
-		delete(s.results, responseID)
 	}
 
 	streamAcks := make(map[uint64]uint64)
 	for _, stream := range streams {
-		streamAcks[stream.StreamID] = stream.ResponseID
+		streamAcks[stream.RequestID] = stream.AckResponseID
 	}
 
 	for streamID, stream := range s.streams {
 		// If the stream ID is greater than the acknowledged sequence number, skip it
-		if stream.sn > sn {
+		if stream.requestID > ackRequestID {
 			continue
 		}
 
 		// If the stream is still held by the client, ack the stream.
 		// Otherwise, close the stream.
-		streamAck, open := streamAcks[stream.sn]
+		streamAck, open := streamAcks[stream.requestID]
 		if open {
 			stream.ack(streamAck)
 		} else {

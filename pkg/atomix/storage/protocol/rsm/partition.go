@@ -17,23 +17,7 @@ package rsm
 import (
 	"context"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/stream"
-	"time"
 )
-
-// Index is a partition log index
-type Index uint64
-
-// PartitionContext provides the current state of the partition
-type PartitionContext interface {
-	// PartitionID is the partition identifier
-	PartitionID() PartitionID
-
-	// Index returns the current index of the service
-	Index() Index
-
-	// Timestamp returns a deterministic, monotonically increasing timestamp
-	Timestamp() time.Time
-}
 
 // PartitionID is a partition identifier
 type PartitionID int

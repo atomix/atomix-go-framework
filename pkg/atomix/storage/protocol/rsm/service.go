@@ -16,26 +16,28 @@ package rsm
 
 import (
 	"io"
+	"time"
 )
 
 // ServiceID is a service identifier
 type ServiceID ServiceId
 
+// Index is a partition log index
+type Index uint64
+
 // ServiceContext provides information about the context within which a service is running
 type ServiceContext interface {
-	PartitionContext
+	// Index returns the current index of the service
+	Index() Index
+
+	// Timestamp returns a deterministic, monotonically increasing timestamp
+	Timestamp() time.Time
 
 	// ServiceID is the service identifier
 	ServiceID() ServiceID
 
 	// ServiceType returns the service type
 	ServiceType() string
-
-	// CurrentOperation returns the current operation identifier
-	CurrentOperation() OperationID
-
-	// CurrentSession returns the current session
-	CurrentSession() Session
 
 	// Session returns the session with the given identifier
 	Session(id SessionID) Session
@@ -47,27 +49,38 @@ type ServiceContext interface {
 // internalContext provides setters for the service context
 type internalContext interface {
 	ServiceContext
-	setCurrentOperation(op OperationID)
-	setCurrentSession(session Session)
+	setIndex(index Index)
 	addSession(session Session)
 	removeSession(session Session)
 }
 
-func newServiceContext(ctx PartitionContext, id ServiceID) ServiceContext {
+func newServiceContext(id ServiceID, context *managerContext) ServiceContext {
 	return &serviceContext{
-		PartitionContext: ctx,
-		serviceID:        id,
-		sessions:         make(map[SessionID]Session),
+		serviceID: id,
+		context:   context,
+		sessions:  make(map[SessionID]Session),
 	}
 }
 
 // serviceContext is a default implementation of the service context
 type serviceContext struct {
-	PartitionContext
 	serviceID      ServiceID
+	context        *managerContext
+	index          Index
 	sessions       map[SessionID]Session
 	currentSession Session
-	currentOp      OperationID
+}
+
+func (c *serviceContext) Index() Index {
+	return c.index
+}
+
+func (c *serviceContext) setIndex(index Index) {
+	c.index = index
+}
+
+func (c *serviceContext) Timestamp() time.Time {
+	return c.context.timestamp
 }
 
 func (c *serviceContext) ServiceID() ServiceID {
@@ -76,24 +89,6 @@ func (c *serviceContext) ServiceID() ServiceID {
 
 func (c *serviceContext) ServiceType() string {
 	return c.serviceID.Type
-}
-
-func (c *serviceContext) CurrentOperation() OperationID {
-	return c.currentOp
-}
-
-// setOperation sets the current operation
-func (c *serviceContext) setCurrentOperation(op OperationID) {
-	c.currentOp = op
-}
-
-func (c *serviceContext) CurrentSession() Session {
-	return c.currentSession
-}
-
-// setCurrentSession sets the current session
-func (c *serviceContext) setCurrentSession(session Session) {
-	c.currentSession = session
 }
 
 func (c *serviceContext) Session(id SessionID) Session {
