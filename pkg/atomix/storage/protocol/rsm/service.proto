@@ -43,6 +43,7 @@ message SessionSnapshot {
     google.protobuf.Timestamp timestamp = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
     uint64 last_request_id = 4 [(gogoproto.customname) = "LastRequestID"];
     repeated SessionServiceSnapshot services = 7;
+    repeated SessionCommandRequest commands = 8;
 }
 
 // Session service snapshot

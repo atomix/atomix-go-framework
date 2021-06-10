@@ -85,12 +85,17 @@ func (m *Manager) Snapshot(writer io.Writer) error {
 				Streams:   streams,
 			})
 		}
+		commands := make([]*SessionCommandRequest, 0, len(session.commandRequests))
+		for _, command := range session.commandRequests {
+			commands = append(commands, command.request)
+		}
 		snapshot.Sessions = append(snapshot.Sessions, SessionSnapshot{
 			SessionID:     uint64(session.id),
 			Timeout:       session.timeout,
 			Timestamp:     session.lastUpdated,
 			LastRequestID: session.commandID,
 			Services:      services,
+			Commands:      commands,
 		})
 	}
 
@@ -132,15 +137,15 @@ func (m *Manager) Install(reader io.Reader) error {
 
 	for _, sessionSnapshot := range snapshot.Sessions {
 		sessionManager := &sessionManager{
-			id:               SessionID(sessionSnapshot.SessionID),
-			timeout:          sessionSnapshot.Timeout,
-			lastUpdated:      sessionSnapshot.Timestamp,
-			ctx:              m.context,
-			commandID:        sessionSnapshot.LastRequestID,
-			commandCallbacks: make(map[uint64]func()),
-			queryCallbacks:   make(map[uint64]*list.List),
-			results:          make(map[uint64]streams.Result),
-			services:         make(map[ServiceID]*serviceSession),
+			id:              SessionID(sessionSnapshot.SessionID),
+			timeout:         sessionSnapshot.Timeout,
+			lastUpdated:     sessionSnapshot.Timestamp,
+			ctx:             m.context,
+			commandID:       sessionSnapshot.LastRequestID,
+			commandRequests: make(map[uint64]sessionCommand),
+			queryCallbacks:  make(map[uint64]*list.List),
+			results:         make(map[uint64]streams.Result),
+			services:        make(map[ServiceID]*serviceSession),
 		}
 
 		for _, service := range sessionSnapshot.Services {
@@ -168,6 +173,12 @@ func (m *Manager) Install(reader io.Reader) error {
 				}
 			}
 			sessionManager.services[ServiceID(service.ServiceId)] = session
+		}
+		for _, command := range sessionSnapshot.Commands {
+			sessionManager.commandRequests[command.Context.RequestID] = sessionCommand{
+				request: command,
+				stream:  streams.NewNilStream(),
+			}
 		}
 		m.sessions[sessionManager.id] = sessionManager
 	}
@@ -263,13 +274,7 @@ func (m *Manager) applyCommand(request *SessionCommandRequest, stream streams.Wr
 				}
 			}
 		} else if requestID > sessionManager.nextCommandID() {
-			sessionManager.scheduleCommand(requestID, func() {
-				log.WithFields(
-					logging.String("NodeID", string(m.member.NodeID)),
-					logging.Uint64("SessionID", request.Context.SessionID)).
-					Debugf("Executing command %d", requestID)
-				m.applySessionCommand(request, sessionManager, stream)
-			})
+			sessionManager.scheduleCommand(request, stream)
 		} else {
 			log.WithFields(
 				logging.String("NodeID", string(m.member.NodeID)),
@@ -282,7 +287,10 @@ func (m *Manager) applyCommand(request *SessionCommandRequest, stream streams.Wr
 
 func (m *Manager) applySessionCommand(request *SessionCommandRequest, session *sessionManager, stream streams.WriteStream) {
 	m.applyServiceCommand(request.Command, request.Context, session, stream)
-	session.completeCommand(request.Context.RequestID)
+	nextRequest, nextStream, ok := session.nextCommand(request)
+	if ok {
+		m.applyCommand(nextRequest, nextStream)
+	}
 }
 
 func (m *Manager) applyServiceCommand(request ServiceCommandRequest, context SessionCommandContext, sessionManager *sessionManager, stream streams.WriteStream) {
@@ -628,9 +636,6 @@ func (m *Manager) Query(bytes []byte, stream streams.WriteStream) {
 				m.sequenceQuery(query, stream)
 			})
 		} else {
-			log.WithFields(
-				logging.String("NodeID", string(m.member.NodeID))).
-				Debugf("Sequencing query %d <= %d", query.Context.LastIndex, m.context.index)
 			m.sequenceQuery(query, stream)
 		}
 	}

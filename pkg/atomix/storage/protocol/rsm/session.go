@@ -48,18 +48,18 @@ func newSessionManager(cluster cluster.Cluster, ctx *managerContext, clientID Cl
 		logging.String("NodeID", string(member.NodeID)),
 		logging.Uint64("SessionID", uint64(ctx.index)))
 	session := &sessionManager{
-		cluster:          cluster,
-		member:           member,
-		log:              log,
-		id:               SessionID(ctx.index),
-		clientID:         clientID,
-		timeout:          *timeout,
-		lastUpdated:      ctx.timestamp,
-		ctx:              ctx,
-		commandCallbacks: make(map[uint64]func()),
-		queryCallbacks:   make(map[uint64]*list.List),
-		results:          make(map[uint64]streams.Result),
-		services:         make(map[ServiceID]*serviceSession),
+		cluster:         cluster,
+		member:          member,
+		log:             log,
+		id:              SessionID(ctx.index),
+		clientID:        clientID,
+		timeout:         *timeout,
+		lastUpdated:     ctx.timestamp,
+		ctx:             ctx,
+		commandRequests: make(map[uint64]sessionCommand),
+		queryCallbacks:  make(map[uint64]*list.List),
+		results:         make(map[uint64]streams.Result),
+		services:        make(map[ServiceID]*serviceSession),
 	}
 	log.Debug("Session open")
 	return session
@@ -67,19 +67,19 @@ func newSessionManager(cluster cluster.Cluster, ctx *managerContext, clientID Cl
 
 // sessionManager manages the ordering of request and response streams for a single client
 type sessionManager struct {
-	cluster          cluster.Cluster
-	member           *cluster.Member
-	log              logging.Logger
-	id               SessionID
-	clientID         ClientID
-	timeout          time.Duration
-	lastUpdated      time.Time
-	ctx              *managerContext
-	commandID        uint64
-	commandCallbacks map[uint64]func()
-	queryCallbacks   map[uint64]*list.List
-	results          map[uint64]streams.Result
-	services         map[ServiceID]*serviceSession
+	cluster         cluster.Cluster
+	member          *cluster.Member
+	log             logging.Logger
+	id              SessionID
+	clientID        ClientID
+	timeout         time.Duration
+	lastUpdated     time.Time
+	ctx             *managerContext
+	commandID       uint64
+	commandRequests map[uint64]sessionCommand
+	queryCallbacks  map[uint64]*list.List
+	results         map[uint64]streams.Result
+	services        map[ServiceID]*serviceSession
 }
 
 // getService gets the service session
@@ -156,8 +156,11 @@ func (s *sessionManager) scheduleQuery(sequenceNumber uint64, f func()) {
 }
 
 // scheduleCommand schedules a command to be executed at the given sequence number
-func (s *sessionManager) scheduleCommand(sequenceNumber uint64, f func()) {
-	s.commandCallbacks[sequenceNumber] = f
+func (s *sessionManager) scheduleCommand(request *SessionCommandRequest, stream streams.WriteStream) {
+	s.commandRequests[request.Context.RequestID] = sessionCommand{
+		request: request,
+		stream:  stream,
+	}
 }
 
 // nextCommandID returns the next command sequence number for the session
@@ -165,10 +168,10 @@ func (s *sessionManager) nextCommandID() uint64 {
 	return s.commandID + 1
 }
 
-// completeCommand completes operations up to the given sequence number and executes commands and
+// nextCommand completes operations up to the given sequence number and executes commands and
 // queries pending for the sequence number to be completed
-func (s *sessionManager) completeCommand(sequenceNumber uint64) {
-	for i := s.commandID + 1; i <= sequenceNumber; i++ {
+func (s *sessionManager) nextCommand(request *SessionCommandRequest) (*SessionCommandRequest, streams.WriteStream, bool) {
+	for i := s.commandID + 1; i <= request.Context.RequestID; i++ {
 		s.commandID = i
 		queries, ok := s.queryCallbacks[i]
 		if ok {
@@ -180,12 +183,13 @@ func (s *sessionManager) completeCommand(sequenceNumber uint64) {
 			delete(s.queryCallbacks, i)
 		}
 
-		command, ok := s.commandCallbacks[s.nextCommandID()]
+		command, ok := s.commandRequests[s.nextCommandID()]
 		if ok {
-			command()
-			delete(s.commandCallbacks, i)
+			delete(s.commandRequests, i)
+			return command.request, command.stream, true
 		}
 	}
+	return nil, nil, false
 }
 
 // close closes the session and completes all its streams
@@ -194,6 +198,11 @@ func (s *sessionManager) close() {
 	for _, service := range s.services {
 		service.close()
 	}
+}
+
+type sessionCommand struct {
+	request *SessionCommandRequest
+	stream  streams.WriteStream
 }
 
 // newServiceSession creates a new service session
