@@ -50,8 +50,9 @@ func RetryingUnaryClientInterceptor(callOpts ...CallOption) func(ctx context.Con
 		}
 		return backoff.Retry(func() error {
 			log.Debugf("Sending %s", req)
-			if err := invoker(ctx, method, req, reply, cc, grpcOpts...); err != nil {
-				if isRetryable(err, callOpts.codes) {
+			callCtx := perCallContext(ctx, callOpts)
+			if err := invoker(callCtx, method, req, reply, cc, grpcOpts...); err != nil {
+				if isRetryable(ctx, callOpts, err) {
 					log.Debugf("Sending %s failed", req, err)
 					return err
 				}
@@ -248,7 +249,7 @@ func (s *retryingClientStream) SendMsg(m interface{}) error {
 			log.Debugf("SendMsg %s: EOF", m)
 			return err
 		}
-	} else if !isRetryable(err, s.opts.codes) {
+	} else if !isRetryable(s.ctx, s.opts, err) {
 		log.Warnf("SendMsg %s: error", m, err)
 		return err
 	}
@@ -265,7 +266,7 @@ func (s *retryingClientStream) SendMsg(m interface{}) error {
 					log.Debugf("SendMsg %s: EOF", m)
 					return err
 				}
-			} else if isRetryable(err, s.opts.codes) {
+			} else if isRetryable(s.ctx, s.opts, err) {
 				log.Debugf("SendMsg %s: error", m, err)
 				return err
 			}
@@ -281,7 +282,7 @@ func (s *retryingClientStream) SendMsg(m interface{}) error {
 					log.Debugf("SendMsg %s: EOF", m)
 					return err
 				}
-			} else if isRetryable(err, s.opts.codes) {
+			} else if isRetryable(s.ctx, s.opts, err) {
 				log.Debugf("SendMsg %s: error", m, err)
 				return err
 			}
@@ -305,7 +306,7 @@ func (s *retryingClientStream) RecvMsg(m interface{}) error {
 		}
 		return backoff.Retry(func() error {
 			if err := s.retryStream(); err != nil {
-				if isRetryable(err, s.opts.codes) {
+				if isRetryable(s.ctx, s.opts, err) {
 					log.Debug("RecvMsg: error", err)
 					return err
 				}
@@ -313,7 +314,7 @@ func (s *retryingClientStream) RecvMsg(m interface{}) error {
 				return backoff.Permanent(err)
 			}
 			if err := s.getStream().RecvMsg(m); err != nil {
-				if isRetryable(err, s.opts.codes) {
+				if isRetryable(s.ctx, s.opts, err) {
 					log.Debugf("RecvMsg: error", err)
 					return err
 				}
@@ -348,7 +349,7 @@ func (s *retryingClientStream) retryStream() error {
 		msgs := s.buffer.list()
 		for _, m := range msgs {
 			if err := stream.SendMsg(m); err != nil {
-				if isRetryable(err, s.opts.codes) {
+				if isRetryable(s.ctx, s.opts, err) {
 					log.Debug("Received stream error", err)
 					return err
 				}
@@ -359,7 +360,7 @@ func (s *retryingClientStream) retryStream() error {
 
 		if closed {
 			if err := stream.CloseSend(); err != nil {
-				if isRetryable(err, s.opts.codes) {
+				if isRetryable(s.ctx, s.opts, err) {
 					log.Debug("Received stream error", err)
 					return err
 				}
@@ -373,9 +374,12 @@ func (s *retryingClientStream) retryStream() error {
 	}, backoff.WithContext(b, s.ctx))
 }
 
-func isRetryable(err error, codes []codes.Code) bool {
+func isRetryable(ctx context.Context, opts *callOptions, err error) bool {
 	st := status.Code(err)
-	for _, code := range codes {
+	if opts.perCallTimeout != nil && st == codes.DeadlineExceeded {
+		return ctx.Err() == nil
+	}
+	for _, code := range opts.codes {
 		if st == code {
 			return true
 		}

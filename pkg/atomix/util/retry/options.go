@@ -15,10 +15,17 @@
 package retry
 
 import (
+	"context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"time"
 )
+
+func WithPerCallTimeout(t time.Duration) CallOption {
+	return newCallOption(func(opts *callOptions) {
+		opts.perCallTimeout = &t
+	})
+}
 
 func WithInterval(d time.Duration) CallOption {
 	return newCallOption(func(opts *callOptions) {
@@ -50,9 +57,17 @@ type CallOption struct {
 }
 
 type callOptions struct {
+	perCallTimeout  *time.Duration
 	initialInterval *time.Duration
 	maxInterval     *time.Duration
 	codes           []codes.Code
+}
+
+func perCallContext(ctx context.Context, opts *callOptions) context.Context {
+	if opts.perCallTimeout != nil {
+		ctx, _ = context.WithTimeout(ctx, *opts.perCallTimeout)
+	}
+	return ctx
 }
 
 func reuseOrNewWithCallOptions(opts *callOptions, options []CallOption) *callOptions {
