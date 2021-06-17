@@ -225,6 +225,9 @@ func ReadBytes(reader io.Reader) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if length == 0 {
+		return []byte{}, nil
+	}
 	bytes := make([]byte, length)
 	if _, err := reader.Read(bytes); err != nil {
 		return nil, err

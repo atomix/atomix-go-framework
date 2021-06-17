@@ -21,6 +21,50 @@ import (
 	"testing"
 )
 
+func TestWriteReadBytes(t *testing.T) {
+	data := []byte{}
+	buf := &bytes.Buffer{}
+	err := WriteBytes(buf, data)
+	assert.NoError(t, err)
+	data = buf.Bytes()
+
+	buf = bytes.NewBuffer(data)
+	data, err = ReadBytes(buf)
+	assert.NoError(t, err)
+	assert.Len(t, data, 0)
+
+	data = []byte{}
+	buf = &bytes.Buffer{}
+	err = WriteBytes(buf, data)
+	assert.NoError(t, err)
+	data = buf.Bytes()
+
+	data, err = ReadBytes(bytes.NewReader(data))
+	assert.NoError(t, err)
+	assert.Len(t, data, 0)
+
+	data = []byte{1, 2, 3}
+	buf = &bytes.Buffer{}
+	err = WriteBytes(buf, data)
+	assert.NoError(t, err)
+	data = buf.Bytes()
+
+	buf = bytes.NewBuffer(data)
+	data, err = ReadBytes(buf)
+	assert.NoError(t, err)
+	assert.Len(t, data, 3)
+
+	data = []byte{1, 2, 3}
+	buf = &bytes.Buffer{}
+	err = WriteBytes(buf, data)
+	assert.NoError(t, err)
+	data = buf.Bytes()
+
+	data, err = ReadBytes(bytes.NewReader(data))
+	assert.NoError(t, err)
+	assert.Len(t, data, 3)
+}
+
 func TestWriteReadSlice(t *testing.T) {
 	buf := &bytes.Buffer{}
 	slice := []*TestStruct{
