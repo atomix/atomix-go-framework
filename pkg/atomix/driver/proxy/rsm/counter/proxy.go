@@ -21,16 +21,18 @@ const (
 )
 
 // NewProxyServer creates a new ProxyServer
-func NewProxyServer(client *rsm.Client) counter.CounterServiceServer {
+func NewProxyServer(client *rsm.Client, readSync bool) counter.CounterServiceServer {
 	return &ProxyServer{
-		Client: client,
-		log:    logging.GetLogger("atomix", "proxy", "counter"),
+		Client:   client,
+		readSync: readSync,
+		log:      logging.GetLogger("atomix", "proxy", "counter"),
 	}
 }
 
 type ProxyServer struct {
 	*rsm.Client
-	log logging.Logger
+	readSync bool
+	log      logging.Logger
 }
 
 func (s *ProxyServer) Set(ctx context.Context, request *counter.SetRequest) (*counter.SetResponse, error) {
@@ -85,7 +87,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *counter.GetRequest) (*co
 		Cluster: request.Headers.ClusterKey,
 		Name:    request.Headers.PrimitiveID.Name,
 	}
-	output, err := partition.DoQuery(ctx, service, getOp, input)
+	output, err := partition.DoQuery(ctx, service, getOp, input, s.readSync)
 	if err != nil {
 		s.log.Warnf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)

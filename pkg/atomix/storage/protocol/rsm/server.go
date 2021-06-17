@@ -60,22 +60,29 @@ func (s *Server) Request(ctx context.Context, request *StorageRequest) (*Storage
 
 	resultCh := make(chan streams.Result, 1)
 	errCh := make(chan error, 1)
-	switch request.Request.Request.(type) {
+	switch r := request.Request.Request.(type) {
 	case *SessionRequest_Command,
 		*SessionRequest_OpenSession,
 		*SessionRequest_KeepAlive,
 		*SessionRequest_CloseSession:
 		go func() {
-			err := partition.ExecuteCommand(context.Background(), bytes, streams.NewChannelStream(resultCh))
+			err := partition.SyncCommand(context.Background(), bytes, streams.NewChannelStream(resultCh))
 			if err != nil {
 				errCh <- err
 			}
 		}()
 	case *SessionRequest_Query:
 		go func() {
-			err := partition.ExecuteQuery(context.Background(), bytes, streams.NewChannelStream(resultCh))
-			if err != nil {
-				errCh <- err
+			if r.Query.Context.Sync {
+				err := partition.SyncQuery(context.Background(), bytes, streams.NewChannelStream(resultCh))
+				if err != nil {
+					errCh <- err
+				}
+			} else {
+				err := partition.StaleQuery(context.Background(), bytes, streams.NewChannelStream(resultCh))
+				if err != nil {
+					errCh <- err
+				}
 			}
 		}()
 	}
@@ -147,19 +154,26 @@ func (s *Server) Stream(request *StorageRequest, srv StorageService_StreamServer
 	errCh := make(chan error)
 	stream := streams.NewChannelStream(resultCh)
 	defer stream.Drain()
-	switch request.Request.Request.(type) {
+	switch r := request.Request.Request.(type) {
 	case *SessionRequest_Command:
 		go func() {
-			err := partition.ExecuteCommand(srv.Context(), bytes, stream)
+			err := partition.SyncCommand(srv.Context(), bytes, stream)
 			if err != nil {
 				errCh <- err
 			}
 		}()
 	case *SessionRequest_Query:
 		go func() {
-			err := partition.ExecuteQuery(srv.Context(), bytes, stream)
-			if err != nil {
-				errCh <- err
+			if r.Query.Context.Sync {
+				err := partition.SyncQuery(srv.Context(), bytes, stream)
+				if err != nil {
+					errCh <- err
+				}
+			} else {
+				err := partition.StaleQuery(srv.Context(), bytes, stream)
+				if err != nil {
+					errCh <- err
+				}
 			}
 		}()
 	}

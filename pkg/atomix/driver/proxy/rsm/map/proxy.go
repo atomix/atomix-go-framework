@@ -27,16 +27,18 @@ const (
 )
 
 // NewProxyServer creates a new ProxyServer
-func NewProxyServer(client *rsm.Client) _map.MapServiceServer {
+func NewProxyServer(client *rsm.Client, readSync bool) _map.MapServiceServer {
 	return &ProxyServer{
-		Client: client,
-		log:    logging.GetLogger("atomix", "proxy", "map"),
+		Client:   client,
+		readSync: readSync,
+		log:      logging.GetLogger("atomix", "proxy", "map"),
 	}
 }
 
 type ProxyServer struct {
 	*rsm.Client
-	log logging.Logger
+	readSync bool
+	log      logging.Logger
 }
 
 func (s *ProxyServer) Size(ctx context.Context, request *_map.SizeRequest) (*_map.SizeResponse, error) {
@@ -54,7 +56,7 @@ func (s *ProxyServer) Size(ctx context.Context, request *_map.SizeRequest) (*_ma
 		Name:    request.Headers.PrimitiveID.Name,
 	}
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
-		return partitions[i].DoQuery(ctx, service, sizeOp, input)
+		return partitions[i].DoQuery(ctx, service, sizeOp, input, s.readSync)
 	})
 	if err != nil {
 		s.log.Warnf("Request SizeRequest failed: %v", err)
@@ -125,7 +127,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *_map.GetRequest) (*_map.
 		Cluster: request.Headers.ClusterKey,
 		Name:    request.Headers.PrimitiveID.Name,
 	}
-	output, err := partition.DoQuery(ctx, service, getOp, input)
+	output, err := partition.DoQuery(ctx, service, getOp, input, s.readSync)
 	if err != nil {
 		s.log.Warnf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -267,7 +269,7 @@ func (s *ProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_
 	}
 	partitions := s.Partitions()
 	err = async.IterAsync(len(partitions), func(i int) error {
-		return partitions[i].DoQueryStream(srv.Context(), service, entriesOp, input, stream)
+		return partitions[i].DoQueryStream(srv.Context(), service, entriesOp, input, stream, s.readSync)
 	})
 	if err != nil {
 		s.log.Warnf("Request EntriesRequest failed: %v", err)

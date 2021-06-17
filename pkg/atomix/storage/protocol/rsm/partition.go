@@ -33,9 +33,12 @@ type Partition interface {
 	// Leader returns the current leader
 	Leader() string
 
-	// ExecuteCommand executes a write request
-	ExecuteCommand(ctx context.Context, input []byte, stream stream.WriteStream) error
+	// SyncCommand executes a write request
+	SyncCommand(ctx context.Context, input []byte, stream stream.WriteStream) error
 
-	// ExecuteQuery executes a read request
-	ExecuteQuery(ctx context.Context, input []byte, stream stream.WriteStream) error
+	// SyncQuery executes a read request
+	SyncQuery(ctx context.Context, input []byte, stream stream.WriteStream) error
+
+	// StaleQuery executes a read request
+	StaleQuery(ctx context.Context, input []byte, stream stream.WriteStream) error
 }

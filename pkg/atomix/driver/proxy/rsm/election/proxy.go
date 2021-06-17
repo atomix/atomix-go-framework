@@ -25,16 +25,18 @@ const (
 )
 
 // NewProxyServer creates a new ProxyServer
-func NewProxyServer(client *rsm.Client) election.LeaderElectionServiceServer {
+func NewProxyServer(client *rsm.Client, readSync bool) election.LeaderElectionServiceServer {
 	return &ProxyServer{
-		Client: client,
-		log:    logging.GetLogger("atomix", "proxy", "election"),
+		Client:   client,
+		readSync: readSync,
+		log:      logging.GetLogger("atomix", "proxy", "election"),
 	}
 }
 
 type ProxyServer struct {
 	*rsm.Client
-	log logging.Logger
+	readSync bool
+	log      logging.Logger
 }
 
 func (s *ProxyServer) Enter(ctx context.Context, request *election.EnterRequest) (*election.EnterResponse, error) {
@@ -225,7 +227,7 @@ func (s *ProxyServer) GetTerm(ctx context.Context, request *election.GetTermRequ
 		Cluster: request.Headers.ClusterKey,
 		Name:    request.Headers.PrimitiveID.Name,
 	}
-	output, err := partition.DoQuery(ctx, service, getTermOp, input)
+	output, err := partition.DoQuery(ctx, service, getTermOp, input, s.readSync)
 	if err != nil {
 		s.log.Warnf("Request GetTermRequest failed: %v", err)
 		return nil, errors.Proto(err)

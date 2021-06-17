@@ -21,6 +21,7 @@ import (
 	logdriver "github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive/log"
 	logro "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/ro/log"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm"
+	"github.com/gogo/protobuf/jsonpb"
 	"google.golang.org/grpc"
 )
 
@@ -49,7 +50,13 @@ func (p *logType) RegisterServer(s *grpc.Server) {
 }
 
 func (p *logType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
-	server := NewProxyServer(p.protocol.Client)
+	config := rsm.RSMConfig{}
+	if options.Config != nil {
+		if err := jsonpb.UnmarshalString(string(options.Config), &config); err != nil {
+			return err
+		}
+	}
+	server := NewProxyServer(p.protocol.Client, config.ReadSync)
 	if !options.Write {
 		server = logro.NewProxyServer(server)
 	}

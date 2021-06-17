@@ -238,8 +238,8 @@ func (s *Session) doCommandStream(ctx context.Context, name string, input []byte
 }
 
 // DoQuery submits a query to the service
-func (s *Session) DoQuery(ctx context.Context, service rsm.ServiceId, name string, input []byte) ([]byte, error) {
-	requestContext := s.getQueryContext()
+func (s *Session) DoQuery(ctx context.Context, service rsm.ServiceId, name string, input []byte, sync bool) ([]byte, error) {
+	requestContext := s.getQueryContext(sync)
 	response, responseStatus, responseContext, err := s.doQuery(ctx, name, input, service, requestContext)
 	if err != nil {
 		return nil, err
@@ -281,8 +281,8 @@ func (s *Session) doQuery(ctx context.Context, name string, input []byte, servic
 }
 
 // DoQueryStream submits a streaming query to the service
-func (s *Session) DoQueryStream(ctx context.Context, service rsm.ServiceId, name string, input []byte, outStream streams.WriteStream) error {
-	requestContext := s.getQueryContext()
+func (s *Session) DoQueryStream(ctx context.Context, service rsm.ServiceId, name string, input []byte, outStream streams.WriteStream, sync bool) error {
+	requestContext := s.getQueryContext(sync)
 	ch := make(chan streams.Result)
 	inStream := streams.NewChannelStream(ch)
 	err := s.doQueryStream(context.Background(), name, input, service, requestContext, inStream)
@@ -865,13 +865,14 @@ func (s *Session) getStateContexts() (rsm.SessionCommandContext, []rsm.SessionSt
 }
 
 // getQueryContext gets the current read header
-func (s *Session) getQueryContext() rsm.SessionQueryContext {
+func (s *Session) getQueryContext(sync bool) rsm.SessionQueryContext {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return rsm.SessionQueryContext{
 		SessionID:     s.SessionID,
 		LastRequestID: s.responseID,
 		LastIndex:     s.lastIndex,
+		Sync:          sync,
 	}
 }
 

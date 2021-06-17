@@ -102,16 +102,18 @@ const (
 )
 
 // New{{ $proxy }} creates a new {{ $proxy }}
-func New{{ $proxy }}(client *rsm.Client) {{ $service }} {
+func New{{ $proxy }}(client *rsm.Client, readSync bool) {{ $service }} {
 	return &{{ $proxy }}{
-		Client: client,
-		log:    logging.GetLogger("atomix", "proxy", {{ .Primitive.Name | lower | quote }}),
+		Client:   client,
+		readSync: readSync,
+		log:      logging.GetLogger("atomix", "proxy", {{ .Primitive.Name | lower | quote }}),
 	}
 }
 
 type {{ $proxy }} struct {
 	*rsm.Client
-	log logging.Logger
+	readSync bool
+	log      logging.Logger
 }
 
 {{- range .Primitive.Methods }}
@@ -153,7 +155,11 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 		Cluster: request{{ template "field" .Request.Headers }}.ClusterKey,
 		Name:    request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
-	output, err := partition.Do{{ template "optype" . }}(ctx, service, {{ $name }}, input)
+    {{- if .Type.IsCommand }}
+	output, err := partition.DoCommand(ctx, service, {{ $name }}, input)
+    {{- else }}
+	output, err := partition.DoQuery(ctx, service, {{ $name }}, input, s.readSync)
+    {{- end }}
 	if err != nil {
         s.log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
@@ -179,11 +185,19 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	}
 	{{- if .Response.Aggregates }}
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
-		return partitions[i].Do{{ template "optype" . }}(ctx, service, {{ $name }}, input)
+        {{- if .Type.IsCommand }}
+		return partitions[i].DoCommand(ctx, service, {{ $name }}, input)
+        {{- else }}
+		return partitions[i].DoQuery(ctx, service, {{ $name }}, input, s.readSync)
+        {{- end }}
 	})
 	{{- else }}
 	err = async.IterAsync(len(partitions), func(i int) error {
-		_, err := partitions[i].Do{{ template "optype" . }}(ctx, service, {{ $name }}, input)
+        {{- if .Type.IsCommand }}
+		_, err := partitions[i].DoCommand(ctx, service, {{ $name }}, input)
+        {{- else }}
+		_, err := partitions[i].DoQuery(ctx, service, {{ $name }}, input, s.readSync)
+        {{- end }}
 		return err
 	})
 	{{- end }}
@@ -262,7 +276,11 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 
     ch := make(chan streams.Result)
 	stream := streams.NewChannelStream(ch)
-	err = partition.Do{{ template "optype" . }}Stream(ctx, service, {{ $name }}, input, stream)
+	{{- if .Type.IsCommand }}
+	err = partition.DoCommandStream(ctx, service, {{ $name }}, input, stream)
+	{{- else }}
+	err = partition.DoQueryStream(ctx, service, {{ $name }}, input, stream, s.readSync)
+	{{- end }}
 	if err != nil {
         s.log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
@@ -294,7 +312,11 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
         ch := make(chan streams.Result)
         stream := streams.NewChannelStream(ch)
-		err := partitions[i].Do{{ template "optype" . }}Stream(srv.Context(), service, {{ $name }}, input, stream)
+        {{- if .Type.IsCommand }}
+		err := partitions[i].DoCommandStream(srv.Context(), service, {{ $name }}, input, stream)
+        {{- else }}
+		err := partitions[i].DoQueryStream(srv.Context(), service, {{ $name }}, input, stream, s.readSync)
+        {{- end }}
 		if err != nil {
 		    return nil, err
 		}
@@ -386,7 +408,11 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 		Cluster: request{{ template "field" .Request.Headers }}.ClusterKey,
 		Name:    request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
-	err = partition.Do{{ template "optype" . }}Stream(srv.Context(), service, {{ $name }}, input, stream)
+    {{- if .Type.IsCommand }}
+	err = partition.DoCommandStream(srv.Context(), service, {{ $name }}, input, stream)
+    {{- else }}
+	err = partition.DoQueryStream(srv.Context(), service, {{ $name }}, input, stream, s.readSync)
+    {{- end }}
 	{{- else if .Scope.IsGlobal }}
 	service := storage.ServiceId{
 		Type:    Type,
@@ -395,7 +421,11 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	}
 	partitions := s.Partitions()
 	err = async.IterAsync(len(partitions), func(i int) error {
-		return partitions[i].Do{{ template "optype" . }}Stream(srv.Context(), service, {{ $name }}, input, stream)
+        {{- if .Type.IsCommand }}
+		return partitions[i].DoCommandStream(srv.Context(), service, {{ $name }}, input, stream)
+        {{- else }}
+		return partitions[i].DoQueryStream(srv.Context(), service, {{ $name }}, input, stream, s.readSync)
+        {{- end }}
 	})
 	{{- end }}
 	if err != nil {

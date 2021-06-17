@@ -21,16 +21,18 @@ const (
 )
 
 // NewProxyServer creates a new ProxyServer
-func NewProxyServer(client *rsm.Client) lock.LockServiceServer {
+func NewProxyServer(client *rsm.Client, readSync bool) lock.LockServiceServer {
 	return &ProxyServer{
-		Client: client,
-		log:    logging.GetLogger("atomix", "proxy", "lock"),
+		Client:   client,
+		readSync: readSync,
+		log:      logging.GetLogger("atomix", "proxy", "lock"),
 	}
 }
 
 type ProxyServer struct {
 	*rsm.Client
-	log logging.Logger
+	readSync bool
+	log      logging.Logger
 }
 
 func (s *ProxyServer) Lock(ctx context.Context, request *lock.LockRequest) (*lock.LockResponse, error) {
@@ -132,7 +134,7 @@ func (s *ProxyServer) GetLock(ctx context.Context, request *lock.GetLockRequest)
 		Cluster: request.Headers.ClusterKey,
 		Name:    request.Headers.PrimitiveID.Name,
 	}
-	output, err := partition.DoQuery(ctx, service, getLockOp, input)
+	output, err := partition.DoQuery(ctx, service, getLockOp, input, s.readSync)
 	if err != nil {
 		s.log.Warnf("Request GetLockRequest failed: %v", err)
 		return nil, errors.Proto(err)

@@ -27,16 +27,18 @@ const (
 )
 
 // NewProxyServer creates a new ProxyServer
-func NewProxyServer(client *rsm.Client) set.SetServiceServer {
+func NewProxyServer(client *rsm.Client, readSync bool) set.SetServiceServer {
 	return &ProxyServer{
-		Client: client,
-		log:    logging.GetLogger("atomix", "proxy", "set"),
+		Client:   client,
+		readSync: readSync,
+		log:      logging.GetLogger("atomix", "proxy", "set"),
 	}
 }
 
 type ProxyServer struct {
 	*rsm.Client
-	log logging.Logger
+	readSync bool
+	log      logging.Logger
 }
 
 func (s *ProxyServer) Size(ctx context.Context, request *set.SizeRequest) (*set.SizeResponse, error) {
@@ -54,7 +56,7 @@ func (s *ProxyServer) Size(ctx context.Context, request *set.SizeRequest) (*set.
 		Name:    request.Headers.PrimitiveID.Name,
 	}
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
-		return partitions[i].DoQuery(ctx, service, sizeOp, input)
+		return partitions[i].DoQuery(ctx, service, sizeOp, input, s.readSync)
 	})
 	if err != nil {
 		s.log.Warnf("Request SizeRequest failed: %v", err)
@@ -94,7 +96,7 @@ func (s *ProxyServer) Contains(ctx context.Context, request *set.ContainsRequest
 		Cluster: request.Headers.ClusterKey,
 		Name:    request.Headers.PrimitiveID.Name,
 	}
-	output, err := partition.DoQuery(ctx, service, containsOp, input)
+	output, err := partition.DoQuery(ctx, service, containsOp, input, s.readSync)
 	if err != nil {
 		s.log.Warnf("Request ContainsRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -267,7 +269,7 @@ func (s *ProxyServer) Elements(request *set.ElementsRequest, srv set.SetService_
 	}
 	partitions := s.Partitions()
 	err = async.IterAsync(len(partitions), func(i int) error {
-		return partitions[i].DoQueryStream(srv.Context(), service, elementsOp, input, stream)
+		return partitions[i].DoQueryStream(srv.Context(), service, elementsOp, input, stream, s.readSync)
 	})
 	if err != nil {
 		s.log.Warnf("Request ElementsRequest failed: %v", err)

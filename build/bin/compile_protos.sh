@@ -15,6 +15,7 @@ go_import_paths="${go_import_paths},Matomix/primitive/timestamp/timestamp.proto=
 protoc -I=$proto_imports --go_out=$go_import_paths,import_path=atomix/storage/protocol/gossip/primitive,plugins=grpc:pkg pkg/atomix/storage/protocol/gossip/primitive/extensions.proto
 
 protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/driver/proxy/gossip,plugins=grpc:pkg   pkg/atomix/driver/proxy/gossip/config.proto
+protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/driver/proxy/rsm,plugins=grpc:pkg   pkg/atomix/driver/proxy/rsm/config.proto
 
 protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/storage/protocol/rsm,plugins=grpc:pkg      pkg/atomix/storage/protocol/rsm/*.proto
 protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/storage/protocol/gossip,plugins=grpc:pkg   pkg/atomix/storage/protocol/gossip/protocol.proto

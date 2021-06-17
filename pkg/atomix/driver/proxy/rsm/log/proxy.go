@@ -29,16 +29,18 @@ const (
 )
 
 // NewProxyServer creates a new ProxyServer
-func NewProxyServer(client *rsm.Client) _log.LogServiceServer {
+func NewProxyServer(client *rsm.Client, readSync bool) _log.LogServiceServer {
 	return &ProxyServer{
-		Client: client,
-		log:    logging.GetLogger("atomix", "proxy", "log"),
+		Client:   client,
+		readSync: readSync,
+		log:      logging.GetLogger("atomix", "proxy", "log"),
 	}
 }
 
 type ProxyServer struct {
 	*rsm.Client
-	log logging.Logger
+	readSync bool
+	log      logging.Logger
 }
 
 func (s *ProxyServer) Size(ctx context.Context, request *_log.SizeRequest) (*_log.SizeResponse, error) {
@@ -59,7 +61,7 @@ func (s *ProxyServer) Size(ctx context.Context, request *_log.SizeRequest) (*_lo
 		Cluster: request.Headers.ClusterKey,
 		Name:    request.Headers.PrimitiveID.Name,
 	}
-	output, err := partition.DoQuery(ctx, service, sizeOp, input)
+	output, err := partition.DoQuery(ctx, service, sizeOp, input, s.readSync)
 	if err != nil {
 		s.log.Warnf("Request SizeRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -127,7 +129,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *_log.GetRequest) (*_log.
 		Cluster: request.Headers.ClusterKey,
 		Name:    request.Headers.PrimitiveID.Name,
 	}
-	output, err := partition.DoQuery(ctx, service, getOp, input)
+	output, err := partition.DoQuery(ctx, service, getOp, input, s.readSync)
 	if err != nil {
 		s.log.Warnf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -161,7 +163,7 @@ func (s *ProxyServer) FirstEntry(ctx context.Context, request *_log.FirstEntryRe
 		Cluster: request.Headers.ClusterKey,
 		Name:    request.Headers.PrimitiveID.Name,
 	}
-	output, err := partition.DoQuery(ctx, service, firstEntryOp, input)
+	output, err := partition.DoQuery(ctx, service, firstEntryOp, input, s.readSync)
 	if err != nil {
 		s.log.Warnf("Request FirstEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -195,7 +197,7 @@ func (s *ProxyServer) LastEntry(ctx context.Context, request *_log.LastEntryRequ
 		Cluster: request.Headers.ClusterKey,
 		Name:    request.Headers.PrimitiveID.Name,
 	}
-	output, err := partition.DoQuery(ctx, service, lastEntryOp, input)
+	output, err := partition.DoQuery(ctx, service, lastEntryOp, input, s.readSync)
 	if err != nil {
 		s.log.Warnf("Request LastEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -229,7 +231,7 @@ func (s *ProxyServer) PrevEntry(ctx context.Context, request *_log.PrevEntryRequ
 		Cluster: request.Headers.ClusterKey,
 		Name:    request.Headers.PrimitiveID.Name,
 	}
-	output, err := partition.DoQuery(ctx, service, prevEntryOp, input)
+	output, err := partition.DoQuery(ctx, service, prevEntryOp, input, s.readSync)
 	if err != nil {
 		s.log.Warnf("Request PrevEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -263,7 +265,7 @@ func (s *ProxyServer) NextEntry(ctx context.Context, request *_log.NextEntryRequ
 		Cluster: request.Headers.ClusterKey,
 		Name:    request.Headers.PrimitiveID.Name,
 	}
-	output, err := partition.DoQuery(ctx, service, nextEntryOp, input)
+	output, err := partition.DoQuery(ctx, service, nextEntryOp, input, s.readSync)
 	if err != nil {
 		s.log.Warnf("Request NextEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -421,7 +423,7 @@ func (s *ProxyServer) Entries(request *_log.EntriesRequest, srv _log.LogService_
 		Cluster: request.Headers.ClusterKey,
 		Name:    request.Headers.PrimitiveID.Name,
 	}
-	err = partition.DoQueryStream(srv.Context(), service, entriesOp, input, stream)
+	err = partition.DoQueryStream(srv.Context(), service, entriesOp, input, stream, s.readSync)
 	if err != nil {
 		s.log.Warnf("Request EntriesRequest failed: %v", err)
 		return errors.Proto(err)
