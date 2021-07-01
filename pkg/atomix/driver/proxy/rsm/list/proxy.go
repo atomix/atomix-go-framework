@@ -324,7 +324,7 @@ func (s *ProxyServer) Events(request *list.EventsRequest, srv list.ListService_E
 
 		s.log.Debugf("Sending EventsResponse %+v", response)
 		if err = srv.Send(response); err != nil {
-			s.log.Errorf("Response EventsResponse failed: %v", err)
+			s.log.Warnf("Response EventsResponse failed: %v", err)
 			return err
 		}
 	}
@@ -377,7 +377,7 @@ func (s *ProxyServer) Elements(request *list.ElementsRequest, srv list.ListServi
 
 		s.log.Debugf("Sending ElementsResponse %+v", response)
 		if err = srv.Send(response); err != nil {
-			s.log.Errorf("Response ElementsResponse failed: %v", err)
+			s.log.Warnf("Response ElementsResponse failed: %v", err)
 			return err
 		}
 	}

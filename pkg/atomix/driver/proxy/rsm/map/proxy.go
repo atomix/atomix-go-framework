@@ -244,7 +244,7 @@ func (s *ProxyServer) Events(request *_map.EventsRequest, srv _map.MapService_Ev
 
 		s.log.Debugf("Sending EventsResponse %+v", response)
 		if err = srv.Send(response); err != nil {
-			s.log.Errorf("Response EventsResponse failed: %v", err)
+			s.log.Warnf("Response EventsResponse failed: %v", err)
 			return err
 		}
 	}
@@ -294,7 +294,7 @@ func (s *ProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_
 
 		s.log.Debugf("Sending EntriesResponse %+v", response)
 		if err = srv.Send(response); err != nil {
-			s.log.Errorf("Response EntriesResponse failed: %v", err)
+			s.log.Warnf("Response EntriesResponse failed: %v", err)
 			return err
 		}
 	}

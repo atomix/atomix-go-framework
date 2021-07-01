@@ -394,7 +394,7 @@ func (s *ProxyServer) Events(request *indexedmap.EventsRequest, srv indexedmap.I
 
 		s.log.Debugf("Sending EventsResponse %+v", response)
 		if err = srv.Send(response); err != nil {
-			s.log.Errorf("Response EventsResponse failed: %v", err)
+			s.log.Warnf("Response EventsResponse failed: %v", err)
 			return err
 		}
 	}
@@ -447,7 +447,7 @@ func (s *ProxyServer) Entries(request *indexedmap.EntriesRequest, srv indexedmap
 
 		s.log.Debugf("Sending EntriesResponse %+v", response)
 		if err = srv.Send(response); err != nil {
-			s.log.Errorf("Response EntriesResponse failed: %v", err)
+			s.log.Warnf("Response EntriesResponse failed: %v", err)
 			return err
 		}
 	}

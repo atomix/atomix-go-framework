@@ -148,7 +148,7 @@ func (s *ProxyServer) Events(request *leader.EventsRequest, srv leader.LeaderLat
 
 		s.log.Debugf("Sending EventsResponse %+v", response)
 		if err = srv.Send(response); err != nil {
-			s.log.Errorf("Response EventsResponse failed: %v", err)
+			s.log.Warnf("Response EventsResponse failed: %v", err)
 			return err
 		}
 	}

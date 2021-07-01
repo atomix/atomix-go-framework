@@ -451,7 +451,7 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 
 		s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
 		if err = srv.Send(response); err != nil {
-            s.log.Errorf("Response {{ .Response.Type.Name }} failed: %v", err)
+            s.log.Warnf("Response {{ .Response.Type.Name }} failed: %v", err)
 			return err
 		}
 	}
