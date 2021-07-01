@@ -23,42 +23,36 @@ import "google/protobuf/timestamp.proto";
 import "gogoproto/gogo.proto";
 
 message StateMachineSnapshot {
-    uint64 index = 1;
+    uint64 index = 1 [(gogoproto.casttype) = "Index"];
     google.protobuf.Timestamp timestamp = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
-    repeated SessionSnapshot sessions = 3 [(gogoproto.nullable) = false];
-    repeated ServiceSnapshot services = 4 [(gogoproto.nullable) = false];
+    repeated SessionSnapshot sessions = 3;
+    repeated ServiceSnapshot services = 4;
 }
 
 // Service snapshot
 message ServiceSnapshot {
-    ServiceId service_id = 1 [(gogoproto.customname) = "ServiceID", (gogoproto.nullable) = false];
-    uint64 index = 2;
+    ServiceId service_id = 1 [(gogoproto.customname) = "ServiceID", (gogoproto.casttype) = "ServiceID", (gogoproto.nullable) = false];
+    uint64 index = 2 [(gogoproto.casttype) = "Index"];
     bytes data = 3;
 }
 
 // Service session
 message SessionSnapshot {
-    uint64 session_id = 1 [(gogoproto.customname) = "SessionID"];
-    google.protobuf.Duration timeout = 2 [(gogoproto.stdduration) = true, (gogoproto.nullable) = false];
-    google.protobuf.Timestamp timestamp = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
-    uint64 last_request_id = 4 [(gogoproto.customname) = "LastRequestID"];
-    repeated SessionServiceSnapshot services = 7;
-    repeated SessionCommandRequest commands = 8;
-}
-
-// Session service snapshot
-message SessionServiceSnapshot {
-    ServiceId service_id = 1 [(gogoproto.nullable) = false];
-    repeated SessionStreamSnapshot streams = 2;
+    uint64 session_id = 1 [(gogoproto.customname) = "SessionID", (gogoproto.casttype) = "SessionID"];
+    google.protobuf.Timestamp timestamp = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+    uint64 last_request_id = 3 [(gogoproto.customname) = "LastRequestID", (gogoproto.casttype) = "RequestID"];
+    uint64 last_response_id = 4 [(gogoproto.customname) = "LastResponseID", (gogoproto.casttype) = "ResponseID"];
+    repeated ServiceId services = 5 [(gogoproto.nullable) = false, (gogoproto.casttype) = "ServiceID"];
+    repeated SessionRequest pending_requests = 6;
+    repeated SessionResponse pending_responses = 7;
+    repeated SessionStreamSnapshot streams = 8;
 }
 
 // Service session stream
 message SessionStreamSnapshot {
-    uint64 stream_id = 1 [(gogoproto.customname) = "StreamID"];
-    uint64 request_id = 2 [(gogoproto.customname) = "RequestID"];
-    string type = 3;
-    uint64 response_id = 4 [(gogoproto.customname) = "ResponseID"];
-    uint64 complete_id = 5 [(gogoproto.customname) = "CompleteID"];
+    uint64 stream_id = 1 [(gogoproto.customname) = "StreamID", (gogoproto.casttype) = "StreamID"];
+    ServiceId service_id = 2 [(gogoproto.customname) = "ServiceID", (gogoproto.casttype) = "ServiceID", (gogoproto.nullable) = false];
+    string operation_id = 3 [(gogoproto.customname) = "OperationID", (gogoproto.casttype) = "OperationID"];
 }
 
 message ServiceId {
@@ -109,25 +103,23 @@ message SessionResponse {
 }
 
 message OpenSessionRequest {
-    string client_id = 1 [(gogoproto.customname) = "ClientID"];
     google.protobuf.Duration timeout = 2 [(gogoproto.stdduration) = true];
 }
 
 message OpenSessionResponse {
-    uint64 session_id = 1 [(gogoproto.customname) = "SessionID"];
+    uint64 session_id = 1 [(gogoproto.customname) = "SessionID", (gogoproto.casttype) = "SessionID"];
 }
 
 message KeepAliveRequest {
-    uint64 session_id = 1 [(gogoproto.customname) = "SessionID"];
-    uint64 ack_request_id = 2 [(gogoproto.customname) = "AckRequestID"];
-    repeated SessionStreamContext streams = 3 [(gogoproto.nullable) = false];
+    uint64 session_id = 1 [(gogoproto.customname) = "SessionID", (gogoproto.casttype) = "SessionID"];
+    uint64 ack_response_id = 2 [(gogoproto.customname) = "AckResponseID", (gogoproto.casttype) = "ResponseID"];
 }
 
 message KeepAliveResponse {
 }
 
 message CloseSessionRequest {
-    uint64 session_id = 1 [(gogoproto.customname) = "SessionID"];
+    uint64 session_id = 1 [(gogoproto.customname) = "SessionID", (gogoproto.casttype) = "SessionID"];
 }
 
 message CloseSessionResponse {
@@ -155,7 +147,7 @@ message SessionQueryResponse {
 }
 
 message ServiceCommandRequest {
-    ServiceId service = 1 [(gogoproto.nullable) = false];
+    ServiceId service_id = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "ServiceID", (gogoproto.casttype) = "ServiceID"];
     oneof request {
         ServiceOperationRequest operation = 2;
         ServiceCreateRequest create = 3;
@@ -174,7 +166,7 @@ message ServiceCommandResponse {
 }
 
 message ServiceQueryRequest {
-    ServiceId service = 1;
+    ServiceId service_id = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "ServiceID", (gogoproto.casttype) = "ServiceID"];
     oneof request {
         ServiceOperationRequest operation = 2;
         ServiceMetadataRequest metadata = 3;
@@ -189,7 +181,7 @@ message ServiceQueryResponse {
 }
 
 message ServiceOperationRequest {
-    string method = 1;
+    string operation_id = 1 [(gogoproto.customname) = "OperationID", (gogoproto.casttype) = "OperationID"];
     bytes value = 2;
 }
 
@@ -226,31 +218,26 @@ message ServiceMetadataRequest {
 }
 
 message ServiceMetadataResponse {
-    repeated ServiceId services = 1;
+    repeated ServiceId services = 1 [(gogoproto.nullable) = false, (gogoproto.casttype) = "ServiceID"];
 }
 
 message SessionCommandContext {
-    uint64 session_id = 1 [(gogoproto.customname) = "SessionID"];
-    uint64 request_id = 2 [(gogoproto.customname) = "RequestID"];
+    uint64 session_id = 1 [(gogoproto.customname) = "SessionID", (gogoproto.casttype) = "SessionID"];
+    uint64 request_id = 2 [(gogoproto.customname) = "RequestID", (gogoproto.casttype) = "RequestID"];
 }
 
 message SessionQueryContext {
-    uint64 session_id = 1 [(gogoproto.customname) = "SessionID"];
-    uint64 last_request_id = 2 [(gogoproto.customname) = "LastRequestID"];
-    uint64 last_index = 3;
+    uint64 session_id = 1 [(gogoproto.customname) = "SessionID", (gogoproto.casttype) = "SessionID"];
+    uint64 last_request_id = 2 [(gogoproto.customname) = "LastRequestID", (gogoproto.casttype) = "RequestID"];
+    uint64 last_index = 3 [(gogoproto.casttype) = "Index"];
     bool sync = 4;
 }
 
 message SessionResponseContext {
-    uint64 session_id = 1 [(gogoproto.customname) = "SessionID"];
-    uint64 request_id = 2 [(gogoproto.customname) = "RequestID"];
-    uint64 index = 3;
-    uint64 sequence = 4;
-}
-
-message SessionStreamContext {
-    uint64 request_id = 1 [(gogoproto.customname) = "RequestID"];
-    uint64 ack_response_id = 2 [(gogoproto.customname) = "AckResponseID"];
+    uint64 session_id = 1 [(gogoproto.customname) = "SessionID", (gogoproto.casttype) = "SessionID"];
+    uint64 request_id = 2 [(gogoproto.customname) = "RequestID", (gogoproto.casttype) = "RequestID"];
+    uint64 response_id = 3 [(gogoproto.customname) = "ResponseID", (gogoproto.casttype) = "ResponseID"];
+    uint64 index = 4 [(gogoproto.casttype) = "Index"];
 }
 
 message SessionResponseStatus {

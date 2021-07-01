@@ -112,6 +112,7 @@ type PathMeta struct {
 
 // MethodMeta is the metadata for a primitive method
 type MethodMeta struct {
+	ID          uint32
 	Name        string
 	Type        MethodTypeMeta
 	Comment     string

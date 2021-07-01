@@ -16,14 +16,9 @@ package rsm
 
 import (
 	"container/list"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
 	"time"
 )
-
-// ClientID is a client identifier
-type ClientID string
 
 // SessionID is a session identifier
 type SessionID uint64
@@ -32,73 +27,123 @@ type SessionID uint64
 type Session interface {
 	// ID returns the session identifier
 	ID() SessionID
-
-	// ClientID returns the client identifier
-	ClientID() ClientID
 }
 
-// newSessionManager creates a new session manager
-func newSessionManager(cluster cluster.Cluster, ctx *managerContext, clientID ClientID, timeout *time.Duration) *sessionManager {
-	if timeout == nil {
-		defaultTimeout := 30 * time.Second
-		timeout = &defaultTimeout
+func newSession(manager *stateManager, sessionID SessionID) *sessionManager {
+	return &sessionManager{
+		stateManager:     manager,
+		sessionID:        sessionID,
+		lastUpdated:      manager.timestamp,
+		commandRequests:  make(map[RequestID]commandRequest),
+		commandResponses: make(map[RequestID]*SessionCommandResponse),
+		queryRequests:    make(map[RequestID]*list.List),
+		streams:          make(map[StreamID]*commandStreamManager),
+		services:         make(map[ServiceID]bool),
 	}
-	member, _ := cluster.Member()
-	log := log.WithFields(
-		logging.String("NodeID", string(member.NodeID)),
-		logging.Uint64("SessionID", uint64(ctx.index)))
-	session := &sessionManager{
-		cluster:         cluster,
-		member:          member,
-		log:             log,
-		id:              SessionID(ctx.index),
-		clientID:        clientID,
-		timeout:         *timeout,
-		lastUpdated:     ctx.timestamp,
-		ctx:             ctx,
-		commandRequests: make(map[uint64]sessionCommand),
-		queryCallbacks:  make(map[uint64]*list.List),
-		results:         make(map[uint64]streams.Result),
-		services:        make(map[ServiceID]*serviceSession),
-	}
-	log.Debug("Session open")
-	return session
 }
 
 // sessionManager manages the ordering of request and response streams for a single client
 type sessionManager struct {
-	cluster         cluster.Cluster
-	member          *cluster.Member
-	log             logging.Logger
-	id              SessionID
-	clientID        ClientID
-	timeout         time.Duration
-	lastUpdated     time.Time
-	ctx             *managerContext
-	commandID       uint64
-	commandRequests map[uint64]sessionCommand
-	queryCallbacks  map[uint64]*list.List
-	results         map[uint64]streams.Result
-	services        map[ServiceID]*serviceSession
+	*stateManager
+	sessionID        SessionID
+	lastUpdated      time.Time
+	commandID        RequestID
+	commandRequests  map[RequestID]commandRequest
+	commandResponses map[RequestID]*SessionResponse
+	queryRequests    map[RequestID]*list.List
+	streams          map[StreamID]*commandStreamManager
+	services         map[ServiceID]bool
 }
 
-// getService gets the service session
-func (s *sessionManager) getService(id ServiceID) *serviceSession {
-	return s.services[id]
+func (s *sessionManager) ID() SessionID {
+	return s.sessionID
+}
+
+func (s *sessionManager) snapshot() (*SessionSnapshot, error) {
+	services := make([]ServiceID, 0, len(s.services))
+	for service := range s.services {
+		services = append(services, service)
+	}
+	requests := make([]*SessionCommandRequest, 0, len(s.commandRequests))
+	for _, request := range s.commandRequests {
+		requests = append(requests, request.request)
+	}
+	responses := make([]*SessionCommandResponse, 0, len(s.commandRequests))
+	for _, response := range s.commandResponses {
+		responses = append(responses, response)
+	}
+	streams := make([]*SessionStreamSnapshot, 0, len(s.streams))
+	for _, stream := range s.streams {
+		streamSnapshot, err := stream.snapshot()
+		if err != nil {
+			return nil, err
+		}
+		streams = append(streams, streamSnapshot)
+	}
+	return &SessionSnapshot{
+		SessionID:     s.sessionID,
+		Timestamp:     s.lastUpdated,
+		LastRequestID: s.commandID,
+		Services:      services,
+		Requests:      requests,
+		Responses:     responses,
+		Streams:       streams,
+	}, nil
+}
+
+func (s *sessionManager) restore(snapshot *SessionSnapshot) error {
+	s.sessionID = snapshot.SessionID
+	s.lastUpdated = snapshot.Timestamp
+	s.commandID = snapshot.LastRequestID
+	for _, serviceID := range snapshot.Services {
+		s.services[serviceID] = true
+		service, ok := s.stateManager.services[serviceID]
+		if !ok {
+			log.Error("Missing service %s", serviceID)
+		} else {
+			service.addSession(s)
+		}
+	}
+	for _, request := range snapshot.Requests {
+		s.commandRequests[RequestID(request.Context.RequestID)] = commandRequest{
+			request: request,
+			stream:  streams.NewNilStream(),
+		}
+	}
+	for _, response := range snapshot.Responses {
+		r := *response
+		s.commandResponses[RequestID(response.Context.RequestID)] = &r
+	}
+	for _, streamSnapshot := range snapshot.Streams {
+		stream := newCommandStream(s, streamSnapshot.StreamID)
+		if err := stream.restore(streamSnapshot); err != nil {
+			return err
+		}
+		s.streams[stream.ID()] = stream
+	}
+	return nil
 }
 
 // addService adds a service session
-func (s *sessionManager) addService(id ServiceID) *serviceSession {
-	session := newServiceSession(s, id)
-	s.services[id] = session
-	return session
+func (s *sessionManager) addService(id ServiceID) {
+	s.services[id] = true
 }
 
 // removeService removes a service session
-func (s *sessionManager) removeService(id ServiceID) *serviceSession {
-	session := s.services[id]
+func (s *sessionManager) removeService(id ServiceID) {
 	delete(s.services, id)
-	return session
+}
+
+func (s *sessionManager) getService(id ServiceID) (*serviceManager, bool) {
+	_, ok := s.services[id]
+	if !ok {
+		return nil, false
+	}
+	service, ok := s.stateManager.services[id]
+	if !ok {
+		return nil, false
+	}
+	return service, true
 }
 
 // timedOut returns a boolean indicating whether the session is timed out
@@ -106,14 +151,73 @@ func (s *sessionManager) timedOut(time time.Time) bool {
 	return s.lastUpdated.UnixNano() > 0 && time.Sub(s.lastUpdated) > s.timeout
 }
 
+// scheduleQuery schedules a query to be executed after the given sequence number
+func (s *sessionManager) scheduleQuery(requestID RequestID, f func()) {
+	queries, ok := s.queryRequests[requestID]
+	if !ok {
+		queries = list.New()
+		s.queryRequests[requestID] = queries
+	}
+	queries.PushBack(f)
+}
+
+// scheduleCommand schedules a command to be executed at the given sequence number
+func (s *sessionManager) scheduleCommand(request *SessionCommandRequest, stream streams.WriteStream) {
+	s.commandRequests[request.Context.RequestID] = commandRequest{
+		request: request,
+		stream:  stream,
+	}
+}
+
+// nextCommandID returns the next command sequence number for the session
+func (s *sessionManager) nextCommandID() uint64 {
+	return s.commandID + 1
+}
+
+func (s *sessionManager) nextQuery() (*SessionQueryRequest, streams.WriteStream, bool) {
+	queryRequests, ok := s.queryRequests[s.commandID]
+	if ok {
+		element := queryRequests.Front()
+		if element != nil {
+			queryRequests.Remove(element)
+			query := element.Value.(queryRequest)
+			return query.request, query.stream, true
+		} else {
+			delete(s.queryRequests, s.commandID)
+		}
+	}
+	return nil, nil, false
+}
+
+func (s *sessionManager) nextCommand() (*SessionCommandRequest, streams.WriteStream, bool) {
+	s.commandID++
+	command, ok := s.commandRequests[s.commandID]
+	if ok {
+		delete(s.commandRequests, s.commandID)
+		return command.request, command.stream, true
+	}
+	return nil, nil, false
+}
+
+// close closes the session and completes all its streams
+func (s *sessionManager) close() {
+	log.Debug("Session closed")
+	for _, stream := range s.streams {
+		stream.Close()
+	}
+	for _, service := range s.services {
+		service.close()
+	}
+}
+
 // getResult gets a unary result
-func (s *sessionManager) getUnaryResult(id uint64) (streams.Result, bool) {
-	result, ok := s.results[id]
+func (s *sessionManager) getResponse(requestID RequestID) (*SessionResponse, bool) {
+	result, ok := s.commandResponses[requestID]
 	return result, ok
 }
 
-// addUnaryResult adds a unary result
-func (s *sessionManager) addUnaryResult(requestID uint64, result streams.Result) streams.Result {
+// addResponse adds a unary result
+func (s *sessionManager) addResponse(requestID RequestID, result streams.Result) *SessionResponse {
 	response := &SessionResponse{
 		Type: SessionResponseType_RESPONSE,
 		Status: SessionResponseStatus{
@@ -123,10 +227,10 @@ func (s *sessionManager) addUnaryResult(requestID uint64, result streams.Result)
 		Response: &SessionResponse_Command{
 			Command: &SessionCommandResponse{
 				Context: SessionResponseContext{
-					SessionID: uint64(s.id),
-					RequestID: requestID,
-					Index:     uint64(s.ctx.index),
-					Sequence:  1,
+					SessionID:  s.sessionID,
+					RequestID:  requestID,
+					Index:      s.index,
+					ResponseID: 1,
 				},
 				Response: ServiceCommandResponse{
 					Response: &ServiceCommandResponse_Operation{
@@ -138,101 +242,14 @@ func (s *sessionManager) addUnaryResult(requestID uint64, result streams.Result)
 			},
 		},
 	}
-	result = streams.Result{
-		Value: response,
-	}
-	s.results[requestID] = result
-	return result
-}
-
-// scheduleQuery schedules a query to be executed after the given sequence number
-func (s *sessionManager) scheduleQuery(sequenceNumber uint64, f func()) {
-	queries, ok := s.queryCallbacks[sequenceNumber]
-	if !ok {
-		queries = list.New()
-		s.queryCallbacks[sequenceNumber] = queries
-	}
-	queries.PushBack(f)
-}
-
-// scheduleCommand schedules a command to be executed at the given sequence number
-func (s *sessionManager) scheduleCommand(request *SessionCommandRequest, stream streams.WriteStream) {
-	s.commandRequests[request.Context.RequestID] = sessionCommand{
-		request: request,
-		stream:  stream,
-	}
-}
-
-// nextCommandID returns the next command sequence number for the session
-func (s *sessionManager) nextCommandID() uint64 {
-	return s.commandID + 1
-}
-
-// nextCommand completes operations up to the given sequence number and executes commands and
-// queries pending for the sequence number to be completed
-func (s *sessionManager) nextCommand(request *SessionCommandRequest) (*SessionCommandRequest, streams.WriteStream, bool) {
-	for i := s.commandID + 1; i <= request.Context.RequestID; i++ {
-		s.commandID = i
-		queries, ok := s.queryCallbacks[i]
-		if ok {
-			query := queries.Front()
-			for query != nil {
-				query.Value.(func())()
-				query = query.Next()
-			}
-			delete(s.queryCallbacks, i)
-		}
-
-		command, ok := s.commandRequests[s.nextCommandID()]
-		if ok {
-			delete(s.commandRequests, i)
-			return command.request, command.stream, true
-		}
-	}
-	return nil, nil, false
-}
-
-// close closes the session and completes all its streams
-func (s *sessionManager) close() {
-	s.log.Debug("Session closed")
-	for _, service := range s.services {
-		service.close()
-	}
-}
-
-type sessionCommand struct {
-	request *SessionCommandRequest
-	stream  streams.WriteStream
-}
-
-// newServiceSession creates a new service session
-func newServiceSession(session *sessionManager, service ServiceID) *serviceSession {
-	return &serviceSession{
-		sessionManager: session,
-		service:        service,
-		streams:        make(map[uint64]*sessionStream),
-	}
-}
-
-// serviceSession manages sessions within a service
-type serviceSession struct {
-	*sessionManager
-	service ServiceID
-	streams map[uint64]*sessionStream
-}
-
-func (s *serviceSession) ID() SessionID {
-	return s.id
-}
-
-func (s *serviceSession) ClientID() ClientID {
-	return s.clientID
+	s.commandResponses[requestID] = response
+	return response
 }
 
 // addStream adds a stream at the given sequence number
-func (s *serviceSession) addStream(requestID uint64, op OperationID, outStream streams.WriteStream) *sessionStream {
-	stream := &sessionStream{
-		opStream: &opStream{
+func (s *sessionManager) addStream(requestID uint64, op OperationID, outStream streams.WriteStream) *commandStreamManager {
+	stream := &commandStreamManager{
+		sessionStreamManager: &sessionStreamManager{
 			id:      StreamID(requestID),
 			op:      op,
 			session: s,
@@ -246,20 +263,151 @@ func (s *serviceSession) addStream(requestID uint64, op OperationID, outStream s
 	}
 	s.streams[requestID] = stream
 	stream.open()
-	s.log.Debugf("Stream open")
+	log.Debugf("Stream open")
 	return stream
 }
 
 // getStream returns a stream by the request sequence number
-func (s *serviceSession) getStream(requestID uint64) *sessionStream {
+func (s *sessionManager) getStream(requestID uint64) *commandStreamManager {
 	return s.streams[requestID]
 }
 
 // ack acknowledges response streams up to the given request sequence number
-func (s *serviceSession) ack(ackRequestID uint64, streams []SessionStreamContext) {
-	for requestID := range s.results {
+func (s *sessionManager) ack(ackRequestID uint64, streams []SessionStreamContext) {
+	for requestID := range s.commandResponses {
 		if requestID <= ackRequestID {
-			delete(s.results, requestID)
+			delete(s.commandResponses, requestID)
+		}
+	}
+
+	streamAcks := make(map[uint64]uint64)
+	for _, stream := range streams {
+		streamAcks[stream.RequestID] = stream.AckResponseID
+	}
+
+	for streamID, stream := range s.streams {
+		// If the stream ID is greater than the acknowledged sequence number, skip it
+		if stream.requestID > ackRequestID {
+			continue
+		}
+
+		// If the stream is still held by the client, ack the stream.
+		// Otherwise, close the stream.
+		streamAck, open := streamAcks[stream.requestID]
+		if open {
+			stream.ack(streamAck)
+		} else {
+			stream.Close()
+			delete(s.streams, streamID)
+		}
+	}
+}
+
+var _ Session = &sessionManager{}
+
+type commandRequest struct {
+	request *SessionRequest
+	stream  streams.WriteStream
+}
+
+type queryRequest struct {
+	request *SessionQueryRequest
+	stream  streams.WriteStream
+}
+
+// managerSessionService manages a service within a session
+type managerSessionService struct {
+	*sessionManager
+	service   ServiceID
+	responses map[uint64]*SessionResponse
+	streams   map[uint64]*commandStreamManager
+}
+
+func (s *managerSessionService) snapshot() (*SessionServiceSnapshot, error) {
+	streams := make([]*SessionStreamSnapshot, 0, len(s.streams))
+	for _, stream := range s.streams {
+		streamSnapshot, err := stream.snapshot()
+		if err != nil {
+			return nil, err
+		}
+		streams = append(streams, streamSnapshot)
+	}
+	return &SessionServiceSnapshot{
+		...
+	}, nil
+}
+
+func (s *managerSessionService) restore(snapshot *SessionServiceSnapshot) error {
+
+}
+
+// getResult gets a unary result
+func (s *managerSessionService) getResponse(requestID uint64) (*SessionResponse, bool) {
+	result, ok := s.responses[requestID]
+	return result, ok
+}
+
+// addResponse adds a unary result
+func (s *managerSessionService) addResponse(requestID uint64, result streams.Result) *SessionResponse {
+	response := &SessionResponse{
+		Type: SessionResponseType_RESPONSE,
+		Status: SessionResponseStatus{
+			Code:    getCode(result.Error),
+			Message: getMessage(result.Error),
+		},
+		Response: &SessionResponse_Command{
+			Command: &SessionCommandResponse{
+				Context: SessionResponseContext{
+					SessionID: uint64(s.sessionID),
+					RequestID: requestID,
+					Index:     uint64(s.index),
+					Sequence:  1,
+				},
+				Response: ServiceCommandResponse{
+					Response: &ServiceCommandResponse_Operation{
+						Operation: &ServiceOperationResponse{
+							result.Value.([]byte),
+						},
+					},
+				},
+			},
+		},
+	}
+	s.responses[requestID] = response
+	return response
+}
+
+// addStream adds a stream at the given sequence number
+func (s *managerSessionService) addStream(requestID uint64, op OperationID, outStream streams.WriteStream) *commandStreamManager {
+	stream := &commandStreamManager{
+		sessionStreamManager: &sessionStreamManager{
+			id:      StreamID(requestID),
+			op:      op,
+			session: s,
+			stream:  outStream,
+		},
+		requestID: requestID,
+		cluster:   s.cluster,
+		member:    s.member,
+		ctx:       s.ctx,
+		results:   list.New(),
+	}
+	s.streams[requestID] = stream
+	stream.open()
+	log.Debugf("Stream open")
+	return stream
+}
+
+// getStream returns a stream by the request sequence number
+func (s *managerSessionService) getStream(requestID uint64) *commandStreamManager {
+	return s.streams[requestID]
+}
+
+// ack acknowledges response streams up to the given request sequence number
+func (s *managerSessionService) ack(ackRequestID uint64, streams []SessionStreamContext) {
+	for requestID := range s.responses {
+		if requestID <= ackRequestID {
+			delete(s.responses, requestID)
 		}
 	}
 
@@ -287,10 +435,10 @@ func (s *serviceSession) ack(ackRequestID uint64, streams []SessionStreamContext
 }
 
 // close closes the session and completes all its streams
-func (s *serviceSession) close() {
+func (s *managerSessionService) close() {
 	for _, stream := range s.streams {
 		stream.Close()
 	}
 }
 
-var _ Session = &serviceSession{}
+var _ Session = &managerSessionService{}

@@ -118,6 +118,11 @@ func (m *Module) executeService(service pgs.Service, packages map[string]pgs.Pac
 	// Iterate through the methods on the service and construct method metadata for the template.
 	methods := make([]meta.MethodMeta, 0)
 	for _, method := range service.Methods() {
+		operationID, err := meta.GetOperationID(method)
+		if err != nil {
+			panic(err)
+		}
+
 		// Get the operation type for the method.
 		operationType, err := meta.GetOperationType(method)
 		if err != nil {
@@ -256,6 +261,7 @@ func (m *Module) executeService(service pgs.Service, packages map[string]pgs.Pac
 		responseMeta.Aggregates = aggregates
 
 		methodMeta := meta.MethodMeta{
+			ID:          operationID,
 			Name:        method.Name().UpperCamelCase().String(),
 			Comment:     method.SourceCodeInfo().LeadingComments(),
 			Type:        methodTypeMeta,

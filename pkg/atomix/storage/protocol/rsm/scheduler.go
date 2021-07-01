@@ -41,6 +41,10 @@ type Scheduler interface {
 
 	// RunAtIndex schedules a function to run at a specific index
 	RunAtIndex(index Index, f func())
+
+	runImmediateTasks()
+	runScheduledTasks(t time.Time)
+	runIndex(index Index)
 }
 
 // Timer is a cancellable timer
@@ -49,8 +53,8 @@ type Timer interface {
 	Cancel()
 }
 
-func newScheduler() *scheduler {
-	return &scheduler{
+func newScheduler() *serviceScheduler {
+	return &serviceScheduler{
 		tasks:          list.New(),
 		scheduledTasks: list.New(),
 		indexTasks:     make(map[Index]*list.List),
@@ -58,22 +62,22 @@ func newScheduler() *scheduler {
 	}
 }
 
-type scheduler struct {
+type serviceScheduler struct {
 	tasks          *list.List
 	scheduledTasks *list.List
 	indexTasks     map[Index]*list.List
 	time           time.Time
 }
 
-func (s *scheduler) Time() time.Time {
+func (s *serviceScheduler) Time() time.Time {
 	return s.time
 }
 
-func (s *scheduler) Run(f func()) {
+func (s *serviceScheduler) Run(f func()) {
 	s.tasks.PushBack(f)
 }
 
-func (s *scheduler) RunAfter(d time.Duration, f func()) Timer {
+func (s *serviceScheduler) RunAfter(d time.Duration, f func()) Timer {
 	task := &task{
 		scheduler: s,
 		time:      time.Now().Add(d),
@@ -84,7 +88,7 @@ func (s *scheduler) RunAfter(d time.Duration, f func()) Timer {
 	return task
 }
 
-func (s *scheduler) RepeatAfter(d time.Duration, i time.Duration, f func()) Timer {
+func (s *serviceScheduler) RepeatAfter(d time.Duration, i time.Duration, f func()) Timer {
 	task := &task{
 		scheduler: s,
 		time:      time.Now().Add(d),
@@ -95,7 +99,7 @@ func (s *scheduler) RepeatAfter(d time.Duration, i time.Duration, f func()) Time
 	return task
 }
 
-func (s *scheduler) RunAt(t time.Time, f func()) Timer {
+func (s *serviceScheduler) RunAt(t time.Time, f func()) Timer {
 	task := &task{
 		scheduler: s,
 		time:      t,
@@ -106,7 +110,7 @@ func (s *scheduler) RunAt(t time.Time, f func()) Timer {
 	return task
 }
 
-func (s *scheduler) RepeatAt(t time.Time, i time.Duration, f func()) Timer {
+func (s *serviceScheduler) RepeatAt(t time.Time, i time.Duration, f func()) Timer {
 	task := &task{
 		scheduler: s,
 		time:      t,
@@ -117,7 +121,7 @@ func (s *scheduler) RepeatAt(t time.Time, i time.Duration, f func()) Timer {
 	return task
 }
 
-func (s *scheduler) RunAtIndex(i Index, f func()) {
+func (s *serviceScheduler) RunAtIndex(i Index, f func()) {
 	tasks, ok := s.indexTasks[i]
 	if !ok {
 		tasks = list.New()
@@ -127,7 +131,7 @@ func (s *scheduler) RunAtIndex(i Index, f func()) {
 }
 
 // runImmediateTasks runs the immediate tasks in the scheduler queue
-func (s *scheduler) runImmediateTasks() {
+func (s *serviceScheduler) runImmediateTasks() {
 	task := s.tasks.Front()
 	for task != nil {
 		task.Value.(func())()
@@ -137,7 +141,7 @@ func (s *scheduler) runImmediateTasks() {
 }
 
 // runScheduleTasks runs the scheduled tasks in the scheduler queue
-func (s *scheduler) runScheduledTasks(time time.Time) {
+func (s *serviceScheduler) runScheduledTasks(time time.Time) {
 	s.time = time
 	element := s.scheduledTasks.Front()
 	if element != nil {
@@ -169,7 +173,7 @@ func (s *scheduler) runScheduledTasks(time time.Time) {
 }
 
 // runIndex runs functions pending at the given index
-func (s *scheduler) runIndex(index Index) {
+func (s *serviceScheduler) runIndex(index Index) {
 	tasks, ok := s.indexTasks[index]
 	if ok {
 		task := tasks.Front()
@@ -182,7 +186,7 @@ func (s *scheduler) runIndex(index Index) {
 }
 
 // schedule schedules a task
-func (s *scheduler) schedule(t *task) {
+func (s *serviceScheduler) schedule(t *task) {
 	if s.scheduledTasks.Len() == 0 {
 		t.element = s.scheduledTasks.PushBack(t)
 	} else {
@@ -199,12 +203,12 @@ func (s *scheduler) schedule(t *task) {
 	}
 }
 
-var _ Scheduler = &scheduler{}
+var _ Scheduler = &serviceScheduler{}
 
 // Scheduler task
 type task struct {
 	Timer
-	scheduler *scheduler
+	scheduler *serviceScheduler
 	interval  time.Duration
 	callback  func()
 	time      time.Time

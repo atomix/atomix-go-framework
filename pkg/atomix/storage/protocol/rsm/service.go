@@ -15,6 +15,7 @@
 package rsm
 
 import (
+	"bytes"
 	"io"
 	"time"
 )
@@ -44,76 +45,141 @@ type ServiceContext interface {
 
 	// Sessions returns a list of open sessions
 	Sessions() []Session
+
+	// Scheduler returns the service scheduler
+	Scheduler() Scheduler
+
+	// Operations returns the operations executor
+	Operations() OperationRegistry
 }
 
-// internalContext provides setters for the service context
-type internalContext interface {
-	ServiceContext
-	setIndex(index Index)
-	addSession(session Session)
-	removeSession(session Session)
+type serviceManagerContext struct {
+	serviceID  ServiceID
+	sessions   map[SessionID]Session
+	index      Index
+	timestamp  time.Time
+	scheduler  Scheduler
+	operations OperationRegistry
 }
 
-func newServiceContext(id ServiceID, context *managerContext) ServiceContext {
-	return &serviceContext{
-		serviceID: id,
-		context:   context,
-		sessions:  make(map[SessionID]Session),
-	}
+func (s *serviceManagerContext) Index() Index {
+	return s.index
 }
 
-// serviceContext is a default implementation of the service context
-type serviceContext struct {
-	serviceID      ServiceID
-	context        *managerContext
-	index          Index
-	sessions       map[SessionID]Session
-	currentSession Session
+func (s *serviceManagerContext) setIndex(index Index) {
+	s.index = index
 }
 
-func (c *serviceContext) Index() Index {
-	return c.index
+func (s *serviceManagerContext) Timestamp() time.Time {
+	return s.timestamp
 }
 
-func (c *serviceContext) setIndex(index Index) {
-	c.index = index
+func (s *serviceManagerContext) setTimestamp(timestamp time.Time) {
+	s.timestamp = timestamp
 }
 
-func (c *serviceContext) Timestamp() time.Time {
-	return c.context.timestamp
+func (s *serviceManagerContext) ServiceID() ServiceID {
+	return s.serviceID
 }
 
-func (c *serviceContext) ServiceID() ServiceID {
-	return c.serviceID
+func (s *serviceManagerContext) ServiceType() string {
+	return s.serviceID.Type
 }
 
-func (c *serviceContext) ServiceType() string {
-	return c.serviceID.Type
+func (s *serviceManagerContext) Scheduler() Scheduler {
+	return s.scheduler
 }
 
-func (c *serviceContext) Session(id SessionID) Session {
-	return c.sessions[id]
+func (s *serviceManagerContext) Operations() OperationRegistry {
+	return s.operations
 }
 
-func (c *serviceContext) Sessions() []Session {
-	sessions := make([]Session, 0, len(c.sessions))
-	for _, session := range c.sessions {
+func (s *serviceManagerContext) Session(id SessionID) Session {
+	return s.sessions[id]
+}
+
+func (s *serviceManagerContext) Sessions() []Session {
+	sessions := make([]Session, 0, len(s.sessions))
+	for _, session := range s.sessions {
 		sessions = append(sessions, session)
 	}
 	return sessions
 }
 
 // addSession adds a session to the service
-func (c *serviceContext) addSession(session Session) {
-	c.sessions[session.ID()] = session
+func (s *serviceManagerContext) addSession(session Session) {
+	s.sessions[session.ID()] = session
 }
 
 // removeSession removes a session from the service
-func (c *serviceContext) removeSession(session Session) {
-	delete(c.sessions, session.ID())
+func (s *serviceManagerContext) removeSession(session Session) {
+	delete(s.sessions, session.ID())
 }
 
-var _ ServiceContext = &serviceContext{}
+func newService(manager *stateManager, serviceID ServiceID) *serviceManager {
+	context := &serviceManagerContext{
+		serviceID:  serviceID,
+		sessions:   make(map[SessionID]Session),
+		scheduler:  newScheduler(),
+		operations: newOperationRegistry(),
+	}
+	return &serviceManager{
+		manager:               manager,
+		serviceManagerContext: context,
+		service:               manager.registry.GetService(serviceID.Type)(manager.scheduler, context),
+	}
+}
+
+type serviceManager struct {
+	*serviceManagerContext
+	manager *stateManager
+	service Service
+}
+
+// addSession adds a session to the service
+func (s *serviceManager) addSession(session Session) {
+	s.serviceManagerContext.addSession(session)
+	if open, ok := s.service.(SessionOpenService); ok {
+		open.SessionOpen(session)
+	}
+}
+
+// removeSession removes a session from the service
+func (s *serviceManager) removeSession(session Session) {
+	s.serviceManagerContext.removeSession(session)
+	if closed, ok := s.service.(SessionClosedService); ok {
+		closed.SessionClosed(session)
+	}
+}
+
+// expireSession expires a session from the service
+func (s *serviceManager) expireSession(session Session) {
+	s.serviceManagerContext.removeSession(session)
+	if expired, ok := s.service.(SessionExpiredService); ok {
+		expired.SessionExpired(session)
+	}
+}
+
+func (s *serviceManager) snapshot() (*ServiceSnapshot, error) {
+	var b bytes.Buffer
+	if err := s.service.Backup(&b); err != nil {
+		return nil, err
+	}
+	return &ServiceSnapshot{
+		ServiceID: s.serviceID,
+		Index:     s.index,
+		Data:      b.Bytes(),
+	}, nil
+}
+
+func (s *serviceManager) restore(snapshot *ServiceSnapshot) error {
+	s.serviceID = snapshot.ServiceID
+	s.index = snapshot.Index
+	if err := s.service.Restore(bytes.NewReader(snapshot.Data)); err != nil {
+		return err
+	}
+	return nil
+}
 
 // SessionOpenService is an interface for listening to session open events
 type SessionOpenService interface {
@@ -149,25 +215,5 @@ type RestoreService interface {
 type Service interface {
 	BackupService
 	RestoreService
-	Executor
-	Scheduler
-	internalContext
-}
-
-// NewService creates a new primitive service
-func NewService(scheduler Scheduler, context ServiceContext) Service {
-	return &managedService{
-		Executor:        newExecutor(),
-		Scheduler:       scheduler,
-		internalContext: context.(internalContext),
-	}
-}
-
-// managedService is a primitive service
-type managedService struct {
-	BackupService
-	RestoreService
-	Executor
-	Scheduler
-	internalContext
+	ServiceContext
 }

@@ -18,6 +18,8 @@ protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/dr
 protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/driver/proxy/rsm,plugins=grpc:pkg   pkg/atomix/driver/proxy/rsm/config.proto
 
 protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/storage/protocol/rsm,plugins=grpc:pkg      pkg/atomix/storage/protocol/rsm/*.proto
+protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/storage/protocol/rsm,plugins=grpc:pkg      pkg/atomix/storage/protocol/rsm2/*.proto
+protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/storage/protocol/rsm,plugins=grpc:pkg      pkg/atomix/storage/protocol/rsm4/*.proto
 protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/storage/protocol/gossip,plugins=grpc:pkg   pkg/atomix/storage/protocol/gossip/protocol.proto
 
 protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/storage/protocol/rsm/counter:pkg    pkg/atomix/storage/protocol/rsm/counter/*.proto

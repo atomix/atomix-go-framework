@@ -50,13 +50,13 @@ type ServiceAdaptor struct {
 }
 
 func (s *ServiceAdaptor) init() {
-	s.RegisterUnaryOperation(enterOp, s.enter)
-	s.RegisterUnaryOperation(withdrawOp, s.withdraw)
-	s.RegisterUnaryOperation(anointOp, s.anoint)
-	s.RegisterUnaryOperation(promoteOp, s.promote)
-	s.RegisterUnaryOperation(evictOp, s.evict)
-	s.RegisterUnaryOperation(getTermOp, s.getTerm)
-	s.RegisterStreamOperation(eventsOp, s.events)
+	s.RegisterUnary(enterOp, s.enter)
+	s.RegisterUnary(withdrawOp, s.withdraw)
+	s.RegisterUnary(anointOp, s.anoint)
+	s.RegisterUnary(promoteOp, s.promote)
+	s.RegisterUnary(evictOp, s.evict)
+	s.RegisterUnary(getTermOp, s.getTerm)
+	s.RegisterStream(eventsOp, s.events)
 }
 func (s *ServiceAdaptor) SessionOpen(rsmSession rsm.Session) {
 	s.rsm.Sessions().open(newSession(rsmSession))

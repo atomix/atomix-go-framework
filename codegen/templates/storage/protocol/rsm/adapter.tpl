@@ -38,10 +38,10 @@ const (
 var new{{ $serviceInt }}Func rsm.NewServiceFunc
 
 func register{{ $serviceInt }}Func(rsmf New{{ $serviceInt }}Func) {
-	new{{ $serviceInt }}Func = func(scheduler rsm.Scheduler, context rsm.ServiceContext) rsm.Service {
+	new{{ $serviceInt }}Func = func(context rsm.ServiceContext) rsm.Service {
 		service := &{{ $serviceImpl }}{
-			Service: rsm.NewService(scheduler, context),
-			rsm:     rsmf(new{{ $serviceContextInt }}(scheduler)),
+			ServiceContext: context,
+			rsm:            rsmf(new{{ $serviceContextInt }}(scheduler)),
 		}
 		service.init()
 		return service
@@ -56,7 +56,7 @@ func Register{{ $serviceInt }}(node *rsm.Node) {
 }
 
 type {{ $serviceImpl }} struct {
-	rsm.Service
+	rsm.ServiceContext
 	rsm {{ $serviceInt }}
 }
 
@@ -65,9 +65,9 @@ func (s *{{ $serviceImpl }}) init() {
     {{- $name := ((printf "%s%sOp" $root.Generator.Prefix .Name) | toLowerCamel) }}
     {{- $op := ( .Name | toLowerCamel ) }}
     {{- if ( and .Response.IsUnary .Type.IsSync ) }}
-	s.RegisterUnaryOperation({{ $name }}, s.{{ $op }})
+	s.Operations().RegisterUnary({{ $name }}, s.{{ $op }})
 	{{- else }}
-	s.RegisterStreamOperation({{ $name }}, s.{{ $op }})
+	s.Operations().RegisterStream({{ $name }}, s.open{{ $op | toUpperCamel }}, s.{{ $op }}, s.close{{ $op | toUpperCamel }})
     {{- end }}
     {{- end }}
 }
@@ -130,9 +130,6 @@ func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte, rsmSession
 
     proposal := {{ $newProposal }}({{ $serviceProposalID }}(s.Index()), session, request)
 
-    s.rsm.Proposals().{{ .Name }}().register(proposal)
-    session.Proposals().{{ .Name }}().register(proposal)
-
     defer func() {
         session.Proposals().{{ .Name }}().unregister(proposal.ID())
         s.rsm.Proposals().{{ .Name }}().unregister(proposal.ID())
@@ -153,7 +150,21 @@ func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte, rsmSession
 	return output, nil
 }
 {{- else }}
-func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte, rsmSession rsm.Session, stream rsm.Stream) (rsm.StreamCloser, error) {
+func (s *{{ $serviceImpl }}) s.open{{ .Name | toUpperCamel }}(stream rsm.Stream) {
+    session, ok := s.rsm.Sessions().Get({{ $serviceSessionID }}(stream.Session().ID()))
+    if !ok {
+        err := errors.NewConflict("session %d not found", rsmSession.ID())
+        log.Warn(err)
+        return nil, err
+    }
+
+    proposalID := {{ $serviceProposalID }}(s.Index())
+    proposal := {{ $newProposal }}(proposalID, session, request, stream)
+    s.rsm.Proposals().{{ .Name }}().register(proposal)
+    session.Proposals().{{ .Name }}().register(proposal)
+}
+
+func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte, stream rsm.Stream) error {
     request := &{{ template "type" .Request.Type }}{}
     err := proto.Unmarshal(input, request)
     if err != nil {
@@ -161,17 +172,8 @@ func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte, rsmSession
         return nil, err
     }
 
-    session, ok := s.rsm.Sessions().Get({{ $serviceSessionID }}(rsmSession.ID()))
-    if !ok {
-        err := errors.NewConflict("session %d not found", rsmSession.ID())
-        log.Warn(err)
-        return nil, err
-    }
-
-    proposal := {{ $newProposal }}({{ $serviceProposalID }}(s.Index()), session, request, stream)
-
-    s.rsm.Proposals().{{ .Name }}().register(proposal)
-    session.Proposals().{{ .Name }}().register(proposal)
+    proposalID := {{ $serviceProposalID }}(s.Index())
+    proposal := s.rsm.Proposals().{{ .Name }}().Get(proposalID)
 
     log.Debugf("Proposing {{ $proposalInt }} %s", proposal)
     err = s.rsm.{{ .Name }}(proposal)
@@ -179,10 +181,13 @@ func (s *{{ $serviceImpl }}) {{ .Name | toLowerCamel }}(input []byte, rsmSession
         log.Warn(err)
         return nil, err
     }
-    return func() {
-        session.Proposals().{{ .Name }}().unregister(proposal.ID())
-        s.rsm.Proposals().{{ .Name }}().unregister(proposal.ID())
-    }, nil
+    return nil
+}
+
+func (s *{{ $serviceImpl }}) s.close{{ .Name | toUpperCamel }}(stream rsm.Stream) {
+    proposalID := {{ $serviceProposalID }}(s.Index())
+    s.rsm.Proposals().{{ .Name }}().unregister(proposalID)
+    session.Proposals().{{ .Name }}().unregister(proposalID)
 }
 {{ end }}
 {{- end }}

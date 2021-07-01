@@ -15,14 +15,16 @@
 package rsm
 
 import (
-	"container/list"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
 )
 
 // StreamID is a stream identifier
 type StreamID uint64
+
+type RequestID uint64
+
+type ResponseID uint64
 
 // Stream is a service stream
 type Stream interface {
@@ -31,100 +33,147 @@ type Stream interface {
 	// ID returns the stream identifier
 	ID() StreamID
 
-	// OperationID returns the stream operation identifier
-	OperationID() OperationID
-
 	// Session returns the stream session
 	Session() Session
 }
 
-// StreamCloser is a function to be called when a stream is closed
-type StreamCloser func()
-
-type opStream struct {
-	id      StreamID
-	op      OperationID
-	stream  streams.WriteStream
-	session Session
-	closer  StreamCloser
-	closed  bool
-}
-
-func (s *opStream) ID() StreamID {
-	return s.id
-}
-
-func (s *opStream) OperationID() OperationID {
-	return s.op
-}
-
-func (s *opStream) Session() Session {
-	return s.session
-}
-
-func (s *opStream) Send(out streams.Result) {
-	s.stream.Send(out)
-}
-
-func (s *opStream) Result(value interface{}, err error) {
-	s.stream.Result(value, err)
-}
-
-func (s *opStream) Value(value interface{}) {
-	s.stream.Value(value)
-}
-
-func (s *opStream) Error(err error) {
-	s.stream.Error(err)
-}
-
-func (s *opStream) setCloser(closer StreamCloser) {
-	if s.closed {
-		if closer != nil {
-			closer()
-		}
-	} else {
-		s.closer = closer
+func newRequestStream(session *sessionManager, serviceID ServiceID, streamID StreamID, stream streams.WriteStream) *sessionStreamManager {
+	return &sessionStreamManager{
+		session:   session,
+		serviceID: serviceID,
+		streamID:  streamID,
+		stream:    stream,
 	}
 }
 
-func (s *opStream) Close() {
+type sessionStreamManager struct {
+	session   *sessionManager
+	serviceID ServiceID
+	streamID  StreamID
+	stream    streams.WriteStream
+}
+
+func (s *sessionStreamManager) ID() StreamID {
+	return s.streamID
+}
+
+func (s *sessionStreamManager) Session() Session {
+	return s.session
+}
+
+func (s *sessionStreamManager) Send(out streams.Result) {
+	s.stream.Send(out)
+}
+
+func (s *sessionStreamManager) Result(value interface{}, err error) {
+	s.stream.Result(value, err)
+}
+
+func (s *sessionStreamManager) Value(value interface{}) {
+	s.stream.Value(value)
+}
+
+func (s *sessionStreamManager) Error(err error) {
+	s.stream.Error(err)
+}
+
+func newQueryStream(session *sessionManager, serviceID ServiceID, requestID RequestID, stream streams.WriteStream) *queryStreamManager {
+	s := &queryStreamManager{
+		sessionStreamManager: newRequestStream(session, serviceID, StreamID(requestID), stream),
+	}
+	s.open()
+	return s
+}
+
+// queryStreamManager wraps a stream for a query
+type queryStreamManager struct {
+	*sessionStreamManager
+	closed bool
+}
+
+func (s *queryStreamManager) open() {
+	service, ok := s.session.getService(s.serviceID)
+	if ok {
+		service.addStream(s)
+	}
+}
+
+func (s *queryStreamManager) Close() {
 	if !s.closed {
 		s.closed = true
-		if s.closer != nil {
-			s.closer()
+		service, ok := s.session.getService(s.serviceID)
+		if ok {
+			service.removeStream(s)
 		}
 	}
 	s.stream.Close()
 }
 
-// queryStream wraps a stream for a query
-type queryStream struct {
-	*opStream
+func newCommandStream(session *sessionManager, serviceID ServiceID, operationID OperationID, requestID RequestID, stream streams.WriteStream) *commandStreamManager {
+	s := &commandStreamManager{
+		sessionStreamManager: newRequestStream(session, serviceID, StreamID(requestID), stream),
+		operationID:          operationID,
+		requestID:            requestID,
+		lastIndex:            session.index,
+	}
+	s.open()
+	return s
 }
 
-// sessionStream manages a single stream for a session
-type sessionStream struct {
-	*opStream
-	cluster    cluster.Cluster
-	member     *cluster.Member
-	requestID  uint64
-	responseID uint64
-	completeID uint64
-	lastIndex  Index
-	ctx        *managerContext
-	results    *list.List
+// commandStreamManager manages a single stream for a session
+type commandStreamManager struct {
+	*sessionStreamManager
+	operationID      OperationID
+	requestID        RequestID
+	responseID       ResponseID
+	ackResponseID    ResponseID
+	lastIndex        Index
+	pendingResponses map[ResponseID]*SessionResponse
+	closed           bool
 }
 
 // sessionStreamResult contains a single stream result
 type sessionStreamResult struct {
-	id       uint64
+	id       ResponseID
 	index    Index
 	response *SessionResponse
 }
 
+func (s *commandStreamManager) snapshot() (*SessionStreamSnapshot, error) {
+	pendingResponses := make([]*SessionResponse, 0, len(s.pendingResponses))
+	for _, response := range s.pendingResponses {
+		pendingResponses = append(pendingResponses, response)
+	}
+	return &SessionStreamSnapshot{
+		ServiceID:        s.serviceID,
+		OperationID:      s.operationID,
+		RequestID:        s.requestID,
+		ResponseID:       s.responseID,
+		AckResponseID:    s.ackResponseID,
+		PendingResponses: pendingResponses,
+	}, nil
+}
+
+func (s *commandStreamManager) restore(snapshot *SessionStreamSnapshot) error {
+	s.serviceID = snapshot.ServiceID
+	s.operationID = snapshot.OperationID
+	s.requestID = snapshot.RequestID
+	s.responseID = snapshot.ResponseID
+	s.ackResponseID = snapshot.AckResponseID
+	s.pendingResponses = make(map[ResponseID]*SessionResponse)
+	for _, pendingResponse := range snapshot.PendingResponses {
+		s.pendingResponses[pendingResponse.GetCommand().Context.ResponseID] = pendingResponse
+	}
+	return nil
+}
+
 // open opens the stream
-func (s *sessionStream) open() {
+func (s *commandStreamManager) open() {
+	service, ok := s.session.getService(s.serviceID)
+	if ok {
+		service.addStream(s)
+	}
+
 	s.updateClock()
 
 	response := &SessionResponse{
@@ -135,10 +184,10 @@ func (s *sessionStream) open() {
 		Response: &SessionResponse_Command{
 			Command: &SessionCommandResponse{
 				Context: SessionResponseContext{
-					SessionID: uint64(s.session.ID()),
-					RequestID: s.requestID,
-					Index:     uint64(s.lastIndex),
-					Sequence:  s.responseID,
+					SessionID:  s.session.ID(),
+					RequestID:  s.requestID,
+					Index:      s.lastIndex,
+					ResponseID: s.responseID,
 				},
 			},
 		},
@@ -159,11 +208,11 @@ func (s *sessionStream) open() {
 	s.stream.Value(out.response)
 }
 
-func (s *sessionStream) updateClock() {
+func (s *commandStreamManager) updateClock() {
 	// If the client acked a sequence number greater than the current event sequence number since we know the
 	// client must have received it from another server.
 	s.responseID++
-	if s.completeID > s.responseID {
+	if s.ackResponseID > s.responseID {
 		log.WithFields(
 			logging.String("NodeID", string(s.member.NodeID)),
 			logging.Uint64("SessionID", uint64(s.session.ID())),
@@ -173,13 +222,13 @@ func (s *sessionStream) updateClock() {
 	}
 
 	// Record the last index sent on the stream
-	s.lastIndex = s.ctx.index
+	s.lastIndex = s.session.index
 }
 
-func (s *sessionStream) Send(result streams.Result) {
+func (s *commandStreamManager) Send(result streams.Result) {
 	s.updateClock()
 
-	// Create the stream result and add it to the results list.
+	// Create the stream result and add it to the commandResponses list.
 	response := &SessionResponse{
 		Type: SessionResponseType_RESPONSE,
 		Status: SessionResponseStatus{
@@ -190,9 +239,9 @@ func (s *sessionStream) Send(result streams.Result) {
 			Command: &SessionCommandResponse{
 				Context: SessionResponseContext{
 					SessionID: uint64(s.session.ID()),
-					RequestID: s.requestID,
+					RequestID: uint64(s.requestID),
 					Index:     uint64(s.lastIndex),
-					Sequence:  s.responseID,
+					Sequence:  uint64(s.responseID),
 				},
 				Response: ServiceCommandResponse{
 					Response: &ServiceCommandResponse_Operation{
@@ -205,11 +254,7 @@ func (s *sessionStream) Send(result streams.Result) {
 		},
 	}
 
-	out := sessionStreamResult{
-		id:       s.responseID,
-		index:    s.ctx.index,
-		response: response,
-	}
+	s.pendingResponses[s.responseID] = response
 	s.results.PushBack(out)
 	log.WithFields(
 		logging.String("NodeID", string(s.member.NodeID)),
@@ -226,39 +271,22 @@ func (s *sessionStream) Send(result streams.Result) {
 	s.stream.Value(out.response)
 }
 
-func (s *sessionStream) Result(value interface{}, err error) {
+func (s *commandStreamManager) Result(value interface{}, err error) {
 	s.Send(streams.Result{
 		Value: value,
 		Error: err,
 	})
 }
 
-func (s *sessionStream) Value(value interface{}) {
+func (s *commandStreamManager) Value(value interface{}) {
 	s.Result(value, nil)
 }
 
-func (s *sessionStream) Error(err error) {
+func (s *commandStreamManager) Error(err error) {
 	s.Result(nil, err)
 }
 
-func (s *sessionStream) setCloser(closer StreamCloser) {
-	if s.closed {
-		if closer != nil {
-			closer()
-		}
-	} else {
-		s.closer = closer
-	}
-}
-
-func (s *sessionStream) Close() {
-	if !s.closed {
-		s.closed = true
-		if s.closer != nil {
-			s.closer()
-		}
-	}
-
+func (s *commandStreamManager) Close() {
 	log.WithFields(
 		logging.String("NodeID", string(s.member.NodeID)),
 		logging.Uint64("SessionID", uint64(s.session.ID())),
@@ -297,16 +325,24 @@ func (s *sessionStream) Close() {
 		Debugf("Sending stream close %d %v", s.responseID, out.response)
 	s.stream.Value(out.response)
 	s.stream.Close()
+
+	if !s.closed {
+		s.closed = true
+		service, ok := s.session.getService(s.serviceID)
+		if ok {
+			service.removeStream(s)
+		}
+	}
 }
 
 // ack acknowledges results up to the given ID
-func (s *sessionStream) ack(id uint64) {
-	if id > s.completeID {
+func (s *commandStreamManager) ack(id uint64) {
+	if id > s.ackResponseID {
 		event := s.results.Front()
 		for event != nil && event.Value.(sessionStreamResult).id <= id {
 			next := event.Next()
 			s.results.Remove(event)
-			s.completeID = event.Value.(sessionStreamResult).id
+			s.ackResponseID = event.Value.(sessionStreamResult).id
 			event = next
 		}
 		log.WithFields(
@@ -318,7 +354,7 @@ func (s *sessionStream) ack(id uint64) {
 }
 
 // replay resends results on the given channel
-func (s *sessionStream) replay(stream streams.WriteStream) {
+func (s *commandStreamManager) replay(stream streams.WriteStream) {
 	result := s.results.Front()
 	for result != nil {
 		response := result.Value.(sessionStreamResult)

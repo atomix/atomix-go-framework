@@ -74,6 +74,18 @@ func GetOperationName(method pgs.Method) (string, error) {
 	return opName, nil
 }
 
+// GetOperationID gets the id extension from the given method
+func GetOperationID(method pgs.Method) (uint32, error) {
+	var operationID uint32
+	ok, err := method.Extension(operations.E_Id, &operationID)
+	if err != nil {
+		return 0, err
+	} else if !ok {
+		return 0, errors.New("no atomix.primitive.operation.id set")
+	}
+	return operationID, nil
+}
+
 // GetOperationType gets the optype extension from the given method
 func GetOperationType(method pgs.Method) (operations.OperationType, error) {
 	var operationType operations.OperationType

@@ -29,8 +29,8 @@ var newServiceFunc rsm.NewServiceFunc
 func registerServiceFunc(rsmf NewServiceFunc) {
 	newServiceFunc = func(scheduler rsm.Scheduler, context rsm.ServiceContext) rsm.Service {
 		service := &ServiceAdaptor{
-			Service: rsm.NewService(scheduler, context),
-			rsm:     rsmf(newServiceContext(scheduler)),
+			ServiceContext: context,
+			rsm:            rsmf(newServiceContext(scheduler)),
 		}
 		service.init()
 		return service
@@ -45,12 +45,12 @@ func RegisterService(node *rsm.Node) {
 }
 
 type ServiceAdaptor struct {
-	rsm.Service
+	rsm.ServiceContext
 	rsm Service
 }
 
 func (s *ServiceAdaptor) init() {
-	s.RegisterUnaryOperation(sizeOp, s.size)
+	s.Operations().RegisterUnary(sizeOp, s.size)
 	s.RegisterUnaryOperation(putOp, s.put)
 	s.RegisterUnaryOperation(getOp, s.get)
 	s.RegisterUnaryOperation(removeOp, s.remove)

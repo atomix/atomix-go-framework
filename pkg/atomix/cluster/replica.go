@@ -37,6 +37,7 @@ func NewReplica(network Network, config protocolapi.ProtocolReplica) *Replica {
 		NodeID:     NodeID(config.NodeID),
 		Host:       config.Host,
 		Port:       int(config.APIPort),
+		ReadOnly:   config.ReadOnly,
 		extraPorts: extraPorts,
 	}
 }
@@ -48,6 +49,7 @@ type Replica struct {
 	NodeID     NodeID
 	Host       string
 	Port       int
+	ReadOnly   bool
 	extraPorts map[string]int
 	conn       *grpc.ClientConn
 	mu         sync.RWMutex

@@ -124,10 +124,10 @@ func (SessionResponseCode) EnumDescriptor() ([]byte, []int) {
 }
 
 type StateMachineSnapshot struct {
-	Index     uint64            `protobuf:"varint,1,opt,name=index,proto3" json:"index,omitempty"`
-	Timestamp time.Time         `protobuf:"bytes,2,opt,name=timestamp,proto3,stdtime" json:"timestamp"`
-	Sessions  []SessionSnapshot `protobuf:"bytes,3,rep,name=sessions,proto3" json:"sessions"`
-	Services  []ServiceSnapshot `protobuf:"bytes,4,rep,name=services,proto3" json:"services"`
+	Index     Index              `protobuf:"varint,1,opt,name=index,proto3,casttype=Index" json:"index,omitempty"`
+	Timestamp time.Time          `protobuf:"bytes,2,opt,name=timestamp,proto3,stdtime" json:"timestamp"`
+	Sessions  []*SessionSnapshot `protobuf:"bytes,3,rep,name=sessions,proto3" json:"sessions,omitempty"`
+	Services  []*ServiceSnapshot `protobuf:"bytes,4,rep,name=services,proto3" json:"services,omitempty"`
 }
 
 func (m *StateMachineSnapshot) Reset()         { *m = StateMachineSnapshot{} }
@@ -163,7 +163,7 @@ func (m *StateMachineSnapshot) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_StateMachineSnapshot proto.InternalMessageInfo
 
-func (m *StateMachineSnapshot) GetIndex() uint64 {
+func (m *StateMachineSnapshot) GetIndex() Index {
 	if m != nil {
 		return m.Index
 	}
@@ -177,14 +177,14 @@ func (m *StateMachineSnapshot) GetTimestamp() time.Time {
 	return time.Time{}
 }
 
-func (m *StateMachineSnapshot) GetSessions() []SessionSnapshot {
+func (m *StateMachineSnapshot) GetSessions() []*SessionSnapshot {
 	if m != nil {
 		return m.Sessions
 	}
 	return nil
 }
 
-func (m *StateMachineSnapshot) GetServices() []ServiceSnapshot {
+func (m *StateMachineSnapshot) GetServices() []*ServiceSnapshot {
 	if m != nil {
 		return m.Services
 	}
@@ -193,8 +193,8 @@ func (m *StateMachineSnapshot) GetServices() []ServiceSnapshot {
 
 // Service snapshot
 type ServiceSnapshot struct {
-	ServiceID ServiceId `protobuf:"bytes,1,opt,name=service_id,json=serviceId,proto3" json:"service_id"`
-	Index     uint64    `protobuf:"varint,2,opt,name=index,proto3" json:"index,omitempty"`
+	ServiceID ServiceID `protobuf:"bytes,1,opt,name=service_id,json=serviceId,proto3,casttype=ServiceID" json:"service_id"`
+	Index     Index     `protobuf:"varint,2,opt,name=index,proto3,casttype=Index" json:"index,omitempty"`
 	Data      []byte    `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
 }
 
@@ -231,14 +231,14 @@ func (m *ServiceSnapshot) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_ServiceSnapshot proto.InternalMessageInfo
 
-func (m *ServiceSnapshot) GetServiceID() ServiceId {
+func (m *ServiceSnapshot) GetServiceID() ServiceID {
 	if m != nil {
 		return m.ServiceID
 	}
-	return ServiceId{}
+	return ServiceID{}
 }
 
-func (m *ServiceSnapshot) GetIndex() uint64 {
+func (m *ServiceSnapshot) GetIndex() Index {
 	if m != nil {
 		return m.Index
 	}
@@ -254,12 +254,14 @@ func (m *ServiceSnapshot) GetData() []byte {
 
 // Service session
 type SessionSnapshot struct {
-	SessionID     uint64                    `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	Timeout       time.Duration             `protobuf:"bytes,2,opt,name=timeout,proto3,stdduration" json:"timeout"`
-	Timestamp     time.Time                 `protobuf:"bytes,3,opt,name=timestamp,proto3,stdtime" json:"timestamp"`
-	LastRequestID uint64                    `protobuf:"varint,4,opt,name=last_request_id,json=lastRequestId,proto3" json:"last_request_id,omitempty"`
-	Services      []*SessionServiceSnapshot `protobuf:"bytes,7,rep,name=services,proto3" json:"services,omitempty"`
-	Commands      []*SessionCommandRequest  `protobuf:"bytes,8,rep,name=commands,proto3" json:"commands,omitempty"`
+	SessionID        SessionID                `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3,casttype=SessionID" json:"session_id,omitempty"`
+	Timestamp        time.Time                `protobuf:"bytes,2,opt,name=timestamp,proto3,stdtime" json:"timestamp"`
+	LastRequestID    RequestID                `protobuf:"varint,3,opt,name=last_request_id,json=lastRequestId,proto3,casttype=RequestID" json:"last_request_id,omitempty"`
+	LastResponseID   ResponseID               `protobuf:"varint,4,opt,name=last_response_id,json=lastResponseId,proto3,casttype=ResponseID" json:"last_response_id,omitempty"`
+	Services         []ServiceID              `protobuf:"bytes,5,rep,name=services,proto3,casttype=ServiceID" json:"services"`
+	PendingRequests  []*SessionRequest        `protobuf:"bytes,6,rep,name=pending_requests,json=pendingRequests,proto3" json:"pending_requests,omitempty"`
+	PendingResponses []*SessionResponse       `protobuf:"bytes,7,rep,name=pending_responses,json=pendingResponses,proto3" json:"pending_responses,omitempty"`
+	Streams          []*SessionStreamSnapshot `protobuf:"bytes,8,rep,name=streams,proto3" json:"streams,omitempty"`
 }
 
 func (m *SessionSnapshot) Reset()         { *m = SessionSnapshot{} }
@@ -295,16 +297,9 @@ func (m *SessionSnapshot) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_SessionSnapshot proto.InternalMessageInfo
 
-func (m *SessionSnapshot) GetSessionID() uint64 {
+func (m *SessionSnapshot) GetSessionID() SessionID {
 	if m != nil {
 		return m.SessionID
-	}
-	return 0
-}
-
-func (m *SessionSnapshot) GetTimeout() time.Duration {
-	if m != nil {
-		return m.Timeout
 	}
 	return 0
 }
@@ -316,74 +311,42 @@ func (m *SessionSnapshot) GetTimestamp() time.Time {
 	return time.Time{}
 }
 
-func (m *SessionSnapshot) GetLastRequestID() uint64 {
+func (m *SessionSnapshot) GetLastRequestID() RequestID {
 	if m != nil {
 		return m.LastRequestID
 	}
 	return 0
 }
 
-func (m *SessionSnapshot) GetServices() []*SessionServiceSnapshot {
+func (m *SessionSnapshot) GetLastResponseID() ResponseID {
+	if m != nil {
+		return m.LastResponseID
+	}
+	return 0
+}
+
+func (m *SessionSnapshot) GetServices() []ServiceID {
 	if m != nil {
 		return m.Services
 	}
 	return nil
 }
 
-func (m *SessionSnapshot) GetCommands() []*SessionCommandRequest {
+func (m *SessionSnapshot) GetPendingRequests() []*SessionRequest {
 	if m != nil {
-		return m.Commands
+		return m.PendingRequests
 	}
 	return nil
 }
 
-// Session service snapshot
-type SessionServiceSnapshot struct {
-	ServiceId ServiceId                `protobuf:"bytes,1,opt,name=service_id,json=serviceId,proto3" json:"service_id"`
-	Streams   []*SessionStreamSnapshot `protobuf:"bytes,2,rep,name=streams,proto3" json:"streams,omitempty"`
-}
-
-func (m *SessionServiceSnapshot) Reset()         { *m = SessionServiceSnapshot{} }
-func (m *SessionServiceSnapshot) String() string { return proto.CompactTextString(m) }
-func (*SessionServiceSnapshot) ProtoMessage()    {}
-func (*SessionServiceSnapshot) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{3}
-}
-func (m *SessionServiceSnapshot) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *SessionServiceSnapshot) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_SessionServiceSnapshot.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *SessionServiceSnapshot) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SessionServiceSnapshot.Merge(m, src)
-}
-func (m *SessionServiceSnapshot) XXX_Size() int {
-	return m.Size()
-}
-func (m *SessionServiceSnapshot) XXX_DiscardUnknown() {
-	xxx_messageInfo_SessionServiceSnapshot.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SessionServiceSnapshot proto.InternalMessageInfo
-
-func (m *SessionServiceSnapshot) GetServiceId() ServiceId {
+func (m *SessionSnapshot) GetPendingResponses() []*SessionResponse {
 	if m != nil {
-		return m.ServiceId
+		return m.PendingResponses
 	}
-	return ServiceId{}
+	return nil
 }
 
-func (m *SessionServiceSnapshot) GetStreams() []*SessionStreamSnapshot {
+func (m *SessionSnapshot) GetStreams() []*SessionStreamSnapshot {
 	if m != nil {
 		return m.Streams
 	}
@@ -392,18 +355,16 @@ func (m *SessionServiceSnapshot) GetStreams() []*SessionStreamSnapshot {
 
 // Service session stream
 type SessionStreamSnapshot struct {
-	StreamID   uint64 `protobuf:"varint,1,opt,name=stream_id,json=streamId,proto3" json:"stream_id,omitempty"`
-	RequestID  uint64 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Type       string `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
-	ResponseID uint64 `protobuf:"varint,4,opt,name=response_id,json=responseId,proto3" json:"response_id,omitempty"`
-	CompleteID uint64 `protobuf:"varint,5,opt,name=complete_id,json=completeId,proto3" json:"complete_id,omitempty"`
+	StreamID    StreamID    `protobuf:"varint,1,opt,name=stream_id,json=streamId,proto3,casttype=StreamID" json:"stream_id,omitempty"`
+	ServiceID   ServiceID   `protobuf:"bytes,2,opt,name=service_id,json=serviceId,proto3,casttype=ServiceID" json:"service_id"`
+	OperationID OperationID `protobuf:"bytes,3,opt,name=operation_id,json=operationId,proto3,casttype=OperationID" json:"operation_id,omitempty"`
 }
 
 func (m *SessionStreamSnapshot) Reset()         { *m = SessionStreamSnapshot{} }
 func (m *SessionStreamSnapshot) String() string { return proto.CompactTextString(m) }
 func (*SessionStreamSnapshot) ProtoMessage()    {}
 func (*SessionStreamSnapshot) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{4}
+	return fileDescriptor_e3f642df445f73e7, []int{3}
 }
 func (m *SessionStreamSnapshot) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -432,39 +393,25 @@ func (m *SessionStreamSnapshot) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_SessionStreamSnapshot proto.InternalMessageInfo
 
-func (m *SessionStreamSnapshot) GetStreamID() uint64 {
+func (m *SessionStreamSnapshot) GetStreamID() StreamID {
 	if m != nil {
 		return m.StreamID
 	}
 	return 0
 }
 
-func (m *SessionStreamSnapshot) GetRequestID() uint64 {
+func (m *SessionStreamSnapshot) GetServiceID() ServiceID {
 	if m != nil {
-		return m.RequestID
+		return m.ServiceID
 	}
-	return 0
+	return ServiceID{}
 }
 
-func (m *SessionStreamSnapshot) GetType() string {
+func (m *SessionStreamSnapshot) GetOperationID() OperationID {
 	if m != nil {
-		return m.Type
+		return m.OperationID
 	}
 	return ""
-}
-
-func (m *SessionStreamSnapshot) GetResponseID() uint64 {
-	if m != nil {
-		return m.ResponseID
-	}
-	return 0
-}
-
-func (m *SessionStreamSnapshot) GetCompleteID() uint64 {
-	if m != nil {
-		return m.CompleteID
-	}
-	return 0
 }
 
 type ServiceId struct {
@@ -477,7 +424,7 @@ func (m *ServiceId) Reset()         { *m = ServiceId{} }
 func (m *ServiceId) String() string { return proto.CompactTextString(m) }
 func (*ServiceId) ProtoMessage()    {}
 func (*ServiceId) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{5}
+	return fileDescriptor_e3f642df445f73e7, []int{4}
 }
 func (m *ServiceId) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -536,7 +483,7 @@ func (m *StorageRequest) Reset()         { *m = StorageRequest{} }
 func (m *StorageRequest) String() string { return proto.CompactTextString(m) }
 func (*StorageRequest) ProtoMessage()    {}
 func (*StorageRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{6}
+	return fileDescriptor_e3f642df445f73e7, []int{5}
 }
 func (m *StorageRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -588,7 +535,7 @@ func (m *StorageResponse) Reset()         { *m = StorageResponse{} }
 func (m *StorageResponse) String() string { return proto.CompactTextString(m) }
 func (*StorageResponse) ProtoMessage()    {}
 func (*StorageResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{7}
+	return fileDescriptor_e3f642df445f73e7, []int{6}
 }
 func (m *StorageResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -640,7 +587,7 @@ func (m *StateMachineRequest) Reset()         { *m = StateMachineRequest{} }
 func (m *StateMachineRequest) String() string { return proto.CompactTextString(m) }
 func (*StateMachineRequest) ProtoMessage()    {}
 func (*StateMachineRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{8}
+	return fileDescriptor_e3f642df445f73e7, []int{7}
 }
 func (m *StateMachineRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -691,7 +638,7 @@ func (m *StateMachineResponse) Reset()         { *m = StateMachineResponse{} }
 func (m *StateMachineResponse) String() string { return proto.CompactTextString(m) }
 func (*StateMachineResponse) ProtoMessage()    {}
 func (*StateMachineResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{9}
+	return fileDescriptor_e3f642df445f73e7, []int{8}
 }
 func (m *StateMachineResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -741,7 +688,7 @@ func (m *SessionRequest) Reset()         { *m = SessionRequest{} }
 func (m *SessionRequest) String() string { return proto.CompactTextString(m) }
 func (*SessionRequest) ProtoMessage()    {}
 func (*SessionRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{10}
+	return fileDescriptor_e3f642df445f73e7, []int{9}
 }
 func (m *SessionRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -867,7 +814,7 @@ func (m *SessionResponse) Reset()         { *m = SessionResponse{} }
 func (m *SessionResponse) String() string { return proto.CompactTextString(m) }
 func (*SessionResponse) ProtoMessage()    {}
 func (*SessionResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{11}
+	return fileDescriptor_e3f642df445f73e7, []int{10}
 }
 func (m *SessionResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -992,15 +939,14 @@ func (*SessionResponse) XXX_OneofWrappers() []interface{} {
 }
 
 type OpenSessionRequest struct {
-	ClientID string         `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
-	Timeout  *time.Duration `protobuf:"bytes,2,opt,name=timeout,proto3,stdduration" json:"timeout,omitempty"`
+	Timeout *time.Duration `protobuf:"bytes,2,opt,name=timeout,proto3,stdduration" json:"timeout,omitempty"`
 }
 
 func (m *OpenSessionRequest) Reset()         { *m = OpenSessionRequest{} }
 func (m *OpenSessionRequest) String() string { return proto.CompactTextString(m) }
 func (*OpenSessionRequest) ProtoMessage()    {}
 func (*OpenSessionRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{12}
+	return fileDescriptor_e3f642df445f73e7, []int{11}
 }
 func (m *OpenSessionRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1029,13 +975,6 @@ func (m *OpenSessionRequest) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_OpenSessionRequest proto.InternalMessageInfo
 
-func (m *OpenSessionRequest) GetClientID() string {
-	if m != nil {
-		return m.ClientID
-	}
-	return ""
-}
-
 func (m *OpenSessionRequest) GetTimeout() *time.Duration {
 	if m != nil {
 		return m.Timeout
@@ -1044,14 +983,14 @@ func (m *OpenSessionRequest) GetTimeout() *time.Duration {
 }
 
 type OpenSessionResponse struct {
-	SessionID uint64 `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	SessionID SessionID `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3,casttype=SessionID" json:"session_id,omitempty"`
 }
 
 func (m *OpenSessionResponse) Reset()         { *m = OpenSessionResponse{} }
 func (m *OpenSessionResponse) String() string { return proto.CompactTextString(m) }
 func (*OpenSessionResponse) ProtoMessage()    {}
 func (*OpenSessionResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{13}
+	return fileDescriptor_e3f642df445f73e7, []int{12}
 }
 func (m *OpenSessionResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1080,7 +1019,7 @@ func (m *OpenSessionResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_OpenSessionResponse proto.InternalMessageInfo
 
-func (m *OpenSessionResponse) GetSessionID() uint64 {
+func (m *OpenSessionResponse) GetSessionID() SessionID {
 	if m != nil {
 		return m.SessionID
 	}
@@ -1088,16 +1027,15 @@ func (m *OpenSessionResponse) GetSessionID() uint64 {
 }
 
 type KeepAliveRequest struct {
-	SessionID    uint64                 `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	AckRequestID uint64                 `protobuf:"varint,2,opt,name=ack_request_id,json=ackRequestId,proto3" json:"ack_request_id,omitempty"`
-	Streams      []SessionStreamContext `protobuf:"bytes,3,rep,name=streams,proto3" json:"streams"`
+	SessionID     SessionID  `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3,casttype=SessionID" json:"session_id,omitempty"`
+	AckResponseID ResponseID `protobuf:"varint,2,opt,name=ack_response_id,json=ackResponseId,proto3,casttype=ResponseID" json:"ack_response_id,omitempty"`
 }
 
 func (m *KeepAliveRequest) Reset()         { *m = KeepAliveRequest{} }
 func (m *KeepAliveRequest) String() string { return proto.CompactTextString(m) }
 func (*KeepAliveRequest) ProtoMessage()    {}
 func (*KeepAliveRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{14}
+	return fileDescriptor_e3f642df445f73e7, []int{13}
 }
 func (m *KeepAliveRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1126,25 +1064,18 @@ func (m *KeepAliveRequest) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_KeepAliveRequest proto.InternalMessageInfo
 
-func (m *KeepAliveRequest) GetSessionID() uint64 {
+func (m *KeepAliveRequest) GetSessionID() SessionID {
 	if m != nil {
 		return m.SessionID
 	}
 	return 0
 }
 
-func (m *KeepAliveRequest) GetAckRequestID() uint64 {
+func (m *KeepAliveRequest) GetAckResponseID() ResponseID {
 	if m != nil {
-		return m.AckRequestID
+		return m.AckResponseID
 	}
 	return 0
-}
-
-func (m *KeepAliveRequest) GetStreams() []SessionStreamContext {
-	if m != nil {
-		return m.Streams
-	}
-	return nil
 }
 
 type KeepAliveResponse struct {
@@ -1154,7 +1085,7 @@ func (m *KeepAliveResponse) Reset()         { *m = KeepAliveResponse{} }
 func (m *KeepAliveResponse) String() string { return proto.CompactTextString(m) }
 func (*KeepAliveResponse) ProtoMessage()    {}
 func (*KeepAliveResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{15}
+	return fileDescriptor_e3f642df445f73e7, []int{14}
 }
 func (m *KeepAliveResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1184,14 +1115,14 @@ func (m *KeepAliveResponse) XXX_DiscardUnknown() {
 var xxx_messageInfo_KeepAliveResponse proto.InternalMessageInfo
 
 type CloseSessionRequest struct {
-	SessionID uint64 `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	SessionID SessionID `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3,casttype=SessionID" json:"session_id,omitempty"`
 }
 
 func (m *CloseSessionRequest) Reset()         { *m = CloseSessionRequest{} }
 func (m *CloseSessionRequest) String() string { return proto.CompactTextString(m) }
 func (*CloseSessionRequest) ProtoMessage()    {}
 func (*CloseSessionRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{16}
+	return fileDescriptor_e3f642df445f73e7, []int{15}
 }
 func (m *CloseSessionRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1220,7 +1151,7 @@ func (m *CloseSessionRequest) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_CloseSessionRequest proto.InternalMessageInfo
 
-func (m *CloseSessionRequest) GetSessionID() uint64 {
+func (m *CloseSessionRequest) GetSessionID() SessionID {
 	if m != nil {
 		return m.SessionID
 	}
@@ -1234,7 +1165,7 @@ func (m *CloseSessionResponse) Reset()         { *m = CloseSessionResponse{} }
 func (m *CloseSessionResponse) String() string { return proto.CompactTextString(m) }
 func (*CloseSessionResponse) ProtoMessage()    {}
 func (*CloseSessionResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{17}
+	return fileDescriptor_e3f642df445f73e7, []int{16}
 }
 func (m *CloseSessionResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1272,7 +1203,7 @@ func (m *SessionCommandRequest) Reset()         { *m = SessionCommandRequest{} }
 func (m *SessionCommandRequest) String() string { return proto.CompactTextString(m) }
 func (*SessionCommandRequest) ProtoMessage()    {}
 func (*SessionCommandRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{18}
+	return fileDescriptor_e3f642df445f73e7, []int{17}
 }
 func (m *SessionCommandRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1324,7 +1255,7 @@ func (m *SessionCommandResponse) Reset()         { *m = SessionCommandResponse{}
 func (m *SessionCommandResponse) String() string { return proto.CompactTextString(m) }
 func (*SessionCommandResponse) ProtoMessage()    {}
 func (*SessionCommandResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{19}
+	return fileDescriptor_e3f642df445f73e7, []int{18}
 }
 func (m *SessionCommandResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1376,7 +1307,7 @@ func (m *SessionQueryRequest) Reset()         { *m = SessionQueryRequest{} }
 func (m *SessionQueryRequest) String() string { return proto.CompactTextString(m) }
 func (*SessionQueryRequest) ProtoMessage()    {}
 func (*SessionQueryRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{20}
+	return fileDescriptor_e3f642df445f73e7, []int{19}
 }
 func (m *SessionQueryRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1428,7 +1359,7 @@ func (m *SessionQueryResponse) Reset()         { *m = SessionQueryResponse{} }
 func (m *SessionQueryResponse) String() string { return proto.CompactTextString(m) }
 func (*SessionQueryResponse) ProtoMessage()    {}
 func (*SessionQueryResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{21}
+	return fileDescriptor_e3f642df445f73e7, []int{20}
 }
 func (m *SessionQueryResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1472,7 +1403,7 @@ func (m *SessionQueryResponse) GetResponse() ServiceQueryResponse {
 }
 
 type ServiceCommandRequest struct {
-	Service ServiceId `protobuf:"bytes,1,opt,name=service,proto3" json:"service"`
+	ServiceID ServiceID `protobuf:"bytes,1,opt,name=service_id,json=serviceId,proto3,casttype=ServiceID" json:"service_id"`
 	// Types that are valid to be assigned to Request:
 	//	*ServiceCommandRequest_Operation
 	//	*ServiceCommandRequest_Create
@@ -1485,7 +1416,7 @@ func (m *ServiceCommandRequest) Reset()         { *m = ServiceCommandRequest{} }
 func (m *ServiceCommandRequest) String() string { return proto.CompactTextString(m) }
 func (*ServiceCommandRequest) ProtoMessage()    {}
 func (*ServiceCommandRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{22}
+	return fileDescriptor_e3f642df445f73e7, []int{21}
 }
 func (m *ServiceCommandRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1545,11 +1476,11 @@ func (m *ServiceCommandRequest) GetRequest() isServiceCommandRequest_Request {
 	return nil
 }
 
-func (m *ServiceCommandRequest) GetService() ServiceId {
+func (m *ServiceCommandRequest) GetServiceID() ServiceID {
 	if m != nil {
-		return m.Service
+		return m.ServiceID
 	}
-	return ServiceId{}
+	return ServiceID{}
 }
 
 func (m *ServiceCommandRequest) GetOperation() *ServiceOperationRequest {
@@ -1603,7 +1534,7 @@ func (m *ServiceCommandResponse) Reset()         { *m = ServiceCommandResponse{}
 func (m *ServiceCommandResponse) String() string { return proto.CompactTextString(m) }
 func (*ServiceCommandResponse) ProtoMessage()    {}
 func (*ServiceCommandResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{23}
+	return fileDescriptor_e3f642df445f73e7, []int{22}
 }
 func (m *ServiceCommandResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1702,7 +1633,7 @@ func (*ServiceCommandResponse) XXX_OneofWrappers() []interface{} {
 }
 
 type ServiceQueryRequest struct {
-	Service *ServiceId `protobuf:"bytes,1,opt,name=service,proto3" json:"service,omitempty"`
+	ServiceID ServiceID `protobuf:"bytes,1,opt,name=service_id,json=serviceId,proto3,casttype=ServiceID" json:"service_id"`
 	// Types that are valid to be assigned to Request:
 	//	*ServiceQueryRequest_Operation
 	//	*ServiceQueryRequest_Metadata
@@ -1713,7 +1644,7 @@ func (m *ServiceQueryRequest) Reset()         { *m = ServiceQueryRequest{} }
 func (m *ServiceQueryRequest) String() string { return proto.CompactTextString(m) }
 func (*ServiceQueryRequest) ProtoMessage()    {}
 func (*ServiceQueryRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{24}
+	return fileDescriptor_e3f642df445f73e7, []int{23}
 }
 func (m *ServiceQueryRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1765,11 +1696,11 @@ func (m *ServiceQueryRequest) GetRequest() isServiceQueryRequest_Request {
 	return nil
 }
 
-func (m *ServiceQueryRequest) GetService() *ServiceId {
+func (m *ServiceQueryRequest) GetServiceID() ServiceID {
 	if m != nil {
-		return m.Service
+		return m.ServiceID
 	}
-	return nil
+	return ServiceID{}
 }
 
 func (m *ServiceQueryRequest) GetOperation() *ServiceOperationRequest {
@@ -1805,7 +1736,7 @@ func (m *ServiceQueryResponse) Reset()         { *m = ServiceQueryResponse{} }
 func (m *ServiceQueryResponse) String() string { return proto.CompactTextString(m) }
 func (*ServiceQueryResponse) ProtoMessage()    {}
 func (*ServiceQueryResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{25}
+	return fileDescriptor_e3f642df445f73e7, []int{24}
 }
 func (m *ServiceQueryResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1880,15 +1811,15 @@ func (*ServiceQueryResponse) XXX_OneofWrappers() []interface{} {
 }
 
 type ServiceOperationRequest struct {
-	Method string `protobuf:"bytes,1,opt,name=method,proto3" json:"method,omitempty"`
-	Value  []byte `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	OperationID OperationID `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3,casttype=OperationID" json:"operation_id,omitempty"`
+	Value       []byte      `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
 }
 
 func (m *ServiceOperationRequest) Reset()         { *m = ServiceOperationRequest{} }
 func (m *ServiceOperationRequest) String() string { return proto.CompactTextString(m) }
 func (*ServiceOperationRequest) ProtoMessage()    {}
 func (*ServiceOperationRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{26}
+	return fileDescriptor_e3f642df445f73e7, []int{25}
 }
 func (m *ServiceOperationRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1917,9 +1848,9 @@ func (m *ServiceOperationRequest) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_ServiceOperationRequest proto.InternalMessageInfo
 
-func (m *ServiceOperationRequest) GetMethod() string {
+func (m *ServiceOperationRequest) GetOperationID() OperationID {
 	if m != nil {
-		return m.Method
+		return m.OperationID
 	}
 	return ""
 }
@@ -1939,7 +1870,7 @@ func (m *ServiceOperationResponse) Reset()         { *m = ServiceOperationRespon
 func (m *ServiceOperationResponse) String() string { return proto.CompactTextString(m) }
 func (*ServiceOperationResponse) ProtoMessage()    {}
 func (*ServiceOperationResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{27}
+	return fileDescriptor_e3f642df445f73e7, []int{26}
 }
 func (m *ServiceOperationResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1982,7 +1913,7 @@ func (m *ServiceCreateRequest) Reset()         { *m = ServiceCreateRequest{} }
 func (m *ServiceCreateRequest) String() string { return proto.CompactTextString(m) }
 func (*ServiceCreateRequest) ProtoMessage()    {}
 func (*ServiceCreateRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{28}
+	return fileDescriptor_e3f642df445f73e7, []int{27}
 }
 func (m *ServiceCreateRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2018,7 +1949,7 @@ func (m *ServiceCreateResponse) Reset()         { *m = ServiceCreateResponse{} }
 func (m *ServiceCreateResponse) String() string { return proto.CompactTextString(m) }
 func (*ServiceCreateResponse) ProtoMessage()    {}
 func (*ServiceCreateResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{29}
+	return fileDescriptor_e3f642df445f73e7, []int{28}
 }
 func (m *ServiceCreateResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2054,7 +1985,7 @@ func (m *ServiceCloseRequest) Reset()         { *m = ServiceCloseRequest{} }
 func (m *ServiceCloseRequest) String() string { return proto.CompactTextString(m) }
 func (*ServiceCloseRequest) ProtoMessage()    {}
 func (*ServiceCloseRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{30}
+	return fileDescriptor_e3f642df445f73e7, []int{29}
 }
 func (m *ServiceCloseRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2090,7 +2021,7 @@ func (m *ServiceCloseResponse) Reset()         { *m = ServiceCloseResponse{} }
 func (m *ServiceCloseResponse) String() string { return proto.CompactTextString(m) }
 func (*ServiceCloseResponse) ProtoMessage()    {}
 func (*ServiceCloseResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{31}
+	return fileDescriptor_e3f642df445f73e7, []int{30}
 }
 func (m *ServiceCloseResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2126,7 +2057,7 @@ func (m *ServiceDeleteRequest) Reset()         { *m = ServiceDeleteRequest{} }
 func (m *ServiceDeleteRequest) String() string { return proto.CompactTextString(m) }
 func (*ServiceDeleteRequest) ProtoMessage()    {}
 func (*ServiceDeleteRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{32}
+	return fileDescriptor_e3f642df445f73e7, []int{31}
 }
 func (m *ServiceDeleteRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2162,7 +2093,7 @@ func (m *ServiceDeleteResponse) Reset()         { *m = ServiceDeleteResponse{} }
 func (m *ServiceDeleteResponse) String() string { return proto.CompactTextString(m) }
 func (*ServiceDeleteResponse) ProtoMessage()    {}
 func (*ServiceDeleteResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{33}
+	return fileDescriptor_e3f642df445f73e7, []int{32}
 }
 func (m *ServiceDeleteResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2199,7 +2130,7 @@ func (m *ServiceMetadataRequest) Reset()         { *m = ServiceMetadataRequest{}
 func (m *ServiceMetadataRequest) String() string { return proto.CompactTextString(m) }
 func (*ServiceMetadataRequest) ProtoMessage()    {}
 func (*ServiceMetadataRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{34}
+	return fileDescriptor_e3f642df445f73e7, []int{33}
 }
 func (m *ServiceMetadataRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2236,14 +2167,14 @@ func (m *ServiceMetadataRequest) GetType() string {
 }
 
 type ServiceMetadataResponse struct {
-	Services []*ServiceId `protobuf:"bytes,1,rep,name=services,proto3" json:"services,omitempty"`
+	Services []ServiceID `protobuf:"bytes,1,rep,name=services,proto3,casttype=ServiceID" json:"services"`
 }
 
 func (m *ServiceMetadataResponse) Reset()         { *m = ServiceMetadataResponse{} }
 func (m *ServiceMetadataResponse) String() string { return proto.CompactTextString(m) }
 func (*ServiceMetadataResponse) ProtoMessage()    {}
 func (*ServiceMetadataResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{35}
+	return fileDescriptor_e3f642df445f73e7, []int{34}
 }
 func (m *ServiceMetadataResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2272,7 +2203,7 @@ func (m *ServiceMetadataResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_ServiceMetadataResponse proto.InternalMessageInfo
 
-func (m *ServiceMetadataResponse) GetServices() []*ServiceId {
+func (m *ServiceMetadataResponse) GetServices() []ServiceID {
 	if m != nil {
 		return m.Services
 	}
@@ -2280,15 +2211,15 @@ func (m *ServiceMetadataResponse) GetServices() []*ServiceId {
 }
 
 type SessionCommandContext struct {
-	SessionID uint64 `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	RequestID uint64 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	SessionID SessionID `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3,casttype=SessionID" json:"session_id,omitempty"`
+	RequestID RequestID `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3,casttype=RequestID" json:"request_id,omitempty"`
 }
 
 func (m *SessionCommandContext) Reset()         { *m = SessionCommandContext{} }
 func (m *SessionCommandContext) String() string { return proto.CompactTextString(m) }
 func (*SessionCommandContext) ProtoMessage()    {}
 func (*SessionCommandContext) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{36}
+	return fileDescriptor_e3f642df445f73e7, []int{35}
 }
 func (m *SessionCommandContext) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2317,14 +2248,14 @@ func (m *SessionCommandContext) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_SessionCommandContext proto.InternalMessageInfo
 
-func (m *SessionCommandContext) GetSessionID() uint64 {
+func (m *SessionCommandContext) GetSessionID() SessionID {
 	if m != nil {
 		return m.SessionID
 	}
 	return 0
 }
 
-func (m *SessionCommandContext) GetRequestID() uint64 {
+func (m *SessionCommandContext) GetRequestID() RequestID {
 	if m != nil {
 		return m.RequestID
 	}
@@ -2332,17 +2263,17 @@ func (m *SessionCommandContext) GetRequestID() uint64 {
 }
 
 type SessionQueryContext struct {
-	SessionID     uint64 `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	LastRequestID uint64 `protobuf:"varint,2,opt,name=last_request_id,json=lastRequestId,proto3" json:"last_request_id,omitempty"`
-	LastIndex     uint64 `protobuf:"varint,3,opt,name=last_index,json=lastIndex,proto3" json:"last_index,omitempty"`
-	Sync          bool   `protobuf:"varint,4,opt,name=sync,proto3" json:"sync,omitempty"`
+	SessionID     SessionID `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3,casttype=SessionID" json:"session_id,omitempty"`
+	LastRequestID RequestID `protobuf:"varint,2,opt,name=last_request_id,json=lastRequestId,proto3,casttype=RequestID" json:"last_request_id,omitempty"`
+	LastIndex     Index     `protobuf:"varint,3,opt,name=last_index,json=lastIndex,proto3,casttype=Index" json:"last_index,omitempty"`
+	Sync          bool      `protobuf:"varint,4,opt,name=sync,proto3" json:"sync,omitempty"`
 }
 
 func (m *SessionQueryContext) Reset()         { *m = SessionQueryContext{} }
 func (m *SessionQueryContext) String() string { return proto.CompactTextString(m) }
 func (*SessionQueryContext) ProtoMessage()    {}
 func (*SessionQueryContext) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{37}
+	return fileDescriptor_e3f642df445f73e7, []int{36}
 }
 func (m *SessionQueryContext) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2371,21 +2302,21 @@ func (m *SessionQueryContext) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_SessionQueryContext proto.InternalMessageInfo
 
-func (m *SessionQueryContext) GetSessionID() uint64 {
+func (m *SessionQueryContext) GetSessionID() SessionID {
 	if m != nil {
 		return m.SessionID
 	}
 	return 0
 }
 
-func (m *SessionQueryContext) GetLastRequestID() uint64 {
+func (m *SessionQueryContext) GetLastRequestID() RequestID {
 	if m != nil {
 		return m.LastRequestID
 	}
 	return 0
 }
 
-func (m *SessionQueryContext) GetLastIndex() uint64 {
+func (m *SessionQueryContext) GetLastIndex() Index {
 	if m != nil {
 		return m.LastIndex
 	}
@@ -2400,17 +2331,17 @@ func (m *SessionQueryContext) GetSync() bool {
 }
 
 type SessionResponseContext struct {
-	SessionID uint64 `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	RequestID uint64 `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Index     uint64 `protobuf:"varint,3,opt,name=index,proto3" json:"index,omitempty"`
-	Sequence  uint64 `protobuf:"varint,4,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	SessionID  SessionID  `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3,casttype=SessionID" json:"session_id,omitempty"`
+	RequestID  RequestID  `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3,casttype=RequestID" json:"request_id,omitempty"`
+	ResponseID ResponseID `protobuf:"varint,3,opt,name=response_id,json=responseId,proto3,casttype=ResponseID" json:"response_id,omitempty"`
+	Index      Index      `protobuf:"varint,4,opt,name=index,proto3,casttype=Index" json:"index,omitempty"`
 }
 
 func (m *SessionResponseContext) Reset()         { *m = SessionResponseContext{} }
 func (m *SessionResponseContext) String() string { return proto.CompactTextString(m) }
 func (*SessionResponseContext) ProtoMessage()    {}
 func (*SessionResponseContext) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{38}
+	return fileDescriptor_e3f642df445f73e7, []int{37}
 }
 func (m *SessionResponseContext) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2439,82 +2370,30 @@ func (m *SessionResponseContext) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_SessionResponseContext proto.InternalMessageInfo
 
-func (m *SessionResponseContext) GetSessionID() uint64 {
+func (m *SessionResponseContext) GetSessionID() SessionID {
 	if m != nil {
 		return m.SessionID
 	}
 	return 0
 }
 
-func (m *SessionResponseContext) GetRequestID() uint64 {
+func (m *SessionResponseContext) GetRequestID() RequestID {
 	if m != nil {
 		return m.RequestID
 	}
 	return 0
 }
 
-func (m *SessionResponseContext) GetIndex() uint64 {
+func (m *SessionResponseContext) GetResponseID() ResponseID {
+	if m != nil {
+		return m.ResponseID
+	}
+	return 0
+}
+
+func (m *SessionResponseContext) GetIndex() Index {
 	if m != nil {
 		return m.Index
-	}
-	return 0
-}
-
-func (m *SessionResponseContext) GetSequence() uint64 {
-	if m != nil {
-		return m.Sequence
-	}
-	return 0
-}
-
-type SessionStreamContext struct {
-	RequestID     uint64 `protobuf:"varint,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	AckResponseID uint64 `protobuf:"varint,2,opt,name=ack_response_id,json=ackResponseId,proto3" json:"ack_response_id,omitempty"`
-}
-
-func (m *SessionStreamContext) Reset()         { *m = SessionStreamContext{} }
-func (m *SessionStreamContext) String() string { return proto.CompactTextString(m) }
-func (*SessionStreamContext) ProtoMessage()    {}
-func (*SessionStreamContext) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{39}
-}
-func (m *SessionStreamContext) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *SessionStreamContext) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_SessionStreamContext.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *SessionStreamContext) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SessionStreamContext.Merge(m, src)
-}
-func (m *SessionStreamContext) XXX_Size() int {
-	return m.Size()
-}
-func (m *SessionStreamContext) XXX_DiscardUnknown() {
-	xxx_messageInfo_SessionStreamContext.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SessionStreamContext proto.InternalMessageInfo
-
-func (m *SessionStreamContext) GetRequestID() uint64 {
-	if m != nil {
-		return m.RequestID
-	}
-	return 0
-}
-
-func (m *SessionStreamContext) GetAckResponseID() uint64 {
-	if m != nil {
-		return m.AckResponseID
 	}
 	return 0
 }
@@ -2529,7 +2408,7 @@ func (m *SessionResponseStatus) Reset()         { *m = SessionResponseStatus{} }
 func (m *SessionResponseStatus) String() string { return proto.CompactTextString(m) }
 func (*SessionResponseStatus) ProtoMessage()    {}
 func (*SessionResponseStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{40}
+	return fileDescriptor_e3f642df445f73e7, []int{38}
 }
 func (m *SessionResponseStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -2585,7 +2464,6 @@ func init() {
 	proto.RegisterType((*StateMachineSnapshot)(nil), "atomix.service.StateMachineSnapshot")
 	proto.RegisterType((*ServiceSnapshot)(nil), "atomix.service.ServiceSnapshot")
 	proto.RegisterType((*SessionSnapshot)(nil), "atomix.service.SessionSnapshot")
-	proto.RegisterType((*SessionServiceSnapshot)(nil), "atomix.service.SessionServiceSnapshot")
 	proto.RegisterType((*SessionStreamSnapshot)(nil), "atomix.service.SessionStreamSnapshot")
 	proto.RegisterType((*ServiceId)(nil), "atomix.service.ServiceId")
 	proto.RegisterType((*StorageRequest)(nil), "atomix.service.StorageRequest")
@@ -2621,7 +2499,6 @@ func init() {
 	proto.RegisterType((*SessionCommandContext)(nil), "atomix.service.SessionCommandContext")
 	proto.RegisterType((*SessionQueryContext)(nil), "atomix.service.SessionQueryContext")
 	proto.RegisterType((*SessionResponseContext)(nil), "atomix.service.SessionResponseContext")
-	proto.RegisterType((*SessionStreamContext)(nil), "atomix.service.SessionStreamContext")
 	proto.RegisterType((*SessionResponseStatus)(nil), "atomix.service.SessionResponseStatus")
 }
 
@@ -2630,130 +2507,127 @@ func init() {
 }
 
 var fileDescriptor_e3f642df445f73e7 = []byte{
-	// 1958 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xb4, 0x58, 0x4b, 0x6c, 0xe3, 0xc6,
-	0x19, 0x36, 0x65, 0xd9, 0x92, 0x46, 0x0f, 0x73, 0x67, 0x9d, 0x8d, 0x62, 0xa0, 0x96, 0xcb, 0x6e,
-	0x36, 0x4e, 0x10, 0xd8, 0x85, 0x83, 0x3e, 0x16, 0x49, 0xb3, 0x90, 0x44, 0x7a, 0xcd, 0x58, 0x96,
-	0xdc, 0x91, 0x9c, 0x3e, 0x2e, 0x06, 0x23, 0x4e, 0xbd, 0xc2, 0x4a, 0xa2, 0x56, 0xa4, 0x16, 0xbb,
-	0x3d, 0xb4, 0x40, 0xd0, 0x43, 0x8f, 0x01, 0x7a, 0x69, 0xd1, 0x73, 0x0b, 0xb4, 0x87, 0x02, 0x45,
-	0xef, 0x3d, 0xe7, 0x98, 0x63, 0x4f, 0x6e, 0x21, 0x17, 0xbd, 0x17, 0x05, 0x8a, 0x1e, 0x8b, 0x79,
-	0x93, 0x94, 0x68, 0x59, 0x4e, 0xf6, 0x44, 0xce, 0xf0, 0x7f, 0xcd, 0xff, 0xfd, 0x2f, 0x0e, 0x78,
-	0xdb, 0x09, 0xbc, 0x41, 0xef, 0xc5, 0xbe, 0x1f, 0x78, 0x63, 0xe7, 0x02, 0xef, 0x8f, 0xc6, 0x5e,
-	0xe0, 0x75, 0xbd, 0xfe, 0xfe, 0xd8, 0x1f, 0xec, 0xfb, 0x78, 0xfc, 0xbc, 0xd7, 0xc5, 0x7b, 0x74,
-	0x13, 0x96, 0x18, 0xe9, 0x1e, 0xdf, 0xdd, 0xda, 0xbe, 0xf0, 0xbc, 0x8b, 0x3e, 0x67, 0xf9, 0x64,
-	0xf2, 0x93, 0x7d, 0x77, 0x32, 0x76, 0x82, 0x9e, 0x37, 0x64, 0xf4, 0x5b, 0x95, 0xf8, 0xf7, 0xa0,
-	0x37, 0xc0, 0x7e, 0xe0, 0x0c, 0x46, 0x9c, 0x60, 0xf3, 0xc2, 0xbb, 0xf0, 0xe8, 0xeb, 0x3e, 0x79,
-	0x63, 0xbb, 0xc6, 0x7f, 0x35, 0xb0, 0xd9, 0x0e, 0x9c, 0x00, 0x9f, 0x38, 0xdd, 0x27, 0xbd, 0x21,
-	0x6e, 0x0f, 0x9d, 0x91, 0xff, 0xc4, 0x0b, 0xe0, 0x26, 0x58, 0xeb, 0x0d, 0x5d, 0xfc, 0xa2, 0xac,
-	0xed, 0x68, 0xbb, 0x69, 0xc4, 0x16, 0xb0, 0x06, 0x72, 0x52, 0x6e, 0x39, 0xb5, 0xa3, 0xed, 0xe6,
-	0x0f, 0xb6, 0xf6, 0x98, 0xe6, 0x3d, 0xa1, 0x79, 0xaf, 0x23, 0x28, 0x6a, 0xd9, 0xcf, 0x2f, 0x2b,
-	0x2b, 0x9f, 0xfd, 0xbd, 0xa2, 0x21, 0xc5, 0x06, 0xab, 0x20, 0xeb, 0x63, 0xdf, 0xef, 0x79, 0x43,
-	0xbf, 0xbc, 0xba, 0xb3, 0xba, 0x9b, 0x3f, 0xa8, 0xec, 0x45, 0x0f, 0xbb, 0xd7, 0x66, 0xdf, 0x85,
-	0x31, 0xb5, 0x34, 0x91, 0x83, 0x24, 0x1b, 0x13, 0x41, 0x49, 0xfd, 0x72, 0x3a, 0x49, 0x04, 0x7d,
-	0xce, 0x8a, 0x60, 0x6c, 0xc6, 0x2f, 0x35, 0xb0, 0x11, 0xa3, 0x81, 0xc7, 0x00, 0xf0, 0xef, 0xe7,
-	0x3d, 0x97, 0x1e, 0x3c, 0x7f, 0xf0, 0x46, 0x82, 0x60, 0xdb, 0xad, 0xdd, 0x21, 0x22, 0xa7, 0x97,
-	0x95, 0x9c, 0xd8, 0x32, 0x51, 0xce, 0x17, 0x5f, 0x95, 0x03, 0x53, 0x61, 0x07, 0x42, 0x90, 0x76,
-	0x9d, 0xc0, 0x29, 0xaf, 0xee, 0x68, 0xbb, 0x05, 0x44, 0xdf, 0x8d, 0x5f, 0xac, 0x12, 0x53, 0x22,
-	0x27, 0x86, 0xef, 0x12, 0x53, 0xe8, 0x96, 0x30, 0x25, 0x5d, 0x2b, 0x32, 0x5d, 0x74, 0x97, 0xe9,
-	0x62, 0xaf, 0x2e, 0xfc, 0x1e, 0xc8, 0x10, 0xff, 0x7a, 0x93, 0x80, 0x83, 0xf2, 0xc6, 0x0c, 0x28,
-	0x26, 0x0f, 0x17, 0x86, 0xc9, 0xaf, 0x09, 0x26, 0x82, 0x27, 0x8a, 0xea, 0xea, 0xed, 0x50, 0x7d,
-	0x08, 0x36, 0xfa, 0x8e, 0x1f, 0x9c, 0x8f, 0xf1, 0xb3, 0x09, 0xf6, 0x03, 0x62, 0x75, 0x9a, 0x5a,
-	0x7d, 0x67, 0x7a, 0x59, 0x29, 0x36, 0x1c, 0x3f, 0x40, 0xec, 0x8b, 0x6d, 0xa2, 0x62, 0x3f, 0xb4,
-	0x74, 0x61, 0x2d, 0x84, 0x66, 0x86, 0xa2, 0xf9, 0x20, 0x29, 0x20, 0xa2, 0x80, 0x29, 0x38, 0x49,
-	0x44, 0x74, 0xbd, 0xc1, 0xc0, 0x19, 0xba, 0x7e, 0x39, 0x4b, 0x65, 0xbc, 0x99, 0x20, 0xa3, 0xce,
-	0xc8, 0xb8, 0x7a, 0x24, 0xd9, 0x8c, 0xdf, 0x68, 0xe0, 0xde, 0x7c, 0x3d, 0xf0, 0xc3, 0xe5, 0x02,
-	0x83, 0xc5, 0x5a, 0x28, 0x16, 0x1e, 0x81, 0x8c, 0x1f, 0x8c, 0xb1, 0x33, 0xf0, 0xcb, 0xa9, 0x6b,
-	0x8d, 0x6b, 0x53, 0x2a, 0x79, 0x3e, 0xc1, 0x65, 0xfc, 0x4b, 0x03, 0xaf, 0xcd, 0x25, 0x81, 0x6f,
-	0x83, 0x1c, 0x23, 0x52, 0x71, 0x52, 0x98, 0x5e, 0x56, 0xb2, 0x8c, 0xcc, 0x36, 0x51, 0x96, 0x7d,
-	0xb6, 0x5d, 0x12, 0x53, 0x21, 0x74, 0x52, 0x2a, 0xa6, 0x14, 0x32, 0xb9, 0xb1, 0x44, 0x05, 0x82,
-	0x74, 0xf0, 0x72, 0x84, 0x69, 0x3c, 0xe4, 0x10, 0x7d, 0x87, 0xfb, 0x20, 0x3f, 0xc6, 0xfe, 0xc8,
-	0x1b, 0xfa, 0x58, 0x01, 0x5c, 0x9a, 0x5e, 0x56, 0x00, 0xe2, 0xdb, 0xb6, 0x89, 0x80, 0x20, 0xb1,
-	0x5d, 0xc2, 0xd0, 0xf5, 0x06, 0xa3, 0x3e, 0x0e, 0x28, 0xc3, 0x9a, 0x62, 0xa8, 0xf3, 0x6d, 0xc2,
-	0x20, 0x48, 0x6c, 0xd7, 0x38, 0x01, 0x32, 0x9b, 0x94, 0x09, 0x5a, 0xc8, 0x84, 0x32, 0xc8, 0x74,
-	0xfb, 0x13, 0x3f, 0xc0, 0x63, 0x7a, 0x82, 0x1c, 0x12, 0x4b, 0x42, 0x3d, 0x74, 0x06, 0xd2, 0x60,
-	0xf2, 0x6e, 0xfc, 0x0c, 0x94, 0xda, 0xac, 0xd6, 0xf2, 0x33, 0xc2, 0x03, 0x50, 0x18, 0x39, 0xe3,
-	0xa0, 0x17, 0x84, 0x52, 0xab, 0x58, 0xdb, 0x98, 0x5e, 0x56, 0xf2, 0xa7, 0x62, 0xdf, 0x36, 0x51,
-	0x5e, 0x12, 0xd9, 0x2e, 0xfc, 0x2e, 0xc8, 0x70, 0xbf, 0xf0, 0xf4, 0xda, 0x4e, 0x80, 0x4f, 0x04,
-	0x95, 0x20, 0x37, 0x3e, 0x25, 0x55, 0x46, 0x18, 0xc0, 0xbc, 0x72, 0x2b, 0x0b, 0xde, 0x07, 0x59,
-	0xe1, 0x55, 0x6e, 0x42, 0x25, 0xd1, 0x04, 0x46, 0x86, 0x24, 0x83, 0xf1, 0x2b, 0x0d, 0xdc, 0x0d,
-	0xd7, 0x78, 0xe1, 0x8a, 0x48, 0xda, 0x6b, 0xb7, 0x4b, 0xfb, 0xdb, 0xbb, 0xa6, 0x1d, 0x6d, 0x3c,
-	0xd2, 0x3d, 0xe1, 0xa3, 0x6a, 0xcb, 0x1e, 0xf5, 0x3f, 0x29, 0x50, 0x8a, 0x2a, 0x84, 0x8f, 0x41,
-	0xc1, 0x1b, 0xe1, 0xe1, 0x39, 0xaf, 0x96, 0x5c, 0xa6, 0x11, 0x97, 0xd9, 0x1a, 0xe1, 0x61, 0x94,
-	0xf3, 0x68, 0x05, 0xe5, 0x3d, 0xb5, 0x0b, 0xab, 0x00, 0x3c, 0xc5, 0x78, 0x74, 0xee, 0xf4, 0x7b,
-	0xcf, 0x05, 0x0a, 0x3b, 0x71, 0x31, 0xc7, 0x18, 0x8f, 0xaa, 0x84, 0x40, 0x09, 0xc9, 0x3d, 0x15,
-	0x7b, 0xf0, 0x23, 0x50, 0xec, 0xf6, 0x3d, 0x1f, 0x4b, 0x63, 0x58, 0xb1, 0xfd, 0x46, 0x5c, 0x4a,
-	0x9d, 0x10, 0xcd, 0x58, 0x53, 0xe8, 0x86, 0xb6, 0x61, 0x15, 0x64, 0x78, 0xe9, 0xa2, 0x79, 0x78,
-	0xd3, 0x82, 0x77, 0xb4, 0x82, 0x04, 0x1f, 0x7c, 0x1f, 0xac, 0x3d, 0x9b, 0xe0, 0xf1, 0x4b, 0x9a,
-	0x97, 0x73, 0xcc, 0xe0, 0x02, 0xbe, 0x4f, 0x68, 0x14, 0x3b, 0xe3, 0xa9, 0xe5, 0x24, 0xf2, 0xc6,
-	0xff, 0x54, 0x03, 0x93, 0x30, 0x7e, 0x27, 0x94, 0xbb, 0xa5, 0x44, 0xd1, 0x82, 0xbc, 0xf3, 0x72,
-	0x84, 0x79, 0x82, 0xd7, 0xc1, 0xba, 0x1f, 0x38, 0xc1, 0xc4, 0xe7, 0x2e, 0x7e, 0x73, 0x01, 0x6b,
-	0x9b, 0x12, 0xf3, 0x9a, 0xcb, 0x59, 0xe1, 0x51, 0x0c, 0xf4, 0x04, 0x3f, 0x47, 0x40, 0x67, 0xe2,
-	0xe2, 0xa8, 0xd7, 0x22, 0xa8, 0x33, 0x4f, 0x7f, 0xfd, 0x1a, 0xd4, 0xa5, 0x94, 0x10, 0xec, 0xc7,
-	0x71, 0xd8, 0x99, 0xbf, 0xef, 0x5f, 0x0f, 0xbb, 0x94, 0x14, 0xc5, 0xbd, 0xa6, 0x70, 0x5f, 0xa7,
-	0x62, 0x1e, 0x2c, 0xc2, 0x5d, 0x0a, 0x92, 0xc0, 0x7f, 0x20, 0x80, 0xcf, 0xcc, 0x37, 0x24, 0x0a,
-	0xbc, 0xe4, 0xe7, 0xc8, 0x03, 0x95, 0xa1, 0xc6, 0x4f, 0x01, 0x9c, 0xcd, 0x1c, 0xd2, 0x94, 0xba,
-	0xfd, 0x1e, 0x1e, 0x06, 0xa2, 0xbe, 0xe5, 0x58, 0x53, 0xaa, 0xd3, 0x4d, 0xd2, 0x94, 0xd8, 0x67,
-	0xdb, 0x85, 0x0f, 0x97, 0x18, 0x5d, 0xd2, 0x91, 0xb1, 0xc5, 0xa8, 0x83, 0xbb, 0x73, 0x00, 0x5c,
-	0x6e, 0x74, 0x32, 0xfe, 0xaa, 0x01, 0x3d, 0x9e, 0xb4, 0x4b, 0x4e, 0x5f, 0xdf, 0x06, 0x25, 0xa7,
-	0xfb, 0xf4, 0x7c, 0xa6, 0xb7, 0xea, 0xd3, 0xcb, 0x4a, 0xa1, 0xda, 0x7d, 0xaa, 0xda, 0x6b, 0xc1,
-	0x51, 0x2b, 0x17, 0x9a, 0x6a, 0x2a, 0x60, 0x73, 0xf0, 0xfd, 0x6b, 0xa7, 0x82, 0xba, 0x37, 0x0c,
-	0xf0, 0x0b, 0x31, 0xc9, 0xca, 0xd1, 0xe0, 0x2e, 0xb8, 0x33, 0x13, 0x7e, 0xc4, 0x35, 0x73, 0x6a,
-	0xc8, 0x92, 0xae, 0xb9, 0x07, 0x36, 0xe7, 0x45, 0xa4, 0xf1, 0x3b, 0x35, 0x8c, 0x44, 0x6b, 0x0b,
-	0xb4, 0x48, 0x6c, 0x52, 0x2b, 0x79, 0x99, 0x5d, 0x50, 0x93, 0x62, 0x47, 0xe2, 0xbc, 0x4c, 0x0c,
-	0x0b, 0xf1, 0xc4, 0x1a, 0x40, 0x9f, 0x51, 0xf5, 0x4a, 0x0c, 0xdd, 0x35, 0xfe, 0xa8, 0x06, 0xba,
-	0x58, 0x2e, 0xc0, 0xc3, 0xb8, 0xa1, 0x0f, 0x16, 0x54, 0x99, 0x04, 0x4b, 0x8f, 0x66, 0xfa, 0xf2,
-	0x83, 0x45, 0xa6, 0x32, 0x6a, 0xf1, 0x3f, 0x22, 0x13, 0xe9, 0xb7, 0xa4, 0x49, 0xcf, 0xd6, 0x5b,
-	0x58, 0x8f, 0x5b, 0x7a, 0x6d, 0x95, 0x4e, 0x30, 0xf3, 0x91, 0xc8, 0xf7, 0x54, 0x92, 0x08, 0xfa,
-	0x0c, 0x2b, 0xe6, 0x22, 0x18, 0x9f, 0xf1, 0x7b, 0xf2, 0x9b, 0x38, 0xa7, 0x28, 0x7c, 0x65, 0x8e,
-	0x3c, 0x9c, 0x71, 0xe4, 0xfd, 0xeb, 0x8d, 0x4c, 0x70, 0xe3, 0x55, 0x8a, 0xc4, 0xe6, 0x9c, 0xe0,
-	0x20, 0x85, 0x86, 0x4b, 0xba, 0xe9, 0x00, 0x2f, 0xe8, 0xe1, 0x63, 0x90, 0xf3, 0x46, 0x98, 0x15,
-	0x21, 0x6e, 0xdd, 0x5b, 0x09, 0xcc, 0x2d, 0x41, 0x17, 0xea, 0xff, 0x92, 0x17, 0x7e, 0x08, 0xd6,
-	0xbb, 0x63, 0xec, 0x04, 0x98, 0x37, 0xa4, 0xa4, 0x33, 0xd6, 0x29, 0x91, 0x12, 0xc1, 0xb9, 0x48,
-	0xc3, 0xa6, 0xbd, 0x80, 0xf7, 0xa1, 0x24, 0x1c, 0x69, 0xd6, 0x86, 0x1a, 0x36, 0xe5, 0x21, 0xca,
-	0x5d, 0x4c, 0xc6, 0xec, 0xa4, 0xf6, 0xc3, 0xb9, 0x4d, 0x4a, 0x14, 0x52, 0xce, 0xb8, 0xc2, 0x0d,
-	0xff, 0x4f, 0x29, 0x92, 0x59, 0xf3, 0xe2, 0x1a, 0x1e, 0x85, 0x7d, 0xc5, 0x1c, 0xbd, 0xbb, 0xd8,
-	0x57, 0xaa, 0x6b, 0x2a, 0x67, 0x3d, 0x92, 0xce, 0x5a, 0x50, 0x04, 0xb8, 0xb3, 0xa4, 0x0c, 0xe1,
-	0xad, 0x0f, 0x84, 0xb7, 0x16, 0x38, 0x9b, 0x79, 0x4b, 0x75, 0x39, 0xe6, 0xae, 0x47, 0xd2, 0x5d,
-	0xe9, 0x6b, 0xd5, 0x0b, 0x77, 0x29, 0xf5, 0xdc, 0x5f, 0xe1, 0x36, 0xf9, 0x4f, 0x9a, 0xdd, 0x33,
-	0x49, 0x06, 0xdf, 0xbb, 0x79, 0x50, 0xbe, 0x82, 0x70, 0x34, 0x41, 0x76, 0x80, 0x03, 0x47, 0x5e,
-	0x48, 0x24, 0x57, 0xaf, 0x13, 0x4e, 0xa6, 0xc4, 0x48, 0xce, 0x70, 0x5c, 0xfc, 0x85, 0x96, 0x89,
-	0xd9, 0x34, 0x8d, 0x46, 0x45, 0xea, 0xcb, 0x44, 0x85, 0x35, 0x63, 0xf3, 0x5b, 0x0b, 0x6d, 0x96,
-	0x72, 0x94, 0xd1, 0x61, 0x70, 0x1e, 0x83, 0xd7, 0x13, 0xdc, 0x05, 0xef, 0x81, 0xf5, 0x01, 0x0e,
-	0x9e, 0x78, 0x7c, 0x8a, 0x41, 0x7c, 0x05, 0x37, 0xc1, 0xda, 0x73, 0xa7, 0x3f, 0x61, 0xa1, 0x59,
-	0x40, 0x6c, 0x61, 0x1c, 0x80, 0x72, 0xd2, 0x21, 0x88, 0xa4, 0x31, 0xf6, 0x27, 0x7d, 0x56, 0x27,
-	0x0b, 0x88, 0xaf, 0x48, 0x93, 0x9d, 0x97, 0xf4, 0xc6, 0xeb, 0xaa, 0x8e, 0x45, 0xe2, 0xdb, 0x78,
-	0x4d, 0x46, 0x52, 0x38, 0xcd, 0xc3, 0x72, 0xc2, 0xf1, 0x1c, 0xda, 0x8f, 0xe4, 0x75, 0x48, 0x7e,
-	0x34, 0x80, 0x8d, 0x77, 0x65, 0x6a, 0xc7, 0x40, 0x9f, 0xf7, 0x3b, 0x6e, 0x9c, 0x4a, 0xdf, 0xc5,
-	0xdd, 0x0d, 0xbf, 0x15, 0xba, 0xd6, 0xd1, 0xe8, 0x7c, 0x73, 0x4d, 0x70, 0xab, 0x8b, 0x39, 0x3f,
-	0x3e, 0x5c, 0xf0, 0x8e, 0xb1, 0xe4, 0x50, 0xb6, 0xd4, 0x65, 0x87, 0xf1, 0xe7, 0x58, 0xf7, 0xbd,
-	0x9d, 0xce, 0x39, 0x77, 0x60, 0xa9, 0x1b, 0xde, 0x81, 0x7d, 0x0d, 0x00, 0xca, 0xca, 0xae, 0x0c,
-	0x57, 0xe9, 0x95, 0x61, 0x8e, 0xec, 0xd8, 0xe2, 0xda, 0xd0, 0x7f, 0x39, 0xec, 0xd2, 0x52, 0x94,
-	0x45, 0xf4, 0x9d, 0xf4, 0xe4, 0x7b, 0xf3, 0x9b, 0xeb, 0xab, 0x74, 0x95, 0xba, 0xd7, 0x5c, 0x0d,
-	0xdf, 0x6b, 0x6e, 0x11, 0xb0, 0x9f, 0x4d, 0xf0, 0xb0, 0xcb, 0xea, 0x65, 0x1a, 0xc9, 0xb5, 0xf1,
-	0x73, 0x39, 0x3b, 0x44, 0x06, 0xd9, 0x98, 0x5e, 0x6d, 0x81, 0xde, 0x87, 0x60, 0x83, 0x4d, 0xd9,
-	0xea, 0xfe, 0x29, 0xe4, 0x5c, 0x3a, 0x66, 0xcb, 0x2b, 0xa8, 0xa2, 0x13, 0x5a, 0xba, 0xc6, 0xa7,
-	0x6a, 0x60, 0x8d, 0xfe, 0x35, 0x92, 0xbf, 0xd4, 0xae, 0xe7, 0xde, 0xf4, 0x2f, 0xb5, 0xee, 0xb9,
-	0x18, 0x51, 0x06, 0x58, 0x06, 0x99, 0x01, 0xf6, 0x7d, 0xe7, 0x02, 0x8b, 0x6b, 0x28, 0xbe, 0x24,
-	0x89, 0xde, 0xc7, 0x8e, 0x8b, 0xc7, 0xfc, 0x22, 0x8a, 0xaf, 0xde, 0x39, 0x94, 0x11, 0x16, 0xfe,
-	0xe9, 0x85, 0x05, 0x90, 0x45, 0x56, 0xfb, 0xb4, 0xd5, 0x6c, 0x5b, 0xfa, 0x0a, 0xdc, 0x00, 0xf9,
-	0xd6, 0xa9, 0xd5, 0x3c, 0x6f, 0x77, 0x90, 0x55, 0x3d, 0xd1, 0x35, 0xa8, 0x83, 0x42, 0xbd, 0xd1,
-	0x6a, 0x5b, 0x62, 0x27, 0xf5, 0xce, 0xbf, 0xb5, 0x19, 0x41, 0xc4, 0x2e, 0xb8, 0x0e, 0x52, 0xad,
-	0x63, 0x7d, 0x05, 0xe6, 0xc0, 0x9a, 0x85, 0x50, 0x0b, 0xe9, 0x1a, 0x2c, 0x01, 0xd0, 0x6c, 0x75,
-	0xce, 0x1b, 0x56, 0xd5, 0xb4, 0x90, 0x9e, 0x82, 0x79, 0x90, 0x39, 0x6b, 0x1e, 0x37, 0x5b, 0x3f,
-	0x68, 0xea, 0xab, 0x44, 0x71, 0xbd, 0xda, 0xac, 0x5b, 0x0d, 0xcb, 0xd4, 0xd3, 0xb0, 0x08, 0x72,
-	0x84, 0xf4, 0xb0, 0x75, 0xd6, 0x34, 0xf5, 0x35, 0x08, 0x41, 0xa9, 0xda, 0x40, 0x56, 0xd5, 0xfc,
-	0xd1, 0xb9, 0xf5, 0x43, 0xbb, 0xdd, 0x69, 0xeb, 0xeb, 0xc4, 0x94, 0xb3, 0x66, 0xf5, 0xac, 0x73,
-	0xd4, 0x42, 0xf6, 0x8f, 0x2d, 0x53, 0xcf, 0x10, 0xa6, 0xc3, 0x16, 0xaa, 0xd9, 0xa6, 0x69, 0x35,
-	0xf5, 0x2c, 0x95, 0xd8, 0x6a, 0x1e, 0x36, 0xec, 0x7a, 0x47, 0xcf, 0x11, 0x65, 0x76, 0xf3, 0xe3,
-	0x6a, 0xc3, 0x36, 0x75, 0x40, 0xce, 0x75, 0xd6, 0xac, 0x7e, 0x5c, 0xb5, 0x1b, 0xd5, 0x5a, 0xc3,
-	0xd2, 0xf3, 0xf0, 0x0e, 0x28, 0x12, 0x7d, 0xed, 0xb3, 0xd3, 0xd3, 0x16, 0xea, 0x58, 0xa6, 0x5e,
-	0x20, 0x0c, 0x1d, 0xfb, 0xc4, 0x6a, 0x9d, 0x75, 0xf4, 0x22, 0x91, 0x65, 0x37, 0x3b, 0x16, 0x6a,
-	0x56, 0x1b, 0x7a, 0xe9, 0xe0, 0x0f, 0x9a, 0xbc, 0xc7, 0xe3, 0x25, 0x03, 0x7e, 0x04, 0x32, 0xa2,
-	0x2e, 0xcd, 0x5e, 0x39, 0x45, 0xae, 0xfc, 0xb6, 0x2a, 0x89, 0xdf, 0x79, 0xa5, 0x3a, 0x06, 0xeb,
-	0x2c, 0x32, 0xbf, 0xb4, 0xa8, 0x6f, 0x6a, 0xb5, 0xf2, 0xe7, 0xd3, 0x6d, 0xed, 0x8b, 0xe9, 0xb6,
-	0xf6, 0x8f, 0xe9, 0xb6, 0xf6, 0xd9, 0xd5, 0xf6, 0xca, 0x17, 0x57, 0xdb, 0x2b, 0x7f, 0xbb, 0xda,
-	0x5e, 0xf9, 0x64, 0x9d, 0xfe, 0xd1, 0xbe, 0xf7, 0xff, 0x00, 0x00, 0x00, 0xff, 0xff, 0x24, 0xb3,
-	0xd3, 0xf3, 0x06, 0x1a, 0x00, 0x00,
+	// 1911 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xd4, 0x58, 0xcd, 0x6f, 0x23, 0x49,
+	0x15, 0x4f, 0xdb, 0x8e, 0x3f, 0x9e, 0x1d, 0xa7, 0xa7, 0x66, 0x76, 0xd6, 0x44, 0xc8, 0x0e, 0xcd,
+	0xee, 0x6c, 0x58, 0xa1, 0x04, 0x05, 0x21, 0x18, 0xcd, 0xc2, 0xc8, 0x1f, 0x9d, 0x49, 0x4f, 0x1c,
+	0x77, 0x68, 0x3b, 0xcb, 0xc2, 0x25, 0xea, 0x75, 0x17, 0x59, 0x6b, 0x6c, 0xb7, 0xb7, 0xbb, 0x3d,
+	0x9a, 0xb9, 0x70, 0x98, 0x1b, 0x07, 0xa4, 0x95, 0x90, 0x10, 0x12, 0x17, 0x2e, 0x20, 0xc1, 0x81,
+	0x0b, 0xff, 0xc4, 0x1c, 0xf7, 0x84, 0x38, 0x05, 0x94, 0x39, 0x22, 0x21, 0x21, 0x84, 0x84, 0xf6,
+	0x84, 0xea, 0xb3, 0x3f, 0xec, 0x8e, 0xd9, 0x49, 0x10, 0xda, 0x53, 0x77, 0x55, 0xbd, 0xf7, 0xab,
+	0x57, 0xef, 0xab, 0x5e, 0x3d, 0xf8, 0x9a, 0x1d, 0xb8, 0x93, 0xd1, 0xb3, 0x3d, 0x3f, 0x70, 0x3d,
+	0xfb, 0x1c, 0xef, 0xcd, 0x3c, 0x37, 0x70, 0x87, 0xee, 0x78, 0xcf, 0xf3, 0x27, 0x7b, 0x3e, 0xf6,
+	0x9e, 0x8e, 0x86, 0x78, 0x97, 0x4e, 0xa2, 0x2a, 0x23, 0xdd, 0xe5, 0xb3, 0x5b, 0xf5, 0x73, 0xd7,
+	0x3d, 0x1f, 0x73, 0x96, 0x0f, 0xe7, 0x3f, 0xde, 0x73, 0xe6, 0x9e, 0x1d, 0x8c, 0xdc, 0x29, 0xa3,
+	0xdf, 0x6a, 0x24, 0xd7, 0x83, 0xd1, 0x04, 0xfb, 0x81, 0x3d, 0x99, 0x71, 0x82, 0x3b, 0xe7, 0xee,
+	0xb9, 0x4b, 0x7f, 0xf7, 0xc8, 0x1f, 0x9b, 0xd5, 0xfe, 0xa5, 0xc0, 0x9d, 0x7e, 0x60, 0x07, 0xf8,
+	0xd8, 0x1e, 0x7e, 0x34, 0x9a, 0xe2, 0xfe, 0xd4, 0x9e, 0xf9, 0x1f, 0xb9, 0x01, 0x6a, 0xc0, 0xfa,
+	0x68, 0xea, 0xe0, 0x67, 0x35, 0x65, 0x5b, 0xd9, 0xc9, 0xb5, 0x4a, 0x9f, 0x5d, 0x34, 0xd6, 0x0d,
+	0x32, 0x61, 0xb1, 0x79, 0xd4, 0x82, 0x92, 0xdc, 0xa2, 0x96, 0xd9, 0x56, 0x76, 0xca, 0xfb, 0x5b,
+	0xbb, 0x4c, 0x88, 0x5d, 0x21, 0xc4, 0xee, 0x40, 0x50, 0xb4, 0x8a, 0x2f, 0x2f, 0x1a, 0x6b, 0x9f,
+	0xfc, 0xa5, 0xa1, 0x58, 0x21, 0x1b, 0x7a, 0x00, 0x45, 0x1f, 0xfb, 0xfe, 0xc8, 0x9d, 0xfa, 0xb5,
+	0xec, 0x76, 0x76, 0xa7, 0xbc, 0xdf, 0xd8, 0x8d, 0x9f, 0x7b, 0xb7, 0xcf, 0xd6, 0x85, 0x5c, 0x96,
+	0x64, 0x60, 0xcc, 0x94, 0xc8, 0xaf, 0xe5, 0xd2, 0x98, 0xe9, 0x37, 0xca, 0xcc, 0x18, 0xb4, 0x5f,
+	0x2b, 0xb0, 0x99, 0x58, 0x45, 0x1f, 0x00, 0xf0, 0xf5, 0xb3, 0x91, 0x43, 0xcf, 0x5d, 0xde, 0xff,
+	0x52, 0x0a, 0xa4, 0xe1, 0xb4, 0xea, 0xe4, 0x44, 0x97, 0x17, 0x8d, 0x92, 0x98, 0xea, 0x7c, 0x16,
+	0x1d, 0x58, 0x25, 0x5f, 0x90, 0x86, 0xca, 0xcc, 0xa4, 0x28, 0x13, 0x41, 0xce, 0xb1, 0x03, 0xbb,
+	0x96, 0xdd, 0x56, 0x76, 0x2a, 0x16, 0xfd, 0xd7, 0x5e, 0xe6, 0x88, 0x88, 0xb1, 0xd3, 0xa3, 0xfb,
+	0x44, 0x44, 0x3a, 0x25, 0x44, 0xcc, 0xb5, 0xb6, 0x98, 0x0c, 0x74, 0x56, 0xc8, 0xc0, 0x07, 0x44,
+	0x06, 0xf6, 0xeb, 0xdc, 0x88, 0xbd, 0x0e, 0x60, 0x73, 0x6c, 0xfb, 0xc1, 0x99, 0x87, 0x3f, 0x9e,
+	0x63, 0x3f, 0x20, 0x32, 0x64, 0xa9, 0x0c, 0xf5, 0xcb, 0x8b, 0xc6, 0x46, 0xd7, 0xf6, 0x03, 0x8b,
+	0xad, 0x30, 0x39, 0xe4, 0xc0, 0xda, 0x18, 0x47, 0xd6, 0x1c, 0xf4, 0x18, 0x54, 0x8e, 0xe3, 0xcf,
+	0xdc, 0xa9, 0x4f, 0xf5, 0x9d, 0xa3, 0x40, 0xdb, 0x97, 0x17, 0x8d, 0x2a, 0x03, 0x62, 0x4b, 0x14,
+	0x09, 0xc2, 0x91, 0x55, 0x1d, 0x47, 0x57, 0x1d, 0x74, 0x18, 0x71, 0x83, 0x75, 0xea, 0x06, 0x57,
+	0xd8, 0xec, 0x16, 0x39, 0x55, 0xdc, 0x4c, 0x92, 0x1b, 0x19, 0xa0, 0xce, 0xf0, 0xd4, 0x19, 0x4d,
+	0xcf, 0xc5, 0x01, 0xfd, 0x5a, 0x9e, 0x22, 0xd6, 0x53, 0xbc, 0x92, 0x9f, 0xc8, 0xda, 0xe4, 0x7c,
+	0x7c, 0xec, 0xa3, 0x2e, 0xdc, 0x0a, 0xa1, 0x98, 0xa8, 0x7e, 0xad, 0x70, 0xa5, 0x87, 0x8b, 0x23,
+	0x59, 0xaa, 0x04, 0xe3, 0x8c, 0xe8, 0x21, 0x14, 0xfc, 0xc0, 0xc3, 0xf6, 0xc4, 0xaf, 0x15, 0x29,
+	0xc6, 0xdb, 0x69, 0x51, 0x42, 0xa9, 0xa4, 0xbb, 0x0b, 0x2e, 0xed, 0x6f, 0x0a, 0xbc, 0xb1, 0x94,
+	0x04, 0x7d, 0x0b, 0x4a, 0x8c, 0x28, 0xf4, 0xa7, 0xda, 0xe5, 0x45, 0xa3, 0xc8, 0xc8, 0xa8, 0xf2,
+	0xe5, 0xbf, 0x55, 0x64, 0xa4, 0x86, 0x93, 0x08, 0x95, 0xcc, 0x0d, 0x86, 0x4a, 0x13, 0x2a, 0xee,
+	0x0c, 0xb3, 0xd4, 0x26, 0xfc, 0xab, 0x44, 0xfd, 0xab, 0x6c, 0x8a, 0x79, 0xca, 0x1e, 0x1d, 0x5a,
+	0x65, 0xc9, 0x63, 0x38, 0xda, 0x31, 0x48, 0x68, 0x87, 0x44, 0x56, 0xf0, 0x7c, 0x86, 0xe9, 0xd9,
+	0x4a, 0x16, 0xfd, 0x47, 0x35, 0x28, 0x0c, 0xc7, 0x73, 0x3f, 0xc0, 0x1e, 0x15, 0xbd, 0x64, 0x89,
+	0x21, 0xa1, 0x9e, 0xda, 0x13, 0xcc, 0x76, 0xb5, 0xe8, 0xbf, 0xf6, 0x13, 0xa8, 0xf6, 0x59, 0xbe,
+	0xe6, 0xe6, 0x45, 0xfb, 0x50, 0x99, 0xd9, 0x5e, 0x30, 0x0a, 0x22, 0x71, 0xb8, 0xd1, 0xda, 0x24,
+	0x32, 0x9e, 0x88, 0x79, 0x22, 0x94, 0x24, 0x32, 0x1c, 0xf4, 0x1d, 0x28, 0x70, 0xa7, 0xe2, 0xea,
+	0x5a, 0xe5, 0x53, 0x82, 0x5c, 0x7b, 0x41, 0x52, 0x95, 0x10, 0x80, 0xb9, 0xc4, 0x6b, 0x49, 0xf0,
+	0x00, 0x8a, 0xc2, 0x17, 0xb9, 0x08, 0x2b, 0x5d, 0x51, 0x32, 0x68, 0x3f, 0x57, 0xe0, 0x76, 0xf4,
+	0x9e, 0x10, 0xaa, 0x88, 0x65, 0x15, 0xe5, 0xf5, 0xb2, 0xca, 0xeb, 0xab, 0xa6, 0x1f, 0xbf, 0xbc,
+	0xa4, 0x7a, 0xa2, 0x47, 0x55, 0x3e, 0xef, 0x51, 0xff, 0x99, 0x81, 0x6a, 0x7c, 0x43, 0xf4, 0x88,
+	0x3a, 0xe5, 0xf4, 0x8c, 0x67, 0x53, 0x8e, 0xa9, 0x25, 0x31, 0xcd, 0x19, 0x9e, 0xc6, 0x39, 0x0f,
+	0xd7, 0xa8, 0x6b, 0x8a, 0x59, 0xd4, 0x04, 0x78, 0x82, 0xf1, 0xec, 0xcc, 0x1e, 0x8f, 0x9e, 0x0a,
+	0x2b, 0x6c, 0x27, 0x61, 0x8e, 0x30, 0x9e, 0x35, 0x09, 0x41, 0x08, 0x52, 0x7a, 0x22, 0xe6, 0xd0,
+	0x63, 0xd8, 0x18, 0x8e, 0x5d, 0x1f, 0x4b, 0x61, 0xb2, 0x14, 0xe5, 0xab, 0x49, 0x94, 0x36, 0x21,
+	0x5a, 0x90, 0xa6, 0x32, 0x8c, 0x4c, 0xa3, 0x26, 0x14, 0x86, 0xee, 0x64, 0x62, 0x4f, 0x59, 0xfa,
+	0x4d, 0x4f, 0x2c, 0x6d, 0x46, 0x15, 0xe2, 0x08, 0x3e, 0xf4, 0x00, 0xd6, 0x3f, 0x9e, 0x63, 0xef,
+	0x79, 0x6d, 0x7d, 0xb9, 0x18, 0x1c, 0xe0, 0xfb, 0x84, 0x26, 0x64, 0x67, 0x3c, 0xad, 0x92, 0xb4,
+	0xbc, 0xf6, 0xef, 0xac, 0xbc, 0xed, 0xa4, 0x19, 0xbf, 0x1d, 0x89, 0xdd, 0x6a, 0x2a, 0xb4, 0x20,
+	0x1f, 0x3c, 0x9f, 0x61, 0x1e, 0xe0, 0x6d, 0xc8, 0xfb, 0x81, 0x1d, 0xcc, 0x7d, 0xae, 0xe2, 0xb7,
+	0x57, 0xb0, 0xf6, 0x29, 0x71, 0x2b, 0x47, 0xbc, 0xd3, 0xe2, 0xac, 0xe8, 0x30, 0x61, 0xf4, 0x14,
+	0x3d, 0xc7, 0x8c, 0xce, 0xe0, 0x92, 0x56, 0x6f, 0xc5, 0xac, 0xce, 0x34, 0xfd, 0x95, 0x2b, 0xac,
+	0x2e, 0x51, 0x22, 0x66, 0x3f, 0x4a, 0x9a, 0x9d, 0xe9, 0xfb, 0xad, 0xab, 0xcd, 0x2e, 0x91, 0xe2,
+	0x76, 0x6f, 0x85, 0x76, 0xcf, 0x53, 0x98, 0x7b, 0xab, 0xec, 0x2e, 0x81, 0xa4, 0xe1, 0xdf, 0x13,
+	0x86, 0x2f, 0x2c, 0x17, 0x24, 0x6e, 0x78, 0xc9, 0xcf, 0x2d, 0x0f, 0x61, 0x84, 0x6a, 0x26, 0xa0,
+	0xc5, 0xc8, 0x41, 0xf7, 0xa1, 0x40, 0x52, 0x84, 0x3b, 0x0f, 0xe4, 0xfd, 0x92, 0xcc, 0x2b, 0x1d,
+	0x5e, 0x02, 0xb7, 0x72, 0xbf, 0x24, 0x29, 0x45, 0xd0, 0x6b, 0x27, 0x70, 0x7b, 0x89, 0x55, 0xae,
+	0x51, 0x3c, 0x69, 0xbf, 0x50, 0x40, 0x4d, 0x86, 0xe5, 0x75, 0x8a, 0xb1, 0x47, 0xb0, 0x69, 0x0f,
+	0x9f, 0xc4, 0xea, 0x1f, 0x56, 0x1a, 0x36, 0x48, 0x21, 0xd5, 0x1c, 0x3e, 0x49, 0x2d, 0x7f, 0x36,
+	0xec, 0xc8, 0xa2, 0xa3, 0xdd, 0x86, 0x5b, 0x0b, 0x8e, 0x43, 0xce, 0xbf, 0x24, 0xfa, 0xaf, 0x73,
+	0xfe, 0xbb, 0x70, 0x67, 0x99, 0x63, 0x69, 0xbf, 0x09, 0x0b, 0x8b, 0x78, 0x8a, 0x40, 0x3a, 0x71,
+	0xb1, 0x69, 0x80, 0x9f, 0x05, 0x3c, 0x5b, 0xae, 0x48, 0x2d, 0x6d, 0x46, 0xcc, 0x63, 0x50, 0xf0,
+	0x32, 0x18, 0xe6, 0xa9, 0xa9, 0xa1, 0x4c, 0xbf, 0xf1, 0xed, 0x43, 0x18, 0x3a, 0xab, 0xfd, 0x5e,
+	0x81, 0xbb, 0xcb, 0x5d, 0x1a, 0x1d, 0x24, 0x05, 0xbd, 0xb7, 0x22, 0x59, 0xa4, 0x48, 0x7a, 0xb8,
+	0x70, 0xbd, 0xde, 0x5b, 0x25, 0x2a, 0xa3, 0xe6, 0x40, 0x61, 0x3c, 0xfc, 0x8a, 0xdc, 0xb5, 0x8b,
+	0x69, 0x13, 0xb5, 0x93, 0x92, 0x5e, 0x99, 0x6c, 0x53, 0xc4, 0x7c, 0x28, 0xc2, 0x36, 0x93, 0x06,
+	0x41, 0xbf, 0xd1, 0x8d, 0x39, 0x04, 0xe3, 0xd3, 0x7e, 0x4b, 0x5e, 0x8c, 0x4b, 0x62, 0xfb, 0xc6,
+	0x14, 0x79, 0xb0, 0xa0, 0xc8, 0xb7, 0xae, 0x16, 0x32, 0x45, 0x8d, 0x2f, 0xb2, 0xc4, 0x37, 0x97,
+	0x38, 0xc7, 0xff, 0xf0, 0xa1, 0xf7, 0x08, 0x4a, 0xb2, 0x12, 0xe5, 0xc2, 0xbf, 0x93, 0x02, 0x2c,
+	0xcb, 0xd7, 0xc8, 0x2d, 0x2f, 0x79, 0xd1, 0xf7, 0x20, 0x3f, 0xf4, 0xb0, 0x1d, 0x60, 0x7e, 0xed,
+	0xa4, 0xa9, 0xa0, 0x4d, 0x89, 0x42, 0x08, 0xce, 0x45, 0xae, 0x65, 0x9a, 0xf1, 0xf9, 0x6d, 0x93,
+	0x66, 0x66, 0x1a, 0xd4, 0x91, 0x6b, 0x99, 0xf2, 0x90, 0xcd, 0x1d, 0x3c, 0xc6, 0x01, 0x4e, 0xbb,
+	0x64, 0x38, 0x77, 0x87, 0x12, 0x45, 0x36, 0x67, 0x5c, 0xd1, 0x6b, 0xfd, 0x0f, 0x19, 0x12, 0x78,
+	0xcb, 0xdc, 0x1e, 0x1d, 0x46, 0x75, 0xc5, 0x8c, 0xb0, 0xb3, 0x5a, 0x57, 0xe1, 0xdd, 0x18, 0x2a,
+	0xeb, 0xa1, 0x54, 0xd6, 0x8a, 0x1c, 0xc1, 0x95, 0x25, 0x31, 0x84, 0xb6, 0xde, 0x13, 0xda, 0x5a,
+	0xa1, 0x6c, 0xa6, 0xad, 0xf0, 0x2e, 0x63, 0xea, 0x7a, 0x28, 0xd5, 0x95, 0xbb, 0x72, 0x7b, 0xa1,
+	0xae, 0x70, 0x7b, 0xae, 0xaf, 0xe8, 0x65, 0xf8, 0xd3, 0x0c, 0x09, 0xfe, 0x85, 0x18, 0xfc, 0x22,
+	0xf8, 0x6c, 0x07, 0x8a, 0x13, 0x1c, 0xd8, 0xb2, 0x91, 0x91, 0x9e, 0x01, 0x8f, 0x39, 0x59, 0x08,
+	0x23, 0x39, 0xa3, 0xce, 0xf3, 0x47, 0x9a, 0x6a, 0x16, 0x43, 0x3d, 0xee, 0x3a, 0x99, 0xeb, 0xb8,
+	0x8e, 0xbe, 0x20, 0xf3, 0x3b, 0x2b, 0x65, 0x96, 0x38, 0xa1, 0xd0, 0x51, 0x0b, 0x7a, 0xf0, 0x66,
+	0x8a, 0xba, 0x16, 0x1e, 0xb7, 0xca, 0xe7, 0x7e, 0xdc, 0xa2, 0x3b, 0xb0, 0xfe, 0xd4, 0x1e, 0xcf,
+	0x99, 0xab, 0x57, 0x2c, 0x36, 0xd0, 0xf6, 0xa1, 0x96, 0x76, 0x5e, 0x74, 0x17, 0xf2, 0x1e, 0xf6,
+	0xe7, 0x63, 0x96, 0x96, 0x2b, 0x16, 0x1f, 0x91, 0x3b, 0x7d, 0x59, 0x12, 0xd1, 0xde, 0x0c, 0xd3,
+	0x66, 0x2c, 0x5e, 0xb4, 0x37, 0xa4, 0x67, 0x46, 0xd3, 0x46, 0x14, 0x27, 0x1a, 0x1f, 0x91, 0xf9,
+	0x58, 0x9e, 0x88, 0xe0, 0xc7, 0x03, 0x42, 0xfb, 0xba, 0x4c, 0x15, 0x09, 0xff, 0x58, 0xf6, 0x88,
+	0xd7, 0x86, 0x52, 0xcd, 0x49, 0xcb, 0xc4, 0x5a, 0x42, 0xca, 0x75, 0x5a, 0x42, 0xda, 0xcf, 0x16,
+	0xea, 0x1b, 0x7e, 0x69, 0x5d, 0xa7, 0xf8, 0xbb, 0x0f, 0x10, 0x69, 0xa0, 0x65, 0x42, 0xd6, 0x94,
+	0xe6, 0x59, 0xc9, 0x13, 0x8d, 0x33, 0xed, 0x4f, 0x89, 0xd2, 0xe0, 0x06, 0xa4, 0x59, 0xd2, 0xd3,
+	0xcb, 0xbc, 0x4e, 0x4f, 0x6f, 0x07, 0x80, 0xe2, 0xb0, 0x46, 0x67, 0x36, 0xd9, 0xe8, 0x2c, 0x91,
+	0x45, 0x43, 0x34, 0x3b, 0xfd, 0xe7, 0xd3, 0x21, 0xcd, 0x96, 0x45, 0x8b, 0xfe, 0x6b, 0x7f, 0x0f,
+	0x0b, 0xb4, 0x44, 0x79, 0xf0, 0xff, 0xd1, 0x34, 0xfa, 0x2e, 0x94, 0xa3, 0xd5, 0x39, 0x3b, 0xcf,
+	0x97, 0x2f, 0x63, 0xc5, 0x78, 0xa2, 0x34, 0x07, 0x2f, 0xec, 0x4a, 0xca, 0x8e, 0x6f, 0x6e, 0x79,
+	0xc7, 0x57, 0x7b, 0x11, 0x7a, 0x56, 0xfc, 0x15, 0x4a, 0x5e, 0xbd, 0x43, 0xd7, 0xf9, 0x6f, 0x5f,
+	0xbd, 0x6d, 0xd7, 0xc1, 0x16, 0x65, 0x40, 0x35, 0x28, 0x4c, 0xb0, 0xef, 0xdb, 0xe7, 0x58, 0xb4,
+	0xb5, 0xf8, 0x90, 0xa4, 0x80, 0x31, 0xb6, 0x1d, 0xec, 0xf1, 0xc6, 0x16, 0x1f, 0xbd, 0x7b, 0x20,
+	0xbd, 0x29, 0xfa, 0x88, 0x46, 0x15, 0x28, 0x5a, 0x7a, 0xff, 0xc4, 0xec, 0xf5, 0x75, 0x75, 0x0d,
+	0x6d, 0x42, 0xd9, 0x3c, 0xd1, 0x7b, 0x67, 0xfd, 0x81, 0xa5, 0x37, 0x8f, 0x55, 0x05, 0xa9, 0x50,
+	0x69, 0x77, 0xcd, 0xbe, 0x2e, 0x66, 0x32, 0xef, 0xfe, 0x43, 0x59, 0x00, 0x22, 0x72, 0xa1, 0x3c,
+	0x64, 0xcc, 0x23, 0x75, 0x0d, 0x95, 0x60, 0x5d, 0xb7, 0x2c, 0xd3, 0x52, 0x15, 0x54, 0x05, 0xe8,
+	0x99, 0x83, 0xb3, 0xae, 0xde, 0xec, 0xe8, 0x96, 0x9a, 0x41, 0x65, 0x28, 0x9c, 0xf6, 0x8e, 0x7a,
+	0xe6, 0x0f, 0x7a, 0x6a, 0x96, 0x6c, 0xdc, 0x6e, 0xf6, 0xda, 0x7a, 0x57, 0xef, 0xa8, 0x39, 0xb4,
+	0x01, 0x25, 0x42, 0x7a, 0x60, 0x9e, 0xf6, 0x3a, 0xea, 0x3a, 0x42, 0x50, 0x6d, 0x76, 0x2d, 0xbd,
+	0xd9, 0xf9, 0xe1, 0x99, 0xfe, 0x81, 0xd1, 0x1f, 0xf4, 0xd5, 0x3c, 0x11, 0xe5, 0xb4, 0xd7, 0x3c,
+	0x1d, 0x1c, 0x9a, 0x96, 0xf1, 0x23, 0xbd, 0xa3, 0x16, 0x08, 0xd3, 0x81, 0x69, 0xb5, 0x8c, 0x4e,
+	0x47, 0xef, 0xa9, 0x45, 0x8a, 0x68, 0xf6, 0x0e, 0xba, 0x46, 0x7b, 0xa0, 0x96, 0xc8, 0x66, 0x46,
+	0xef, 0xfd, 0x66, 0xd7, 0xe8, 0xa8, 0x40, 0xce, 0x75, 0xda, 0x6b, 0xbe, 0xdf, 0x34, 0xba, 0xcd,
+	0x56, 0x57, 0x57, 0xcb, 0xe8, 0x16, 0x6c, 0x90, 0xfd, 0xfa, 0xa7, 0x27, 0x27, 0xa6, 0x35, 0xd0,
+	0x3b, 0x6a, 0x85, 0x30, 0x0c, 0x8c, 0x63, 0xdd, 0x3c, 0x1d, 0xa8, 0x1b, 0x04, 0xcb, 0xe8, 0x0d,
+	0x74, 0xab, 0xd7, 0xec, 0xaa, 0xd5, 0xfd, 0xdf, 0x29, 0xb2, 0x2f, 0xc8, 0x33, 0x07, 0x7a, 0x0c,
+	0x05, 0x91, 0xb1, 0x16, 0x5b, 0x58, 0xb1, 0x16, 0xe2, 0x56, 0x23, 0x75, 0x9d, 0xe7, 0xb0, 0x23,
+	0xc8, 0xb3, 0xbe, 0xeb, 0xb5, 0xa1, 0xbe, 0xa1, 0xb4, 0x6a, 0x2f, 0x2f, 0xeb, 0xca, 0xa7, 0x97,
+	0x75, 0xe5, 0xaf, 0x97, 0x75, 0xe5, 0x93, 0x57, 0xf5, 0xb5, 0x4f, 0x5f, 0xd5, 0xd7, 0xfe, 0xfc,
+	0xaa, 0xbe, 0xf6, 0x61, 0x9e, 0x3e, 0xa6, 0xbf, 0xf9, 0x9f, 0x00, 0x00, 0x00, 0xff, 0xff, 0x1d,
+	0xaa, 0x1d, 0xa4, 0x9a, 0x1a, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -3029,10 +2903,10 @@ func (m *SessionSnapshot) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.Commands) > 0 {
-		for iNdEx := len(m.Commands) - 1; iNdEx >= 0; iNdEx-- {
+	if len(m.Streams) > 0 {
+		for iNdEx := len(m.Streams) - 1; iNdEx >= 0; iNdEx-- {
 			{
-				size, err := m.Commands[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				size, err := m.Streams[iNdEx].MarshalToSizedBuffer(dAtA[:i])
 				if err != nil {
 					return 0, err
 				}
@@ -3041,6 +2915,34 @@ func (m *SessionSnapshot) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 			}
 			i--
 			dAtA[i] = 0x42
+		}
+	}
+	if len(m.PendingResponses) > 0 {
+		for iNdEx := len(m.PendingResponses) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.PendingResponses[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintService(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x3a
+		}
+	}
+	if len(m.PendingRequests) > 0 {
+		for iNdEx := len(m.PendingRequests) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.PendingRequests[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintService(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x32
 		}
 	}
 	if len(m.Services) > 0 {
@@ -3054,13 +2956,18 @@ func (m *SessionSnapshot) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 				i = encodeVarintService(dAtA, i, uint64(size))
 			}
 			i--
-			dAtA[i] = 0x3a
+			dAtA[i] = 0x2a
 		}
+	}
+	if m.LastResponseID != 0 {
+		i = encodeVarintService(dAtA, i, uint64(m.LastResponseID))
+		i--
+		dAtA[i] = 0x20
 	}
 	if m.LastRequestID != 0 {
 		i = encodeVarintService(dAtA, i, uint64(m.LastRequestID))
 		i--
-		dAtA[i] = 0x20
+		dAtA[i] = 0x18
 	}
 	n3, err3 := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.Timestamp, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdTime(m.Timestamp):])
 	if err3 != nil {
@@ -3069,67 +2976,12 @@ func (m *SessionSnapshot) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i -= n3
 	i = encodeVarintService(dAtA, i, uint64(n3))
 	i--
-	dAtA[i] = 0x1a
-	n4, err4 := github_com_gogo_protobuf_types.StdDurationMarshalTo(m.Timeout, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdDuration(m.Timeout):])
-	if err4 != nil {
-		return 0, err4
-	}
-	i -= n4
-	i = encodeVarintService(dAtA, i, uint64(n4))
-	i--
 	dAtA[i] = 0x12
 	if m.SessionID != 0 {
 		i = encodeVarintService(dAtA, i, uint64(m.SessionID))
 		i--
 		dAtA[i] = 0x8
 	}
-	return len(dAtA) - i, nil
-}
-
-func (m *SessionServiceSnapshot) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *SessionServiceSnapshot) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *SessionServiceSnapshot) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	if len(m.Streams) > 0 {
-		for iNdEx := len(m.Streams) - 1; iNdEx >= 0; iNdEx-- {
-			{
-				size, err := m.Streams[iNdEx].MarshalToSizedBuffer(dAtA[:i])
-				if err != nil {
-					return 0, err
-				}
-				i -= size
-				i = encodeVarintService(dAtA, i, uint64(size))
-			}
-			i--
-			dAtA[i] = 0x12
-		}
-	}
-	{
-		size, err := m.ServiceId.MarshalToSizedBuffer(dAtA[:i])
-		if err != nil {
-			return 0, err
-		}
-		i -= size
-		i = encodeVarintService(dAtA, i, uint64(size))
-	}
-	i--
-	dAtA[i] = 0xa
 	return len(dAtA) - i, nil
 }
 
@@ -3153,28 +3005,23 @@ func (m *SessionStreamSnapshot) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.CompleteID != 0 {
-		i = encodeVarintService(dAtA, i, uint64(m.CompleteID))
-		i--
-		dAtA[i] = 0x28
-	}
-	if m.ResponseID != 0 {
-		i = encodeVarintService(dAtA, i, uint64(m.ResponseID))
-		i--
-		dAtA[i] = 0x20
-	}
-	if len(m.Type) > 0 {
-		i -= len(m.Type)
-		copy(dAtA[i:], m.Type)
-		i = encodeVarintService(dAtA, i, uint64(len(m.Type)))
+	if len(m.OperationID) > 0 {
+		i -= len(m.OperationID)
+		copy(dAtA[i:], m.OperationID)
+		i = encodeVarintService(dAtA, i, uint64(len(m.OperationID)))
 		i--
 		dAtA[i] = 0x1a
 	}
-	if m.RequestID != 0 {
-		i = encodeVarintService(dAtA, i, uint64(m.RequestID))
-		i--
-		dAtA[i] = 0x10
+	{
+		size, err := m.ServiceID.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintService(dAtA, i, uint64(size))
 	}
+	i--
+	dAtA[i] = 0x12
 	if m.StreamID != 0 {
 		i = encodeVarintService(dAtA, i, uint64(m.StreamID))
 		i--
@@ -3339,12 +3186,12 @@ func (m *StateMachineRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x12
 	}
-	n9, err9 := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.Timestamp, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdTime(m.Timestamp):])
-	if err9 != nil {
-		return 0, err9
+	n8, err8 := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.Timestamp, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdTime(m.Timestamp):])
+	if err8 != nil {
+		return 0, err8
 	}
-	i -= n9
-	i = encodeVarintService(dAtA, i, uint64(n9))
+	i -= n8
+	i = encodeVarintService(dAtA, i, uint64(n8))
 	i--
 	dAtA[i] = 0xa
 	return len(dAtA) - i, nil
@@ -3695,21 +3542,14 @@ func (m *OpenSessionRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	var l int
 	_ = l
 	if m.Timeout != nil {
-		n22, err22 := github_com_gogo_protobuf_types.StdDurationMarshalTo(*m.Timeout, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdDuration(*m.Timeout):])
-		if err22 != nil {
-			return 0, err22
+		n21, err21 := github_com_gogo_protobuf_types.StdDurationMarshalTo(*m.Timeout, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdDuration(*m.Timeout):])
+		if err21 != nil {
+			return 0, err21
 		}
-		i -= n22
-		i = encodeVarintService(dAtA, i, uint64(n22))
+		i -= n21
+		i = encodeVarintService(dAtA, i, uint64(n21))
 		i--
 		dAtA[i] = 0x12
-	}
-	if len(m.ClientID) > 0 {
-		i -= len(m.ClientID)
-		copy(dAtA[i:], m.ClientID)
-		i = encodeVarintService(dAtA, i, uint64(len(m.ClientID)))
-		i--
-		dAtA[i] = 0xa
 	}
 	return len(dAtA) - i, nil
 }
@@ -3762,22 +3602,8 @@ func (m *KeepAliveRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.Streams) > 0 {
-		for iNdEx := len(m.Streams) - 1; iNdEx >= 0; iNdEx-- {
-			{
-				size, err := m.Streams[iNdEx].MarshalToSizedBuffer(dAtA[:i])
-				if err != nil {
-					return 0, err
-				}
-				i -= size
-				i = encodeVarintService(dAtA, i, uint64(size))
-			}
-			i--
-			dAtA[i] = 0x1a
-		}
-	}
-	if m.AckRequestID != 0 {
-		i = encodeVarintService(dAtA, i, uint64(m.AckRequestID))
+	if m.AckResponseID != 0 {
+		i = encodeVarintService(dAtA, i, uint64(m.AckResponseID))
 		i--
 		dAtA[i] = 0x10
 	}
@@ -4065,7 +3891,7 @@ func (m *ServiceCommandRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		}
 	}
 	{
-		size, err := m.Service.MarshalToSizedBuffer(dAtA[:i])
+		size, err := m.ServiceID.MarshalToSizedBuffer(dAtA[:i])
 		if err != nil {
 			return 0, err
 		}
@@ -4306,18 +4132,16 @@ func (m *ServiceQueryRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 			}
 		}
 	}
-	if m.Service != nil {
-		{
-			size, err := m.Service.MarshalToSizedBuffer(dAtA[:i])
-			if err != nil {
-				return 0, err
-			}
-			i -= size
-			i = encodeVarintService(dAtA, i, uint64(size))
+	{
+		size, err := m.ServiceID.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
 		}
-		i--
-		dAtA[i] = 0xa
+		i -= size
+		i = encodeVarintService(dAtA, i, uint64(size))
 	}
+	i--
+	dAtA[i] = 0xa
 	return len(dAtA) - i, nil
 }
 
@@ -4464,10 +4288,10 @@ func (m *ServiceOperationRequest) MarshalToSizedBuffer(dAtA []byte) (int, error)
 		i--
 		dAtA[i] = 0x12
 	}
-	if len(m.Method) > 0 {
-		i -= len(m.Method)
-		copy(dAtA[i:], m.Method)
-		i = encodeVarintService(dAtA, i, uint64(len(m.Method)))
+	if len(m.OperationID) > 0 {
+		i -= len(m.OperationID)
+		copy(dAtA[i:], m.OperationID)
+		i = encodeVarintService(dAtA, i, uint64(len(m.OperationID)))
 		i--
 		dAtA[i] = 0xa
 	}
@@ -4810,13 +4634,13 @@ func (m *SessionResponseContext) MarshalToSizedBuffer(dAtA []byte) (int, error) 
 	_ = i
 	var l int
 	_ = l
-	if m.Sequence != 0 {
-		i = encodeVarintService(dAtA, i, uint64(m.Sequence))
+	if m.Index != 0 {
+		i = encodeVarintService(dAtA, i, uint64(m.Index))
 		i--
 		dAtA[i] = 0x20
 	}
-	if m.Index != 0 {
-		i = encodeVarintService(dAtA, i, uint64(m.Index))
+	if m.ResponseID != 0 {
+		i = encodeVarintService(dAtA, i, uint64(m.ResponseID))
 		i--
 		dAtA[i] = 0x18
 	}
@@ -4827,39 +4651,6 @@ func (m *SessionResponseContext) MarshalToSizedBuffer(dAtA []byte) (int, error) 
 	}
 	if m.SessionID != 0 {
 		i = encodeVarintService(dAtA, i, uint64(m.SessionID))
-		i--
-		dAtA[i] = 0x8
-	}
-	return len(dAtA) - i, nil
-}
-
-func (m *SessionStreamContext) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *SessionStreamContext) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *SessionStreamContext) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	if m.AckResponseID != 0 {
-		i = encodeVarintService(dAtA, i, uint64(m.AckResponseID))
-		i--
-		dAtA[i] = 0x10
-	}
-	if m.RequestID != 0 {
-		i = encodeVarintService(dAtA, i, uint64(m.RequestID))
 		i--
 		dAtA[i] = 0x8
 	}
@@ -4972,12 +4763,13 @@ func (m *SessionSnapshot) Size() (n int) {
 	if m.SessionID != 0 {
 		n += 1 + sovService(uint64(m.SessionID))
 	}
-	l = github_com_gogo_protobuf_types.SizeOfStdDuration(m.Timeout)
-	n += 1 + l + sovService(uint64(l))
 	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.Timestamp)
 	n += 1 + l + sovService(uint64(l))
 	if m.LastRequestID != 0 {
 		n += 1 + sovService(uint64(m.LastRequestID))
+	}
+	if m.LastResponseID != 0 {
+		n += 1 + sovService(uint64(m.LastResponseID))
 	}
 	if len(m.Services) > 0 {
 		for _, e := range m.Services {
@@ -4985,23 +4777,18 @@ func (m *SessionSnapshot) Size() (n int) {
 			n += 1 + l + sovService(uint64(l))
 		}
 	}
-	if len(m.Commands) > 0 {
-		for _, e := range m.Commands {
+	if len(m.PendingRequests) > 0 {
+		for _, e := range m.PendingRequests {
 			l = e.Size()
 			n += 1 + l + sovService(uint64(l))
 		}
 	}
-	return n
-}
-
-func (m *SessionServiceSnapshot) Size() (n int) {
-	if m == nil {
-		return 0
+	if len(m.PendingResponses) > 0 {
+		for _, e := range m.PendingResponses {
+			l = e.Size()
+			n += 1 + l + sovService(uint64(l))
+		}
 	}
-	var l int
-	_ = l
-	l = m.ServiceId.Size()
-	n += 1 + l + sovService(uint64(l))
 	if len(m.Streams) > 0 {
 		for _, e := range m.Streams {
 			l = e.Size()
@@ -5020,18 +4807,11 @@ func (m *SessionStreamSnapshot) Size() (n int) {
 	if m.StreamID != 0 {
 		n += 1 + sovService(uint64(m.StreamID))
 	}
-	if m.RequestID != 0 {
-		n += 1 + sovService(uint64(m.RequestID))
-	}
-	l = len(m.Type)
+	l = m.ServiceID.Size()
+	n += 1 + l + sovService(uint64(l))
+	l = len(m.OperationID)
 	if l > 0 {
 		n += 1 + l + sovService(uint64(l))
-	}
-	if m.ResponseID != 0 {
-		n += 1 + sovService(uint64(m.ResponseID))
-	}
-	if m.CompleteID != 0 {
-		n += 1 + sovService(uint64(m.CompleteID))
 	}
 	return n
 }
@@ -5272,10 +5052,6 @@ func (m *OpenSessionRequest) Size() (n int) {
 	}
 	var l int
 	_ = l
-	l = len(m.ClientID)
-	if l > 0 {
-		n += 1 + l + sovService(uint64(l))
-	}
 	if m.Timeout != nil {
 		l = github_com_gogo_protobuf_types.SizeOfStdDuration(*m.Timeout)
 		n += 1 + l + sovService(uint64(l))
@@ -5304,14 +5080,8 @@ func (m *KeepAliveRequest) Size() (n int) {
 	if m.SessionID != 0 {
 		n += 1 + sovService(uint64(m.SessionID))
 	}
-	if m.AckRequestID != 0 {
-		n += 1 + sovService(uint64(m.AckRequestID))
-	}
-	if len(m.Streams) > 0 {
-		for _, e := range m.Streams {
-			l = e.Size()
-			n += 1 + l + sovService(uint64(l))
-		}
+	if m.AckResponseID != 0 {
+		n += 1 + sovService(uint64(m.AckResponseID))
 	}
 	return n
 }
@@ -5404,7 +5174,7 @@ func (m *ServiceCommandRequest) Size() (n int) {
 	}
 	var l int
 	_ = l
-	l = m.Service.Size()
+	l = m.ServiceID.Size()
 	n += 1 + l + sovService(uint64(l))
 	if m.Request != nil {
 		n += m.Request.Size()
@@ -5526,10 +5296,8 @@ func (m *ServiceQueryRequest) Size() (n int) {
 	}
 	var l int
 	_ = l
-	if m.Service != nil {
-		l = m.Service.Size()
-		n += 1 + l + sovService(uint64(l))
-	}
+	l = m.ServiceID.Size()
+	n += 1 + l + sovService(uint64(l))
 	if m.Request != nil {
 		n += m.Request.Size()
 	}
@@ -5602,7 +5370,7 @@ func (m *ServiceOperationRequest) Size() (n int) {
 	}
 	var l int
 	_ = l
-	l = len(m.Method)
+	l = len(m.OperationID)
 	if l > 0 {
 		n += 1 + l + sovService(uint64(l))
 	}
@@ -5756,26 +5524,11 @@ func (m *SessionResponseContext) Size() (n int) {
 	if m.RequestID != 0 {
 		n += 1 + sovService(uint64(m.RequestID))
 	}
+	if m.ResponseID != 0 {
+		n += 1 + sovService(uint64(m.ResponseID))
+	}
 	if m.Index != 0 {
 		n += 1 + sovService(uint64(m.Index))
-	}
-	if m.Sequence != 0 {
-		n += 1 + sovService(uint64(m.Sequence))
-	}
-	return n
-}
-
-func (m *SessionStreamContext) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	if m.RequestID != 0 {
-		n += 1 + sovService(uint64(m.RequestID))
-	}
-	if m.AckResponseID != 0 {
-		n += 1 + sovService(uint64(m.AckResponseID))
 	}
 	return n
 }
@@ -5849,7 +5602,7 @@ func (m *StateMachineSnapshot) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.Index |= uint64(b&0x7F) << shift
+				m.Index |= Index(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -5916,7 +5669,7 @@ func (m *StateMachineSnapshot) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Sessions = append(m.Sessions, SessionSnapshot{})
+			m.Sessions = append(m.Sessions, &SessionSnapshot{})
 			if err := m.Sessions[len(m.Sessions)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
@@ -5950,7 +5703,7 @@ func (m *StateMachineSnapshot) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Services = append(m.Services, ServiceSnapshot{})
+			m.Services = append(m.Services, &ServiceSnapshot{})
 			if err := m.Services[len(m.Services)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
@@ -6055,7 +5808,7 @@ func (m *ServiceSnapshot) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.Index |= uint64(b&0x7F) << shift
+				m.Index |= Index(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -6161,45 +5914,12 @@ func (m *SessionSnapshot) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.SessionID |= uint64(b&0x7F) << shift
+				m.SessionID |= SessionID(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Timeout", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowService
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthService
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthService
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if err := github_com_gogo_protobuf_types.StdDurationUnmarshal(&m.Timeout, dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Timestamp", wireType)
 			}
@@ -6232,7 +5952,7 @@ func (m *SessionSnapshot) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 4:
+		case 3:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field LastRequestID", wireType)
 			}
@@ -6246,12 +5966,31 @@ func (m *SessionSnapshot) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.LastRequestID |= uint64(b&0x7F) << shift
+				m.LastRequestID |= RequestID(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-		case 7:
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastResponseID", wireType)
+			}
+			m.LastResponseID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.LastResponseID |= ResponseID(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Services", wireType)
 			}
@@ -6280,132 +6019,80 @@ func (m *SessionSnapshot) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Services = append(m.Services, &SessionServiceSnapshot{})
+			m.Services = append(m.Services, ServiceID{})
 			if err := m.Services[len(m.Services)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PendingRequests", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthService
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthService
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.PendingRequests = append(m.PendingRequests, &SessionRequest{})
+			if err := m.PendingRequests[len(m.PendingRequests)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PendingResponses", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthService
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthService
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.PendingResponses = append(m.PendingResponses, &SessionResponse{})
+			if err := m.PendingResponses[len(m.PendingResponses)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		case 8:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Commands", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowService
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthService
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthService
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Commands = append(m.Commands, &SessionCommandRequest{})
-			if err := m.Commands[len(m.Commands)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipService(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthService
-			}
-			if (iNdEx + skippy) < 0 {
-				return ErrInvalidLengthService
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *SessionServiceSnapshot) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowService
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: SessionServiceSnapshot: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: SessionServiceSnapshot: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ServiceId", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowService
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthService
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthService
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if err := m.ServiceId.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Streams", wireType)
 			}
@@ -6506,16 +6193,16 @@ func (m *SessionStreamSnapshot) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.StreamID |= uint64(b&0x7F) << shift
+				m.StreamID |= StreamID(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		case 2:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field RequestID", wireType)
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ServiceID", wireType)
 			}
-			m.RequestID = 0
+			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowService
@@ -6525,14 +6212,28 @@ func (m *SessionStreamSnapshot) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.RequestID |= uint64(b&0x7F) << shift
+				msglen |= int(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
+			if msglen < 0 {
+				return ErrInvalidLengthService
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthService
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ServiceID.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Type", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field OperationID", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -6560,46 +6261,8 @@ func (m *SessionStreamSnapshot) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Type = string(dAtA[iNdEx:postIndex])
+			m.OperationID = OperationID(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 4:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ResponseID", wireType)
-			}
-			m.ResponseID = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowService
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.ResponseID |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 5:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field CompleteID", wireType)
-			}
-			m.CompleteID = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowService
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.CompleteID |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipService(dAtA[iNdEx:])
@@ -7737,38 +7400,6 @@ func (m *OpenSessionRequest) Unmarshal(dAtA []byte) error {
 			return fmt.Errorf("proto: OpenSessionRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ClientID", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowService
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthService
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthService
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.ClientID = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Timeout", wireType)
@@ -7872,7 +7503,7 @@ func (m *OpenSessionResponse) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.SessionID |= uint64(b&0x7F) << shift
+				m.SessionID |= SessionID(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -7944,16 +7575,16 @@ func (m *KeepAliveRequest) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.SessionID |= uint64(b&0x7F) << shift
+				m.SessionID |= SessionID(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		case 2:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field AckRequestID", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field AckResponseID", wireType)
 			}
-			m.AckRequestID = 0
+			m.AckResponseID = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowService
@@ -7963,45 +7594,11 @@ func (m *KeepAliveRequest) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.AckRequestID |= uint64(b&0x7F) << shift
+				m.AckResponseID |= ResponseID(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Streams", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowService
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthService
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthService
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Streams = append(m.Streams, SessionStreamContext{})
-			if err := m.Streams[len(m.Streams)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipService(dAtA[iNdEx:])
@@ -8122,7 +7719,7 @@ func (m *CloseSessionRequest) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.SessionID |= uint64(b&0x7F) << shift
+				m.SessionID |= SessionID(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -8711,7 +8308,7 @@ func (m *ServiceCommandRequest) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Service", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field ServiceID", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -8738,7 +8335,7 @@ func (m *ServiceCommandRequest) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.Service.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			if err := m.ServiceID.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -9130,7 +8727,7 @@ func (m *ServiceQueryRequest) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Service", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field ServiceID", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -9157,10 +8754,7 @@ func (m *ServiceQueryRequest) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.Service == nil {
-				m.Service = &ServiceId{}
-			}
-			if err := m.Service.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			if err := m.ServiceID.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -9412,7 +9006,7 @@ func (m *ServiceOperationRequest) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Method", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field OperationID", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -9440,7 +9034,7 @@ func (m *ServiceOperationRequest) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Method = string(dAtA[iNdEx:postIndex])
+			m.OperationID = OperationID(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -10048,7 +9642,7 @@ func (m *ServiceMetadataResponse) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Services = append(m.Services, &ServiceId{})
+			m.Services = append(m.Services, ServiceID{})
 			if err := m.Services[len(m.Services)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
@@ -10120,7 +9714,7 @@ func (m *SessionCommandContext) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.SessionID |= uint64(b&0x7F) << shift
+				m.SessionID |= SessionID(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -10139,7 +9733,7 @@ func (m *SessionCommandContext) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.RequestID |= uint64(b&0x7F) << shift
+				m.RequestID |= RequestID(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -10211,7 +9805,7 @@ func (m *SessionQueryContext) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.SessionID |= uint64(b&0x7F) << shift
+				m.SessionID |= SessionID(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -10230,7 +9824,7 @@ func (m *SessionQueryContext) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.LastRequestID |= uint64(b&0x7F) << shift
+				m.LastRequestID |= RequestID(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -10249,7 +9843,7 @@ func (m *SessionQueryContext) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.LastIndex |= uint64(b&0x7F) << shift
+				m.LastIndex |= Index(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -10341,7 +9935,7 @@ func (m *SessionResponseContext) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.SessionID |= uint64(b&0x7F) << shift
+				m.SessionID |= SessionID(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -10360,12 +9954,31 @@ func (m *SessionResponseContext) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.RequestID |= uint64(b&0x7F) << shift
+				m.RequestID |= RequestID(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResponseID", wireType)
+			}
+			m.ResponseID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ResponseID |= ResponseID(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Index", wireType)
 			}
@@ -10379,117 +9992,7 @@ func (m *SessionResponseContext) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.Index |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 4:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Sequence", wireType)
-			}
-			m.Sequence = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowService
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.Sequence |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		default:
-			iNdEx = preIndex
-			skippy, err := skipService(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthService
-			}
-			if (iNdEx + skippy) < 0 {
-				return ErrInvalidLengthService
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *SessionStreamContext) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowService
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: SessionStreamContext: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: SessionStreamContext: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field RequestID", wireType)
-			}
-			m.RequestID = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowService
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.RequestID |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 2:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field AckResponseID", wireType)
-			}
-			m.AckResponseID = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowService
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.AckResponseID |= uint64(b&0x7F) << shift
+				m.Index |= Index(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}

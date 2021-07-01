@@ -17,13 +17,13 @@ package rsm
 // OperationID is an operation identifier
 type OperationID string
 
-// Executor executes primitive operations
-type Executor interface {
-	// RegisterUnaryOperation registers a unary primitive operation
-	RegisterUnaryOperation(id OperationID, callback func([]byte, Session) ([]byte, error))
+// OperationRegistry executes primitive operations
+type OperationRegistry interface {
+	// RegisterUnary registers a unary primitive operation
+	RegisterUnary(id OperationID, callback func([]byte, Session) ([]byte, error))
 
-	// RegisterStreamOperation registers a new primitive operation
-	RegisterStreamOperation(id OperationID, callback func([]byte, Session, Stream) (StreamCloser, error))
+	// RegisterStream registers a new primitive operation
+	RegisterStream(id OperationID, opener func(Stream), callback func([]byte, Stream) error, closer func(Stream))
 
 	// GetOperation returns an operation by name
 	GetOperation(id OperationID) Operation
@@ -40,32 +40,36 @@ type UnaryOperation interface {
 
 // StreamingOperation is a primitive operation that returns a stream
 type StreamingOperation interface {
+	Open(stream Stream)
+	Close(stream Stream)
 	// Execute executes the operation
-	Execute(bytes []byte, session Session, stream Stream) (StreamCloser, error)
+	Execute(bytes []byte, stream Stream) error
 }
 
-// newExecutor returns a new executor
-func newExecutor() Executor {
+// newOperationRegistry returns a new executor
+func newOperationRegistry() OperationRegistry {
 	return &executor{
 		operations: make(map[OperationID]Operation),
 	}
 }
 
-// executor is an implementation of the Executor interface
+// executor is an implementation of the OperationRegistry interface
 type executor struct {
-	Executor
+	OperationRegistry
 	operations map[OperationID]Operation
 }
 
-func (e *executor) RegisterUnaryOperation(id OperationID, callback func([]byte, Session) ([]byte, error)) {
+func (e *executor) RegisterUnary(id OperationID, callback func([]byte, Session) ([]byte, error)) {
 	e.operations[id] = &unaryOperation{
 		f: callback,
 	}
 }
 
-func (e *executor) RegisterStreamOperation(id OperationID, callback func([]byte, Session, Stream) (StreamCloser, error)) {
+func (e *executor) RegisterStream(id OperationID, opener func(Stream), callback func([]byte, Stream) error, closer func(Stream)) {
 	e.operations[id] = &streamingOperation{
-		f: callback,
+		opener: opener,
+		f:      callback,
+		closer: closer,
 	}
 }
 
@@ -84,9 +88,19 @@ func (o *unaryOperation) Execute(bytes []byte, session Session) ([]byte, error) 
 
 // streamingOperation is an implementation of the StreamingOperation interface
 type streamingOperation struct {
-	f func([]byte, Session, Stream) (StreamCloser, error)
+	opener func(Stream)
+	f      func([]byte, Stream) error
+	closer func(Stream)
 }
 
-func (o *streamingOperation) Execute(bytes []byte, session Session, stream Stream) (StreamCloser, error) {
-	return o.f(bytes, session, stream)
+func (o *streamingOperation) Open(stream Stream) {
+	o.opener(stream)
+}
+
+func (o *streamingOperation) Execute(bytes []byte, stream Stream) error {
+	return o.f(bytes, stream)
+}
+
+func (o *streamingOperation) Close(stream Stream) {
+	o.closer(stream)
 }

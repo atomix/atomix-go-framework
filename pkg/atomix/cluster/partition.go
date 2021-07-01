@@ -16,8 +16,10 @@ package cluster
 
 import (
 	"context"
+	"fmt"
 	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"google.golang.org/grpc"
 	"sync"
 )
 
@@ -29,6 +31,8 @@ func NewPartition(config protocolapi.ProtocolPartition, cluster Cluster) Partiti
 	return &partition{
 		id:           PartitionID(config.PartitionID),
 		cluster:      cluster,
+		host:         config.Host,
+		port:         int(config.APIPort),
 		replicasByID: make(map[ReplicaID]*Replica),
 	}
 }
@@ -43,6 +47,8 @@ type Partition interface {
 	Replica(id ReplicaID) (*Replica, bool)
 	// Replicas returns the set of all replicas in the partition
 	Replicas() []*Replica
+	// Connect connects to the partition
+	Connect(ctx context.Context, opts ...ConnectOption) (*grpc.ClientConn, error)
 	// Watch watches the partition for changes
 	Watch(ctx context.Context, ch chan<- ReplicaSet) error
 }
@@ -55,12 +61,16 @@ type ConfigurablePartition interface {
 // partition is a cluster partition
 type partition struct {
 	id           PartitionID
+	host         string
+	port         int
 	cluster      Cluster
 	replicas     ReplicaSet
 	replicasByID map[ReplicaID]*Replica
 	watchers     []chan<- ReplicaSet
 	configMu     sync.RWMutex
 	updateMu     sync.Mutex
+	conn         *grpc.ClientConn
+	connMu       sync.RWMutex
 }
 
 func (p *partition) ID() PartitionID {
@@ -93,6 +103,33 @@ func (p *partition) Replicas() []*Replica {
 	replicas := make([]*Replica, len(p.replicas))
 	copy(replicas, p.replicas)
 	return replicas
+}
+
+// Connect connects to the replica
+func (p *partition) Connect(ctx context.Context, opts ...ConnectOption) (*grpc.ClientConn, error) {
+	options := applyConnectOptions(opts...)
+
+	p.connMu.RLock()
+	conn := p.conn
+	p.connMu.RUnlock()
+	if conn != nil {
+		return conn, nil
+	}
+
+	p.connMu.Lock()
+	defer p.connMu.Unlock()
+	if p.conn != nil {
+		return p.conn, nil
+	}
+
+	dialOpts := options.dialOptions
+	dialOpts = append(dialOpts, grpc.WithContextDialer(p.cluster.Network().Connect))
+	conn, err := grpc.DialContext(ctx, fmt.Sprintf("%s:%d", p.host, p.port), dialOpts...)
+	if err != nil {
+		return nil, err
+	}
+	p.conn = conn
+	return conn, err
 }
 
 // Update updates the partition configuration
