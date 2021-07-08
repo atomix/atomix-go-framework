@@ -122,9 +122,16 @@ func (p *partition) Connect(ctx context.Context, opts ...ConnectOption) (*grpc.C
 		return p.conn, nil
 	}
 
+	var target string
+	if options.scheme != "" {
+		target = fmt.Sprintf("%s:///%s:%d", options.scheme, p.host, p.port)
+	} else {
+		target = fmt.Sprintf("%s:%d", p.host, p.port)
+	}
+
 	dialOpts := options.dialOptions
 	dialOpts = append(dialOpts, grpc.WithContextDialer(p.cluster.Network().Connect))
-	conn, err := grpc.DialContext(ctx, fmt.Sprintf("%s:%d", p.host, p.port), dialOpts...)
+	conn, err := grpc.DialContext(ctx, target, dialOpts...)
 	if err != nil {
 		return nil, err
 	}

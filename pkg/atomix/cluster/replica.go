@@ -77,9 +77,16 @@ func (m *Replica) Connect(ctx context.Context, opts ...ConnectOption) (*grpc.Cli
 		return m.conn, nil
 	}
 
+	var target string
+	if options.scheme != "" {
+		target = fmt.Sprintf("%s:///%s:%d", options.scheme, m.Host, m.Port)
+	} else {
+		target = fmt.Sprintf("%s:%d", m.Host, m.Port)
+	}
+
 	dialOpts := options.dialOptions
 	dialOpts = append(dialOpts, grpc.WithContextDialer(m.network.Connect))
-	conn, err := grpc.DialContext(ctx, fmt.Sprintf("%s:%d", m.Host, m.Port), dialOpts...)
+	conn, err := grpc.DialContext(ctx, target, dialOpts...)
 	if err != nil {
 		return nil, err
 	}

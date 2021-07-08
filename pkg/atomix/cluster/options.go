@@ -190,12 +190,28 @@ func applyConnectOptions(opts ...ConnectOption) *connectOptions {
 }
 
 type connectOptions struct {
+	scheme      string
 	dialOptions []grpc.DialOption
 }
 
 // ConnectOption is an option for connecting to a peer
 type ConnectOption interface {
 	apply(options *connectOptions)
+}
+
+// WithDialScheme sets the dial scheme for the gRPC connection
+func WithDialScheme(scheme string) ConnectOption {
+	return &dialSchemeOption{
+		scheme: scheme,
+	}
+}
+
+type dialSchemeOption struct {
+	scheme string
+}
+
+func (o *dialSchemeOption) apply(options *connectOptions) {
+	options.scheme = o.scheme
 }
 
 // WithDialOption creates a dial option for the gRPC connection
