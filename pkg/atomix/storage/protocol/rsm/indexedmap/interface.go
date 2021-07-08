@@ -4,11 +4,9 @@ package indexedmap
 import (
 	"fmt"
 	indexedmap "github.com/atomix/atomix-api/go/atomix/primitive/indexedmap"
-	errors "github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	util "github.com/atomix/atomix-go-framework/pkg/atomix/util"
 	proto "github.com/golang/protobuf/proto"
-	uuid "github.com/google/uuid"
 	"io"
 )
 
@@ -17,19 +15,19 @@ type Service interface {
 	Backup(SnapshotWriter) error
 	Restore(SnapshotReader) error
 	// Size returns the size of the map
-	Size(SizeProposal) error
+	Size(SizeQuery) error
 	// Put puts an entry into the map
 	Put(PutProposal) error
 	// Get gets the entry for a key
-	Get(GetProposal) error
+	Get(GetQuery) error
 	// FirstEntry gets the first entry in the map
-	FirstEntry(FirstEntryProposal) error
+	FirstEntry(FirstEntryQuery) error
 	// LastEntry gets the last entry in the map
-	LastEntry(LastEntryProposal) error
+	LastEntry(LastEntryQuery) error
 	// PrevEntry gets the previous entry in the map
-	PrevEntry(PrevEntryProposal) error
+	PrevEntry(PrevEntryQuery) error
 	// NextEntry gets the next entry in the map
-	NextEntry(NextEntryProposal) error
+	NextEntry(NextEntryQuery) error
 	// Remove removes an entry from the map
 	Remove(RemoveProposal) error
 	// Clear removes all entries from the map
@@ -37,7 +35,7 @@ type Service interface {
 	// Events listens for change events
 	Events(EventsProposal) error
 	// Entries lists all entries in the map
-	Entries(EntriesProposal) error
+	Entries(EntriesQuery) error
 }
 
 type ServiceContext interface {
@@ -46,11 +44,11 @@ type ServiceContext interface {
 	Proposals() Proposals
 }
 
-func newServiceContext(scheduler rsm.Scheduler) ServiceContext {
+func newServiceContext(service rsm.ServiceContext) ServiceContext {
 	return &serviceContext{
-		scheduler: scheduler,
-		sessions:  newSessions(),
-		proposals: newProposals(),
+		scheduler: service.Scheduler(),
+		sessions:  newSessions(service.Sessions()),
+		proposals: newProposals(service.Commands()),
 	}
 }
 
@@ -132,53 +130,33 @@ func (r *serviceSnapshotReader) ReadState() (*IndexedMapState, error) {
 var _ SnapshotReader = &serviceSnapshotReader{}
 
 type Sessions interface {
-	open(Session)
-	expire(SessionID)
-	close(SessionID)
 	Get(SessionID) (Session, bool)
 	List() []Session
 }
 
-func newSessions() Sessions {
+func newSessions(sessions rsm.Sessions) Sessions {
 	return &serviceSessions{
-		sessions: make(map[SessionID]Session),
+		sessions: sessions,
 	}
 }
 
 type serviceSessions struct {
-	sessions map[SessionID]Session
-}
-
-func (s *serviceSessions) open(session Session) {
-	s.sessions[session.ID()] = session
-	session.setState(SessionOpen)
-}
-
-func (s *serviceSessions) expire(sessionID SessionID) {
-	session, ok := s.sessions[sessionID]
-	if ok {
-		session.setState(SessionClosed)
-		delete(s.sessions, sessionID)
-	}
-}
-
-func (s *serviceSessions) close(sessionID SessionID) {
-	session, ok := s.sessions[sessionID]
-	if ok {
-		session.setState(SessionClosed)
-		delete(s.sessions, sessionID)
-	}
+	sessions rsm.Sessions
 }
 
 func (s *serviceSessions) Get(id SessionID) (Session, bool) {
-	session, ok := s.sessions[id]
-	return session, ok
+	session, ok := s.sessions.Get(rsm.SessionID(id))
+	if !ok {
+		return nil, false
+	}
+	return newSession(session), true
 }
 
 func (s *serviceSessions) List() []Session {
-	sessions := make([]Session, 0, len(s.sessions))
-	for _, session := range s.sessions {
-		sessions = append(sessions, session)
+	serviceSessions := s.sessions.List()
+	sessions := make([]Session, len(serviceSessions))
+	for i, serviceSession := range serviceSessions {
+		sessions[i] = newSession(serviceSession)
 	}
 	return sessions
 }
@@ -198,18 +176,18 @@ type Watcher interface {
 	Cancel()
 }
 
-func newWatcher(f func()) Watcher {
+func newWatcher(watcher rsm.SessionStateWatcher) Watcher {
 	return &serviceWatcher{
-		f: f,
+		watcher: watcher,
 	}
 }
 
 type serviceWatcher struct {
-	f func()
+	watcher rsm.SessionStateWatcher
 }
 
 func (s *serviceWatcher) Cancel() {
-	s.f()
+	s.watcher.Cancel()
 }
 
 var _ Watcher = &serviceWatcher{}
@@ -217,7 +195,6 @@ var _ Watcher = &serviceWatcher{}
 type Session interface {
 	ID() SessionID
 	State() SessionState
-	setState(SessionState)
 	Watch(func(SessionState)) Watcher
 	Proposals() Proposals
 }
@@ -225,16 +202,13 @@ type Session interface {
 func newSession(session rsm.Session) Session {
 	return &serviceSession{
 		session:   session,
-		proposals: newProposals(),
-		watchers:  make(map[string]func(SessionState)),
+		proposals: newProposals(session.Commands()),
 	}
 }
 
 type serviceSession struct {
 	session   rsm.Session
 	proposals Proposals
-	state     SessionState
-	watchers  map[string]func(SessionState)
 }
 
 func (s *serviceSession) ID() SessionID {
@@ -246,92 +220,42 @@ func (s *serviceSession) Proposals() Proposals {
 }
 
 func (s *serviceSession) State() SessionState {
-	return s.state
-}
-
-func (s *serviceSession) setState(state SessionState) {
-	if state != s.state {
-		s.state = state
-		for _, watcher := range s.watchers {
-			watcher(state)
-		}
-	}
+	return SessionState(s.session.State())
 }
 
 func (s *serviceSession) Watch(f func(SessionState)) Watcher {
-	id := uuid.New().String()
-	s.watchers[id] = f
-	return newWatcher(func() {
-		delete(s.watchers, id)
-	})
+	return newWatcher(s.session.Watch(func(state rsm.SessionState) {
+		f(SessionState(state))
+	}))
 }
 
 var _ Session = &serviceSession{}
 
 type Proposals interface {
-	Size() SizeProposals
 	Put() PutProposals
-	Get() GetProposals
-	FirstEntry() FirstEntryProposals
-	LastEntry() LastEntryProposals
-	PrevEntry() PrevEntryProposals
-	NextEntry() NextEntryProposals
 	Remove() RemoveProposals
 	Clear() ClearProposals
 	Events() EventsProposals
-	Entries() EntriesProposals
 }
 
-func newProposals() Proposals {
+func newProposals(commands rsm.Commands) Proposals {
 	return &serviceProposals{
-		sizeProposals:       newSizeProposals(),
-		putProposals:        newPutProposals(),
-		getProposals:        newGetProposals(),
-		firstEntryProposals: newFirstEntryProposals(),
-		lastEntryProposals:  newLastEntryProposals(),
-		prevEntryProposals:  newPrevEntryProposals(),
-		nextEntryProposals:  newNextEntryProposals(),
-		removeProposals:     newRemoveProposals(),
-		clearProposals:      newClearProposals(),
-		eventsProposals:     newEventsProposals(),
-		entriesProposals:    newEntriesProposals(),
+		putProposals:    newPutProposals(commands),
+		removeProposals: newRemoveProposals(commands),
+		clearProposals:  newClearProposals(commands),
+		eventsProposals: newEventsProposals(commands),
 	}
 }
 
 type serviceProposals struct {
-	sizeProposals       SizeProposals
-	putProposals        PutProposals
-	getProposals        GetProposals
-	firstEntryProposals FirstEntryProposals
-	lastEntryProposals  LastEntryProposals
-	prevEntryProposals  PrevEntryProposals
-	nextEntryProposals  NextEntryProposals
-	removeProposals     RemoveProposals
-	clearProposals      ClearProposals
-	eventsProposals     EventsProposals
-	entriesProposals    EntriesProposals
+	putProposals    PutProposals
+	removeProposals RemoveProposals
+	clearProposals  ClearProposals
+	eventsProposals EventsProposals
 }
 
-func (s *serviceProposals) Size() SizeProposals {
-	return s.sizeProposals
-}
 func (s *serviceProposals) Put() PutProposals {
 	return s.putProposals
-}
-func (s *serviceProposals) Get() GetProposals {
-	return s.getProposals
-}
-func (s *serviceProposals) FirstEntry() FirstEntryProposals {
-	return s.firstEntryProposals
-}
-func (s *serviceProposals) LastEntry() LastEntryProposals {
-	return s.lastEntryProposals
-}
-func (s *serviceProposals) PrevEntry() PrevEntryProposals {
-	return s.prevEntryProposals
-}
-func (s *serviceProposals) NextEntry() NextEntryProposals {
-	return s.nextEntryProposals
 }
 func (s *serviceProposals) Remove() RemoveProposals {
 	return s.removeProposals
@@ -341,9 +265,6 @@ func (s *serviceProposals) Clear() ClearProposals {
 }
 func (s *serviceProposals) Events() EventsProposals {
 	return s.eventsProposals
-}
-func (s *serviceProposals) Entries() EntriesProposals {
-	return s.entriesProposals
 }
 
 var _ Proposals = &serviceProposals{}
@@ -356,149 +277,127 @@ type Proposal interface {
 	Session() Session
 }
 
-func newProposal(id ProposalID, session Session) Proposal {
+func newProposal(command rsm.Command) Proposal {
 	return &serviceProposal{
-		id:      id,
-		session: session,
+		command: command,
 	}
 }
 
 type serviceProposal struct {
-	id      ProposalID
-	session Session
+	command rsm.Command
 }
 
 func (p *serviceProposal) ID() ProposalID {
-	return p.id
+	return ProposalID(p.command.ID())
 }
 
 func (p *serviceProposal) Session() Session {
-	return p.session
+	return newSession(p.command.Session())
 }
 
 func (p *serviceProposal) String() string {
-	return fmt.Sprintf("ProposalID: %d, SessionID: %d", p.id, p.session.ID())
+	return fmt.Sprintf("ProposalID: %d, SessionID: %d", p.ID(), p.Session().ID())
 }
 
 var _ Proposal = &serviceProposal{}
 
-type SizeProposals interface {
-	register(SizeProposal)
-	unregister(ProposalID)
-	Get(ProposalID) (SizeProposal, bool)
-	List() []SizeProposal
+type Query interface {
+	fmt.Stringer
+	Session() Session
 }
 
-func newSizeProposals() SizeProposals {
-	return &sizeProposals{
-		proposals: make(map[ProposalID]SizeProposal),
+func newQuery(query rsm.Query) Query {
+	return &serviceQuery{
+		query: query,
 	}
 }
 
-type sizeProposals struct {
-	proposals map[ProposalID]SizeProposal
+type serviceQuery struct {
+	query rsm.Query
 }
 
-func (p *sizeProposals) register(proposal SizeProposal) {
-	p.proposals[proposal.ID()] = proposal
+func (p *serviceQuery) Session() Session {
+	return newSession(p.query.Session())
 }
 
-func (p *sizeProposals) unregister(id ProposalID) {
-	delete(p.proposals, id)
+func (p *serviceQuery) String() string {
+	return fmt.Sprintf("SessionID: %d", p.Session().ID())
 }
 
-func (p *sizeProposals) Get(id ProposalID) (SizeProposal, bool) {
-	proposal, ok := p.proposals[id]
-	return proposal, ok
-}
+var _ Query = &serviceQuery{}
 
-func (p *sizeProposals) List() []SizeProposal {
-	proposals := make([]SizeProposal, 0, len(p.proposals))
-	for _, proposal := range p.proposals {
-		proposals = append(proposals, proposal)
-	}
-	return proposals
-}
-
-var _ SizeProposals = &sizeProposals{}
-
-type SizeProposal interface {
-	Proposal
-	Request() *indexedmap.SizeRequest
+type SizeQuery interface {
+	Query
+	Request() (*indexedmap.SizeRequest, error)
 	Reply(*indexedmap.SizeResponse) error
-	response() *indexedmap.SizeResponse
 }
 
-func newSizeProposal(id ProposalID, session Session, request *indexedmap.SizeRequest) SizeProposal {
-	return &sizeProposal{
-		Proposal: newProposal(id, session),
-		req:      request,
+func newSizeQuery(query rsm.Query) SizeQuery {
+	return &sizeQuery{
+		Query: newQuery(query),
+		query: query,
 	}
 }
 
-type sizeProposal struct {
-	Proposal
-	req *indexedmap.SizeRequest
-	res *indexedmap.SizeResponse
+type sizeQuery struct {
+	Query
+	query rsm.Query
 }
 
-func (p *sizeProposal) Request() *indexedmap.SizeRequest {
-	return p.req
-}
-
-func (p *sizeProposal) Reply(reply *indexedmap.SizeResponse) error {
-	if p.res != nil {
-		return errors.NewConflict("reply already sent")
+func (p *sizeQuery) Request() (*indexedmap.SizeRequest, error) {
+	request := &indexedmap.SizeRequest{}
+	if err := proto.Unmarshal(p.query.Input(), request); err != nil {
+		return nil, err
 	}
-	log.Debugf("Accepted SizeProposal %s: %s", p, reply)
-	p.res = reply
+	log.Debugf("Received SizeQuery %s: %s", p, request)
+	return request, nil
+}
+
+func (p *sizeQuery) Reply(response *indexedmap.SizeResponse) error {
+	log.Debugf("Sending SizeQuery %s: %s", p, response)
+	output, err := proto.Marshal(response)
+	if err != nil {
+		return err
+	}
+	p.query.Output(output, nil)
+	p.query.Close()
 	return nil
 }
 
-func (p *sizeProposal) response() *indexedmap.SizeResponse {
-	return p.res
+func (p *sizeQuery) String() string {
+	return fmt.Sprintf("SessionID=%d", p.Session().ID())
 }
 
-func (p *sizeProposal) String() string {
-	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
-}
-
-var _ SizeProposal = &sizeProposal{}
+var _ SizeQuery = &sizeQuery{}
 
 type PutProposals interface {
-	register(PutProposal)
-	unregister(ProposalID)
 	Get(ProposalID) (PutProposal, bool)
 	List() []PutProposal
 }
 
-func newPutProposals() PutProposals {
+func newPutProposals(commands rsm.Commands) PutProposals {
 	return &putProposals{
-		proposals: make(map[ProposalID]PutProposal),
+		commands: commands,
 	}
 }
 
 type putProposals struct {
-	proposals map[ProposalID]PutProposal
-}
-
-func (p *putProposals) register(proposal PutProposal) {
-	p.proposals[proposal.ID()] = proposal
-}
-
-func (p *putProposals) unregister(id ProposalID) {
-	delete(p.proposals, id)
+	commands rsm.Commands
 }
 
 func (p *putProposals) Get(id ProposalID) (PutProposal, bool) {
-	proposal, ok := p.proposals[id]
-	return proposal, ok
+	command, ok := p.commands.Get(rsm.CommandID(id))
+	if !ok {
+		return nil, false
+	}
+	return newPutProposal(command), true
 }
 
 func (p *putProposals) List() []PutProposal {
-	proposals := make([]PutProposal, 0, len(p.proposals))
-	for _, proposal := range p.proposals {
-		proposals = append(proposals, proposal)
+	commands := p.commands.List(rsm.OperationID(2))
+	proposals := make([]PutProposal, len(commands))
+	for i, command := range commands {
+		proposals[i] = newPutProposal(command)
 	}
 	return proposals
 }
@@ -507,496 +406,296 @@ var _ PutProposals = &putProposals{}
 
 type PutProposal interface {
 	Proposal
-	Request() *indexedmap.PutRequest
+	Request() (*indexedmap.PutRequest, error)
 	Reply(*indexedmap.PutResponse) error
-	response() *indexedmap.PutResponse
 }
 
-func newPutProposal(id ProposalID, session Session, request *indexedmap.PutRequest) PutProposal {
+func newPutProposal(command rsm.Command) PutProposal {
 	return &putProposal{
-		Proposal: newProposal(id, session),
-		req:      request,
+		Proposal: newProposal(command),
+		command:  command,
 	}
 }
 
 type putProposal struct {
 	Proposal
-	req *indexedmap.PutRequest
-	res *indexedmap.PutResponse
+	command rsm.Command
 }
 
-func (p *putProposal) Request() *indexedmap.PutRequest {
-	return p.req
-}
-
-func (p *putProposal) Reply(reply *indexedmap.PutResponse) error {
-	if p.res != nil {
-		return errors.NewConflict("reply already sent")
+func (p *putProposal) Request() (*indexedmap.PutRequest, error) {
+	request := &indexedmap.PutRequest{}
+	if err := proto.Unmarshal(p.command.Input(), request); err != nil {
+		return nil, err
 	}
-	log.Debugf("Accepted PutProposal %s: %s", p, reply)
-	p.res = reply
+	log.Debugf("Received PutProposal %s: %s", p, request)
+	return request, nil
+}
+
+func (p *putProposal) Reply(response *indexedmap.PutResponse) error {
+	log.Debugf("Sending PutProposal %s: %s", p, response)
+	output, err := proto.Marshal(response)
+	if err != nil {
+		return err
+	}
+	p.command.Output(output, nil)
+	p.command.Close()
 	return nil
 }
 
-func (p *putProposal) response() *indexedmap.PutResponse {
-	return p.res
-}
-
 func (p *putProposal) String() string {
-	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d", p.ID(), p.Session().ID())
 }
 
 var _ PutProposal = &putProposal{}
 
-type GetProposals interface {
-	register(GetProposal)
-	unregister(ProposalID)
-	Get(ProposalID) (GetProposal, bool)
-	List() []GetProposal
-}
-
-func newGetProposals() GetProposals {
-	return &getProposals{
-		proposals: make(map[ProposalID]GetProposal),
-	}
-}
-
-type getProposals struct {
-	proposals map[ProposalID]GetProposal
-}
-
-func (p *getProposals) register(proposal GetProposal) {
-	p.proposals[proposal.ID()] = proposal
-}
-
-func (p *getProposals) unregister(id ProposalID) {
-	delete(p.proposals, id)
-}
-
-func (p *getProposals) Get(id ProposalID) (GetProposal, bool) {
-	proposal, ok := p.proposals[id]
-	return proposal, ok
-}
-
-func (p *getProposals) List() []GetProposal {
-	proposals := make([]GetProposal, 0, len(p.proposals))
-	for _, proposal := range p.proposals {
-		proposals = append(proposals, proposal)
-	}
-	return proposals
-}
-
-var _ GetProposals = &getProposals{}
-
-type GetProposal interface {
-	Proposal
-	Request() *indexedmap.GetRequest
+type GetQuery interface {
+	Query
+	Request() (*indexedmap.GetRequest, error)
 	Reply(*indexedmap.GetResponse) error
-	response() *indexedmap.GetResponse
 }
 
-func newGetProposal(id ProposalID, session Session, request *indexedmap.GetRequest) GetProposal {
-	return &getProposal{
-		Proposal: newProposal(id, session),
-		req:      request,
+func newGetQuery(query rsm.Query) GetQuery {
+	return &getQuery{
+		Query: newQuery(query),
+		query: query,
 	}
 }
 
-type getProposal struct {
-	Proposal
-	req *indexedmap.GetRequest
-	res *indexedmap.GetResponse
+type getQuery struct {
+	Query
+	query rsm.Query
 }
 
-func (p *getProposal) Request() *indexedmap.GetRequest {
-	return p.req
-}
-
-func (p *getProposal) Reply(reply *indexedmap.GetResponse) error {
-	if p.res != nil {
-		return errors.NewConflict("reply already sent")
+func (p *getQuery) Request() (*indexedmap.GetRequest, error) {
+	request := &indexedmap.GetRequest{}
+	if err := proto.Unmarshal(p.query.Input(), request); err != nil {
+		return nil, err
 	}
-	log.Debugf("Accepted GetProposal %s: %s", p, reply)
-	p.res = reply
+	log.Debugf("Received GetQuery %s: %s", p, request)
+	return request, nil
+}
+
+func (p *getQuery) Reply(response *indexedmap.GetResponse) error {
+	log.Debugf("Sending GetQuery %s: %s", p, response)
+	output, err := proto.Marshal(response)
+	if err != nil {
+		return err
+	}
+	p.query.Output(output, nil)
+	p.query.Close()
 	return nil
 }
 
-func (p *getProposal) response() *indexedmap.GetResponse {
-	return p.res
+func (p *getQuery) String() string {
+	return fmt.Sprintf("SessionID=%d", p.Session().ID())
 }
 
-func (p *getProposal) String() string {
-	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
-}
+var _ GetQuery = &getQuery{}
 
-var _ GetProposal = &getProposal{}
-
-type FirstEntryProposals interface {
-	register(FirstEntryProposal)
-	unregister(ProposalID)
-	Get(ProposalID) (FirstEntryProposal, bool)
-	List() []FirstEntryProposal
-}
-
-func newFirstEntryProposals() FirstEntryProposals {
-	return &firstEntryProposals{
-		proposals: make(map[ProposalID]FirstEntryProposal),
-	}
-}
-
-type firstEntryProposals struct {
-	proposals map[ProposalID]FirstEntryProposal
-}
-
-func (p *firstEntryProposals) register(proposal FirstEntryProposal) {
-	p.proposals[proposal.ID()] = proposal
-}
-
-func (p *firstEntryProposals) unregister(id ProposalID) {
-	delete(p.proposals, id)
-}
-
-func (p *firstEntryProposals) Get(id ProposalID) (FirstEntryProposal, bool) {
-	proposal, ok := p.proposals[id]
-	return proposal, ok
-}
-
-func (p *firstEntryProposals) List() []FirstEntryProposal {
-	proposals := make([]FirstEntryProposal, 0, len(p.proposals))
-	for _, proposal := range p.proposals {
-		proposals = append(proposals, proposal)
-	}
-	return proposals
-}
-
-var _ FirstEntryProposals = &firstEntryProposals{}
-
-type FirstEntryProposal interface {
-	Proposal
-	Request() *indexedmap.FirstEntryRequest
+type FirstEntryQuery interface {
+	Query
+	Request() (*indexedmap.FirstEntryRequest, error)
 	Reply(*indexedmap.FirstEntryResponse) error
-	response() *indexedmap.FirstEntryResponse
 }
 
-func newFirstEntryProposal(id ProposalID, session Session, request *indexedmap.FirstEntryRequest) FirstEntryProposal {
-	return &firstEntryProposal{
-		Proposal: newProposal(id, session),
-		req:      request,
+func newFirstEntryQuery(query rsm.Query) FirstEntryQuery {
+	return &firstEntryQuery{
+		Query: newQuery(query),
+		query: query,
 	}
 }
 
-type firstEntryProposal struct {
-	Proposal
-	req *indexedmap.FirstEntryRequest
-	res *indexedmap.FirstEntryResponse
+type firstEntryQuery struct {
+	Query
+	query rsm.Query
 }
 
-func (p *firstEntryProposal) Request() *indexedmap.FirstEntryRequest {
-	return p.req
-}
-
-func (p *firstEntryProposal) Reply(reply *indexedmap.FirstEntryResponse) error {
-	if p.res != nil {
-		return errors.NewConflict("reply already sent")
+func (p *firstEntryQuery) Request() (*indexedmap.FirstEntryRequest, error) {
+	request := &indexedmap.FirstEntryRequest{}
+	if err := proto.Unmarshal(p.query.Input(), request); err != nil {
+		return nil, err
 	}
-	log.Debugf("Accepted FirstEntryProposal %s: %s", p, reply)
-	p.res = reply
+	log.Debugf("Received FirstEntryQuery %s: %s", p, request)
+	return request, nil
+}
+
+func (p *firstEntryQuery) Reply(response *indexedmap.FirstEntryResponse) error {
+	log.Debugf("Sending FirstEntryQuery %s: %s", p, response)
+	output, err := proto.Marshal(response)
+	if err != nil {
+		return err
+	}
+	p.query.Output(output, nil)
+	p.query.Close()
 	return nil
 }
 
-func (p *firstEntryProposal) response() *indexedmap.FirstEntryResponse {
-	return p.res
+func (p *firstEntryQuery) String() string {
+	return fmt.Sprintf("SessionID=%d", p.Session().ID())
 }
 
-func (p *firstEntryProposal) String() string {
-	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
-}
+var _ FirstEntryQuery = &firstEntryQuery{}
 
-var _ FirstEntryProposal = &firstEntryProposal{}
-
-type LastEntryProposals interface {
-	register(LastEntryProposal)
-	unregister(ProposalID)
-	Get(ProposalID) (LastEntryProposal, bool)
-	List() []LastEntryProposal
-}
-
-func newLastEntryProposals() LastEntryProposals {
-	return &lastEntryProposals{
-		proposals: make(map[ProposalID]LastEntryProposal),
-	}
-}
-
-type lastEntryProposals struct {
-	proposals map[ProposalID]LastEntryProposal
-}
-
-func (p *lastEntryProposals) register(proposal LastEntryProposal) {
-	p.proposals[proposal.ID()] = proposal
-}
-
-func (p *lastEntryProposals) unregister(id ProposalID) {
-	delete(p.proposals, id)
-}
-
-func (p *lastEntryProposals) Get(id ProposalID) (LastEntryProposal, bool) {
-	proposal, ok := p.proposals[id]
-	return proposal, ok
-}
-
-func (p *lastEntryProposals) List() []LastEntryProposal {
-	proposals := make([]LastEntryProposal, 0, len(p.proposals))
-	for _, proposal := range p.proposals {
-		proposals = append(proposals, proposal)
-	}
-	return proposals
-}
-
-var _ LastEntryProposals = &lastEntryProposals{}
-
-type LastEntryProposal interface {
-	Proposal
-	Request() *indexedmap.LastEntryRequest
+type LastEntryQuery interface {
+	Query
+	Request() (*indexedmap.LastEntryRequest, error)
 	Reply(*indexedmap.LastEntryResponse) error
-	response() *indexedmap.LastEntryResponse
 }
 
-func newLastEntryProposal(id ProposalID, session Session, request *indexedmap.LastEntryRequest) LastEntryProposal {
-	return &lastEntryProposal{
-		Proposal: newProposal(id, session),
-		req:      request,
+func newLastEntryQuery(query rsm.Query) LastEntryQuery {
+	return &lastEntryQuery{
+		Query: newQuery(query),
+		query: query,
 	}
 }
 
-type lastEntryProposal struct {
-	Proposal
-	req *indexedmap.LastEntryRequest
-	res *indexedmap.LastEntryResponse
+type lastEntryQuery struct {
+	Query
+	query rsm.Query
 }
 
-func (p *lastEntryProposal) Request() *indexedmap.LastEntryRequest {
-	return p.req
-}
-
-func (p *lastEntryProposal) Reply(reply *indexedmap.LastEntryResponse) error {
-	if p.res != nil {
-		return errors.NewConflict("reply already sent")
+func (p *lastEntryQuery) Request() (*indexedmap.LastEntryRequest, error) {
+	request := &indexedmap.LastEntryRequest{}
+	if err := proto.Unmarshal(p.query.Input(), request); err != nil {
+		return nil, err
 	}
-	log.Debugf("Accepted LastEntryProposal %s: %s", p, reply)
-	p.res = reply
+	log.Debugf("Received LastEntryQuery %s: %s", p, request)
+	return request, nil
+}
+
+func (p *lastEntryQuery) Reply(response *indexedmap.LastEntryResponse) error {
+	log.Debugf("Sending LastEntryQuery %s: %s", p, response)
+	output, err := proto.Marshal(response)
+	if err != nil {
+		return err
+	}
+	p.query.Output(output, nil)
+	p.query.Close()
 	return nil
 }
 
-func (p *lastEntryProposal) response() *indexedmap.LastEntryResponse {
-	return p.res
+func (p *lastEntryQuery) String() string {
+	return fmt.Sprintf("SessionID=%d", p.Session().ID())
 }
 
-func (p *lastEntryProposal) String() string {
-	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
-}
+var _ LastEntryQuery = &lastEntryQuery{}
 
-var _ LastEntryProposal = &lastEntryProposal{}
-
-type PrevEntryProposals interface {
-	register(PrevEntryProposal)
-	unregister(ProposalID)
-	Get(ProposalID) (PrevEntryProposal, bool)
-	List() []PrevEntryProposal
-}
-
-func newPrevEntryProposals() PrevEntryProposals {
-	return &prevEntryProposals{
-		proposals: make(map[ProposalID]PrevEntryProposal),
-	}
-}
-
-type prevEntryProposals struct {
-	proposals map[ProposalID]PrevEntryProposal
-}
-
-func (p *prevEntryProposals) register(proposal PrevEntryProposal) {
-	p.proposals[proposal.ID()] = proposal
-}
-
-func (p *prevEntryProposals) unregister(id ProposalID) {
-	delete(p.proposals, id)
-}
-
-func (p *prevEntryProposals) Get(id ProposalID) (PrevEntryProposal, bool) {
-	proposal, ok := p.proposals[id]
-	return proposal, ok
-}
-
-func (p *prevEntryProposals) List() []PrevEntryProposal {
-	proposals := make([]PrevEntryProposal, 0, len(p.proposals))
-	for _, proposal := range p.proposals {
-		proposals = append(proposals, proposal)
-	}
-	return proposals
-}
-
-var _ PrevEntryProposals = &prevEntryProposals{}
-
-type PrevEntryProposal interface {
-	Proposal
-	Request() *indexedmap.PrevEntryRequest
+type PrevEntryQuery interface {
+	Query
+	Request() (*indexedmap.PrevEntryRequest, error)
 	Reply(*indexedmap.PrevEntryResponse) error
-	response() *indexedmap.PrevEntryResponse
 }
 
-func newPrevEntryProposal(id ProposalID, session Session, request *indexedmap.PrevEntryRequest) PrevEntryProposal {
-	return &prevEntryProposal{
-		Proposal: newProposal(id, session),
-		req:      request,
+func newPrevEntryQuery(query rsm.Query) PrevEntryQuery {
+	return &prevEntryQuery{
+		Query: newQuery(query),
+		query: query,
 	}
 }
 
-type prevEntryProposal struct {
-	Proposal
-	req *indexedmap.PrevEntryRequest
-	res *indexedmap.PrevEntryResponse
+type prevEntryQuery struct {
+	Query
+	query rsm.Query
 }
 
-func (p *prevEntryProposal) Request() *indexedmap.PrevEntryRequest {
-	return p.req
-}
-
-func (p *prevEntryProposal) Reply(reply *indexedmap.PrevEntryResponse) error {
-	if p.res != nil {
-		return errors.NewConflict("reply already sent")
+func (p *prevEntryQuery) Request() (*indexedmap.PrevEntryRequest, error) {
+	request := &indexedmap.PrevEntryRequest{}
+	if err := proto.Unmarshal(p.query.Input(), request); err != nil {
+		return nil, err
 	}
-	log.Debugf("Accepted PrevEntryProposal %s: %s", p, reply)
-	p.res = reply
+	log.Debugf("Received PrevEntryQuery %s: %s", p, request)
+	return request, nil
+}
+
+func (p *prevEntryQuery) Reply(response *indexedmap.PrevEntryResponse) error {
+	log.Debugf("Sending PrevEntryQuery %s: %s", p, response)
+	output, err := proto.Marshal(response)
+	if err != nil {
+		return err
+	}
+	p.query.Output(output, nil)
+	p.query.Close()
 	return nil
 }
 
-func (p *prevEntryProposal) response() *indexedmap.PrevEntryResponse {
-	return p.res
+func (p *prevEntryQuery) String() string {
+	return fmt.Sprintf("SessionID=%d", p.Session().ID())
 }
 
-func (p *prevEntryProposal) String() string {
-	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
-}
+var _ PrevEntryQuery = &prevEntryQuery{}
 
-var _ PrevEntryProposal = &prevEntryProposal{}
-
-type NextEntryProposals interface {
-	register(NextEntryProposal)
-	unregister(ProposalID)
-	Get(ProposalID) (NextEntryProposal, bool)
-	List() []NextEntryProposal
-}
-
-func newNextEntryProposals() NextEntryProposals {
-	return &nextEntryProposals{
-		proposals: make(map[ProposalID]NextEntryProposal),
-	}
-}
-
-type nextEntryProposals struct {
-	proposals map[ProposalID]NextEntryProposal
-}
-
-func (p *nextEntryProposals) register(proposal NextEntryProposal) {
-	p.proposals[proposal.ID()] = proposal
-}
-
-func (p *nextEntryProposals) unregister(id ProposalID) {
-	delete(p.proposals, id)
-}
-
-func (p *nextEntryProposals) Get(id ProposalID) (NextEntryProposal, bool) {
-	proposal, ok := p.proposals[id]
-	return proposal, ok
-}
-
-func (p *nextEntryProposals) List() []NextEntryProposal {
-	proposals := make([]NextEntryProposal, 0, len(p.proposals))
-	for _, proposal := range p.proposals {
-		proposals = append(proposals, proposal)
-	}
-	return proposals
-}
-
-var _ NextEntryProposals = &nextEntryProposals{}
-
-type NextEntryProposal interface {
-	Proposal
-	Request() *indexedmap.NextEntryRequest
+type NextEntryQuery interface {
+	Query
+	Request() (*indexedmap.NextEntryRequest, error)
 	Reply(*indexedmap.NextEntryResponse) error
-	response() *indexedmap.NextEntryResponse
 }
 
-func newNextEntryProposal(id ProposalID, session Session, request *indexedmap.NextEntryRequest) NextEntryProposal {
-	return &nextEntryProposal{
-		Proposal: newProposal(id, session),
-		req:      request,
+func newNextEntryQuery(query rsm.Query) NextEntryQuery {
+	return &nextEntryQuery{
+		Query: newQuery(query),
+		query: query,
 	}
 }
 
-type nextEntryProposal struct {
-	Proposal
-	req *indexedmap.NextEntryRequest
-	res *indexedmap.NextEntryResponse
+type nextEntryQuery struct {
+	Query
+	query rsm.Query
 }
 
-func (p *nextEntryProposal) Request() *indexedmap.NextEntryRequest {
-	return p.req
-}
-
-func (p *nextEntryProposal) Reply(reply *indexedmap.NextEntryResponse) error {
-	if p.res != nil {
-		return errors.NewConflict("reply already sent")
+func (p *nextEntryQuery) Request() (*indexedmap.NextEntryRequest, error) {
+	request := &indexedmap.NextEntryRequest{}
+	if err := proto.Unmarshal(p.query.Input(), request); err != nil {
+		return nil, err
 	}
-	log.Debugf("Accepted NextEntryProposal %s: %s", p, reply)
-	p.res = reply
+	log.Debugf("Received NextEntryQuery %s: %s", p, request)
+	return request, nil
+}
+
+func (p *nextEntryQuery) Reply(response *indexedmap.NextEntryResponse) error {
+	log.Debugf("Sending NextEntryQuery %s: %s", p, response)
+	output, err := proto.Marshal(response)
+	if err != nil {
+		return err
+	}
+	p.query.Output(output, nil)
+	p.query.Close()
 	return nil
 }
 
-func (p *nextEntryProposal) response() *indexedmap.NextEntryResponse {
-	return p.res
+func (p *nextEntryQuery) String() string {
+	return fmt.Sprintf("SessionID=%d", p.Session().ID())
 }
 
-func (p *nextEntryProposal) String() string {
-	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
-}
-
-var _ NextEntryProposal = &nextEntryProposal{}
+var _ NextEntryQuery = &nextEntryQuery{}
 
 type RemoveProposals interface {
-	register(RemoveProposal)
-	unregister(ProposalID)
 	Get(ProposalID) (RemoveProposal, bool)
 	List() []RemoveProposal
 }
 
-func newRemoveProposals() RemoveProposals {
+func newRemoveProposals(commands rsm.Commands) RemoveProposals {
 	return &removeProposals{
-		proposals: make(map[ProposalID]RemoveProposal),
+		commands: commands,
 	}
 }
 
 type removeProposals struct {
-	proposals map[ProposalID]RemoveProposal
-}
-
-func (p *removeProposals) register(proposal RemoveProposal) {
-	p.proposals[proposal.ID()] = proposal
-}
-
-func (p *removeProposals) unregister(id ProposalID) {
-	delete(p.proposals, id)
+	commands rsm.Commands
 }
 
 func (p *removeProposals) Get(id ProposalID) (RemoveProposal, bool) {
-	proposal, ok := p.proposals[id]
-	return proposal, ok
+	command, ok := p.commands.Get(rsm.CommandID(id))
+	if !ok {
+		return nil, false
+	}
+	return newRemoveProposal(command), true
 }
 
 func (p *removeProposals) List() []RemoveProposal {
-	proposals := make([]RemoveProposal, 0, len(p.proposals))
-	for _, proposal := range p.proposals {
-		proposals = append(proposals, proposal)
+	commands := p.commands.List(rsm.OperationID(8))
+	proposals := make([]RemoveProposal, len(commands))
+	for i, command := range commands {
+		proposals[i] = newRemoveProposal(command)
 	}
 	return proposals
 }
@@ -1005,81 +704,76 @@ var _ RemoveProposals = &removeProposals{}
 
 type RemoveProposal interface {
 	Proposal
-	Request() *indexedmap.RemoveRequest
+	Request() (*indexedmap.RemoveRequest, error)
 	Reply(*indexedmap.RemoveResponse) error
-	response() *indexedmap.RemoveResponse
 }
 
-func newRemoveProposal(id ProposalID, session Session, request *indexedmap.RemoveRequest) RemoveProposal {
+func newRemoveProposal(command rsm.Command) RemoveProposal {
 	return &removeProposal{
-		Proposal: newProposal(id, session),
-		req:      request,
+		Proposal: newProposal(command),
+		command:  command,
 	}
 }
 
 type removeProposal struct {
 	Proposal
-	req *indexedmap.RemoveRequest
-	res *indexedmap.RemoveResponse
+	command rsm.Command
 }
 
-func (p *removeProposal) Request() *indexedmap.RemoveRequest {
-	return p.req
-}
-
-func (p *removeProposal) Reply(reply *indexedmap.RemoveResponse) error {
-	if p.res != nil {
-		return errors.NewConflict("reply already sent")
+func (p *removeProposal) Request() (*indexedmap.RemoveRequest, error) {
+	request := &indexedmap.RemoveRequest{}
+	if err := proto.Unmarshal(p.command.Input(), request); err != nil {
+		return nil, err
 	}
-	log.Debugf("Accepted RemoveProposal %s: %s", p, reply)
-	p.res = reply
+	log.Debugf("Received RemoveProposal %s: %s", p, request)
+	return request, nil
+}
+
+func (p *removeProposal) Reply(response *indexedmap.RemoveResponse) error {
+	log.Debugf("Sending RemoveProposal %s: %s", p, response)
+	output, err := proto.Marshal(response)
+	if err != nil {
+		return err
+	}
+	p.command.Output(output, nil)
+	p.command.Close()
 	return nil
 }
 
-func (p *removeProposal) response() *indexedmap.RemoveResponse {
-	return p.res
-}
-
 func (p *removeProposal) String() string {
-	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d", p.ID(), p.Session().ID())
 }
 
 var _ RemoveProposal = &removeProposal{}
 
 type ClearProposals interface {
-	register(ClearProposal)
-	unregister(ProposalID)
 	Get(ProposalID) (ClearProposal, bool)
 	List() []ClearProposal
 }
 
-func newClearProposals() ClearProposals {
+func newClearProposals(commands rsm.Commands) ClearProposals {
 	return &clearProposals{
-		proposals: make(map[ProposalID]ClearProposal),
+		commands: commands,
 	}
 }
 
 type clearProposals struct {
-	proposals map[ProposalID]ClearProposal
-}
-
-func (p *clearProposals) register(proposal ClearProposal) {
-	p.proposals[proposal.ID()] = proposal
-}
-
-func (p *clearProposals) unregister(id ProposalID) {
-	delete(p.proposals, id)
+	commands rsm.Commands
 }
 
 func (p *clearProposals) Get(id ProposalID) (ClearProposal, bool) {
-	proposal, ok := p.proposals[id]
-	return proposal, ok
+	command, ok := p.commands.Get(rsm.CommandID(id))
+	if !ok {
+		return nil, false
+	}
+	return newClearProposal(command), true
 }
 
 func (p *clearProposals) List() []ClearProposal {
-	proposals := make([]ClearProposal, 0, len(p.proposals))
-	for _, proposal := range p.proposals {
-		proposals = append(proposals, proposal)
+	commands := p.commands.List(rsm.OperationID(9))
+	proposals := make([]ClearProposal, len(commands))
+	for i, command := range commands {
+		proposals[i] = newClearProposal(command)
 	}
 	return proposals
 }
@@ -1088,81 +782,76 @@ var _ ClearProposals = &clearProposals{}
 
 type ClearProposal interface {
 	Proposal
-	Request() *indexedmap.ClearRequest
+	Request() (*indexedmap.ClearRequest, error)
 	Reply(*indexedmap.ClearResponse) error
-	response() *indexedmap.ClearResponse
 }
 
-func newClearProposal(id ProposalID, session Session, request *indexedmap.ClearRequest) ClearProposal {
+func newClearProposal(command rsm.Command) ClearProposal {
 	return &clearProposal{
-		Proposal: newProposal(id, session),
-		req:      request,
+		Proposal: newProposal(command),
+		command:  command,
 	}
 }
 
 type clearProposal struct {
 	Proposal
-	req *indexedmap.ClearRequest
-	res *indexedmap.ClearResponse
+	command rsm.Command
 }
 
-func (p *clearProposal) Request() *indexedmap.ClearRequest {
-	return p.req
-}
-
-func (p *clearProposal) Reply(reply *indexedmap.ClearResponse) error {
-	if p.res != nil {
-		return errors.NewConflict("reply already sent")
+func (p *clearProposal) Request() (*indexedmap.ClearRequest, error) {
+	request := &indexedmap.ClearRequest{}
+	if err := proto.Unmarshal(p.command.Input(), request); err != nil {
+		return nil, err
 	}
-	log.Debugf("Accepted ClearProposal %s: %s", p, reply)
-	p.res = reply
+	log.Debugf("Received ClearProposal %s: %s", p, request)
+	return request, nil
+}
+
+func (p *clearProposal) Reply(response *indexedmap.ClearResponse) error {
+	log.Debugf("Sending ClearProposal %s: %s", p, response)
+	output, err := proto.Marshal(response)
+	if err != nil {
+		return err
+	}
+	p.command.Output(output, nil)
+	p.command.Close()
 	return nil
 }
 
-func (p *clearProposal) response() *indexedmap.ClearResponse {
-	return p.res
-}
-
 func (p *clearProposal) String() string {
-	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d", p.ID(), p.Session().ID())
 }
 
 var _ ClearProposal = &clearProposal{}
 
 type EventsProposals interface {
-	register(EventsProposal)
-	unregister(ProposalID)
 	Get(ProposalID) (EventsProposal, bool)
 	List() []EventsProposal
 }
 
-func newEventsProposals() EventsProposals {
+func newEventsProposals(commands rsm.Commands) EventsProposals {
 	return &eventsProposals{
-		proposals: make(map[ProposalID]EventsProposal),
+		commands: commands,
 	}
 }
 
 type eventsProposals struct {
-	proposals map[ProposalID]EventsProposal
-}
-
-func (p *eventsProposals) register(proposal EventsProposal) {
-	p.proposals[proposal.ID()] = proposal
-}
-
-func (p *eventsProposals) unregister(id ProposalID) {
-	delete(p.proposals, id)
+	commands rsm.Commands
 }
 
 func (p *eventsProposals) Get(id ProposalID) (EventsProposal, bool) {
-	proposal, ok := p.proposals[id]
-	return proposal, ok
+	command, ok := p.commands.Get(rsm.CommandID(id))
+	if !ok {
+		return nil, false
+	}
+	return newEventsProposal(command), true
 }
 
 func (p *eventsProposals) List() []EventsProposal {
-	proposals := make([]EventsProposal, 0, len(p.proposals))
-	for _, proposal := range p.proposals {
-		proposals = append(proposals, proposal)
+	commands := p.commands.List(rsm.OperationID(10))
+	proposals := make([]EventsProposal, len(commands))
+	for i, command := range commands {
+		proposals[i] = newEventsProposal(command)
 	}
 	return proposals
 }
@@ -1171,132 +860,98 @@ var _ EventsProposals = &eventsProposals{}
 
 type EventsProposal interface {
 	Proposal
-	Request() *indexedmap.EventsRequest
+	Request() (*indexedmap.EventsRequest, error)
 	Notify(*indexedmap.EventsResponse) error
 	Close() error
 }
 
-func newEventsProposal(id ProposalID, session Session, request *indexedmap.EventsRequest, stream rsm.Stream) EventsProposal {
+func newEventsProposal(command rsm.Command) EventsProposal {
 	return &eventsProposal{
-		Proposal: newProposal(id, session),
-		request:  request,
-		stream:   stream,
+		Proposal: newProposal(command),
+		command:  command,
 	}
 }
 
 type eventsProposal struct {
 	Proposal
-	request *indexedmap.EventsRequest
-	stream  rsm.Stream
+	command rsm.Command
 }
 
-func (p *eventsProposal) Request() *indexedmap.EventsRequest {
-	return p.request
+func (p *eventsProposal) Request() (*indexedmap.EventsRequest, error) {
+	request := &indexedmap.EventsRequest{}
+	if err := proto.Unmarshal(p.command.Input(), request); err != nil {
+		return nil, err
+	}
+	log.Debugf("Received EventsProposal %s: %s", p, request)
+	return request, nil
 }
 
-func (p *eventsProposal) Notify(notification *indexedmap.EventsResponse) error {
-	log.Debugf("Notifying EventsProposal %s: %s", p, notification)
-	bytes, err := proto.Marshal(notification)
+func (p *eventsProposal) Notify(response *indexedmap.EventsResponse) error {
+	log.Debugf("Notifying EventsProposal %s: %s", p, response)
+	output, err := proto.Marshal(response)
 	if err != nil {
 		return err
 	}
-	p.stream.Value(bytes)
+	p.command.Output(output, nil)
 	return nil
 }
 
 func (p *eventsProposal) Close() error {
-	p.stream.Close()
+	p.command.Close()
 	return nil
 }
 
 func (p *eventsProposal) String() string {
-	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.request)
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d", p.ID(), p.Session().ID())
 }
 
 var _ EventsProposal = &eventsProposal{}
 
-type EntriesProposals interface {
-	register(EntriesProposal)
-	unregister(ProposalID)
-	Get(ProposalID) (EntriesProposal, bool)
-	List() []EntriesProposal
-}
-
-func newEntriesProposals() EntriesProposals {
-	return &entriesProposals{
-		proposals: make(map[ProposalID]EntriesProposal),
-	}
-}
-
-type entriesProposals struct {
-	proposals map[ProposalID]EntriesProposal
-}
-
-func (p *entriesProposals) register(proposal EntriesProposal) {
-	p.proposals[proposal.ID()] = proposal
-}
-
-func (p *entriesProposals) unregister(id ProposalID) {
-	delete(p.proposals, id)
-}
-
-func (p *entriesProposals) Get(id ProposalID) (EntriesProposal, bool) {
-	proposal, ok := p.proposals[id]
-	return proposal, ok
-}
-
-func (p *entriesProposals) List() []EntriesProposal {
-	proposals := make([]EntriesProposal, 0, len(p.proposals))
-	for _, proposal := range p.proposals {
-		proposals = append(proposals, proposal)
-	}
-	return proposals
-}
-
-var _ EntriesProposals = &entriesProposals{}
-
-type EntriesProposal interface {
-	Proposal
-	Request() *indexedmap.EntriesRequest
+type EntriesQuery interface {
+	Query
+	Request() (*indexedmap.EntriesRequest, error)
 	Notify(*indexedmap.EntriesResponse) error
 	Close() error
 }
 
-func newEntriesProposal(id ProposalID, session Session, request *indexedmap.EntriesRequest, stream rsm.Stream) EntriesProposal {
-	return &entriesProposal{
-		Proposal: newProposal(id, session),
-		request:  request,
-		stream:   stream,
+func newEntriesQuery(query rsm.Query) EntriesQuery {
+	return &entriesQuery{
+		Query: newQuery(query),
+		query: query,
 	}
 }
 
-type entriesProposal struct {
-	Proposal
-	request *indexedmap.EntriesRequest
-	stream  rsm.Stream
+type entriesQuery struct {
+	Query
+	query rsm.Query
 }
 
-func (p *entriesProposal) Request() *indexedmap.EntriesRequest {
-	return p.request
+func (p *entriesQuery) Request() (*indexedmap.EntriesRequest, error) {
+	request := &indexedmap.EntriesRequest{}
+	if err := proto.Unmarshal(p.query.Input(), request); err != nil {
+		return nil, err
+	}
+	log.Debugf("Received EntriesQuery %s: %s", p, request)
+	return request, nil
 }
 
-func (p *entriesProposal) Notify(notification *indexedmap.EntriesResponse) error {
-	log.Debugf("Notifying EntriesProposal %s: %s", p, notification)
-	bytes, err := proto.Marshal(notification)
+func (p *entriesQuery) Notify(response *indexedmap.EntriesResponse) error {
+	log.Debugf("Notifying EntriesQuery %s: %s", p, response)
+	output, err := proto.Marshal(response)
 	if err != nil {
 		return err
 	}
-	p.stream.Value(bytes)
+	p.query.Output(output, nil)
 	return nil
 }
 
-func (p *entriesProposal) Close() error {
-	p.stream.Close()
+func (p *entriesQuery) Close() error {
+	p.query.Close()
 	return nil
 }
 
-func (p *entriesProposal) String() string {
-	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.request)
+func (p *entriesQuery) String() string {
+	return fmt.Sprintf("SessionID=%d", p.Session().ID())
 }
 
-var _ EntriesProposal = &entriesProposal{}
+var _ EntriesQuery = &entriesQuery{}

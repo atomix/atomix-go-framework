@@ -33,6 +33,9 @@ type Partition interface {
 	// Leader returns the current leader
 	Leader() string
 
+	// Followers returns the followers
+	Followers() []string
+
 	// SyncCommand executes a write request
 	SyncCommand(ctx context.Context, input []byte, stream stream.WriteStream) error
 

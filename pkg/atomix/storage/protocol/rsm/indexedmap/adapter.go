@@ -2,11 +2,9 @@
 package indexedmap
 
 import (
-	indexedmap "github.com/atomix/atomix-api/go/atomix/primitive/indexedmap"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
-	"github.com/golang/protobuf/proto"
 	"io"
 )
 
@@ -31,13 +29,11 @@ const (
 var newServiceFunc rsm.NewServiceFunc
 
 func registerServiceFunc(rsmf NewServiceFunc) {
-	newServiceFunc = func(scheduler rsm.Scheduler, context rsm.ServiceContext) rsm.Service {
-		service := &ServiceAdaptor{
-			Service: rsm.NewService(scheduler, context),
-			rsm:     rsmf(newServiceContext(scheduler)),
+	newServiceFunc = func(context rsm.ServiceContext) rsm.Service {
+		return &ServiceAdaptor{
+			ServiceContext: context,
+			rsm:            rsmf(newServiceContext(context)),
 		}
-		service.init()
-		return service
 	}
 }
 
@@ -49,33 +45,125 @@ func RegisterService(node *rsm.Node) {
 }
 
 type ServiceAdaptor struct {
-	rsm.Service
+	rsm.ServiceContext
 	rsm Service
 }
 
-func (s *ServiceAdaptor) init() {
-	s.RegisterUnary(sizeOp, s.size)
-	s.RegisterUnary(putOp, s.put)
-	s.RegisterUnary(getOp, s.get)
-	s.RegisterUnary(firstEntryOp, s.firstEntry)
-	s.RegisterUnary(lastEntryOp, s.lastEntry)
-	s.RegisterUnary(prevEntryOp, s.prevEntry)
-	s.RegisterUnary(nextEntryOp, s.nextEntry)
-	s.RegisterUnary(removeOp, s.remove)
-	s.RegisterUnary(clearOp, s.clear)
-	s.RegisterStream(eventsOp, s.events)
-	s.RegisterStream(entriesOp, s.entries)
-}
-func (s *ServiceAdaptor) SessionOpen(rsmSession rsm.Session) {
-	s.rsm.Sessions().open(newSession(rsmSession))
+func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) error {
+	switch command.OperationID() {
+	case 2:
+		p := newPutProposal(command)
+		log.Debugf("Proposing PutProposal %s", p)
+		err := s.rsm.Put(p)
+		if err != nil {
+			log.Warn(err)
+			return err
+		}
+		return nil
+	case 8:
+		p := newRemoveProposal(command)
+		log.Debugf("Proposing RemoveProposal %s", p)
+		err := s.rsm.Remove(p)
+		if err != nil {
+			log.Warn(err)
+			return err
+		}
+		return nil
+	case 9:
+		p := newClearProposal(command)
+		log.Debugf("Proposing ClearProposal %s", p)
+		err := s.rsm.Clear(p)
+		if err != nil {
+			log.Warn(err)
+			return err
+		}
+		return nil
+	case 10:
+		p := newEventsProposal(command)
+		log.Debugf("Proposing EventsProposal %s", p)
+		err := s.rsm.Events(p)
+		if err != nil {
+			log.Warn(err)
+			return err
+		}
+		return nil
+	default:
+		err := errors.NewNotSupported("unknown operation %d", command.OperationID())
+		log.Warn(err)
+		return err
+	}
 }
 
-func (s *ServiceAdaptor) SessionExpired(session rsm.Session) {
-	s.rsm.Sessions().expire(SessionID(session.ID()))
-}
-
-func (s *ServiceAdaptor) SessionClosed(session rsm.Session) {
-	s.rsm.Sessions().close(SessionID(session.ID()))
+func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) error {
+	switch query.OperationID() {
+	case 1:
+		q := newSizeQuery(query)
+		log.Debugf("Querying SizeQuery %s", q)
+		err := s.rsm.Size(q)
+		if err != nil {
+			log.Warn(err)
+			return err
+		}
+		return nil
+	case 3:
+		q := newGetQuery(query)
+		log.Debugf("Querying GetQuery %s", q)
+		err := s.rsm.Get(q)
+		if err != nil {
+			log.Warn(err)
+			return err
+		}
+		return nil
+	case 4:
+		q := newFirstEntryQuery(query)
+		log.Debugf("Querying FirstEntryQuery %s", q)
+		err := s.rsm.FirstEntry(q)
+		if err != nil {
+			log.Warn(err)
+			return err
+		}
+		return nil
+	case 5:
+		q := newLastEntryQuery(query)
+		log.Debugf("Querying LastEntryQuery %s", q)
+		err := s.rsm.LastEntry(q)
+		if err != nil {
+			log.Warn(err)
+			return err
+		}
+		return nil
+	case 6:
+		q := newPrevEntryQuery(query)
+		log.Debugf("Querying PrevEntryQuery %s", q)
+		err := s.rsm.PrevEntry(q)
+		if err != nil {
+			log.Warn(err)
+			return err
+		}
+		return nil
+	case 7:
+		q := newNextEntryQuery(query)
+		log.Debugf("Querying NextEntryQuery %s", q)
+		err := s.rsm.NextEntry(q)
+		if err != nil {
+			log.Warn(err)
+			return err
+		}
+		return nil
+	case 11:
+		q := newEntriesQuery(query)
+		log.Debugf("Querying EntriesQuery %s", q)
+		err := s.rsm.Entries(q)
+		if err != nil {
+			log.Warn(err)
+			return err
+		}
+		return nil
+	default:
+		err := errors.NewNotSupported("unknown operation %d", query.OperationID())
+		log.Warn(err)
+		return err
+	}
 }
 func (s *ServiceAdaptor) Backup(writer io.Writer) error {
 	err := s.rsm.Backup(newSnapshotWriter(writer))
@@ -93,420 +181,6 @@ func (s *ServiceAdaptor) Restore(reader io.Reader) error {
 		return err
 	}
 	return nil
-}
-func (s *ServiceAdaptor) size(input []byte, rsmSession rsm.Session) ([]byte, error) {
-	request := &indexedmap.SizeRequest{}
-	err := proto.Unmarshal(input, request)
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-
-	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
-	if !ok {
-		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Warn(err)
-		return nil, err
-	}
-
-	proposal := newSizeProposal(ProposalID(s.Index()), session, request)
-
-	s.rsm.Proposals().Size().register(proposal)
-	session.Proposals().Size().register(proposal)
-
-	defer func() {
-		session.Proposals().Size().unregister(proposal.ID())
-		s.rsm.Proposals().Size().unregister(proposal.ID())
-	}()
-
-	log.Debugf("Proposing SizeProposal %s", proposal)
-	err = s.rsm.Size(proposal)
-	if err != nil {
-		log.Warn(err)
-		return nil, err
-	}
-
-	output, err := proto.Marshal(proposal.response())
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	return output, nil
-}
-func (s *ServiceAdaptor) put(input []byte, rsmSession rsm.Session) ([]byte, error) {
-	request := &indexedmap.PutRequest{}
-	err := proto.Unmarshal(input, request)
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-
-	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
-	if !ok {
-		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Warn(err)
-		return nil, err
-	}
-
-	proposal := newPutProposal(ProposalID(s.Index()), session, request)
-
-	s.rsm.Proposals().Put().register(proposal)
-	session.Proposals().Put().register(proposal)
-
-	defer func() {
-		session.Proposals().Put().unregister(proposal.ID())
-		s.rsm.Proposals().Put().unregister(proposal.ID())
-	}()
-
-	log.Debugf("Proposing PutProposal %s", proposal)
-	err = s.rsm.Put(proposal)
-	if err != nil {
-		log.Warn(err)
-		return nil, err
-	}
-
-	output, err := proto.Marshal(proposal.response())
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	return output, nil
-}
-func (s *ServiceAdaptor) get(input []byte, rsmSession rsm.Session) ([]byte, error) {
-	request := &indexedmap.GetRequest{}
-	err := proto.Unmarshal(input, request)
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-
-	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
-	if !ok {
-		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Warn(err)
-		return nil, err
-	}
-
-	proposal := newGetProposal(ProposalID(s.Index()), session, request)
-
-	s.rsm.Proposals().Get().register(proposal)
-	session.Proposals().Get().register(proposal)
-
-	defer func() {
-		session.Proposals().Get().unregister(proposal.ID())
-		s.rsm.Proposals().Get().unregister(proposal.ID())
-	}()
-
-	log.Debugf("Proposing GetProposal %s", proposal)
-	err = s.rsm.Get(proposal)
-	if err != nil {
-		log.Warn(err)
-		return nil, err
-	}
-
-	output, err := proto.Marshal(proposal.response())
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	return output, nil
-}
-func (s *ServiceAdaptor) firstEntry(input []byte, rsmSession rsm.Session) ([]byte, error) {
-	request := &indexedmap.FirstEntryRequest{}
-	err := proto.Unmarshal(input, request)
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-
-	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
-	if !ok {
-		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Warn(err)
-		return nil, err
-	}
-
-	proposal := newFirstEntryProposal(ProposalID(s.Index()), session, request)
-
-	s.rsm.Proposals().FirstEntry().register(proposal)
-	session.Proposals().FirstEntry().register(proposal)
-
-	defer func() {
-		session.Proposals().FirstEntry().unregister(proposal.ID())
-		s.rsm.Proposals().FirstEntry().unregister(proposal.ID())
-	}()
-
-	log.Debugf("Proposing FirstEntryProposal %s", proposal)
-	err = s.rsm.FirstEntry(proposal)
-	if err != nil {
-		log.Warn(err)
-		return nil, err
-	}
-
-	output, err := proto.Marshal(proposal.response())
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	return output, nil
-}
-func (s *ServiceAdaptor) lastEntry(input []byte, rsmSession rsm.Session) ([]byte, error) {
-	request := &indexedmap.LastEntryRequest{}
-	err := proto.Unmarshal(input, request)
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-
-	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
-	if !ok {
-		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Warn(err)
-		return nil, err
-	}
-
-	proposal := newLastEntryProposal(ProposalID(s.Index()), session, request)
-
-	s.rsm.Proposals().LastEntry().register(proposal)
-	session.Proposals().LastEntry().register(proposal)
-
-	defer func() {
-		session.Proposals().LastEntry().unregister(proposal.ID())
-		s.rsm.Proposals().LastEntry().unregister(proposal.ID())
-	}()
-
-	log.Debugf("Proposing LastEntryProposal %s", proposal)
-	err = s.rsm.LastEntry(proposal)
-	if err != nil {
-		log.Warn(err)
-		return nil, err
-	}
-
-	output, err := proto.Marshal(proposal.response())
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	return output, nil
-}
-func (s *ServiceAdaptor) prevEntry(input []byte, rsmSession rsm.Session) ([]byte, error) {
-	request := &indexedmap.PrevEntryRequest{}
-	err := proto.Unmarshal(input, request)
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-
-	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
-	if !ok {
-		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Warn(err)
-		return nil, err
-	}
-
-	proposal := newPrevEntryProposal(ProposalID(s.Index()), session, request)
-
-	s.rsm.Proposals().PrevEntry().register(proposal)
-	session.Proposals().PrevEntry().register(proposal)
-
-	defer func() {
-		session.Proposals().PrevEntry().unregister(proposal.ID())
-		s.rsm.Proposals().PrevEntry().unregister(proposal.ID())
-	}()
-
-	log.Debugf("Proposing PrevEntryProposal %s", proposal)
-	err = s.rsm.PrevEntry(proposal)
-	if err != nil {
-		log.Warn(err)
-		return nil, err
-	}
-
-	output, err := proto.Marshal(proposal.response())
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	return output, nil
-}
-func (s *ServiceAdaptor) nextEntry(input []byte, rsmSession rsm.Session) ([]byte, error) {
-	request := &indexedmap.NextEntryRequest{}
-	err := proto.Unmarshal(input, request)
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-
-	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
-	if !ok {
-		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Warn(err)
-		return nil, err
-	}
-
-	proposal := newNextEntryProposal(ProposalID(s.Index()), session, request)
-
-	s.rsm.Proposals().NextEntry().register(proposal)
-	session.Proposals().NextEntry().register(proposal)
-
-	defer func() {
-		session.Proposals().NextEntry().unregister(proposal.ID())
-		s.rsm.Proposals().NextEntry().unregister(proposal.ID())
-	}()
-
-	log.Debugf("Proposing NextEntryProposal %s", proposal)
-	err = s.rsm.NextEntry(proposal)
-	if err != nil {
-		log.Warn(err)
-		return nil, err
-	}
-
-	output, err := proto.Marshal(proposal.response())
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	return output, nil
-}
-func (s *ServiceAdaptor) remove(input []byte, rsmSession rsm.Session) ([]byte, error) {
-	request := &indexedmap.RemoveRequest{}
-	err := proto.Unmarshal(input, request)
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-
-	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
-	if !ok {
-		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Warn(err)
-		return nil, err
-	}
-
-	proposal := newRemoveProposal(ProposalID(s.Index()), session, request)
-
-	s.rsm.Proposals().Remove().register(proposal)
-	session.Proposals().Remove().register(proposal)
-
-	defer func() {
-		session.Proposals().Remove().unregister(proposal.ID())
-		s.rsm.Proposals().Remove().unregister(proposal.ID())
-	}()
-
-	log.Debugf("Proposing RemoveProposal %s", proposal)
-	err = s.rsm.Remove(proposal)
-	if err != nil {
-		log.Warn(err)
-		return nil, err
-	}
-
-	output, err := proto.Marshal(proposal.response())
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	return output, nil
-}
-func (s *ServiceAdaptor) clear(input []byte, rsmSession rsm.Session) ([]byte, error) {
-	request := &indexedmap.ClearRequest{}
-	err := proto.Unmarshal(input, request)
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-
-	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
-	if !ok {
-		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Warn(err)
-		return nil, err
-	}
-
-	proposal := newClearProposal(ProposalID(s.Index()), session, request)
-
-	s.rsm.Proposals().Clear().register(proposal)
-	session.Proposals().Clear().register(proposal)
-
-	defer func() {
-		session.Proposals().Clear().unregister(proposal.ID())
-		s.rsm.Proposals().Clear().unregister(proposal.ID())
-	}()
-
-	log.Debugf("Proposing ClearProposal %s", proposal)
-	err = s.rsm.Clear(proposal)
-	if err != nil {
-		log.Warn(err)
-		return nil, err
-	}
-
-	output, err := proto.Marshal(proposal.response())
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-	return output, nil
-}
-func (s *ServiceAdaptor) events(input []byte, rsmSession rsm.Session, stream rsm.Stream) (rsm.StreamCloser, error) {
-	request := &indexedmap.EventsRequest{}
-	err := proto.Unmarshal(input, request)
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-
-	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
-	if !ok {
-		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Warn(err)
-		return nil, err
-	}
-
-	proposal := newEventsProposal(ProposalID(s.Index()), session, request, stream)
-
-	s.rsm.Proposals().Events().register(proposal)
-	session.Proposals().Events().register(proposal)
-
-	log.Debugf("Proposing EventsProposal %s", proposal)
-	err = s.rsm.Events(proposal)
-	if err != nil {
-		log.Warn(err)
-		return nil, err
-	}
-	return func() {
-		session.Proposals().Events().unregister(proposal.ID())
-		s.rsm.Proposals().Events().unregister(proposal.ID())
-	}, nil
-}
-
-func (s *ServiceAdaptor) entries(input []byte, rsmSession rsm.Session, stream rsm.Stream) (rsm.StreamCloser, error) {
-	request := &indexedmap.EntriesRequest{}
-	err := proto.Unmarshal(input, request)
-	if err != nil {
-		log.Error(err)
-		return nil, err
-	}
-
-	session, ok := s.rsm.Sessions().Get(SessionID(rsmSession.ID()))
-	if !ok {
-		err := errors.NewConflict("session %d not found", rsmSession.ID())
-		log.Warn(err)
-		return nil, err
-	}
-
-	proposal := newEntriesProposal(ProposalID(s.Index()), session, request, stream)
-
-	s.rsm.Proposals().Entries().register(proposal)
-	session.Proposals().Entries().register(proposal)
-
-	log.Debugf("Proposing EntriesProposal %s", proposal)
-	err = s.rsm.Entries(proposal)
-	if err != nil {
-		log.Warn(err)
-		return nil, err
-	}
-	return func() {
-		session.Proposals().Entries().unregister(proposal.ID())
-		s.rsm.Proposals().Entries().unregister(proposal.ID())
-	}, nil
 }
 
 var _ rsm.Service = &ServiceAdaptor{}

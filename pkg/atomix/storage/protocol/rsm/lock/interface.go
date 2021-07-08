@@ -8,7 +8,6 @@ import (
 	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	util "github.com/atomix/atomix-go-framework/pkg/atomix/util"
 	proto "github.com/golang/protobuf/proto"
-	uuid "github.com/google/uuid"
 	"io"
 )
 
@@ -21,7 +20,7 @@ type Service interface {
 	// Unlock releases the lock
 	Unlock(UnlockProposal) error
 	// GetLock gets the lock state
-	GetLock(GetLockProposal) error
+	GetLock(GetLockQuery) error
 }
 
 type ServiceContext interface {
@@ -30,11 +29,11 @@ type ServiceContext interface {
 	Proposals() Proposals
 }
 
-func newServiceContext(scheduler rsm.Scheduler) ServiceContext {
+func newServiceContext(service rsm.ServiceContext) ServiceContext {
 	return &serviceContext{
-		scheduler: scheduler,
-		sessions:  newSessions(),
-		proposals: newProposals(),
+		scheduler: service.Scheduler(),
+		sessions:  newSessions(service.Sessions()),
+		proposals: newProposals(service.Commands()),
 	}
 }
 
@@ -116,53 +115,33 @@ func (r *serviceSnapshotReader) ReadState() (*LockState, error) {
 var _ SnapshotReader = &serviceSnapshotReader{}
 
 type Sessions interface {
-	open(Session)
-	expire(SessionID)
-	close(SessionID)
 	Get(SessionID) (Session, bool)
 	List() []Session
 }
 
-func newSessions() Sessions {
+func newSessions(sessions rsm.Sessions) Sessions {
 	return &serviceSessions{
-		sessions: make(map[SessionID]Session),
+		sessions: sessions,
 	}
 }
 
 type serviceSessions struct {
-	sessions map[SessionID]Session
-}
-
-func (s *serviceSessions) open(session Session) {
-	s.sessions[session.ID()] = session
-	session.setState(SessionOpen)
-}
-
-func (s *serviceSessions) expire(sessionID SessionID) {
-	session, ok := s.sessions[sessionID]
-	if ok {
-		session.setState(SessionClosed)
-		delete(s.sessions, sessionID)
-	}
-}
-
-func (s *serviceSessions) close(sessionID SessionID) {
-	session, ok := s.sessions[sessionID]
-	if ok {
-		session.setState(SessionClosed)
-		delete(s.sessions, sessionID)
-	}
+	sessions rsm.Sessions
 }
 
 func (s *serviceSessions) Get(id SessionID) (Session, bool) {
-	session, ok := s.sessions[id]
-	return session, ok
+	session, ok := s.sessions.Get(rsm.SessionID(id))
+	if !ok {
+		return nil, false
+	}
+	return newSession(session), true
 }
 
 func (s *serviceSessions) List() []Session {
-	sessions := make([]Session, 0, len(s.sessions))
-	for _, session := range s.sessions {
-		sessions = append(sessions, session)
+	serviceSessions := s.sessions.List()
+	sessions := make([]Session, len(serviceSessions))
+	for i, serviceSession := range serviceSessions {
+		sessions[i] = newSession(serviceSession)
 	}
 	return sessions
 }
@@ -182,18 +161,18 @@ type Watcher interface {
 	Cancel()
 }
 
-func newWatcher(f func()) Watcher {
+func newWatcher(watcher rsm.SessionStateWatcher) Watcher {
 	return &serviceWatcher{
-		f: f,
+		watcher: watcher,
 	}
 }
 
 type serviceWatcher struct {
-	f func()
+	watcher rsm.SessionStateWatcher
 }
 
 func (s *serviceWatcher) Cancel() {
-	s.f()
+	s.watcher.Cancel()
 }
 
 var _ Watcher = &serviceWatcher{}
@@ -201,7 +180,6 @@ var _ Watcher = &serviceWatcher{}
 type Session interface {
 	ID() SessionID
 	State() SessionState
-	setState(SessionState)
 	Watch(func(SessionState)) Watcher
 	Proposals() Proposals
 }
@@ -209,16 +187,13 @@ type Session interface {
 func newSession(session rsm.Session) Session {
 	return &serviceSession{
 		session:   session,
-		proposals: newProposals(),
-		watchers:  make(map[string]func(SessionState)),
+		proposals: newProposals(session.Commands()),
 	}
 }
 
 type serviceSession struct {
 	session   rsm.Session
 	proposals Proposals
-	state     SessionState
-	watchers  map[string]func(SessionState)
 }
 
 func (s *serviceSession) ID() SessionID {
@@ -230,24 +205,13 @@ func (s *serviceSession) Proposals() Proposals {
 }
 
 func (s *serviceSession) State() SessionState {
-	return s.state
-}
-
-func (s *serviceSession) setState(state SessionState) {
-	if state != s.state {
-		s.state = state
-		for _, watcher := range s.watchers {
-			watcher(state)
-		}
-	}
+	return SessionState(s.session.State())
 }
 
 func (s *serviceSession) Watch(f func(SessionState)) Watcher {
-	id := uuid.New().String()
-	s.watchers[id] = f
-	return newWatcher(func() {
-		delete(s.watchers, id)
-	})
+	return newWatcher(s.session.Watch(func(state rsm.SessionState) {
+		f(SessionState(state))
+	}))
 }
 
 var _ Session = &serviceSession{}
@@ -255,21 +219,18 @@ var _ Session = &serviceSession{}
 type Proposals interface {
 	Lock() LockProposals
 	Unlock() UnlockProposals
-	GetLock() GetLockProposals
 }
 
-func newProposals() Proposals {
+func newProposals(commands rsm.Commands) Proposals {
 	return &serviceProposals{
-		lockProposals:    newLockProposals(),
-		unlockProposals:  newUnlockProposals(),
-		getLockProposals: newGetLockProposals(),
+		lockProposals:   newLockProposals(commands),
+		unlockProposals: newUnlockProposals(commands),
 	}
 }
 
 type serviceProposals struct {
-	lockProposals    LockProposals
-	unlockProposals  UnlockProposals
-	getLockProposals GetLockProposals
+	lockProposals   LockProposals
+	unlockProposals UnlockProposals
 }
 
 func (s *serviceProposals) Lock() LockProposals {
@@ -277,9 +238,6 @@ func (s *serviceProposals) Lock() LockProposals {
 }
 func (s *serviceProposals) Unlock() UnlockProposals {
 	return s.unlockProposals
-}
-func (s *serviceProposals) GetLock() GetLockProposals {
-	return s.getLockProposals
 }
 
 var _ Proposals = &serviceProposals{}
@@ -292,66 +250,83 @@ type Proposal interface {
 	Session() Session
 }
 
-func newProposal(id ProposalID, session Session) Proposal {
+func newProposal(command rsm.Command) Proposal {
 	return &serviceProposal{
-		id:      id,
-		session: session,
+		command: command,
 	}
 }
 
 type serviceProposal struct {
-	id      ProposalID
-	session Session
+	command rsm.Command
 }
 
 func (p *serviceProposal) ID() ProposalID {
-	return p.id
+	return ProposalID(p.command.ID())
 }
 
 func (p *serviceProposal) Session() Session {
-	return p.session
+	return newSession(p.command.Session())
 }
 
 func (p *serviceProposal) String() string {
-	return fmt.Sprintf("ProposalID: %d, SessionID: %d", p.id, p.session.ID())
+	return fmt.Sprintf("ProposalID: %d, SessionID: %d", p.ID(), p.Session().ID())
 }
 
 var _ Proposal = &serviceProposal{}
 
+type Query interface {
+	fmt.Stringer
+	Session() Session
+}
+
+func newQuery(query rsm.Query) Query {
+	return &serviceQuery{
+		query: query,
+	}
+}
+
+type serviceQuery struct {
+	query rsm.Query
+}
+
+func (p *serviceQuery) Session() Session {
+	return newSession(p.query.Session())
+}
+
+func (p *serviceQuery) String() string {
+	return fmt.Sprintf("SessionID: %d", p.Session().ID())
+}
+
+var _ Query = &serviceQuery{}
+
 type LockProposals interface {
-	register(LockProposal)
-	unregister(ProposalID)
 	Get(ProposalID) (LockProposal, bool)
 	List() []LockProposal
 }
 
-func newLockProposals() LockProposals {
+func newLockProposals(commands rsm.Commands) LockProposals {
 	return &lockProposals{
-		proposals: make(map[ProposalID]LockProposal),
+		commands: commands,
 	}
 }
 
 type lockProposals struct {
-	proposals map[ProposalID]LockProposal
-}
-
-func (p *lockProposals) register(proposal LockProposal) {
-	p.proposals[proposal.ID()] = proposal
-}
-
-func (p *lockProposals) unregister(id ProposalID) {
-	delete(p.proposals, id)
+	commands rsm.Commands
 }
 
 func (p *lockProposals) Get(id ProposalID) (LockProposal, bool) {
-	proposal, ok := p.proposals[id]
-	return proposal, ok
+	command, ok := p.commands.Get(rsm.CommandID(id))
+	if !ok {
+		return nil, false
+	}
+	return newLockProposal(command), true
 }
 
 func (p *lockProposals) List() []LockProposal {
-	proposals := make([]LockProposal, 0, len(p.proposals))
-	for _, proposal := range p.proposals {
-		proposals = append(proposals, proposal)
+	commands := p.commands.List(rsm.OperationID(1))
+	proposals := make([]LockProposal, len(commands))
+	for i, command := range commands {
+		proposals[i] = newLockProposal(command)
 	}
 	return proposals
 }
@@ -360,45 +335,46 @@ var _ LockProposals = &lockProposals{}
 
 type LockProposal interface {
 	Proposal
-	Request() *lock.LockRequest
+	Request() (*lock.LockRequest, error)
 	Reply(*lock.LockResponse) error
 	Fail(error) error
 	Close() error
 }
 
-func newLockProposal(id ProposalID, session Session, request *lock.LockRequest, stream rsm.Stream) LockProposal {
+func newLockProposal(command rsm.Command) LockProposal {
 	return &lockProposal{
-		Proposal: newProposal(id, session),
-		request:  request,
-		stream:   stream,
+		Proposal: newProposal(command),
+		command:  command,
 	}
 }
 
 type lockProposal struct {
 	Proposal
-	request  *lock.LockRequest
-	stream   rsm.Stream
+	command  rsm.Command
 	complete bool
 }
 
-func (p *lockProposal) Request() *lock.LockRequest {
-	return p.request
+func (p *lockProposal) Request() (*lock.LockRequest, error) {
+	request := &lock.LockRequest{}
+	if err := proto.Unmarshal(p.command.Input(), request); err != nil {
+		return nil, err
+	}
+	log.Debugf("Received LockProposal %s: %s", p, request)
+	return request, nil
 }
 
-func (p *lockProposal) Reply(reply *lock.LockResponse) error {
+func (p *lockProposal) Reply(response *lock.LockResponse) error {
 	if p.complete {
 		return errors.NewConflict("reply already sent")
 	}
-	log.Debugf("Accepted LockProposal %s: %s", p, reply)
-	p.complete = true
-	bytes, err := proto.Marshal(reply)
+	log.Debugf("Sending LockProposal %s: %s", p, response)
+	output, err := proto.Marshal(response)
 	if err != nil {
-		p.stream.Error(err)
 		return err
-	} else {
-		p.stream.Value(bytes)
 	}
-	p.stream.Close()
+	p.command.Output(output, nil)
+	p.command.Close()
+	p.complete = true
 	return nil
 }
 
@@ -406,10 +382,10 @@ func (p *lockProposal) Fail(err error) error {
 	if p.complete {
 		return errors.NewConflict("reply already sent")
 	}
-	log.Warnf("Rejected LockProposals %s: %s", p, err)
+	log.Debugf("Sending LockProposal %s: %s", p, err)
+	p.command.Output(nil, err)
+	p.command.Close()
 	p.complete = true
-	p.stream.Error(err)
-	p.stream.Close()
 	return nil
 }
 
@@ -418,50 +394,44 @@ func (p *lockProposal) Close() error {
 		return errors.NewConflict("reply already sent")
 	}
 	p.complete = true
-	p.stream.Close()
+	p.command.Close()
 	return nil
 }
 
 func (p *lockProposal) String() string {
-	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.request)
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d", p.ID(), p.Session().ID())
 }
 
 var _ LockProposal = &lockProposal{}
 
 type UnlockProposals interface {
-	register(UnlockProposal)
-	unregister(ProposalID)
 	Get(ProposalID) (UnlockProposal, bool)
 	List() []UnlockProposal
 }
 
-func newUnlockProposals() UnlockProposals {
+func newUnlockProposals(commands rsm.Commands) UnlockProposals {
 	return &unlockProposals{
-		proposals: make(map[ProposalID]UnlockProposal),
+		commands: commands,
 	}
 }
 
 type unlockProposals struct {
-	proposals map[ProposalID]UnlockProposal
-}
-
-func (p *unlockProposals) register(proposal UnlockProposal) {
-	p.proposals[proposal.ID()] = proposal
-}
-
-func (p *unlockProposals) unregister(id ProposalID) {
-	delete(p.proposals, id)
+	commands rsm.Commands
 }
 
 func (p *unlockProposals) Get(id ProposalID) (UnlockProposal, bool) {
-	proposal, ok := p.proposals[id]
-	return proposal, ok
+	command, ok := p.commands.Get(rsm.CommandID(id))
+	if !ok {
+		return nil, false
+	}
+	return newUnlockProposal(command), true
 }
 
 func (p *unlockProposals) List() []UnlockProposal {
-	proposals := make([]UnlockProposal, 0, len(p.proposals))
-	for _, proposal := range p.proposals {
-		proposals = append(proposals, proposal)
+	commands := p.commands.List(rsm.OperationID(2))
+	proposals := make([]UnlockProposal, len(commands))
+	for i, command := range commands {
+		proposals[i] = newUnlockProposal(command)
 	}
 	return proposals
 }
@@ -470,126 +440,88 @@ var _ UnlockProposals = &unlockProposals{}
 
 type UnlockProposal interface {
 	Proposal
-	Request() *lock.UnlockRequest
+	Request() (*lock.UnlockRequest, error)
 	Reply(*lock.UnlockResponse) error
-	response() *lock.UnlockResponse
 }
 
-func newUnlockProposal(id ProposalID, session Session, request *lock.UnlockRequest) UnlockProposal {
+func newUnlockProposal(command rsm.Command) UnlockProposal {
 	return &unlockProposal{
-		Proposal: newProposal(id, session),
-		req:      request,
+		Proposal: newProposal(command),
+		command:  command,
 	}
 }
 
 type unlockProposal struct {
 	Proposal
-	req *lock.UnlockRequest
-	res *lock.UnlockResponse
+	command rsm.Command
 }
 
-func (p *unlockProposal) Request() *lock.UnlockRequest {
-	return p.req
-}
-
-func (p *unlockProposal) Reply(reply *lock.UnlockResponse) error {
-	if p.res != nil {
-		return errors.NewConflict("reply already sent")
+func (p *unlockProposal) Request() (*lock.UnlockRequest, error) {
+	request := &lock.UnlockRequest{}
+	if err := proto.Unmarshal(p.command.Input(), request); err != nil {
+		return nil, err
 	}
-	log.Debugf("Accepted UnlockProposal %s: %s", p, reply)
-	p.res = reply
+	log.Debugf("Received UnlockProposal %s: %s", p, request)
+	return request, nil
+}
+
+func (p *unlockProposal) Reply(response *lock.UnlockResponse) error {
+	log.Debugf("Sending UnlockProposal %s: %s", p, response)
+	output, err := proto.Marshal(response)
+	if err != nil {
+		return err
+	}
+	p.command.Output(output, nil)
+	p.command.Close()
 	return nil
 }
 
-func (p *unlockProposal) response() *lock.UnlockResponse {
-	return p.res
-}
-
 func (p *unlockProposal) String() string {
-	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
+	return fmt.Sprintf("ProposalID=%d, SessionID=%d", p.ID(), p.Session().ID())
 }
 
 var _ UnlockProposal = &unlockProposal{}
 
-type GetLockProposals interface {
-	register(GetLockProposal)
-	unregister(ProposalID)
-	Get(ProposalID) (GetLockProposal, bool)
-	List() []GetLockProposal
-}
-
-func newGetLockProposals() GetLockProposals {
-	return &getLockProposals{
-		proposals: make(map[ProposalID]GetLockProposal),
-	}
-}
-
-type getLockProposals struct {
-	proposals map[ProposalID]GetLockProposal
-}
-
-func (p *getLockProposals) register(proposal GetLockProposal) {
-	p.proposals[proposal.ID()] = proposal
-}
-
-func (p *getLockProposals) unregister(id ProposalID) {
-	delete(p.proposals, id)
-}
-
-func (p *getLockProposals) Get(id ProposalID) (GetLockProposal, bool) {
-	proposal, ok := p.proposals[id]
-	return proposal, ok
-}
-
-func (p *getLockProposals) List() []GetLockProposal {
-	proposals := make([]GetLockProposal, 0, len(p.proposals))
-	for _, proposal := range p.proposals {
-		proposals = append(proposals, proposal)
-	}
-	return proposals
-}
-
-var _ GetLockProposals = &getLockProposals{}
-
-type GetLockProposal interface {
-	Proposal
-	Request() *lock.GetLockRequest
+type GetLockQuery interface {
+	Query
+	Request() (*lock.GetLockRequest, error)
 	Reply(*lock.GetLockResponse) error
-	response() *lock.GetLockResponse
 }
 
-func newGetLockProposal(id ProposalID, session Session, request *lock.GetLockRequest) GetLockProposal {
-	return &getLockProposal{
-		Proposal: newProposal(id, session),
-		req:      request,
+func newGetLockQuery(query rsm.Query) GetLockQuery {
+	return &getLockQuery{
+		Query: newQuery(query),
+		query: query,
 	}
 }
 
-type getLockProposal struct {
-	Proposal
-	req *lock.GetLockRequest
-	res *lock.GetLockResponse
+type getLockQuery struct {
+	Query
+	query rsm.Query
 }
 
-func (p *getLockProposal) Request() *lock.GetLockRequest {
-	return p.req
-}
-
-func (p *getLockProposal) Reply(reply *lock.GetLockResponse) error {
-	if p.res != nil {
-		return errors.NewConflict("reply already sent")
+func (p *getLockQuery) Request() (*lock.GetLockRequest, error) {
+	request := &lock.GetLockRequest{}
+	if err := proto.Unmarshal(p.query.Input(), request); err != nil {
+		return nil, err
 	}
-	log.Debugf("Accepted GetLockProposal %s: %s", p, reply)
-	p.res = reply
+	log.Debugf("Received GetLockQuery %s: %s", p, request)
+	return request, nil
+}
+
+func (p *getLockQuery) Reply(response *lock.GetLockResponse) error {
+	log.Debugf("Sending GetLockQuery %s: %s", p, response)
+	output, err := proto.Marshal(response)
+	if err != nil {
+		return err
+	}
+	p.query.Output(output, nil)
+	p.query.Close()
 	return nil
 }
 
-func (p *getLockProposal) response() *lock.GetLockResponse {
-	return p.res
+func (p *getLockQuery) String() string {
+	return fmt.Sprintf("SessionID=%d", p.Session().ID())
 }
 
-func (p *getLockProposal) String() string {
-	return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
-}
-
-var _ GetLockProposal = &getLockProposal{}
+var _ GetLockQuery = &getLockQuery{}

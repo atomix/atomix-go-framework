@@ -18,17 +18,13 @@ protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/dr
 protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/driver/proxy/rsm,plugins=grpc:pkg   pkg/atomix/driver/proxy/rsm/config.proto
 
 protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/storage/protocol/rsm,plugins=grpc:pkg      pkg/atomix/storage/protocol/rsm/*.proto
-protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/storage/protocol/rsm,plugins=grpc:pkg      pkg/atomix/storage/protocol/rsm2/*.proto
-protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/storage/protocol/rsm,plugins=grpc:pkg      pkg/atomix/storage/protocol/rsm4/*.proto
 protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/storage/protocol/gossip,plugins=grpc:pkg   pkg/atomix/storage/protocol/gossip/protocol.proto
 
 protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/storage/protocol/rsm/counter:pkg    pkg/atomix/storage/protocol/rsm/counter/*.proto
 protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/storage/protocol/rsm/election:pkg   pkg/atomix/storage/protocol/rsm/election/*.proto
 protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/storage/protocol/rsm/indexedmap:pkg pkg/atomix/storage/protocol/rsm/indexedmap/*.proto
-protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/storage/protocol/rsm/leader:pkg     pkg/atomix/storage/protocol/rsm/leader/*.proto
 protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/storage/protocol/rsm/list:pkg       pkg/atomix/storage/protocol/rsm/list/*.proto
 protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/storage/protocol/rsm/lock:pkg       pkg/atomix/storage/protocol/rsm/lock/*.proto
-protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/storage/protocol/rsm/log:pkg        pkg/atomix/storage/protocol/rsm/log/*.proto
 protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/storage/protocol/rsm/map:pkg        pkg/atomix/storage/protocol/rsm/map/*.proto
 protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/storage/protocol/rsm/set:pkg        pkg/atomix/storage/protocol/rsm/set/*.proto
 protoc -I=$proto_imports --gogofaster_out=$go_import_paths,import_path=atomix/storage/protocol/rsm/value:pkg      pkg/atomix/storage/protocol/rsm/value/*.proto

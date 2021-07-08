@@ -14,22 +14,20 @@
 
 package rsm
 
-import (
-	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
-	"io"
-)
+// CommandID is a command identifier
+type CommandID uint64
 
-// StateMachine applies commands from a protocol to a collection of state machines
-type StateMachine interface {
-	// Snapshot writes the state machine snapshot to the given writer
-	Snapshot(writer io.Writer) error
+// Commands provides access to pending commands
+type Commands interface {
+	Get(CommandID) (Command, bool)
+	List(OperationID) []Command
+	open(Command)
+	close(Command)
+}
 
-	// Install reads the state machine snapshot from the given reader
-	Install(reader io.Reader) error
-
-	// Command applies a command to the state machine
-	Command(bytes []byte, stream streams.WriteStream)
-
-	// Query applies a query to the state machine
-	Query(bytes []byte, stream streams.WriteStream)
+// Command is a command operation
+type Command interface {
+	Operation
+	// ID returns the command identifier
+	ID() CommandID
 }

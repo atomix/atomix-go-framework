@@ -39,12 +39,8 @@ type Scheduler interface {
 	// RepeatAt schedules a function to run repeatedly every interval starting after the given delay
 	RepeatAt(t time.Time, i time.Duration, f func()) Timer
 
-	// RunAtIndex schedules a function to run at a specific index
-	RunAtIndex(index Index, f func())
-
 	runImmediateTasks()
 	runScheduledTasks(t time.Time)
-	runIndex(index Index)
 }
 
 // Timer is a cancellable timer
@@ -57,7 +53,6 @@ func newScheduler() *serviceScheduler {
 	return &serviceScheduler{
 		tasks:          list.New(),
 		scheduledTasks: list.New(),
-		indexTasks:     make(map[Index]*list.List),
 		time:           time.Now(),
 	}
 }
@@ -65,7 +60,6 @@ func newScheduler() *serviceScheduler {
 type serviceScheduler struct {
 	tasks          *list.List
 	scheduledTasks *list.List
-	indexTasks     map[Index]*list.List
 	time           time.Time
 }
 
@@ -121,15 +115,6 @@ func (s *serviceScheduler) RepeatAt(t time.Time, i time.Duration, f func()) Time
 	return task
 }
 
-func (s *serviceScheduler) RunAtIndex(i Index, f func()) {
-	tasks, ok := s.indexTasks[i]
-	if !ok {
-		tasks = list.New()
-		s.indexTasks[i] = tasks
-	}
-	tasks.PushBack(f)
-}
-
 // runImmediateTasks runs the immediate tasks in the scheduler queue
 func (s *serviceScheduler) runImmediateTasks() {
 	task := s.tasks.Front()
@@ -169,19 +154,6 @@ func (s *serviceScheduler) runScheduledTasks(time time.Time) {
 			}
 			element = element.Next()
 		}
-	}
-}
-
-// runIndex runs functions pending at the given index
-func (s *serviceScheduler) runIndex(index Index) {
-	tasks, ok := s.indexTasks[index]
-	if ok {
-		task := tasks.Front()
-		for task != nil {
-			task.Value.(func())()
-			task = task.Next()
-		}
-		delete(s.indexTasks, index)
 	}
 }
 

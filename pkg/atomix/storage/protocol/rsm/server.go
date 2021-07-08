@@ -27,126 +27,74 @@ type Server struct {
 	Protocol Protocol
 }
 
-func (s *Server) Request(ctx context.Context, request *StorageRequest) (*StorageResponse, error) {
-	log.Debugf("Received StorageRequest %+v", request)
+func (s *Server) GetConfig(ctx context.Context, request *PartitionConfigRequest) (*PartitionConfigResponse, error) {
+	log.Debugf("Received PartitionConfigRequest %+v", request)
+	// If the client requires a leader and is not the leader, return an error
+	partition := s.Protocol.Partition(PartitionID(request.PartitionID))
+	response := &PartitionConfigResponse{
+		Leader:    partition.Leader(),
+		Followers: partition.Followers(),
+	}
+	log.Debugf("Sending PartitionConfigResponse %+v", response)
+	return response, nil
+}
+
+func (s *Server) Query(ctx context.Context, request *PartitionQueryRequest) (*PartitionQueryResponse, error) {
+	log.Debugf("Received PartitionQueryRequest %+v", request)
 
 	// If the client requires a leader and is not the leader, return an error
 	partition := s.Protocol.Partition(PartitionID(request.PartitionID))
-	if partition.MustLeader() && !partition.IsLeader() {
-		response := &StorageResponse{
-			PartitionID: request.PartitionID,
-			Response: &SessionResponse{
-				Type: SessionResponseType_RESPONSE,
-				Status: SessionResponseStatus{
-					Code:   SessionResponseCode_NOT_LEADER,
-					Leader: partition.Leader(),
-				},
-			},
-		}
-		log.Debugf("Sending StorageResponse %+v", response)
-		return response, nil
-	}
 
-	smRequest := &StateMachineRequest{
-		Timestamp: time.Now(),
-		Request:   request.Request,
-	}
-
-	bytes, err := proto.Marshal(smRequest)
+	bytes, err := proto.Marshal(&request.Request)
 	if err != nil {
-		log.Debugf("StorageRequest %+v failed: %s", request, err)
+		log.Debugf("PartitionQueryRequest %+v failed: %s", request, err)
 		return nil, err
 	}
 
 	resultCh := make(chan streams.Result, 1)
 	errCh := make(chan error, 1)
-	switch r := request.Request.Request.(type) {
-	case *SessionRequest_Command,
-		*SessionRequest_OpenSession,
-		*SessionRequest_KeepAlive,
-		*SessionRequest_CloseSession:
-		go func() {
-			err := partition.SyncCommand(context.Background(), bytes, streams.NewChannelStream(resultCh))
-			if err != nil {
-				errCh <- err
-			}
-		}()
-	case *SessionRequest_Query:
-		go func() {
-			if r.Query.Context.Sync {
-				err := partition.SyncQuery(context.Background(), bytes, streams.NewChannelStream(resultCh))
-				if err != nil {
-					errCh <- err
-				}
-			} else {
-				err := partition.StaleQuery(context.Background(), bytes, streams.NewChannelStream(resultCh))
-				if err != nil {
-					errCh <- err
-				}
-			}
-		}()
-	}
+	go func() {
+		err := partition.StaleQuery(context.Background(), bytes, streams.NewChannelStream(resultCh))
+		if err != nil {
+			errCh <- err
+		}
+	}()
 
 	select {
 	case result, ok := <-resultCh:
 		if !ok {
 			err = errors.NewCanceled("stream closed")
-			log.Debugf("StorageRequest %+v failed: %s", request, err)
+			log.Debugf("PartitionQueryRequest %+v failed: %s", request, err)
 			return nil, err
 		}
 
 		if result.Failed() {
-			log.Warnf("StorageRequest %+v failed: %v", request, result.Error)
+			log.Warnf("PartitionQueryRequest %+v failed: %v", request, result.Error)
 			return nil, result.Error
 		}
 
-		smResponse := &StateMachineResponse{}
-		if err := proto.Unmarshal(result.Value.([]byte), smResponse); err != nil {
+		response := &PartitionQueryResponse{}
+		if err := proto.Unmarshal(result.Value.([]byte), &response.Response); err != nil {
 			return nil, err
 		}
-
-		response := &StorageResponse{
-			PartitionID: request.PartitionID,
-			Response:    smResponse.Response,
-		}
-		log.Debugf("Sending StorageResponse %+v", response)
+		log.Debugf("Sending PartitionQueryResponse %+v", response)
 		return response, nil
 	case err := <-errCh:
-		log.Debugf("StorageRequest %+v failed: %s", request, err)
+		log.Debugf("PartitionQueryRequest %+v failed: %s", request, err)
 		return nil, err
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
 }
 
-func (s *Server) Stream(request *StorageRequest, srv StorageService_StreamServer) error {
-	log.Debugf("Received StorageRequest %+v", request)
+func (s *Server) QueryStream(request *PartitionQueryRequest, srv PartitionService_QueryStreamServer) error {
+	log.Debugf("Received PartitionQueryRequest %+v", request)
 
-	// If the client requires a leader and is not the leader, return an error
 	partition := s.Protocol.Partition(PartitionID(request.PartitionID))
-	if partition.MustLeader() && !partition.IsLeader() {
-		response := &StorageResponse{
-			PartitionID: request.PartitionID,
-			Response: &SessionResponse{
-				Type: SessionResponseType_RESPONSE,
-				Status: SessionResponseStatus{
-					Code:   SessionResponseCode_NOT_LEADER,
-					Leader: partition.Leader(),
-				},
-			},
-		}
-		log.Debugf("Sending StorageResponse %+v", response)
-		return srv.Send(response)
-	}
 
-	smRequest := &StateMachineRequest{
-		Timestamp: time.Now(),
-		Request:   request.Request,
-	}
-
-	bytes, err := proto.Marshal(smRequest)
+	bytes, err := proto.Marshal(&request.Request)
 	if err != nil {
-		log.Debugf("StorageRequest %+v failed: %s", request, err)
+		log.Debugf("PartitionQueryRequest %+v failed: %s", request, err)
 		return err
 	}
 
@@ -154,65 +102,163 @@ func (s *Server) Stream(request *StorageRequest, srv StorageService_StreamServer
 	errCh := make(chan error)
 	stream := streams.NewChannelStream(resultCh)
 	defer stream.Drain()
-	switch r := request.Request.Request.(type) {
-	case *SessionRequest_Command:
-		go func() {
-			err := partition.SyncCommand(srv.Context(), bytes, stream)
-			if err != nil {
-				errCh <- err
-			}
-		}()
-	case *SessionRequest_Query:
-		go func() {
-			if r.Query.Context.Sync {
-				err := partition.SyncQuery(srv.Context(), bytes, stream)
-				if err != nil {
-					errCh <- err
-				}
-			} else {
-				err := partition.StaleQuery(srv.Context(), bytes, stream)
-				if err != nil {
-					errCh <- err
-				}
-			}
-		}()
-	}
+	go func() {
+		err := partition.StaleQuery(srv.Context(), bytes, stream)
+		if err != nil {
+			errCh <- err
+		}
+	}()
 
 	for {
 		select {
 		case result, ok := <-resultCh:
 			if !ok {
-				log.Debugf("Finished StorageRequest %+v", request)
+				log.Debugf("Finished PartitionQueryRequest %+v", request)
 				return nil
 			}
 
 			if result.Failed() {
-				log.Warnf("StorageRequest %+v failed: %v", request, result.Error)
+				log.Warnf("PartitionQueryRequest %+v failed: %v", request, result.Error)
 				return result.Error
 			}
 
-			smResponse := &StateMachineResponse{}
-			if err := proto.Unmarshal(result.Value.([]byte), smResponse); err != nil {
+			response := &PartitionQueryResponse{}
+			if err := proto.Unmarshal(result.Value.([]byte), &response.Response); err != nil {
 				return err
 			}
 
-			response := &StorageResponse{
-				PartitionID: request.PartitionID,
-				Response:    smResponse.Response,
-			}
-			log.Debugf("Sending StorageResponse %+v", response)
+			log.Debugf("Sending PartitionQueryResponse %+v", response)
 			if err := srv.Send(response); err != nil {
 				return err
 			}
 		case err := <-errCh:
-			log.Warnf("StorageRequest %+v failed: %v", request, err)
+			log.Warnf("PartitionQueryRequest %+v failed: %v", request, err)
 			return err
 		case <-srv.Context().Done():
 			err := srv.Context().Err()
-			log.Debugf("Finished StorageRequest %+v: %v", request, err)
+			log.Debugf("Finished PartitionQueryRequest %+v: %v", request, err)
 			return err
 		}
 	}
 }
 
-var _ StorageServiceServer = &Server{}
+func (s *Server) Command(ctx context.Context, request *PartitionCommandRequest) (*PartitionCommandResponse, error) {
+	log.Debugf("Received PartitionCommandRequest %+v", request)
+
+	// If the client requires a leader and is not the leader, return an error
+	partition := s.Protocol.Partition(PartitionID(request.PartitionID))
+	if partition.MustLeader() && !partition.IsLeader() {
+		return nil, errors.Proto(errors.NewUnavailable("not the leader"))
+	}
+
+	if request.Request.Timestamp == nil {
+		timestamp := time.Now()
+		request.Request.Timestamp = &timestamp
+	}
+
+	bytes, err := proto.Marshal(&request.Request)
+	if err != nil {
+		log.Debugf("PartitionCommandRequest %+v failed: %s", request, err)
+		return nil, err
+	}
+
+	resultCh := make(chan streams.Result, 1)
+	errCh := make(chan error, 1)
+	go func() {
+		err := partition.SyncCommand(context.Background(), bytes, streams.NewChannelStream(resultCh))
+		if err != nil {
+			errCh <- err
+		}
+	}()
+
+	select {
+	case result, ok := <-resultCh:
+		if !ok {
+			err = errors.NewCanceled("stream closed")
+			log.Debugf("PartitionCommandRequest %+v failed: %s", request, err)
+			return nil, err
+		}
+
+		if result.Failed() {
+			log.Warnf("PartitionCommandRequest %+v failed: %v", request, result.Error)
+			return nil, result.Error
+		}
+
+		response := &PartitionCommandResponse{}
+		if err := proto.Unmarshal(result.Value.([]byte), &response.Response); err != nil {
+			return nil, err
+		}
+		log.Debugf("Sending PartitionCommandResponse %+v", response)
+		return response, nil
+	case err := <-errCh:
+		log.Debugf("PartitionCommandRequest %+v failed: %s", request, err)
+		return nil, err
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+func (s *Server) CommandStream(request *PartitionCommandRequest, srv PartitionService_CommandStreamServer) error {
+	log.Debugf("Received PartitionCommandRequest %+v", request)
+
+	// If the client requires a leader and is not the leader, return an error
+	partition := s.Protocol.Partition(PartitionID(request.PartitionID))
+	if partition.MustLeader() && !partition.IsLeader() {
+		return errors.Proto(errors.NewUnavailable("not the leader"))
+	}
+
+	if request.Request.Timestamp == nil {
+		timestamp := time.Now()
+		request.Request.Timestamp = &timestamp
+	}
+
+	bytes, err := proto.Marshal(&request.Request)
+	if err != nil {
+		log.Debugf("PartitionCommandRequest %+v failed: %s", request, err)
+		return err
+	}
+
+	resultCh := make(chan streams.Result)
+	errCh := make(chan error)
+	stream := streams.NewChannelStream(resultCh)
+	defer stream.Drain()
+	go func() {
+		err := partition.SyncCommand(srv.Context(), bytes, stream)
+		if err != nil {
+			errCh <- err
+		}
+	}()
+
+	for {
+		select {
+		case result, ok := <-resultCh:
+			if !ok {
+				log.Debugf("Finished PartitionCommandRequest %+v", request)
+				return nil
+			}
+
+			if result.Failed() {
+				log.Warnf("PartitionCommandRequest %+v failed: %v", request, result.Error)
+				return result.Error
+			}
+
+			response := &PartitionCommandResponse{}
+			if err := proto.Unmarshal(result.Value.([]byte), &response.Response); err != nil {
+				return err
+			}
+			log.Debugf("Sending PartitionCommandResponse %+v", response)
+			if err := srv.Send(response); err != nil {
+				return err
+			}
+		case err := <-errCh:
+			log.Warnf("PartitionCommandRequest %+v failed: %v", request, err)
+			return err
+		case <-srv.Context().Done():
+			err := srv.Context().Err()
+			log.Debugf("Finished PartitionCommandRequest %+v: %v", request, err)
+			return err
+		}
+	}
+}
+
+var _ PartitionServiceServer = &Server{}

@@ -17,10 +17,13 @@ import (
 	"io"
 	"fmt"
 	{{ import "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm" }}
-	{{ import "github.com/atomix/atomix-go-framework/pkg/atomix/errors" }}
 	{{ import "github.com/atomix/atomix-go-framework/pkg/atomix/util" }}
 	{{ import "github.com/golang/protobuf/proto" }}
-	{{ import "github.com/google/uuid" }}
+	{{- range .Primitive.Methods }}
+	{{- if ( and .Response.IsUnary .Type.IsAsync ) }}
+	{{ import "github.com/atomix/atomix-go-framework/pkg/atomix/errors" }}
+	{{- end }}
+	{{- end }}
 	{{- $package := .Package }}
 	{{- range .Imports }}
 	{{ .Alias }} {{ .Path | quote }}
@@ -60,6 +63,10 @@ import (
 {{- $serviceProposalImpl := ( ( printf "%sServiceProposal" .Generator.Prefix ) | toLowerCamel ) }}
 {{- $newServiceProposal := printf "new%sProposal" .Generator.Prefix }}
 
+{{- $serviceQueryInt := printf "%sQuery" .Generator.Prefix }}
+{{- $serviceQueryImpl := ( ( printf "%sServiceQuery" .Generator.Prefix ) | toLowerCamel ) }}
+{{- $newServiceQuery := printf "new%sQuery" .Generator.Prefix }}
+
 type {{ $serviceInt }} interface {
     {{ $serviceContextInt }}
 
@@ -80,8 +87,13 @@ type {{ $serviceInt }} interface {
     {{- $informerInt := printf "%s%sInformer" $serviceInt .Name }}
     {{- $writerInt := printf "%s%sWriter" $serviceInt .Name }}
 
+    {{- if .Type.IsCommand }}
     {{- $proposalInt := printf "%sProposal" .Name }}
     {{ .Name }}({{ $proposalInt }}) error
+    {{- else if .Type.IsQuery }}
+    {{- $queryInt := printf "%sQuery" .Name }}
+    {{ .Name }}({{ $queryInt }}) error
+    {{- end }}
     {{- end }}
 }
 
@@ -91,11 +103,11 @@ type {{ $serviceContextInt }} interface {
     Proposals() {{ $serviceProposalsInt }}
 }
 
-func new{{ $serviceContextInt }}(scheduler rsm.Scheduler) {{ $serviceContextInt }} {
+func new{{ $serviceContextInt }}(service rsm.ServiceContext) {{ $serviceContextInt }} {
     return &{{ $serviceContextImpl }}{
-        scheduler: scheduler,
-        sessions:  {{ $newServiceSessions }}(),
-        proposals: {{ $newServiceProposals }}(),
+        scheduler: service.Scheduler(),
+        sessions:  {{ $newServiceSessions }}(service.Sessions()),
+        proposals: {{ $newServiceProposals }}(service.Commands()),
     }
 }
 
@@ -177,53 +189,33 @@ func (r *{{ $serviceSnapshotReaderImpl }}) ReadState() (*{{ template "type" .Pri
 var _ {{ $serviceSnapshotReaderInt }} = &{{ $serviceSnapshotReaderImpl }}{}
 
 type {{ $serviceSessionsInt }} interface {
-    open({{ $serviceSessionInt }})
-    expire({{ $serviceSessionID }})
-    close({{ $serviceSessionID }})
     Get({{ $serviceSessionID }}) ({{ $serviceSessionInt }}, bool)
     List() []{{ $serviceSessionInt }}
 }
 
-func {{ $newServiceSessions }}() {{ $serviceSessionsInt }} {
+func {{ $newServiceSessions }}(sessions rsm.Sessions) {{ $serviceSessionsInt }} {
     return &{{ $serviceSessionsImpl }}{
-        sessions: make(map[{{ $serviceSessionID }}]{{ $serviceSessionInt }}),
+        sessions: sessions,
     }
 }
 
 type {{ $serviceSessionsImpl }} struct {
-    sessions map[{{ $serviceSessionID }}]{{ $serviceSessionInt }}
-}
-
-func (s *{{ $serviceSessionsImpl }}) open(session {{ $serviceSessionInt }}) {
-	s.sessions[session.ID()] = session
-	session.setState(SessionOpen)
-}
-
-func (s *{{ $serviceSessionsImpl }}) expire(sessionID {{ $serviceSessionID }}) {
-	session, ok := s.sessions[sessionID]
-	if ok {
-		session.setState(SessionClosed)
-		delete(s.sessions, sessionID)
-	}
-}
-
-func (s *{{ $serviceSessionsImpl }}) close(sessionID {{ $serviceSessionID }}) {
-	session, ok := s.sessions[sessionID]
-	if ok {
-		session.setState(SessionClosed)
-		delete(s.sessions, sessionID)
-	}
+    sessions rsm.Sessions
 }
 
 func (s *{{ $serviceSessionsImpl }}) Get(id {{ $serviceSessionID }}) ({{ $serviceSessionInt }}, bool) {
-    session, ok := s.sessions[id]
-    return session, ok
+    session, ok := s.sessions.Get(rsm.SessionID(id))
+    if !ok {
+        return nil, false
+    }
+    return {{ $newServiceSession }}(session), true
 }
 
 func (s *{{ $serviceSessionsImpl }}) List() []{{ $serviceSessionInt }} {
-    sessions := make([]{{ $serviceSessionInt }}, 0, len(s.sessions))
-    for _, session := range s.sessions {
-        sessions = append(sessions, session)
+    serviceSessions := s.sessions.List()
+    sessions := make([]{{ $serviceSessionInt }}, len(serviceSessions))
+    for i, serviceSession := range serviceSessions {
+        sessions[i] = {{ $newServiceSession }}(serviceSession)
     }
     return sessions
 }
@@ -243,18 +235,18 @@ type {{ $serviceWatcherInt }} interface {
 	Cancel()
 }
 
-func {{ $newServiceWatcher }}(f func()) {{ $serviceWatcherInt }} {
+func {{ $newServiceWatcher }}(watcher rsm.SessionStateWatcher) {{ $serviceWatcherInt }} {
 	return &{{ $serviceWatcherImpl }}{
-		f: f,
+		watcher: watcher,
 	}
 }
 
 type {{ $serviceWatcherImpl }} struct {
-	f func()
+	watcher rsm.SessionStateWatcher
 }
 
 func (s *{{ $serviceWatcherImpl }}) Cancel() {
-	s.f()
+    s.watcher.Cancel()
 }
 
 var _ {{ $serviceWatcherInt }} = &{{ $serviceWatcherImpl }}{}
@@ -262,24 +254,20 @@ var _ {{ $serviceWatcherInt }} = &{{ $serviceWatcherImpl }}{}
 type {{ $serviceSessionInt }} interface {
     ID() {{ $serviceSessionID }}
 	State() {{ $serviceSessionState }}
-	setState({{ $serviceSessionState }})
-	Watch(func({{ $serviceSessionState }})) Watcher
+	Watch(func({{ $serviceSessionState }})) {{ $serviceWatcherInt }}
     Proposals() {{ $serviceProposalsInt }}
 }
 
 func {{ $newServiceSession }}(session rsm.Session) {{ $serviceSessionInt }} {
     return &{{ $serviceSessionImpl }}{
         session:    session,
-        proposals: {{ $newServiceProposals }}(),
-        watchers:  make(map[string]func({{ $serviceSessionState }})),
+        proposals: {{ $newServiceProposals }}(session.Commands()),
     }
 }
 
 type {{ $serviceSessionImpl }} struct {
     session   rsm.Session
     proposals {{ $serviceProposalsInt }}
-	state     {{ $serviceSessionState }}
-	watchers  map[string]func({{ $serviceSessionState }})
 }
 
 func (s *{{ $serviceSessionImpl }}) ID() {{ $serviceSessionID }} {
@@ -290,60 +278,57 @@ func (s *{{ $serviceSessionImpl }}) Proposals() {{ $serviceProposalsInt }} {
     return s.proposals
 }
 
-func (s *{{ $serviceSessionImpl }}) State() SessionState {
-	return s.state
+func (s *{{ $serviceSessionImpl }}) State() {{ $serviceSessionState }} {
+	return {{ $serviceSessionState }}(s.session.State())
 }
 
-func (s *{{ $serviceSessionImpl }}) setState(state {{ $serviceSessionState }}) {
-	if state != s.state {
-		s.state = state
-		for _, watcher := range s.watchers {
-			watcher(state)
-		}
-	}
-}
-
-func (s *{{ $serviceSessionImpl }}) Watch(f func({{ $serviceSessionState }})) Watcher {
-	id := uuid.New().String()
-	s.watchers[id] = f
-	return {{ $newServiceWatcher }}(func() {
-		delete(s.watchers, id)
-	})
+func (s *{{ $serviceSessionImpl }}) Watch(f func({{ $serviceSessionState }})) {{ $serviceWatcherInt }} {
+	return {{ $newServiceWatcher }}(s.session.Watch(func(state rsm.SessionState) {
+	    f(SessionState(state))
+	}))
 }
 
 var _ {{ $serviceSessionInt }} = &{{ $serviceSessionImpl }}{}
 
 type {{ $serviceProposalsInt }} interface {
     {{- range .Primitive.Methods }}
+    {{- if .Type.IsCommand }}
     {{- $proposalsInt := printf "%sProposals" .Name }}
     {{ .Name }}() {{ $proposalsInt }}
     {{- end }}
+    {{- end }}
 }
 
-func {{ $newServiceProposals }}() {{ $serviceProposalsInt }} {
+func {{ $newServiceProposals }}(commands rsm.Commands) {{ $serviceProposalsInt }} {
     return &{{ $serviceProposalsImpl }}{
         {{- range .Primitive.Methods }}
+        {{- if .Type.IsCommand }}
         {{- $proposalsField := printf "%sProposals" ( .Name | toLowerCamel ) }}
         {{- $newProposals := printf "new%sProposals" .Name }}
-        {{ $proposalsField }}: {{ $newProposals }}(),
+        {{ $proposalsField }}: {{ $newProposals }}(commands),
+        {{- end }}
         {{- end }}
     }
 }
 
 type {{ $serviceProposalsImpl }} struct {
     {{- range .Primitive.Methods }}
+    {{- if .Type.IsCommand }}
     {{- $proposalsInt := printf "%sProposals" .Name }}
     {{- $proposalsField := printf "%sProposals" ( .Name | toLowerCamel ) }}
     {{ $proposalsField }} {{ $proposalsInt }}
     {{- end }}
+    {{- end }}
 }
 
 {{- range .Primitive.Methods }}
+{{- if .Type.IsCommand }}
 {{- $proposalsInt := printf "%sProposals" .Name }}
 {{- $proposalsField := printf "%sProposals" ( .Name | toLowerCamel ) }}
 func (s *{{ $serviceProposalsImpl }}) {{ .Name }}() {{ $proposalsInt }} {
     return s.{{ $proposalsField }}
 }
+{{- end }}
 {{- end }}
 
 var _ {{ $serviceProposalsInt }} = &{{ $serviceProposalsImpl }}{}
@@ -356,33 +341,57 @@ type {{ $serviceProposalInt }} interface {
 	Session() {{ $serviceSessionInt }}
 }
 
-func {{ $newServiceProposal }}(id {{ $serviceProposalID }}, session {{ $serviceSessionInt }}) {{ $serviceProposalInt }} {
+func {{ $newServiceProposal }}(command rsm.Command) {{ $serviceProposalInt }} {
     return &{{ $serviceProposalImpl }}{
-        id:      id,
-        session: session,
+        command: command,
     }
 }
 
 type {{ $serviceProposalImpl }} struct {
-    id      {{ $serviceProposalID }}
-    session {{ $serviceSessionInt }}
+    command rsm.Command
 }
 
 func (p *{{ $serviceProposalImpl }}) ID() {{ $serviceProposalID }} {
-    return p.id
+    return {{ $serviceProposalID }}(p.command.ID())
 }
 
 func (p *{{ $serviceProposalImpl }}) Session() {{ $serviceSessionInt }} {
-    return p.session
+    return {{ $newServiceSession }}(p.command.Session())
 }
 
 func (p *{{ $serviceProposalImpl }}) String() string {
-    return fmt.Sprintf("ProposalID: %d, SessionID: %d", p.id, p.session.ID())
+    return fmt.Sprintf("ProposalID: %d, SessionID: %d", p.ID(), p.Session().ID())
 }
 
 var _ {{ $serviceProposalInt }} = &{{ $serviceProposalImpl }}{}
 
+type {{ $serviceQueryInt }} interface {
+    fmt.Stringer
+	Session() {{ $serviceSessionInt }}
+}
+
+func {{ $newServiceQuery }}(query rsm.Query) {{ $serviceQueryInt }} {
+    return &{{ $serviceQueryImpl }}{
+        query: query,
+    }
+}
+
+type {{ $serviceQueryImpl }} struct {
+    query rsm.Query
+}
+
+func (p *{{ $serviceQueryImpl }}) Session() {{ $serviceSessionInt }} {
+    return {{ $newServiceSession }}(p.query.Session())
+}
+
+func (p *{{ $serviceQueryImpl }}) String() string {
+    return fmt.Sprintf("SessionID: %d", p.Session().ID())
+}
+
+var _ {{ $serviceQueryInt }} = &{{ $serviceQueryImpl }}{}
+
 {{- range .Primitive.Methods }}
+{{- if .Type.IsCommand }}
 {{- $proposalsInt := printf "%sProposals" .Name }}
 {{- $proposalsImpl := printf "%sProposals" ( .Name | toLowerCamel ) }}
 {{- $newProposals := printf "new%sProposals" .Name }}
@@ -390,39 +399,33 @@ var _ {{ $serviceProposalInt }} = &{{ $serviceProposalImpl }}{}
 {{- $proposalImpl := printf "%sProposal" ( .Name | toLowerCamel ) }}
 {{- $newProposal := printf "new%sProposal" .Name }}
 type {{ $proposalsInt }} interface {
-    register({{ $proposalInt }})
-    unregister({{ $serviceProposalID }})
     Get({{ $serviceProposalID }}) ({{ $proposalInt }}, bool)
     List() []{{ $proposalInt }}
 }
 
-func {{ $newProposals }}() {{ $proposalsInt }} {
+func {{ $newProposals }}(commands rsm.Commands) {{ $proposalsInt }} {
     return &{{ $proposalsImpl }}{
-        proposals: make(map[{{ $serviceProposalID }}]{{ $proposalInt }}),
+        commands: commands,
     }
 }
 
 type {{ $proposalsImpl }} struct {
-    proposals map[{{ $serviceProposalID }}]{{ $proposalInt }}
-}
-
-func (p *{{ $proposalsImpl }}) register(proposal {{ $proposalInt }}) {
-    p.proposals[proposal.ID()] = proposal
-}
-
-func (p *{{ $proposalsImpl }}) unregister(id {{ $serviceProposalID }}) {
-    delete(p.proposals, id)
+    commands rsm.Commands
 }
 
 func (p *{{ $proposalsImpl }}) Get(id {{ $serviceProposalID }}) ({{ $proposalInt }}, bool) {
-    proposal, ok := p.proposals[id]
-    return proposal, ok
+    command, ok := p.commands.Get(rsm.CommandID(id))
+    if !ok {
+        return nil, false
+    }
+    return {{ $newProposal }}(command), true
 }
 
 func (p *{{ $proposalsImpl }}) List() []{{ $proposalInt }} {
-    proposals := make([]{{ $proposalInt }}, 0, len(p.proposals))
-    for _, proposal := range p.proposals {
-        proposals = append(proposals, proposal)
+    commands := p.commands.List(rsm.OperationID({{ .ID }}))
+    proposals := make([]{{ $proposalInt }}, len(commands))
+    for i, command := range commands {
+        proposals[i] = {{ $newProposal }}(command)
     }
     return proposals
 }
@@ -431,10 +434,9 @@ var _ {{ $proposalsInt }} = &{{ $proposalsImpl }}{}
 
 type {{ $proposalInt }} interface {
     {{ $serviceProposalInt }}
-    Request() *{{ template "type" .Request.Type }}
+    Request() (*{{ template "type" .Request.Type }}, error)
     {{- if ( and .Response.IsUnary .Type.IsSync ) }}
     Reply(*{{ template "type" .Response.Type }}) error
-    response() *{{ template "type" .Response.Type }}
     {{- else if ( and .Response.IsUnary .Type.IsAsync ) }}
     Reply(*{{ template "type" .Response.Type }}) error
     Fail(error) error
@@ -446,73 +448,76 @@ type {{ $proposalInt }} interface {
 }
 
 {{- if ( and .Response.IsUnary .Type.IsSync ) }}
-func {{ $newProposal }}(id {{ $serviceProposalID }}, session {{ $serviceSessionInt }}, request *{{ template "type" .Request.Type }}) {{ $proposalInt }} {
+func {{ $newProposal }}(command rsm.Command) {{ $proposalInt }} {
     return &{{ $proposalImpl }}{
-        {{ $serviceProposalInt }}: {{ $newServiceProposal }}(id, session),
-        req: request,
+        {{ $serviceProposalInt }}: {{ $newServiceProposal }}(command),
+        command: command,
     }
 }
 
 type {{ $proposalImpl }} struct {
     {{ $serviceProposalInt }}
-    req *{{ template "type" .Request.Type }}
-    res *{{ template "type" .Response.Type }}
+    command rsm.Command
 }
 
-func (p *{{ $proposalImpl }}) Request() *{{ template "type" .Request.Type }} {
-    return p.req
-}
-
-func (p *{{ $proposalImpl }}) Reply(reply *{{ template "type" .Response.Type }}) error {
-    if p.res != nil {
-        return errors.NewConflict("reply already sent")
+func (p *{{ $proposalImpl }}) Request() (*{{ template "type" .Request.Type }}, error) {
+    request := &{{ template "type" .Request.Type }}{}
+    if err := proto.Unmarshal(p.command.Input(), request); err != nil {
+        return nil, err
     }
-    log.Debugf("Accepted {{ $proposalInt }} %s: %s", p, reply)
-    p.res = reply
+    log.Debugf("Received {{ $proposalInt }} %s: %s", p, request)
+    return request, nil
+}
+
+func (p *{{ $proposalImpl }}) Reply(response *{{ template "type" .Response.Type }}) error {
+    log.Debugf("Sending {{ $proposalInt }} %s: %s", p, response)
+    output, err := proto.Marshal(response)
+    if err != nil {
+        return err
+    }
+    p.command.Output(output, nil)
+    p.command.Close()
     return nil
 }
 
-func (p *{{ $proposalImpl }}) response() *{{ template "type" .Response.Type }} {
-    return p.res
-}
-
 func (p *{{ $proposalImpl }}) String() string {
-    return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.req)
+    return fmt.Sprintf("ProposalID=%d, SessionID=%d", p.ID(), p.Session().ID())
 }
 {{- else if ( and .Response.IsUnary .Type.IsAsync ) }}
-func {{ $newProposal }}(id {{ $serviceProposalID }}, session {{ $serviceSessionInt }}, request *{{ template "type" .Request.Type }}, stream rsm.Stream) {{ $proposalInt }} {
+func {{ $newProposal }}(command rsm.Command) {{ $proposalInt }} {
     return &{{ $proposalImpl }}{
-        {{ $serviceProposalInt }}: {{ $newServiceProposal }}(id, session),
-        request: request,
-        stream:  stream,
+        {{ $serviceProposalInt }}: {{ $newServiceProposal }}(command),
+        command: command,
     }
 }
 
 type {{ $proposalImpl }} struct {
     {{ $serviceProposalInt }}
-    request  *{{ template "type" .Request.Type }}
-    stream   rsm.Stream
+    command  rsm.Command
     complete bool
 }
 
-func (p *{{ $proposalImpl }}) Request() *{{ template "type" .Request.Type }} {
-    return p.request
+func (p *{{ $proposalImpl }}) Request() (*{{ template "type" .Request.Type }}, error) {
+    request := &{{ template "type" .Request.Type }}{}
+    if err := proto.Unmarshal(p.command.Input(), request); err != nil {
+        return nil, err
+    }
+    log.Debugf("Received {{ $proposalInt }} %s: %s", p, request)
+    return request, nil
 }
 
-func (p *{{ $proposalImpl }}) Reply(reply *{{ template "type" .Response.Type }}) error {
+func (p *{{ $proposalImpl }}) Reply(response *{{ template "type" .Response.Type }}) error {
     if p.complete {
         return errors.NewConflict("reply already sent")
     }
-    log.Debugf("Accepted {{ $proposalInt }} %s: %s", p, reply)
-    p.complete = true
-    bytes, err := proto.Marshal(reply)
+    log.Debugf("Sending {{ $proposalInt }} %s: %s", p, response)
+    output, err := proto.Marshal(response)
     if err != nil {
-        p.stream.Error(err)
         return err
-    } else {
-        p.stream.Value(bytes)
     }
-    p.stream.Close()
+    p.command.Output(output, nil)
+    p.command.Close()
+    p.complete = true
     return nil
 }
 
@@ -520,10 +525,10 @@ func (p *{{ $proposalImpl }}) Fail(err error) error {
     if p.complete {
         return errors.NewConflict("reply already sent")
     }
-    log.Warnf("Rejected {{ $proposalsInt }} %s: %s", p, err)
+    log.Debugf("Sending {{ $proposalInt }} %s: %s", p, err)
+    p.command.Output(nil, err)
+    p.command.Close()
     p.complete = true
-    p.stream.Error(err)
-    p.stream.Close()
     return nil
 }
 
@@ -532,51 +537,154 @@ func (p *{{ $proposalImpl }}) Close() error {
         return errors.NewConflict("reply already sent")
     }
     p.complete = true
-    p.stream.Close()
+    p.command.Close()
     return nil
 }
 
 func (p *{{ $proposalImpl }}) String() string {
-    return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.request)
+    return fmt.Sprintf("ProposalID=%d, SessionID=%d", p.ID(), p.Session().ID())
 }
 {{- else if .Response.IsStream }}
-func {{ $newProposal }}(id {{ $serviceProposalID }}, session {{ $serviceSessionInt }}, request *{{ template "type" .Request.Type }}, stream rsm.Stream) {{ $proposalInt }} {
+func {{ $newProposal }}(command rsm.Command) {{ $proposalInt }} {
     return &{{ $proposalImpl }}{
-        {{ $serviceProposalInt }}: {{ $newServiceProposal }}(id, session),
-        request: request,
-        stream:  stream,
+        {{ $serviceProposalInt }}: {{ $newServiceProposal }}(command),
+        command: command,
     }
 }
 
 type {{ $proposalImpl }} struct {
     {{ $serviceProposalInt }}
-    request *{{ template "type" .Request.Type }}
-    stream  rsm.Stream
+    command rsm.Command
 }
 
-func (p *{{ $proposalImpl }}) Request() *{{ template "type" .Request.Type }} {
-    return p.request
+func (p *{{ $proposalImpl }}) Request() (*{{ template "type" .Request.Type }}, error) {
+    request := &{{ template "type" .Request.Type }}{}
+    if err := proto.Unmarshal(p.command.Input(), request); err != nil {
+        return nil, err
+    }
+    log.Debugf("Received {{ $proposalInt }} %s: %s", p, request)
+    return request, nil
 }
 
-func (p *{{ $proposalImpl }}) Notify(notification *{{ template "type" .Response.Type }}) error {
-    log.Debugf("Notifying {{ $proposalInt }} %s: %s", p, notification)
-    bytes, err := proto.Marshal(notification)
+func (p *{{ $proposalImpl }}) Notify(response *{{ template "type" .Response.Type }}) error {
+    log.Debugf("Notifying {{ $proposalInt }} %s: %s", p, response)
+    output, err := proto.Marshal(response)
     if err != nil {
         return err
     }
-    p.stream.Value(bytes)
+    p.command.Output(output, nil)
     return nil
 }
 
 func (p *{{ $proposalImpl }}) Close() error {
-    p.stream.Close()
+    p.command.Close()
     return nil
 }
 
 func (p *{{ $proposalImpl }}) String() string {
-    return fmt.Sprintf("ProposalID=%d, SessionID=%d, Request=%s", p.ID(), p.Session().ID(), p.request)
+    return fmt.Sprintf("ProposalID=%d, SessionID=%d", p.ID(), p.Session().ID())
 }
 {{- end }}
 
 var _ {{ $proposalInt }} = &{{ $proposalImpl }}{}
+{{- else if .Type.IsQuery }}
+{{- $queryInt := printf "%sQuery" .Name }}
+{{- $queryImpl := printf "%sQuery" ( .Name | toLowerCamel ) }}
+{{- $newQuery := printf "new%sQuery" .Name }}
+
+type {{ $queryInt }} interface {
+    {{ $serviceQueryInt }}
+    Request() (*{{ template "type" .Request.Type }}, error)
+    {{- if ( and .Response.IsUnary .Type.IsSync ) }}
+    Reply(*{{ template "type" .Response.Type }}) error
+    {{- else if ( and .Response.IsUnary .Type.IsAsync ) }}
+    Reply(*{{ template "type" .Response.Type }}) error
+    Fail(error) error
+    Close() error
+    {{- else if .Response.IsStream }}
+    Notify(*{{ template "type" .Response.Type }}) error
+    Close() error
+    {{- end }}
+}
+
+{{- if .Response.IsUnary }}
+func {{ $newQuery }}(query rsm.Query) {{ $queryInt }} {
+    return &{{ $queryImpl }}{
+        {{ $serviceQueryInt }}: {{ $newServiceQuery }}(query),
+        query: query,
+    }
+}
+
+type {{ $queryImpl }} struct {
+    {{ $serviceQueryInt }}
+    query rsm.Query
+}
+
+func (p *{{ $queryImpl }}) Request() (*{{ template "type" .Request.Type }}, error) {
+    request := &{{ template "type" .Request.Type }}{}
+    if err := proto.Unmarshal(p.query.Input(), request); err != nil {
+        return nil, err
+    }
+    log.Debugf("Received {{ $queryInt }} %s: %s", p, request)
+    return request, nil
+}
+
+func (p *{{ $queryImpl }}) Reply(response *{{ template "type" .Response.Type }}) error {
+    log.Debugf("Sending {{ $queryInt }} %s: %s", p, response)
+    output, err := proto.Marshal(response)
+    if err != nil {
+        return err
+    }
+    p.query.Output(output, nil)
+    p.query.Close()
+    return nil
+}
+
+func (p *{{ $queryImpl }}) String() string {
+    return fmt.Sprintf("SessionID=%d", p.Session().ID())
+}
+{{- else if .Response.IsStream }}
+func {{ $newQuery }}(query rsm.Query) {{ $queryInt }} {
+    return &{{ $queryImpl }}{
+        {{ $serviceQueryInt }}: {{ $newServiceQuery }}(query),
+        query: query,
+    }
+}
+
+type {{ $queryImpl }} struct {
+    {{ $serviceQueryInt }}
+    query rsm.Query
+}
+
+func (p *{{ $queryImpl }}) Request() (*{{ template "type" .Request.Type }}, error) {
+    request := &{{ template "type" .Request.Type }}{}
+    if err := proto.Unmarshal(p.query.Input(), request); err != nil {
+        return nil, err
+    }
+    log.Debugf("Received {{ $queryInt }} %s: %s", p, request)
+    return request, nil
+}
+
+func (p *{{ $queryImpl }}) Notify(response *{{ template "type" .Response.Type }}) error {
+    log.Debugf("Notifying {{ $queryInt }} %s: %s", p, response)
+    output, err := proto.Marshal(response)
+    if err != nil {
+        return err
+    }
+    p.query.Output(output, nil)
+    return nil
+}
+
+func (p *{{ $queryImpl }}) Close() error {
+    p.query.Close()
+    return nil
+}
+
+func (p *{{ $queryImpl }}) String() string {
+    return fmt.Sprintf("SessionID=%d", p.Session().ID())
+}
+{{- end }}
+
+var _ {{ $queryInt }} = &{{ $queryImpl }}{}
+{{- end }}
 {{- end }}
