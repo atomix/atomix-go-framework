@@ -15,17 +15,18 @@ import (
 const Type = "Value"
 
 const (
-	setOp    = "Set"
-	getOp    = "Get"
-	eventsOp = "Events"
+	setOp    storage.OperationID = 1
+	getOp    storage.OperationID = 2
+	eventsOp storage.OperationID = 3
 )
+
+var log = logging.GetLogger("atomix", "proxy", "value")
 
 // NewProxyServer creates a new ProxyServer
 func NewProxyServer(client *rsm.Client, readSync bool) value.ValueServiceServer {
 	return &ProxyServer{
 		Client:   client,
 		readSync: readSync,
-		log:      logging.GetLogger("atomix", "proxy", "value"),
 	}
 }
 
@@ -36,10 +37,10 @@ type ProxyServer struct {
 }
 
 func (s *ProxyServer) Set(ctx context.Context, request *value.SetRequest) (*value.SetResponse, error) {
-	s.log.Debugf("Received SetRequest %+v", request)
+	log.Debugf("Received SetRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		s.log.Errorf("Request SetRequest failed: %v", err)
+		log.Errorf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	clusterKey := request.Headers.ClusterKey
@@ -48,32 +49,37 @@ func (s *ProxyServer) Set(ctx context.Context, request *value.SetRequest) (*valu
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceId{
-		Type:    Type,
-		Cluster: request.Headers.ClusterKey,
-		Name:    request.Headers.PrimitiveID.Name,
+	service := storage.ServiceID{
+		Type:      Type,
+		Namespace: s.Namespace,
+		Name:      request.Headers.PrimitiveID.Name,
 	}
-	output, err := partition.DoCommand(ctx, service, setOp, input)
+	session, err := partition.GetSession(ctx, service)
 	if err != nil {
-		s.log.Warnf("Request SetRequest failed: %v", err)
+		log.Errorf("Request SetRequest failed: %v", err)
+		return nil, errors.Proto(err)
+	}
+	output, err := session.DoCommand(ctx, setOp, input)
+	if err != nil {
+		log.Warnf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &value.SetResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		s.log.Errorf("Request SetRequest failed: %v", err)
+		log.Errorf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	s.log.Debugf("Sending SetResponse %+v", response)
+	log.Debugf("Sending SetResponse %+v", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Get(ctx context.Context, request *value.GetRequest) (*value.GetResponse, error) {
-	s.log.Debugf("Received GetRequest %+v", request)
+	log.Debugf("Received GetRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		s.log.Errorf("Request GetRequest failed: %v", err)
+		log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	clusterKey := request.Headers.ClusterKey
@@ -82,32 +88,37 @@ func (s *ProxyServer) Get(ctx context.Context, request *value.GetRequest) (*valu
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceId{
-		Type:    Type,
-		Cluster: request.Headers.ClusterKey,
-		Name:    request.Headers.PrimitiveID.Name,
+	service := storage.ServiceID{
+		Type:      Type,
+		Namespace: s.Namespace,
+		Name:      request.Headers.PrimitiveID.Name,
 	}
-	output, err := partition.DoQuery(ctx, service, getOp, input, s.readSync)
+	session, err := partition.GetSession(ctx, service)
 	if err != nil {
-		s.log.Warnf("Request GetRequest failed: %v", err)
+		log.Errorf("Request GetRequest failed: %v", err)
+		return nil, errors.Proto(err)
+	}
+	output, err := session.DoQuery(ctx, getOp, input, s.readSync)
+	if err != nil {
+		log.Warnf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &value.GetResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		s.log.Errorf("Request GetRequest failed: %v", err)
+		log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	s.log.Debugf("Sending GetResponse %+v", response)
+	log.Debugf("Sending GetResponse %+v", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueService_EventsServer) error {
-	s.log.Debugf("Received EventsRequest %+v", request)
+	log.Debugf("Received EventsRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		s.log.Errorf("Request EventsRequest failed: %v", err)
+		log.Errorf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
@@ -119,14 +130,18 @@ func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueServic
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceId{
-		Type:    Type,
-		Cluster: request.Headers.ClusterKey,
-		Name:    request.Headers.PrimitiveID.Name,
+	service := storage.ServiceID{
+		Type:      Type,
+		Namespace: s.Namespace,
+		Name:      request.Headers.PrimitiveID.Name,
 	}
-	err = partition.DoCommandStream(srv.Context(), service, eventsOp, input, stream)
+	session, err := partition.GetSession(ctx, service)
 	if err != nil {
-		s.log.Warnf("Request EventsRequest failed: %v", err)
+		return nil, err
+	}
+	err = session.DoCommandStream(srv.Context(), eventsOp, input, stream)
+	if err != nil {
+		log.Warnf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
@@ -135,23 +150,23 @@ func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueServic
 			if result.Error == context.Canceled {
 				break
 			}
-			s.log.Warnf("Request EventsRequest failed: %v", result.Error)
+			log.Warnf("Request EventsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 
 		response := &value.EventsResponse{}
 		err = proto.Unmarshal(result.Value.([]byte), response)
 		if err != nil {
-			s.log.Errorf("Request EventsRequest failed: %v", err)
+			log.Errorf("Request EventsRequest failed: %v", err)
 			return errors.Proto(err)
 		}
 
-		s.log.Debugf("Sending EventsResponse %+v", response)
+		log.Debugf("Sending EventsResponse %+v", response)
 		if err = srv.Send(response); err != nil {
-			s.log.Warnf("Response EventsResponse failed: %v", err)
+			log.Warnf("Response EventsResponse failed: %v", err)
 			return err
 		}
 	}
-	s.log.Debugf("Finished EventsRequest %+v", request)
+	log.Debugf("Finished EventsRequest %+v", request)
 	return nil
 }

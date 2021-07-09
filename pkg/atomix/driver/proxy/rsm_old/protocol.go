@@ -15,7 +15,6 @@
 package rsm
 
 import (
-	"context"
 	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
@@ -25,15 +24,16 @@ import (
 	"google.golang.org/grpc"
 )
 
-var log = logging.GetLogger("atomix", "proxy", "rsm")
-
 // NewProtocol creates a new state machine protocol
 func NewProtocol(cluster cluster.Cluster, env env.DriverEnv) *Protocol {
+	member, _ := cluster.Member()
+	log := logging.GetLogger("atomix", "proxy", string(member.ID))
 	return &Protocol{
 		Server:     server.NewServer(cluster),
-		Client:     NewClient(cluster, env),
+		Client:     NewClient(cluster, log),
 		Env:        env,
 		primitives: primitive.NewPrimitiveTypeRegistry(),
+		log:        log,
 	}
 }
 
@@ -43,6 +43,7 @@ type Protocol struct {
 	Client     *Client
 	Env        env.DriverEnv
 	primitives *primitive.PrimitiveTypeRegistry
+	log        logging.Logger
 }
 
 // Name returns the protocol name
@@ -58,7 +59,7 @@ func (n *Protocol) Primitives() *primitive.PrimitiveTypeRegistry {
 
 // Start starts the node
 func (n *Protocol) Start() error {
-	log.Info("Starting protocol")
+	n.log.Info("Starting protocol")
 	n.Services().RegisterService(func(s *grpc.Server) {
 		for _, primitiveType := range n.Primitives().ListPrimitiveTypes() {
 			primitiveType.RegisterServer(s)
@@ -68,11 +69,11 @@ func (n *Protocol) Start() error {
 		RegisterPrimitiveServer(s, n.Client, n.Env)
 	})
 	if err := n.Server.Start(); err != nil {
-		log.Error(err, "Starting protocol")
+		n.log.Error(err, "Starting protocol")
 		return err
 	}
-	if err := n.Client.Connect(context.Background()); err != nil {
-		log.Error(err, "Starting protocol")
+	if err := n.Client.Connect(); err != nil {
+		n.log.Error(err, "Starting protocol")
 		return err
 	}
 	return nil
@@ -91,7 +92,7 @@ func (n *Protocol) Stop() error {
 	if err := n.Server.Stop(); err != nil {
 		return err
 	}
-	if err := n.Client.Close(context.Background()); err != nil {
+	if err := n.Client.Close(); err != nil {
 		return err
 	}
 	return nil

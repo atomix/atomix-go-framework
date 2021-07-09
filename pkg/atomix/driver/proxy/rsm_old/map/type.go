@@ -12,44 +12,45 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package leader
+package _map //nolint:golint
 
 import (
 	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
-	leaderapi "github.com/atomix/atomix-api/go/atomix/primitive/leader"
+	mapapi "github.com/atomix/atomix-api/go/atomix/primitive/map"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive"
-	leaderdriver "github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive/leader"
-	leaderro "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/ro/leader"
+	mapdriver "github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive/map"
+	mapro "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/ro/map"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm"
 	"github.com/gogo/protobuf/jsonpb"
 	"google.golang.org/grpc"
 )
 
+// Register registers the map proxy
 func Register(protocol *rsm.Protocol) {
-	protocol.Primitives().RegisterPrimitiveType(newLeaderLatchType(protocol))
+	protocol.Primitives().RegisterPrimitiveType(newMapType(protocol))
 }
 
-func newLeaderLatchType(protocol *rsm.Protocol) primitive.PrimitiveType {
-	return &leaderLatchType{
+func newMapType(protocol *rsm.Protocol) primitive.PrimitiveType {
+	return &mapType{
 		protocol: protocol,
-		registry: leaderdriver.NewProxyRegistry(),
+		registry: mapdriver.NewProxyRegistry(),
 	}
 }
 
-type leaderLatchType struct {
+type mapType struct {
 	protocol *rsm.Protocol
-	registry *leaderdriver.ProxyRegistry
+	registry *mapdriver.ProxyRegistry
 }
 
-func (p *leaderLatchType) Name() string {
+func (p *mapType) Name() string {
 	return Type
 }
 
-func (p *leaderLatchType) RegisterServer(s *grpc.Server) {
-	leaderapi.RegisterLeaderLatchServiceServer(s, leaderdriver.NewProxyServer(p.registry, p.protocol.Env))
+func (p *mapType) RegisterServer(s *grpc.Server) {
+	mapapi.RegisterMapServiceServer(s, mapdriver.NewProxyServer(p.registry, p.protocol.Env))
 }
 
-func (p *leaderLatchType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
+func (p *mapType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
 	config := rsm.RSMConfig{}
 	if options.Config != nil {
 		if err := jsonpb.UnmarshalString(string(options.Config), &config); err != nil {
@@ -58,13 +59,13 @@ func (p *leaderLatchType) AddProxy(id driverapi.ProxyId, options driverapi.Proxy
 	}
 	server := NewProxyServer(p.protocol.Client, config.ReadSync)
 	if !options.Write {
-		server = leaderro.NewProxyServer(server)
+		server = mapro.NewProxyServer(server)
 	}
 	return p.registry.AddProxy(id.PrimitiveId, server)
 }
 
-func (p *leaderLatchType) RemoveProxy(id driverapi.ProxyId) error {
+func (p *mapType) RemoveProxy(id driverapi.ProxyId) error {
 	return p.registry.RemoveProxy(id.PrimitiveId)
 }
 
-var _ primitive.PrimitiveType = &leaderLatchType{}
+var _ primitive.PrimitiveType = &mapType{}

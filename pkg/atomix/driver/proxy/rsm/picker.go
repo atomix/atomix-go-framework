@@ -77,6 +77,6 @@ func (p *Picker) nextFollower() balancer.SubConn {
 
 func init() {
 	balancer.Register(
-		base.NewBalancerBuilder(Name, &Picker{}, base.Config{}),
+		base.NewBalancerBuilder(resolverName, &Picker{}, base.Config{}),
 	)
 }

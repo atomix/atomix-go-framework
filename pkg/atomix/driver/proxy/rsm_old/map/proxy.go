@@ -17,22 +17,21 @@ import (
 const Type = "Map"
 
 const (
-	sizeOp    storage.OperationID = 1
-	putOp     storage.OperationID = 2
-	getOp     storage.OperationID = 3
-	removeOp  storage.OperationID = 4
-	clearOp   storage.OperationID = 5
-	eventsOp  storage.OperationID = 6
-	entriesOp storage.OperationID = 7
+	sizeOp    = "Size"
+	putOp     = "Put"
+	getOp     = "Get"
+	removeOp  = "Remove"
+	clearOp   = "Clear"
+	eventsOp  = "Events"
+	entriesOp = "Entries"
 )
-
-var log = logging.GetLogger("atomix", "proxy", "map")
 
 // NewProxyServer creates a new ProxyServer
 func NewProxyServer(client *rsm.Client, readSync bool) _map.MapServiceServer {
 	return &ProxyServer{
 		Client:   client,
 		readSync: readSync,
+		log:      logging.GetLogger("atomix", "proxy", "map"),
 	}
 }
 
@@ -43,28 +42,24 @@ type ProxyServer struct {
 }
 
 func (s *ProxyServer) Size(ctx context.Context, request *_map.SizeRequest) (*_map.SizeResponse, error) {
-	log.Debugf("Received SizeRequest %+v", request)
+	s.log.Debugf("Received SizeRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		log.Errorf("Request SizeRequest failed: %v", err)
+		s.log.Errorf("Request SizeRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	partitions := s.Partitions()
 
-	service := storage.ServiceID{
-		Type:      Type,
-		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
-		session, err := partitions[i].GetSession(ctx, service)
-		if err != nil {
-			return nil, err
-		}
-		return session.DoQuery(ctx, sizeOp, input, s.readSync)
+		return partitions[i].DoQuery(ctx, service, sizeOp, input, s.readSync)
 	})
 	if err != nil {
-		log.Warnf("Request SizeRequest failed: %v", err)
+		s.log.Warnf("Request SizeRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	responses := make([]_map.SizeResponse, 0, len(outputs))
@@ -72,7 +67,7 @@ func (s *ProxyServer) Size(ctx context.Context, request *_map.SizeRequest) (*_ma
 		var response _map.SizeResponse
 		err := proto.Unmarshal(output.([]byte), &response)
 		if err != nil {
-			log.Errorf("Request SizeRequest failed: %v", err)
+			s.log.Errorf("Request SizeRequest failed: %v", err)
 			return nil, errors.Proto(err)
 		}
 		responses = append(responses, response)
@@ -82,175 +77,152 @@ func (s *ProxyServer) Size(ctx context.Context, request *_map.SizeRequest) (*_ma
 	for _, r := range responses {
 		response.Size_ += r.Size_
 	}
-	log.Debugf("Sending SizeResponse %+v", response)
+	s.log.Debugf("Sending SizeResponse %+v", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Put(ctx context.Context, request *_map.PutRequest) (*_map.PutResponse, error) {
-	log.Debugf("Received PutRequest %+v", request)
+	s.log.Debugf("Received PutRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		log.Errorf("Request PutRequest failed: %v", err)
+		s.log.Errorf("Request PutRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	partitionKey := request.Entry.Key.Key
 	partition := s.PartitionBy([]byte(partitionKey))
 
-	service := storage.ServiceID{
-		Type:      Type,
-		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	output, err := partition.DoCommand(ctx, service, putOp, input)
 	if err != nil {
-		log.Errorf("Request PutRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	output, err := session.DoCommand(ctx, putOp, input)
-	if err != nil {
-		log.Warnf("Request PutRequest failed: %v", err)
+		s.log.Warnf("Request PutRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &_map.PutResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		log.Errorf("Request PutRequest failed: %v", err)
+		s.log.Errorf("Request PutRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending PutResponse %+v", response)
+	s.log.Debugf("Sending PutResponse %+v", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Get(ctx context.Context, request *_map.GetRequest) (*_map.GetResponse, error) {
-	log.Debugf("Received GetRequest %+v", request)
+	s.log.Debugf("Received GetRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		log.Errorf("Request GetRequest failed: %v", err)
+		s.log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	partitionKey := request.Key
 	partition := s.PartitionBy([]byte(partitionKey))
 
-	service := storage.ServiceID{
-		Type:      Type,
-		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	output, err := partition.DoQuery(ctx, service, getOp, input, s.readSync)
 	if err != nil {
-		log.Errorf("Request GetRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	output, err := session.DoQuery(ctx, getOp, input, s.readSync)
-	if err != nil {
-		log.Warnf("Request GetRequest failed: %v", err)
+		s.log.Warnf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &_map.GetResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		log.Errorf("Request GetRequest failed: %v", err)
+		s.log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending GetResponse %+v", response)
+	s.log.Debugf("Sending GetResponse %+v", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Remove(ctx context.Context, request *_map.RemoveRequest) (*_map.RemoveResponse, error) {
-	log.Debugf("Received RemoveRequest %+v", request)
+	s.log.Debugf("Received RemoveRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		log.Errorf("Request RemoveRequest failed: %v", err)
+		s.log.Errorf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	partitionKey := request.Key.Key
 	partition := s.PartitionBy([]byte(partitionKey))
 
-	service := storage.ServiceID{
-		Type:      Type,
-		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	output, err := partition.DoCommand(ctx, service, removeOp, input)
 	if err != nil {
-		log.Errorf("Request RemoveRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	output, err := session.DoCommand(ctx, removeOp, input)
-	if err != nil {
-		log.Warnf("Request RemoveRequest failed: %v", err)
+		s.log.Warnf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &_map.RemoveResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		log.Errorf("Request RemoveRequest failed: %v", err)
+		s.log.Errorf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending RemoveResponse %+v", response)
+	s.log.Debugf("Sending RemoveResponse %+v", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Clear(ctx context.Context, request *_map.ClearRequest) (*_map.ClearResponse, error) {
-	log.Debugf("Received ClearRequest %+v", request)
+	s.log.Debugf("Received ClearRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		log.Errorf("Request ClearRequest failed: %v", err)
+		s.log.Errorf("Request ClearRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	partitions := s.Partitions()
 
-	service := storage.ServiceID{
-		Type:      Type,
-		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	err = async.IterAsync(len(partitions), func(i int) error {
-		session, err := partitions[i].GetSession(ctx, service)
-		if err != nil {
-			return err
-		}
-		_, err := session.DoCommand(ctx, clearOp, input)
+		_, err := partitions[i].DoCommand(ctx, service, clearOp, input)
 		return err
 	})
 	if err != nil {
-		log.Warnf("Request ClearRequest failed: %v", err)
+		s.log.Warnf("Request ClearRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &_map.ClearResponse{}
-	log.Debugf("Sending ClearResponse %+v", response)
+	s.log.Debugf("Sending ClearResponse %+v", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Events(request *_map.EventsRequest, srv _map.MapService_EventsServer) error {
-	log.Debugf("Received EventsRequest %+v", request)
+	s.log.Debugf("Received EventsRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		log.Errorf("Request EventsRequest failed: %v", err)
+		s.log.Errorf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
 	ch := make(chan streams.Result)
 	stream := streams.NewChannelStream(ch)
-	service := storage.ServiceID{
-		Type:      Type,
-		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	partitions := s.Partitions()
 	err = async.IterAsync(len(partitions), func(i int) error {
-		session, err := partitions[i].GetSession(ctx, service)
-		if err != nil {
-			return nil, err
-		}
-		return session.DoCommandStream(srv.Context(), eventsOp, input, stream)
+		return partitions[i].DoCommandStream(srv.Context(), service, eventsOp, input, stream)
 	})
 	if err != nil {
-		log.Warnf("Request EventsRequest failed: %v", err)
+		s.log.Warnf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
@@ -259,52 +231,48 @@ func (s *ProxyServer) Events(request *_map.EventsRequest, srv _map.MapService_Ev
 			if result.Error == context.Canceled {
 				break
 			}
-			log.Warnf("Request EventsRequest failed: %v", result.Error)
+			s.log.Warnf("Request EventsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 
 		response := &_map.EventsResponse{}
 		err = proto.Unmarshal(result.Value.([]byte), response)
 		if err != nil {
-			log.Errorf("Request EventsRequest failed: %v", err)
+			s.log.Errorf("Request EventsRequest failed: %v", err)
 			return errors.Proto(err)
 		}
 
-		log.Debugf("Sending EventsResponse %+v", response)
+		s.log.Debugf("Sending EventsResponse %+v", response)
 		if err = srv.Send(response); err != nil {
-			log.Warnf("Response EventsResponse failed: %v", err)
+			s.log.Warnf("Response EventsResponse failed: %v", err)
 			return err
 		}
 	}
-	log.Debugf("Finished EventsRequest %+v", request)
+	s.log.Debugf("Finished EventsRequest %+v", request)
 	return nil
 }
 
 func (s *ProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_EntriesServer) error {
-	log.Debugf("Received EntriesRequest %+v", request)
+	s.log.Debugf("Received EntriesRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		log.Errorf("Request EntriesRequest failed: %v", err)
+		s.log.Errorf("Request EntriesRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
 	ch := make(chan streams.Result)
 	stream := streams.NewChannelStream(ch)
-	service := storage.ServiceID{
-		Type:      Type,
-		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	partitions := s.Partitions()
 	err = async.IterAsync(len(partitions), func(i int) error {
-		session, err := partitions[i].GetSession(ctx, service)
-		if err != nil {
-			return nil, err
-		}
-		return session.DoQueryStream(srv.Context(), entriesOp, input, stream, s.readSync)
+		return partitions[i].DoQueryStream(srv.Context(), service, entriesOp, input, stream, s.readSync)
 	})
 	if err != nil {
-		log.Warnf("Request EntriesRequest failed: %v", err)
+		s.log.Warnf("Request EntriesRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
@@ -313,23 +281,23 @@ func (s *ProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_
 			if result.Error == context.Canceled {
 				break
 			}
-			log.Warnf("Request EntriesRequest failed: %v", result.Error)
+			s.log.Warnf("Request EntriesRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 
 		response := &_map.EntriesResponse{}
 		err = proto.Unmarshal(result.Value.([]byte), response)
 		if err != nil {
-			log.Errorf("Request EntriesRequest failed: %v", err)
+			s.log.Errorf("Request EntriesRequest failed: %v", err)
 			return errors.Proto(err)
 		}
 
-		log.Debugf("Sending EntriesResponse %+v", response)
+		s.log.Debugf("Sending EntriesResponse %+v", response)
 		if err = srv.Send(response); err != nil {
-			log.Warnf("Response EntriesResponse failed: %v", err)
+			s.log.Warnf("Response EntriesResponse failed: %v", err)
 			return err
 		}
 	}
-	log.Debugf("Finished EntriesRequest %+v", request)
+	s.log.Debugf("Finished EntriesRequest %+v", request)
 	return nil
 }

@@ -15,35 +15,34 @@
 package rsm
 
 import (
-	"context"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/util"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/util/async"
 )
 
 // NewClient creates a new proxy client
-func NewClient(cluster cluster.Cluster, env env.DriverEnv) *Client {
+func NewClient(cluster cluster.Cluster, log logging.Logger) *Client {
 	partitions := cluster.Partitions()
 	proxyPartitions := make([]*Partition, 0, len(partitions))
 	proxyPartitionsByID := make(map[PartitionID]*Partition)
 	for _, partition := range partitions {
-		proxyPartition := NewPartition(partition)
+		proxyPartition := NewPartition(partition, log)
 		proxyPartitions = append(proxyPartitions, proxyPartition)
 		proxyPartitionsByID[proxyPartition.ID] = proxyPartition
 	}
 	return &Client{
-		Namespace:      env.Namespace,
 		partitions:     proxyPartitions,
 		partitionsByID: proxyPartitionsByID,
+		log:            log,
 	}
 }
 
 // Client is a client for communicating with the storage layer
 type Client struct {
-	Namespace      string
 	partitions     []*Partition
 	partitionsByID map[PartitionID]*Partition
+	log            logging.Logger
 }
 
 func (p *Client) Partition(partitionID PartitionID) *Partition {
@@ -62,14 +61,14 @@ func (p *Client) Partitions() []*Partition {
 	return p.partitions
 }
 
-func (p *Client) Connect(ctx context.Context) error {
+func (p *Client) Connect() error {
 	return async.IterAsync(len(p.partitions), func(i int) error {
-		return p.partitions[i].open(ctx)
+		return p.partitions[i].Connect()
 	})
 }
 
-func (p *Client) Close(ctx context.Context) error {
+func (p *Client) Close() error {
 	return async.IterAsync(len(p.partitions), func(i int) error {
-		return p.partitions[i].close(ctx)
+		return p.partitions[i].Close()
 	})
 }

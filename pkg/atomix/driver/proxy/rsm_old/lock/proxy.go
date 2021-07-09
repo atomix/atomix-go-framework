@@ -15,18 +15,17 @@ import (
 const Type = "Lock"
 
 const (
-	lockOp    storage.OperationID = 1
-	unlockOp  storage.OperationID = 2
-	getLockOp storage.OperationID = 3
+	lockOp    = "Lock"
+	unlockOp  = "Unlock"
+	getLockOp = "GetLock"
 )
-
-var log = logging.GetLogger("atomix", "proxy", "lock")
 
 // NewProxyServer creates a new ProxyServer
 func NewProxyServer(client *rsm.Client, readSync bool) lock.LockServiceServer {
 	return &ProxyServer{
 		Client:   client,
 		readSync: readSync,
+		log:      logging.GetLogger("atomix", "proxy", "lock"),
 	}
 }
 
@@ -37,10 +36,10 @@ type ProxyServer struct {
 }
 
 func (s *ProxyServer) Lock(ctx context.Context, request *lock.LockRequest) (*lock.LockResponse, error) {
-	log.Debugf("Received LockRequest %+v", request)
+	s.log.Debugf("Received LockRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		log.Errorf("Request LockRequest failed: %v", err)
+		s.log.Errorf("Request LockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	clusterKey := request.Headers.ClusterKey
@@ -49,21 +48,17 @@ func (s *ProxyServer) Lock(ctx context.Context, request *lock.LockRequest) (*loc
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
-		Type:      Type,
-		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
-	}
-	session, err := partition.GetSession(ctx, service)
-	if err != nil {
-		return nil, err
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 
 	ch := make(chan streams.Result)
 	stream := streams.NewChannelStream(ch)
-	err = session.DoCommandStream(ctx, lockOp, input, stream)
+	err = partition.DoCommandStream(ctx, service, lockOp, input, stream)
 	if err != nil {
-		log.Warnf("Request LockRequest failed: %v", err)
+		s.log.Warnf("Request LockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -73,25 +68,25 @@ func (s *ProxyServer) Lock(ctx context.Context, request *lock.LockRequest) (*loc
 	}
 
 	if result.Failed() {
-		log.Warnf("Request LockRequest failed: %v", result.Error)
+		s.log.Warnf("Request LockRequest failed: %v", result.Error)
 		return nil, errors.Proto(result.Error)
 	}
 
 	response := &lock.LockResponse{}
 	err = proto.Unmarshal(result.Value.([]byte), response)
 	if err != nil {
-		log.Errorf("Request LockRequest failed: %v", err)
+		s.log.Errorf("Request LockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending LockResponse %+v", response)
+	s.log.Debugf("Sending LockResponse %+v", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Unlock(ctx context.Context, request *lock.UnlockRequest) (*lock.UnlockResponse, error) {
-	log.Debugf("Received UnlockRequest %+v", request)
+	s.log.Debugf("Received UnlockRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		log.Errorf("Request UnlockRequest failed: %v", err)
+		s.log.Errorf("Request UnlockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	clusterKey := request.Headers.ClusterKey
@@ -100,37 +95,32 @@ func (s *ProxyServer) Unlock(ctx context.Context, request *lock.UnlockRequest) (
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
-		Type:      Type,
-		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	output, err := partition.DoCommand(ctx, service, unlockOp, input)
 	if err != nil {
-		log.Errorf("Request UnlockRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	output, err := session.DoCommand(ctx, unlockOp, input)
-	if err != nil {
-		log.Warnf("Request UnlockRequest failed: %v", err)
+		s.log.Warnf("Request UnlockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &lock.UnlockResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		log.Errorf("Request UnlockRequest failed: %v", err)
+		s.log.Errorf("Request UnlockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending UnlockResponse %+v", response)
+	s.log.Debugf("Sending UnlockResponse %+v", response)
 	return response, nil
 }
 
 func (s *ProxyServer) GetLock(ctx context.Context, request *lock.GetLockRequest) (*lock.GetLockResponse, error) {
-	log.Debugf("Received GetLockRequest %+v", request)
+	s.log.Debugf("Received GetLockRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		log.Errorf("Request GetLockRequest failed: %v", err)
+		s.log.Errorf("Request GetLockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	clusterKey := request.Headers.ClusterKey
@@ -139,28 +129,23 @@ func (s *ProxyServer) GetLock(ctx context.Context, request *lock.GetLockRequest)
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
-		Type:      Type,
-		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	output, err := partition.DoQuery(ctx, service, getLockOp, input, s.readSync)
 	if err != nil {
-		log.Errorf("Request GetLockRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	output, err := session.DoQuery(ctx, getLockOp, input, s.readSync)
-	if err != nil {
-		log.Warnf("Request GetLockRequest failed: %v", err)
+		s.log.Warnf("Request GetLockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &lock.GetLockResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		log.Errorf("Request GetLockRequest failed: %v", err)
+		s.log.Errorf("Request GetLockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending GetLockResponse %+v", response)
+	s.log.Debugf("Sending GetLockResponse %+v", response)
 	return response, nil
 }

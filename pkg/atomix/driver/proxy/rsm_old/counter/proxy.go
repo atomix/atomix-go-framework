@@ -14,19 +14,18 @@ import (
 const Type = "Counter"
 
 const (
-	setOp       storage.OperationID = 1
-	getOp       storage.OperationID = 2
-	incrementOp storage.OperationID = 3
-	decrementOp storage.OperationID = 4
+	setOp       = "Set"
+	getOp       = "Get"
+	incrementOp = "Increment"
+	decrementOp = "Decrement"
 )
-
-var log = logging.GetLogger("atomix", "proxy", "counter")
 
 // NewProxyServer creates a new ProxyServer
 func NewProxyServer(client *rsm.Client, readSync bool) counter.CounterServiceServer {
 	return &ProxyServer{
 		Client:   client,
 		readSync: readSync,
+		log:      logging.GetLogger("atomix", "proxy", "counter"),
 	}
 }
 
@@ -37,10 +36,10 @@ type ProxyServer struct {
 }
 
 func (s *ProxyServer) Set(ctx context.Context, request *counter.SetRequest) (*counter.SetResponse, error) {
-	log.Debugf("Received SetRequest %+v", request)
+	s.log.Debugf("Received SetRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		log.Errorf("Request SetRequest failed: %v", err)
+		s.log.Errorf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	clusterKey := request.Headers.ClusterKey
@@ -49,37 +48,32 @@ func (s *ProxyServer) Set(ctx context.Context, request *counter.SetRequest) (*co
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
-		Type:      Type,
-		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	output, err := partition.DoCommand(ctx, service, setOp, input)
 	if err != nil {
-		log.Errorf("Request SetRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	output, err := session.DoCommand(ctx, setOp, input)
-	if err != nil {
-		log.Warnf("Request SetRequest failed: %v", err)
+		s.log.Warnf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &counter.SetResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		log.Errorf("Request SetRequest failed: %v", err)
+		s.log.Errorf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending SetResponse %+v", response)
+	s.log.Debugf("Sending SetResponse %+v", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Get(ctx context.Context, request *counter.GetRequest) (*counter.GetResponse, error) {
-	log.Debugf("Received GetRequest %+v", request)
+	s.log.Debugf("Received GetRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		log.Errorf("Request GetRequest failed: %v", err)
+		s.log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	clusterKey := request.Headers.ClusterKey
@@ -88,37 +82,32 @@ func (s *ProxyServer) Get(ctx context.Context, request *counter.GetRequest) (*co
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
-		Type:      Type,
-		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	output, err := partition.DoQuery(ctx, service, getOp, input, s.readSync)
 	if err != nil {
-		log.Errorf("Request GetRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	output, err := session.DoQuery(ctx, getOp, input, s.readSync)
-	if err != nil {
-		log.Warnf("Request GetRequest failed: %v", err)
+		s.log.Warnf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &counter.GetResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		log.Errorf("Request GetRequest failed: %v", err)
+		s.log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending GetResponse %+v", response)
+	s.log.Debugf("Sending GetResponse %+v", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Increment(ctx context.Context, request *counter.IncrementRequest) (*counter.IncrementResponse, error) {
-	log.Debugf("Received IncrementRequest %+v", request)
+	s.log.Debugf("Received IncrementRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		log.Errorf("Request IncrementRequest failed: %v", err)
+		s.log.Errorf("Request IncrementRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	clusterKey := request.Headers.ClusterKey
@@ -127,37 +116,32 @@ func (s *ProxyServer) Increment(ctx context.Context, request *counter.IncrementR
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
-		Type:      Type,
-		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	output, err := partition.DoCommand(ctx, service, incrementOp, input)
 	if err != nil {
-		log.Errorf("Request IncrementRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	output, err := session.DoCommand(ctx, incrementOp, input)
-	if err != nil {
-		log.Warnf("Request IncrementRequest failed: %v", err)
+		s.log.Warnf("Request IncrementRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &counter.IncrementResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		log.Errorf("Request IncrementRequest failed: %v", err)
+		s.log.Errorf("Request IncrementRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending IncrementResponse %+v", response)
+	s.log.Debugf("Sending IncrementResponse %+v", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Decrement(ctx context.Context, request *counter.DecrementRequest) (*counter.DecrementResponse, error) {
-	log.Debugf("Received DecrementRequest %+v", request)
+	s.log.Debugf("Received DecrementRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		log.Errorf("Request DecrementRequest failed: %v", err)
+		s.log.Errorf("Request DecrementRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	clusterKey := request.Headers.ClusterKey
@@ -166,28 +150,23 @@ func (s *ProxyServer) Decrement(ctx context.Context, request *counter.DecrementR
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
-		Type:      Type,
-		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	output, err := partition.DoCommand(ctx, service, decrementOp, input)
 	if err != nil {
-		log.Errorf("Request DecrementRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	output, err := session.DoCommand(ctx, decrementOp, input)
-	if err != nil {
-		log.Warnf("Request DecrementRequest failed: %v", err)
+		s.log.Warnf("Request DecrementRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &counter.DecrementResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		log.Errorf("Request DecrementRequest failed: %v", err)
+		s.log.Errorf("Request DecrementRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending DecrementResponse %+v", response)
+	s.log.Debugf("Sending DecrementResponse %+v", response)
 	return response, nil
 }

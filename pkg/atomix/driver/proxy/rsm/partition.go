@@ -18,18 +18,19 @@ import (
 	"context"
 	"fmt"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
-	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/util/async"
+	"google.golang.org/grpc"
+	"sync"
+	"time"
 )
 
 // NewPartition creates a new proxy partition
-func NewPartition(partition cluster.Partition, log logging.Logger) *Partition {
+func NewPartition(partition cluster.Partition) *Partition {
 	return &Partition{
-		Session:   NewSession(partition, log),
 		Partition: partition,
 		ID:        PartitionID(partition.ID()),
-		log:       log,
 	}
 }
 
@@ -39,36 +40,89 @@ type PartitionID int
 // Partition is a proxy partition
 type Partition struct {
 	cluster.Partition
-	*Session
-	ID  PartitionID
-	log logging.Logger
+	ID             PartitionID
+	sessionTimeout time.Duration
+	sessions       map[rsm.ServiceID]*Session
+	conn           *grpc.ClientConn
+	ticker         *time.Ticker
+	mu             sync.RWMutex
 }
 
-func (p *Partition) Connect() error {
-	p.log.Infof("Opening session on partition %d", p.ID)
-	err := p.Session.open(context.TODO())
+func (p *Partition) GetSession(ctx context.Context, serviceID rsm.ServiceID) (*Session, error) {
+	log.Infof("Opening session %s on partition %d", serviceID, p.ID)
+	p.mu.RLock()
+	session, ok := p.sessions[serviceID]
+	p.mu.RUnlock()
+	if ok {
+		return session, nil
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	session, ok = p.sessions[serviceID]
+	if ok {
+		return session, nil
+	}
+
+	session = newSession(p.conn, serviceID)
+	err := session.open(ctx)
 	if err != nil {
-		p.log.Error(err, fmt.Sprintf("Opening session on partition %d", p.ID))
+		log.Error(err, fmt.Sprintf("Opening session %s on partition %d", serviceID, p.ID))
+		return nil, err
+	}
+	p.sessions[serviceID] = session
+	return session, nil
+}
+
+func (p *Partition) open(ctx context.Context) error {
+	conn, err := p.Partition.Connect(ctx)
+	if err != nil {
 		return err
+	}
+	p.conn = conn
+
+	go func() {
+		for range p.ticker.C {
+			go p.keepAliveSessions(context.Background())
+		}
+	}()
+	return nil
+}
+
+func (p *Partition) keepAliveSessions(ctx context.Context) error {
+	p.mu.RLock()
+	sessionStates := make(map[rsm.SessionID]*rsm.SessionKeepAlive)
+	for _, session := range p.sessions {
+		sessionStates[session.sessionID] = session.getState()
+	}
+	p.mu.RUnlock()
+
+	request := &rsm.PartitionCommandRequest{
+		Request: rsm.CommandRequest{
+			Request: &rsm.CommandRequest_KeepAlive{
+				KeepAlive: &rsm.KeepAliveRequest{
+					Sessions: sessionStates,
+				},
+			},
+		},
+	}
+	client := rsm.NewPartitionServiceClient(p.conn)
+	_, err := client.Command(ctx, request)
+	if err != nil {
+		return errors.From(err)
 	}
 	return nil
 }
 
-func (p *Partition) Close() error {
-	p.log.Infof("Disconnecting from partition %d", p.ID)
-	err := p.Session.close(context.TODO())
-	_ = p.disconnect()
-	if err != nil {
-		p.log.Error(err, fmt.Sprintf("Disconnecting from partition %d", p.ID))
-		return err
+func (p *Partition) close(ctx context.Context) error {
+	log.Infof("Closing sessions for partition %d", p.ID)
+	p.mu.RLock()
+	sessions := make([]*Session, 0, len(p.sessions))
+	for _, session := range p.sessions {
+		sessions = append(sessions, session)
 	}
-	return nil
-}
-
-// PartitionOutput is a result for session-supporting servers containing session header information
-type PartitionOutput struct {
-	streams.Result
-	Type    rsm.SessionResponseType
-	Status  rsm.SessionResponseStatus
-	Context rsm.SessionResponseContext
+	p.mu.RUnlock()
+	return async.IterAsync(len(sessions), func(i int) error {
+		return sessions[i].close(ctx)
+	})
 }

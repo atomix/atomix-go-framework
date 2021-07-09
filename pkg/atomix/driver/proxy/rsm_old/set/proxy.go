@@ -17,22 +17,21 @@ import (
 const Type = "Set"
 
 const (
-	sizeOp     storage.OperationID = 1
-	containsOp storage.OperationID = 2
-	addOp      storage.OperationID = 3
-	removeOp   storage.OperationID = 4
-	clearOp    storage.OperationID = 5
-	eventsOp   storage.OperationID = 6
-	elementsOp storage.OperationID = 7
+	sizeOp     = "Size"
+	containsOp = "Contains"
+	addOp      = "Add"
+	removeOp   = "Remove"
+	clearOp    = "Clear"
+	eventsOp   = "Events"
+	elementsOp = "Elements"
 )
-
-var log = logging.GetLogger("atomix", "proxy", "set")
 
 // NewProxyServer creates a new ProxyServer
 func NewProxyServer(client *rsm.Client, readSync bool) set.SetServiceServer {
 	return &ProxyServer{
 		Client:   client,
 		readSync: readSync,
+		log:      logging.GetLogger("atomix", "proxy", "set"),
 	}
 }
 
@@ -43,28 +42,24 @@ type ProxyServer struct {
 }
 
 func (s *ProxyServer) Size(ctx context.Context, request *set.SizeRequest) (*set.SizeResponse, error) {
-	log.Debugf("Received SizeRequest %+v", request)
+	s.log.Debugf("Received SizeRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		log.Errorf("Request SizeRequest failed: %v", err)
+		s.log.Errorf("Request SizeRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	partitions := s.Partitions()
 
-	service := storage.ServiceID{
-		Type:      Type,
-		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
-		session, err := partitions[i].GetSession(ctx, service)
-		if err != nil {
-			return nil, err
-		}
-		return session.DoQuery(ctx, sizeOp, input, s.readSync)
+		return partitions[i].DoQuery(ctx, service, sizeOp, input, s.readSync)
 	})
 	if err != nil {
-		log.Warnf("Request SizeRequest failed: %v", err)
+		s.log.Warnf("Request SizeRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	responses := make([]set.SizeResponse, 0, len(outputs))
@@ -72,7 +67,7 @@ func (s *ProxyServer) Size(ctx context.Context, request *set.SizeRequest) (*set.
 		var response set.SizeResponse
 		err := proto.Unmarshal(output.([]byte), &response)
 		if err != nil {
-			log.Errorf("Request SizeRequest failed: %v", err)
+			s.log.Errorf("Request SizeRequest failed: %v", err)
 			return nil, errors.Proto(err)
 		}
 		responses = append(responses, response)
@@ -82,175 +77,152 @@ func (s *ProxyServer) Size(ctx context.Context, request *set.SizeRequest) (*set.
 	for _, r := range responses {
 		response.Size_ += r.Size_
 	}
-	log.Debugf("Sending SizeResponse %+v", response)
+	s.log.Debugf("Sending SizeResponse %+v", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Contains(ctx context.Context, request *set.ContainsRequest) (*set.ContainsResponse, error) {
-	log.Debugf("Received ContainsRequest %+v", request)
+	s.log.Debugf("Received ContainsRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		log.Errorf("Request ContainsRequest failed: %v", err)
+		s.log.Errorf("Request ContainsRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	partitionKey := request.Element.Value
 	partition := s.PartitionBy([]byte(partitionKey))
 
-	service := storage.ServiceID{
-		Type:      Type,
-		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	output, err := partition.DoQuery(ctx, service, containsOp, input, s.readSync)
 	if err != nil {
-		log.Errorf("Request ContainsRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	output, err := session.DoQuery(ctx, containsOp, input, s.readSync)
-	if err != nil {
-		log.Warnf("Request ContainsRequest failed: %v", err)
+		s.log.Warnf("Request ContainsRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &set.ContainsResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		log.Errorf("Request ContainsRequest failed: %v", err)
+		s.log.Errorf("Request ContainsRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending ContainsResponse %+v", response)
+	s.log.Debugf("Sending ContainsResponse %+v", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Add(ctx context.Context, request *set.AddRequest) (*set.AddResponse, error) {
-	log.Debugf("Received AddRequest %+v", request)
+	s.log.Debugf("Received AddRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		log.Errorf("Request AddRequest failed: %v", err)
+		s.log.Errorf("Request AddRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	partitionKey := request.Element.Value
 	partition := s.PartitionBy([]byte(partitionKey))
 
-	service := storage.ServiceID{
-		Type:      Type,
-		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	output, err := partition.DoCommand(ctx, service, addOp, input)
 	if err != nil {
-		log.Errorf("Request AddRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	output, err := session.DoCommand(ctx, addOp, input)
-	if err != nil {
-		log.Warnf("Request AddRequest failed: %v", err)
+		s.log.Warnf("Request AddRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &set.AddResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		log.Errorf("Request AddRequest failed: %v", err)
+		s.log.Errorf("Request AddRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending AddResponse %+v", response)
+	s.log.Debugf("Sending AddResponse %+v", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Remove(ctx context.Context, request *set.RemoveRequest) (*set.RemoveResponse, error) {
-	log.Debugf("Received RemoveRequest %+v", request)
+	s.log.Debugf("Received RemoveRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		log.Errorf("Request RemoveRequest failed: %v", err)
+		s.log.Errorf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	partitionKey := request.Element.Value
 	partition := s.PartitionBy([]byte(partitionKey))
 
-	service := storage.ServiceID{
-		Type:      Type,
-		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	output, err := partition.DoCommand(ctx, service, removeOp, input)
 	if err != nil {
-		log.Errorf("Request RemoveRequest failed: %v", err)
-		return nil, errors.Proto(err)
-	}
-	output, err := session.DoCommand(ctx, removeOp, input)
-	if err != nil {
-		log.Warnf("Request RemoveRequest failed: %v", err)
+		s.log.Warnf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &set.RemoveResponse{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-		log.Errorf("Request RemoveRequest failed: %v", err)
+		s.log.Errorf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending RemoveResponse %+v", response)
+	s.log.Debugf("Sending RemoveResponse %+v", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Clear(ctx context.Context, request *set.ClearRequest) (*set.ClearResponse, error) {
-	log.Debugf("Received ClearRequest %+v", request)
+	s.log.Debugf("Received ClearRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		log.Errorf("Request ClearRequest failed: %v", err)
+		s.log.Errorf("Request ClearRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	partitions := s.Partitions()
 
-	service := storage.ServiceID{
-		Type:      Type,
-		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	err = async.IterAsync(len(partitions), func(i int) error {
-		session, err := partitions[i].GetSession(ctx, service)
-		if err != nil {
-			return err
-		}
-		_, err := session.DoCommand(ctx, clearOp, input)
+		_, err := partitions[i].DoCommand(ctx, service, clearOp, input)
 		return err
 	})
 	if err != nil {
-		log.Warnf("Request ClearRequest failed: %v", err)
+		s.log.Warnf("Request ClearRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
 	response := &set.ClearResponse{}
-	log.Debugf("Sending ClearResponse %+v", response)
+	s.log.Debugf("Sending ClearResponse %+v", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Events(request *set.EventsRequest, srv set.SetService_EventsServer) error {
-	log.Debugf("Received EventsRequest %+v", request)
+	s.log.Debugf("Received EventsRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		log.Errorf("Request EventsRequest failed: %v", err)
+		s.log.Errorf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
 	ch := make(chan streams.Result)
 	stream := streams.NewChannelStream(ch)
-	service := storage.ServiceID{
-		Type:      Type,
-		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	partitions := s.Partitions()
 	err = async.IterAsync(len(partitions), func(i int) error {
-		session, err := partitions[i].GetSession(ctx, service)
-		if err != nil {
-			return nil, err
-		}
-		return session.DoCommandStream(srv.Context(), eventsOp, input, stream)
+		return partitions[i].DoCommandStream(srv.Context(), service, eventsOp, input, stream)
 	})
 	if err != nil {
-		log.Warnf("Request EventsRequest failed: %v", err)
+		s.log.Warnf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
@@ -259,52 +231,48 @@ func (s *ProxyServer) Events(request *set.EventsRequest, srv set.SetService_Even
 			if result.Error == context.Canceled {
 				break
 			}
-			log.Warnf("Request EventsRequest failed: %v", result.Error)
+			s.log.Warnf("Request EventsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 
 		response := &set.EventsResponse{}
 		err = proto.Unmarshal(result.Value.([]byte), response)
 		if err != nil {
-			log.Errorf("Request EventsRequest failed: %v", err)
+			s.log.Errorf("Request EventsRequest failed: %v", err)
 			return errors.Proto(err)
 		}
 
-		log.Debugf("Sending EventsResponse %+v", response)
+		s.log.Debugf("Sending EventsResponse %+v", response)
 		if err = srv.Send(response); err != nil {
-			log.Warnf("Response EventsResponse failed: %v", err)
+			s.log.Warnf("Response EventsResponse failed: %v", err)
 			return err
 		}
 	}
-	log.Debugf("Finished EventsRequest %+v", request)
+	s.log.Debugf("Finished EventsRequest %+v", request)
 	return nil
 }
 
 func (s *ProxyServer) Elements(request *set.ElementsRequest, srv set.SetService_ElementsServer) error {
-	log.Debugf("Received ElementsRequest %+v", request)
+	s.log.Debugf("Received ElementsRequest %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-		log.Errorf("Request ElementsRequest failed: %v", err)
+		s.log.Errorf("Request ElementsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
 	ch := make(chan streams.Result)
 	stream := streams.NewChannelStream(ch)
-	service := storage.ServiceID{
-		Type:      Type,
-		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+	service := storage.ServiceId{
+		Type:    Type,
+		Cluster: request.Headers.ClusterKey,
+		Name:    request.Headers.PrimitiveID.Name,
 	}
 	partitions := s.Partitions()
 	err = async.IterAsync(len(partitions), func(i int) error {
-		session, err := partitions[i].GetSession(ctx, service)
-		if err != nil {
-			return nil, err
-		}
-		return session.DoQueryStream(srv.Context(), elementsOp, input, stream, s.readSync)
+		return partitions[i].DoQueryStream(srv.Context(), service, elementsOp, input, stream, s.readSync)
 	})
 	if err != nil {
-		log.Warnf("Request ElementsRequest failed: %v", err)
+		s.log.Warnf("Request ElementsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
@@ -313,23 +281,23 @@ func (s *ProxyServer) Elements(request *set.ElementsRequest, srv set.SetService_
 			if result.Error == context.Canceled {
 				break
 			}
-			log.Warnf("Request ElementsRequest failed: %v", result.Error)
+			s.log.Warnf("Request ElementsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 
 		response := &set.ElementsResponse{}
 		err = proto.Unmarshal(result.Value.([]byte), response)
 		if err != nil {
-			log.Errorf("Request ElementsRequest failed: %v", err)
+			s.log.Errorf("Request ElementsRequest failed: %v", err)
 			return errors.Proto(err)
 		}
 
-		log.Debugf("Sending ElementsResponse %+v", response)
+		s.log.Debugf("Sending ElementsResponse %+v", response)
 		if err = srv.Send(response); err != nil {
-			log.Warnf("Response ElementsResponse failed: %v", err)
+			s.log.Warnf("Response ElementsResponse failed: %v", err)
 			return err
 		}
 	}
-	log.Debugf("Finished ElementsRequest %+v", request)
+	s.log.Debugf("Finished ElementsRequest %+v", request)
 	return nil
 }

@@ -25,20 +25,20 @@ import (
 	"google.golang.org/grpc"
 )
 
-func RegisterPrimitiveServer(server *grpc.Server, protocol *Protocol, env env.DriverEnv) {
-	primitiveapi.RegisterPrimitiveServer(server, newPrimitiveServer(protocol, env))
+func RegisterPrimitiveServer(server *grpc.Server, client *Client, env env.DriverEnv) {
+	primitiveapi.RegisterPrimitiveServer(server, newPrimitiveServer(client, env))
 }
 
-func newPrimitiveServer(protocol *Protocol, env env.DriverEnv) primitiveapi.PrimitiveServer {
+func newPrimitiveServer(client *Client, env env.DriverEnv) primitiveapi.PrimitiveServer {
 	return &PrimitiveServer{
-		Protocol: protocol,
-		env:      env,
-		log:      logging.GetLogger("atomix", "primitive"),
+		Client: client,
+		env:    env,
+		log:    logging.GetLogger("atomix", "primitive"),
 	}
 }
 
 type PrimitiveServer struct {
-	*Protocol
+	*Client
 	env env.DriverEnv
 	log logging.Logger
 }

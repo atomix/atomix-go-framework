@@ -17,8 +17,7 @@ package rsm
 import (
 	"context"
 	"fmt"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
-	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm4"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	"sync"
 
 	"google.golang.org/grpc"
@@ -32,7 +31,6 @@ type Resolver struct {
 	clientConn    resolver.ClientConn
 	resolverConn  *grpc.ClientConn
 	serviceConfig *serviceconfig.ParseResult
-	log           logging.Logger
 }
 
 var _ resolver.Builder = (*Resolver)(nil)
@@ -47,22 +45,21 @@ func (r *Resolver) Build(target resolver.Target, cc resolver.ClientConn, opts re
 		)
 	}
 	r.serviceConfig = r.clientConn.ParseServiceConfig(
-		fmt.Sprintf(`{"loadBalancingConfig":[{"%s":{}}]}`, Name),
+		fmt.Sprintf(`{"loadBalancingConfig":[{"%s":{}}]}`, resolverName),
 	)
 	var err error
 	r.resolverConn, err = grpc.Dial(target.Endpoint, dialOpts...)
 	if err != nil {
 		return nil, err
 	}
-	r.log = logging.GetLogger("driver", "rsm", "resolver")
 	r.ResolveNow(resolver.ResolveNowOptions{})
 	return r, nil
 }
 
-const Name = "rsm"
+const resolverName = "rsm"
 
 func (r *Resolver) Scheme() string {
-	return Name
+	return resolverName
 }
 
 func init() {
@@ -76,9 +73,12 @@ func (r *Resolver) ResolveNow(resolver.ResolveNowOptions) {
 	defer r.mu.Unlock()
 	client := rsm.NewPartitionServiceClient(r.resolverConn)
 	ctx := context.Background()
-	response, err := client.GetConfig(ctx, &rsm.PartitionConfigRequest{})
+	request := &rsm.PartitionConfigRequest{
+		PartitionID: r.partitionID,
+	}
+	response, err := client.GetConfig(ctx, request)
 	if err != nil {
-		r.log.Error("failed to resolve server", err)
+		log.Error("failed to resolve server", err)
 		return
 	}
 
@@ -109,6 +109,6 @@ func (r *Resolver) ResolveNow(resolver.ResolveNowOptions) {
 
 func (r *Resolver) Close() {
 	if err := r.resolverConn.Close(); err != nil {
-		r.log.Error("failed to close conn", err)
+		log.Error("failed to close conn", err)
 	}
 }

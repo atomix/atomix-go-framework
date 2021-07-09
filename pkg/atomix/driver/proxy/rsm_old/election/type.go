@@ -12,44 +12,44 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package log
+package election
 
 import (
 	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
-	logapi "github.com/atomix/atomix-api/go/atomix/primitive/log"
+	electionapi "github.com/atomix/atomix-api/go/atomix/primitive/election"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive"
-	logdriver "github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive/log"
-	logro "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/ro/log"
+	electiondriver "github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive/election"
+	electionro "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/ro/election"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm"
 	"github.com/gogo/protobuf/jsonpb"
 	"google.golang.org/grpc"
 )
 
 func Register(protocol *rsm.Protocol) {
-	protocol.Primitives().RegisterPrimitiveType(newLogType(protocol))
+	protocol.Primitives().RegisterPrimitiveType(newLeaderElectionType(protocol))
 }
 
-func newLogType(protocol *rsm.Protocol) primitive.PrimitiveType {
-	return &logType{
+func newLeaderElectionType(protocol *rsm.Protocol) primitive.PrimitiveType {
+	return &electionType{
 		protocol: protocol,
-		registry: logdriver.NewProxyRegistry(),
+		registry: electiondriver.NewProxyRegistry(),
 	}
 }
 
-type logType struct {
+type electionType struct {
 	protocol *rsm.Protocol
-	registry *logdriver.ProxyRegistry
+	registry *electiondriver.ProxyRegistry
 }
 
-func (p *logType) Name() string {
+func (p *electionType) Name() string {
 	return Type
 }
 
-func (p *logType) RegisterServer(s *grpc.Server) {
-	logapi.RegisterLogServiceServer(s, logdriver.NewProxyServer(p.registry, p.protocol.Env))
+func (p *electionType) RegisterServer(s *grpc.Server) {
+	electionapi.RegisterLeaderElectionServiceServer(s, electiondriver.NewProxyServer(p.registry, p.protocol.Env))
 }
 
-func (p *logType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
+func (p *electionType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions) error {
 	config := rsm.RSMConfig{}
 	if options.Config != nil {
 		if err := jsonpb.UnmarshalString(string(options.Config), &config); err != nil {
@@ -58,13 +58,13 @@ func (p *logType) AddProxy(id driverapi.ProxyId, options driverapi.ProxyOptions)
 	}
 	server := NewProxyServer(p.protocol.Client, config.ReadSync)
 	if !options.Write {
-		server = logro.NewProxyServer(server)
+		server = electionro.NewProxyServer(server)
 	}
 	return p.registry.AddProxy(id.PrimitiveId, server)
 }
 
-func (p *logType) RemoveProxy(id driverapi.ProxyId) error {
+func (p *electionType) RemoveProxy(id driverapi.ProxyId) error {
 	return p.registry.RemoveProxy(id.PrimitiveId)
 }
 
-var _ primitive.PrimitiveType = &logType{}
+var _ primitive.PrimitiveType = &electionType{}
