@@ -97,16 +97,17 @@ const {{ printf "%sType" .Generator.Prefix }} = {{ .Primitive.Name | quote }}
 {{ $root := . }}
 const (
     {{- range .Primitive.Methods }}
-    {{ (printf "%s%sOp" $root.Generator.Prefix .Name) | toLowerCamel }} = {{ .Name | quote }}
+    {{ (printf "%s%sOp" $root.Generator.Prefix .Name) | toLowerCamel }} storage.OperationID = {{ .ID }}
     {{- end }}
 )
+
+var log = logging.GetLogger("atomix", "proxy", {{ .Primitive.Name | lower | quote }})
 
 // New{{ $proxy }} creates a new {{ $proxy }}
 func New{{ $proxy }}(client *rsm.Client, readSync bool) {{ $service }} {
 	return &{{ $proxy }}{
 		Client:   client,
 		readSync: readSync,
-		log:      logging.GetLogger("atomix", "proxy", {{ .Primitive.Name | lower | quote }}),
 	}
 }
 
@@ -121,10 +122,10 @@ type {{ $proxy }} struct {
 {{- $method := . }}
 {{ if and .Response.IsUnary .Type.IsSync }}
 func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "type" .Request.Type }}) (*{{ template "type" .Response.Type }}, error) {
-	s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
+	log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-        s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
+        log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
 
@@ -150,25 +151,30 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
     partition := s.PartitionBy([]byte(clusterKey))
 	{{- end }}
 
-	service := storage.ServiceId{
-		Type:    Type,
-		Cluster: request{{ template "field" .Request.Headers }}.ClusterKey,
-		Name:    request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
+	service := storage.ServiceID{
+		Type:      Type,
+		Namespace: s.Namespace,
+		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
+	}
+	session, err := partition.GetSession(ctx, service)
+	if err != nil {
+        log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
+		return nil, errors.Proto(err)
 	}
     {{- if .Type.IsCommand }}
-	output, err := partition.DoCommand(ctx, service, {{ $name }}, input)
+	output, err := session.DoCommand(ctx, {{ $name }}, input)
     {{- else }}
-	output, err := partition.DoQuery(ctx, service, {{ $name }}, input, s.readSync)
+	output, err := session.DoQuery(ctx, {{ $name }}, input, s.readSync)
     {{- end }}
 	if err != nil {
-        s.log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
+        log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
 
 	response := &{{ template "type" .Response.Type }}{}
 	err = proto.Unmarshal(output, response)
 	if err != nil {
-        s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
+        log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
 	{{- else if .Scope.IsGlobal }}
@@ -178,31 +184,39 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
     {{- $aggregates = true }}
     {{- end }}
 
-	service := storage.ServiceId{
-		Type:    Type,
-		Cluster: request{{ template "field" .Request.Headers }}.ClusterKey,
-		Name:    request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
+	service := storage.ServiceID{
+		Type:      Type,
+		Namespace: s.Namespace,
+		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
 	{{- if .Response.Aggregates }}
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
+        session, err := partitions[i].GetSession(ctx, service)
+        if err != nil {
+            return nil, err
+        }
         {{- if .Type.IsCommand }}
-		return partitions[i].DoCommand(ctx, service, {{ $name }}, input)
+		return session.DoCommand(ctx, {{ $name }}, input)
         {{- else }}
-		return partitions[i].DoQuery(ctx, service, {{ $name }}, input, s.readSync)
+		return session.DoQuery(ctx, {{ $name }}, input, s.readSync)
         {{- end }}
 	})
 	{{- else }}
 	err = async.IterAsync(len(partitions), func(i int) error {
+        session, err := partitions[i].GetSession(ctx, service)
+        if err != nil {
+            return err
+        }
         {{- if .Type.IsCommand }}
-		_, err := partitions[i].DoCommand(ctx, service, {{ $name }}, input)
+		_, err := session.DoCommand(ctx, {{ $name }}, input)
         {{- else }}
-		_, err := partitions[i].DoQuery(ctx, service, {{ $name }}, input, s.readSync)
+		_, err := session.DoQuery(ctx, {{ $name }}, input, s.readSync)
         {{- end }}
 		return err
 	})
 	{{- end }}
 	if err != nil {
-        s.log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
+        log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
 
@@ -212,7 +226,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	    var response {{ template "type" $method.Response.Type }}
         err := proto.Unmarshal(output.([]byte), &response)
         if err != nil {
-            s.log.Errorf("Request {{ $method.Request.Type.Name }} failed: %v", err)
+            log.Errorf("Request {{ $method.Request.Type.Name }} failed: %v", err)
             return nil, errors.Proto(err)
         }
         responses = append(responses, response)
@@ -234,15 +248,15 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
     {{- end }}
 	{{- end }}
 	{{- end }}
-	s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
+	log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
 	return response, nil
 }
 {{ else if .Type.IsAsync }}
 func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "type" .Request.Type }}) (*{{ template "type" .Response.Type }}, error) {
-	s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
+	log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-        s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
+        log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
 
@@ -268,21 +282,25 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
     partition := s.PartitionBy([]byte(clusterKey))
 	{{- end }}
 
-	service := storage.ServiceId{
-		Type:    Type,
-		Cluster: request{{ template "field" .Request.Headers }}.ClusterKey,
-		Name:    request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
+	service := storage.ServiceID{
+		Type:      Type,
+		Namespace: s.Namespace,
+		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
+	session, err := partition.GetSession(ctx, service)
+    if err != nil {
+        return nil, err
+    }
 
     ch := make(chan streams.Result)
 	stream := streams.NewChannelStream(ch)
 	{{- if .Type.IsCommand }}
-	err = partition.DoCommandStream(ctx, service, {{ $name }}, input, stream)
+	err = session.DoCommandStream(ctx, {{ $name }}, input, stream)
 	{{- else }}
-	err = partition.DoQueryStream(ctx, service, {{ $name }}, input, stream, s.readSync)
+	err = session.DoQueryStream(ctx, {{ $name }}, input, stream, s.readSync)
 	{{- end }}
 	if err != nil {
-        s.log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
+        log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
 
@@ -292,30 +310,34 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	}
 
     if result.Failed() {
-        s.log.Warnf("Request {{ .Request.Type.Name }} failed: %v", result.Error)
+        log.Warnf("Request {{ .Request.Type.Name }} failed: %v", result.Error)
         return nil, errors.Proto(result.Error)
     }
 
     response := &{{ template "type" .Response.Type }}{}
     err = proto.Unmarshal(result.Value.([]byte), response)
     if err != nil {
-        s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
+        log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
         return nil, errors.Proto(err)
     }
 	{{- else if .Scope.IsGlobal }}
-	service := storage.ServiceId{
-		Type:    Type,
-		Cluster: request{{ template "field" .Request.Headers }}.ClusterKey,
-		Name:    request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
+	service := storage.ServiceID{
+		Type:      Type,
+		Namespace: s.Namespace,
+		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
 	partitions := s.Partitions()
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
+        session, err := partitions[i].GetSession(ctx, service)
+        if err != nil {
+            return nil, err
+        }
         ch := make(chan streams.Result)
         stream := streams.NewChannelStream(ch)
         {{- if .Type.IsCommand }}
-		err := partitions[i].DoCommandStream(srv.Context(), service, {{ $name }}, input, stream)
+		err := session.DoCommandStream(srv.Context(), {{ $name }}, input, stream)
         {{- else }}
-		err := partitions[i].DoQueryStream(srv.Context(), service, {{ $name }}, input, stream, s.readSync)
+		err := session.DoQueryStream(srv.Context(), {{ $name }}, input, stream, s.readSync)
         {{- end }}
 		if err != nil {
 		    return nil, err
@@ -333,7 +355,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
         response := &{{ template "type" .Response.Type }}{}
         err = proto.Unmarshal(result.Value.([]byte), response)
         if err != nil {
-            s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
+            log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
             return nil, errors.Proto(err)
         }
         return response, nil
@@ -345,7 +367,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	    var response {{ template "type" $method.Response.Type }}
         err := proto.Unmarshal(output.([]byte), &response)
         if err != nil {
-            s.log.Errorf("Request {{ $method.Request.Type.Name }} failed: %v", err)
+            log.Errorf("Request {{ $method.Request.Type.Name }} failed: %v", err)
             return nil, errors.Proto(err)
         }
         responses = append(responses, response)
@@ -367,15 +389,15 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
     {{- end }}
 	{{- end }}
 	{{- end }}
-	s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
+	log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
 	return response, nil
 }
 {{ else if .Response.IsStream }}
 func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }}, srv {{ template "type" $primitive.Type }}_{{ .Name }}Server) error {
-    s.log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
+    log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
-        s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
+        log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
         return errors.Proto(err)
 	}
 
@@ -403,33 +425,41 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
     partition := s.PartitionBy([]byte(clusterKey))
 	{{- end }}
 
-	service := storage.ServiceId{
-		Type:    Type,
-		Cluster: request{{ template "field" .Request.Headers }}.ClusterKey,
-		Name:    request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
+	service := storage.ServiceID{
+		Type:      Type,
+		Namespace: s.Namespace,
+		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
+    session, err := partition.GetSession(ctx, service)
+    if err != nil {
+        return nil, err
+    }
     {{- if .Type.IsCommand }}
-	err = partition.DoCommandStream(srv.Context(), service, {{ $name }}, input, stream)
+	err = session.DoCommandStream(srv.Context(), {{ $name }}, input, stream)
     {{- else }}
-	err = partition.DoQueryStream(srv.Context(), service, {{ $name }}, input, stream, s.readSync)
+	err = session.DoQueryStream(srv.Context(), {{ $name }}, input, stream, s.readSync)
     {{- end }}
 	{{- else if .Scope.IsGlobal }}
-	service := storage.ServiceId{
-		Type:    Type,
-		Cluster: request{{ template "field" .Request.Headers }}.ClusterKey,
-		Name:    request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
+	service := storage.ServiceID{
+		Type:      Type,
+		Namespace: s.Namespace,
+		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
 	partitions := s.Partitions()
 	err = async.IterAsync(len(partitions), func(i int) error {
+        session, err := partitions[i].GetSession(ctx, service)
+        if err != nil {
+            return nil, err
+        }
         {{- if .Type.IsCommand }}
-		return partitions[i].DoCommandStream(srv.Context(), service, {{ $name }}, input, stream)
+		return session.DoCommandStream(srv.Context(), {{ $name }}, input, stream)
         {{- else }}
-		return partitions[i].DoQueryStream(srv.Context(), service, {{ $name }}, input, stream, s.readSync)
+		return session.DoQueryStream(srv.Context(), {{ $name }}, input, stream, s.readSync)
         {{- end }}
 	})
 	{{- end }}
 	if err != nil {
-        s.log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
+        log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return errors.Proto(err)
 	}
 
@@ -438,24 +468,24 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 		    if result.Error == context.Canceled {
 		        break
 			}
-			s.log.Warnf("Request {{ .Request.Type.Name }} failed: %v", result.Error)
+			log.Warnf("Request {{ .Request.Type.Name }} failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 
 		response := &{{ template "type" .Response.Type }}{}
         err = proto.Unmarshal(result.Value.([]byte), response)
         if err != nil {
-            s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
+            log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
             return errors.Proto(err)
         }
 
-		s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
+		log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
 		if err = srv.Send(response); err != nil {
-            s.log.Warnf("Response {{ .Response.Type.Name }} failed: %v", err)
+            log.Warnf("Response {{ .Response.Type.Name }} failed: %v", err)
 			return err
 		}
 	}
-	s.log.Debugf("Finished {{ .Request.Type.Name }} %+v", request)
+	log.Debugf("Finished {{ .Request.Type.Name }} %+v", request)
 	return nil
 }
 {{ end }}
