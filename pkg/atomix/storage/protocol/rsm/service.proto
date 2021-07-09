@@ -63,7 +63,7 @@ message ServiceId {
 }
 
 message PartitionConfigRequest {
-    uint32 partition_id = 1 [(gogoproto.customname) = "PartitionID"];
+    uint32 partition_id = 1 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "PartitionID"];
 }
 
 message PartitionConfigResponse {
@@ -72,7 +72,7 @@ message PartitionConfigResponse {
 }
 
 message PartitionCommandRequest {
-    uint32 partition_id = 1 [(gogoproto.customname) = "PartitionID"];
+    uint32 partition_id = 1 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "PartitionID"];
     CommandRequest request = 2 [(gogoproto.nullable) = false];
 }
 
@@ -146,8 +146,9 @@ message SessionCommandResponse {
 }
 
 message PartitionQueryRequest {
-    uint32 partition_id = 1 [(gogoproto.customname) = "PartitionID"];
+    uint32 partition_id = 1 [(gogoproto.customname) = "PartitionID", (gogoproto.casttype) = "PartitionID"];
     QueryRequest request = 2 [(gogoproto.nullable) = false];
+    bool sync = 3;
 }
 
 message PartitionQueryResponse {

@@ -14,6 +14,12 @@
 
 package rsm
 
+// RequestID is a request identifier
+type RequestID uint64
+
+// ResponseID is a response identifier
+type ResponseID uint64
+
 // CommandID is a command identifier
 type CommandID uint64
 

@@ -30,7 +30,7 @@ type Server struct {
 func (s *Server) GetConfig(ctx context.Context, request *PartitionConfigRequest) (*PartitionConfigResponse, error) {
 	log.Debugf("Received PartitionConfigRequest %+v", request)
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(PartitionID(request.PartitionID))
+	partition := s.Protocol.Partition(request.PartitionID)
 	response := &PartitionConfigResponse{
 		Leader:    partition.Leader(),
 		Followers: partition.Followers(),
@@ -43,7 +43,7 @@ func (s *Server) Query(ctx context.Context, request *PartitionQueryRequest) (*Pa
 	log.Debugf("Received PartitionQueryRequest %+v", request)
 
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(PartitionID(request.PartitionID))
+	partition := s.Protocol.Partition(request.PartitionID)
 
 	bytes, err := proto.Marshal(&request.Request)
 	if err != nil {
@@ -54,9 +54,16 @@ func (s *Server) Query(ctx context.Context, request *PartitionQueryRequest) (*Pa
 	resultCh := make(chan streams.Result, 1)
 	errCh := make(chan error, 1)
 	go func() {
-		err := partition.StaleQuery(context.Background(), bytes, streams.NewChannelStream(resultCh))
-		if err != nil {
-			errCh <- err
+		if request.Sync {
+			err := partition.SyncQuery(context.Background(), bytes, streams.NewChannelStream(resultCh))
+			if err != nil {
+				errCh <- err
+			}
+		} else {
+			err := partition.StaleQuery(context.Background(), bytes, streams.NewChannelStream(resultCh))
+			if err != nil {
+				errCh <- err
+			}
 		}
 	}()
 
@@ -90,7 +97,7 @@ func (s *Server) Query(ctx context.Context, request *PartitionQueryRequest) (*Pa
 func (s *Server) QueryStream(request *PartitionQueryRequest, srv PartitionService_QueryStreamServer) error {
 	log.Debugf("Received PartitionQueryRequest %+v", request)
 
-	partition := s.Protocol.Partition(PartitionID(request.PartitionID))
+	partition := s.Protocol.Partition(request.PartitionID)
 
 	bytes, err := proto.Marshal(&request.Request)
 	if err != nil {
@@ -103,9 +110,16 @@ func (s *Server) QueryStream(request *PartitionQueryRequest, srv PartitionServic
 	stream := streams.NewChannelStream(resultCh)
 	defer stream.Drain()
 	go func() {
-		err := partition.StaleQuery(srv.Context(), bytes, stream)
-		if err != nil {
-			errCh <- err
+		if request.Sync {
+			err := partition.SyncQuery(srv.Context(), bytes, stream)
+			if err != nil {
+				errCh <- err
+			}
+		} else {
+			err := partition.StaleQuery(srv.Context(), bytes, stream)
+			if err != nil {
+				errCh <- err
+			}
 		}
 	}()
 
@@ -146,7 +160,7 @@ func (s *Server) Command(ctx context.Context, request *PartitionCommandRequest) 
 	log.Debugf("Received PartitionCommandRequest %+v", request)
 
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(PartitionID(request.PartitionID))
+	partition := s.Protocol.Partition(request.PartitionID)
 	if partition.MustLeader() && !partition.IsLeader() {
 		return nil, errors.Proto(errors.NewUnavailable("not the leader"))
 	}
@@ -202,7 +216,7 @@ func (s *Server) CommandStream(request *PartitionCommandRequest, srv PartitionSe
 	log.Debugf("Received PartitionCommandRequest %+v", request)
 
 	// If the client requires a leader and is not the leader, return an error
-	partition := s.Protocol.Partition(PartitionID(request.PartitionID))
+	partition := s.Protocol.Partition(request.PartitionID)
 	if partition.MustLeader() && !partition.IsLeader() {
 		return errors.Proto(errors.NewUnavailable("not the leader"))
 	}
