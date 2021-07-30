@@ -95,7 +95,8 @@ type Watcher interface {
 
 func newSession(manager *primitiveServiceManager) *primitiveSession {
 	return &primitiveSession{
-		manager: manager,
+		manager:  manager,
+		services: make(map[ServiceID]*primitiveServiceSession),
 	}
 }
 
@@ -188,6 +189,7 @@ func (s *primitiveServiceSession) open(sessionID SessionID) error {
 		return errors.NewInvalid("unknown session %d", sessionID)
 	}
 	s.session = session
+	s.commands = newSessionCommands()
 	s.session.services[s.service.serviceID] = s
 	s.service.sessions.add(s)
 	s.state = SessionOpen
@@ -215,6 +217,13 @@ func (s *primitiveServiceSession) restore(snapshot *ServiceSessionSnapshot) erro
 		return errors.NewInvalid("unknown session %d", snapshot.SessionID)
 	}
 	s.session = session
+	s.commands = newSessionCommands()
+	for _, commandSnapshot := range snapshot.Commands {
+		command := newServiceSessionCommand(s)
+		if err := command.restore(commandSnapshot); err != nil {
+			return err
+		}
+	}
 	s.session.services[s.service.serviceID] = s
 	s.state = SessionOpen
 	s.service.sessions.add(s)
@@ -309,6 +318,7 @@ func (c *primitiveServiceSessionCommand) Input() []byte {
 func (c *primitiveServiceSessionCommand) open(id CommandID, request *ServiceCommandRequest, stream streams.WriteStream) error {
 	c.commandID = id
 	c.request = request
+	c.responses = list.New()
 	c.state = SessionCommandState_COMMAND_OPEN
 	c.stream = stream
 	c.session.commands.add(c)

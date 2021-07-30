@@ -76,17 +76,16 @@ func NewSession(partition cluster.Partition, opts ...SessionOption) *Session {
 
 // Session maintains the session for a primitive
 type Session struct {
-	partition   cluster.Partition
-	Timeout     time.Duration
-	partitionID rsm.PartitionID
-	sessionID   rsm.SessionID
-	lastIndex   *sessionIndex
-	requestID   *sessionRequestID
-	requestCh   chan sessionRequestEvent
-	conn        *grpc.ClientConn
-	client      rsm.PartitionServiceClient
-	services    map[rsm.ServiceInfo]*Service
-	servicesMu  sync.RWMutex
+	partition  cluster.Partition
+	Timeout    time.Duration
+	sessionID  rsm.SessionID
+	lastIndex  *sessionIndex
+	requestID  *sessionRequestID
+	requestCh  chan sessionRequestEvent
+	conn       *grpc.ClientConn
+	client     rsm.PartitionServiceClient
+	services   map[rsm.ServiceInfo]*Service
+	servicesMu sync.RWMutex
 }
 
 func (s *Session) GetService(ctx context.Context, serviceInfo rsm.ServiceInfo) (*Service, error) {
@@ -169,7 +168,7 @@ func (s *Session) doCommand(ctx context.Context, serviceID rsm.ServiceID, operat
 func (s *Session) doCommandStream(ctx context.Context, serviceID rsm.ServiceID, operationID rsm.OperationID, input []byte, stream streams.WriteStream) error {
 	requestID := s.requestID.Next()
 	request := &rsm.PartitionCommandRequest{
-		PartitionID: s.partitionID,
+		PartitionID: rsm.PartitionID(s.partition.ID()),
 		Request: rsm.CommandRequest{
 			Request: &rsm.CommandRequest_SessionCommand{
 				SessionCommand: &rsm.SessionCommandRequest{
@@ -236,7 +235,7 @@ func (s *Session) doCommandStream(ctx context.Context, serviceID rsm.ServiceID, 
 // doQuery submits a query to the service
 func (s *Session) doQuery(ctx context.Context, serviceID rsm.ServiceID, operationID rsm.OperationID, input []byte, sync bool) ([]byte, error) {
 	request := &rsm.PartitionQueryRequest{
-		PartitionID: s.partitionID,
+		PartitionID: rsm.PartitionID(s.partition.ID()),
 		Sync:        sync,
 		Request: rsm.QueryRequest{
 			LastIndex: s.lastIndex.Get(),
@@ -272,7 +271,7 @@ func (s *Session) doQuery(ctx context.Context, serviceID rsm.ServiceID, operatio
 // doQueryStream submits a streaming query to the service
 func (s *Session) doQueryStream(ctx context.Context, serviceID rsm.ServiceID, operationID rsm.OperationID, input []byte, stream streams.WriteStream, sync bool) error {
 	request := &rsm.PartitionQueryRequest{
-		PartitionID: s.partitionID,
+		PartitionID: rsm.PartitionID(s.partition.ID()),
 		Sync:        sync,
 		Request: rsm.QueryRequest{
 			LastIndex: s.lastIndex.Get(),
@@ -322,9 +321,10 @@ func (s *Session) doQueryStream(ctx context.Context, serviceID rsm.ServiceID, op
 
 func (s *Session) open(ctx context.Context) error {
 	conn, err := s.partition.Connect(ctx,
+		cluster.WithDialScheme(resolverName),
 		cluster.WithDialOption(grpc.WithInsecure()),
 		cluster.WithDialOption(grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"rsm"}`)),
-		cluster.WithDialOption(grpc.WithResolvers(newResolver(s.partitionID))),
+		cluster.WithDialOption(grpc.WithResolvers(newResolver(s.partition))),
 		cluster.WithDialOption(grpc.WithUnaryInterceptor(retry.RetryingUnaryClientInterceptor(retry.WithRetryOn(codes.Unavailable, codes.Unknown)))),
 		cluster.WithDialOption(grpc.WithStreamInterceptor(retry.RetryingStreamClientInterceptor(retry.WithRetryOn(codes.Unavailable, codes.Unknown)))))
 	if err != nil {
@@ -334,6 +334,7 @@ func (s *Session) open(ctx context.Context) error {
 	s.client = rsm.NewPartitionServiceClient(s.conn)
 
 	request := &rsm.PartitionCommandRequest{
+		PartitionID: rsm.PartitionID(s.partition.ID()),
 		Request: rsm.CommandRequest{
 			Request: &rsm.CommandRequest_OpenSession{
 				OpenSession: &rsm.OpenSessionRequest{
@@ -349,7 +350,11 @@ func (s *Session) open(ctx context.Context) error {
 	}
 
 	s.sessionID = response.Response.GetOpenSession().SessionID
+
+	s.lastIndex = &sessionIndex{}
 	s.lastIndex.Update(response.Response.Index)
+
+	s.requestID = &sessionRequestID{}
 
 	s.requestCh = make(chan sessionRequestEvent, chanBufSize)
 	go func() {
@@ -433,6 +438,7 @@ func (s *Session) keepAliveSessions(ctx context.Context, requestID rsm.RequestID
 	}
 
 	request := &rsm.PartitionCommandRequest{
+		PartitionID: rsm.PartitionID(s.partition.ID()),
 		Request: rsm.CommandRequest{
 			Request: &rsm.CommandRequest_KeepAlive{
 				KeepAlive: &rsm.KeepAliveRequest{
@@ -454,6 +460,7 @@ func (s *Session) keepAliveSessions(ctx context.Context, requestID rsm.RequestID
 
 func (s *Session) close(ctx context.Context) error {
 	request := &rsm.PartitionCommandRequest{
+		PartitionID: rsm.PartitionID(s.partition.ID()),
 		Request: rsm.CommandRequest{
 			Request: &rsm.CommandRequest_CloseSession{
 				CloseSession: &rsm.CloseSessionRequest{

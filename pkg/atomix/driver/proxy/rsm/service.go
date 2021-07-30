@@ -60,7 +60,7 @@ func (s *Service) DoQueryStream(ctx context.Context, operationID rsm.OperationID
 
 func (s *Service) open(ctx context.Context) error {
 	request := &rsm.PartitionCommandRequest{
-		PartitionID: s.partitionID,
+		PartitionID: rsm.PartitionID(s.partition.ID()),
 		Request: rsm.CommandRequest{
 			Request: &rsm.CommandRequest_SessionCommand{
 				SessionCommand: &rsm.SessionCommandRequest{
@@ -85,7 +85,7 @@ func (s *Service) open(ctx context.Context) error {
 
 func (s *Service) close(ctx context.Context) error {
 	request := &rsm.PartitionCommandRequest{
-		PartitionID: s.partitionID,
+		PartitionID: rsm.PartitionID(s.partition.ID()),
 		Request: rsm.CommandRequest{
 			Request: &rsm.CommandRequest_SessionCommand{
 				SessionCommand: &rsm.SessionCommandRequest{

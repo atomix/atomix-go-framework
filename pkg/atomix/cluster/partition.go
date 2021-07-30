@@ -41,6 +41,8 @@ func NewPartition(config protocolapi.ProtocolPartition, cluster Cluster) Partiti
 type Partition interface {
 	// ID returns the partition identifier
 	ID() PartitionID
+	// Cluster returns the cluster to which the partition belongs
+	Cluster() Cluster
 	// Member returns the local partition member
 	Member() (*Member, bool)
 	// Replica looks up a replica in the partition
@@ -75,6 +77,10 @@ type partition struct {
 
 func (p *partition) ID() PartitionID {
 	return p.id
+}
+
+func (p *partition) Cluster() Cluster {
+	return p.cluster
 }
 
 // Member returns the local partition member

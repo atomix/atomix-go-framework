@@ -17,23 +17,26 @@ package rsm
 import (
 	"context"
 	"fmt"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/util/retry"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/attributes"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/serviceconfig"
 )
 
 const resolverName = "rsm"
 
-func newResolver(partition rsm.PartitionID) resolver.Builder {
+func newResolver(partition cluster.Partition) resolver.Builder {
 	return &ResolverBuilder{
-		partitionID: partition,
+		partition: partition,
 	}
 }
 
 type ResolverBuilder struct {
-	partitionID rsm.PartitionID
+	partition cluster.Partition
 }
 
 func (b *ResolverBuilder) Scheme() string {
@@ -47,7 +50,13 @@ func (b *ResolverBuilder) Build(target resolver.Target, cc resolver.ClientConn, 
 			dialOpts,
 			grpc.WithTransportCredentials(opts.DialCreds),
 		)
+	} else {
+		dialOpts = append(dialOpts, grpc.WithInsecure())
 	}
+	dialOpts = append(dialOpts, grpc.WithUnaryInterceptor(retry.RetryingUnaryClientInterceptor(retry.WithRetryOn(codes.Unavailable, codes.Unknown))))
+	dialOpts = append(dialOpts, grpc.WithStreamInterceptor(retry.RetryingStreamClientInterceptor(retry.WithRetryOn(codes.Unavailable, codes.Unknown))))
+	dialOpts = append(dialOpts, grpc.WithContextDialer(b.partition.Cluster().Network().Connect))
+
 	resolverConn, err := grpc.Dial(target.Endpoint, dialOpts...)
 	if err != nil {
 		return nil, err
@@ -58,7 +67,7 @@ func (b *ResolverBuilder) Build(target resolver.Target, cc resolver.ClientConn, 
 	)
 
 	resolver := &Resolver{
-		partitionID:   b.partitionID,
+		partitionID:   rsm.PartitionID(b.partition.ID()),
 		clientConn:    cc,
 		resolverConn:  resolverConn,
 		serviceConfig: serviceConfig,
