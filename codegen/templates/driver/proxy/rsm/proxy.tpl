@@ -93,7 +93,7 @@ import (
 	{{- end }}
 )
 
-const {{ printf "%sType" .Generator.Prefix }} storage.ServiceType = {{ .Primitive.Name | quote }}
+const {{ printf "%sType" .Generator.Prefix }} = {{ .Primitive.Name | quote }}
 {{ $root := . }}
 const (
     {{- range .Primitive.Methods }}
@@ -152,7 +152,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	{{- end }}
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
@@ -185,7 +185,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
     {{- end }}
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
@@ -208,9 +208,9 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
             return err
         }
         {{- if .Type.IsCommand }}
-		_, err := service.DoCommand(ctx, {{ $name }}, input)
+		_, err = service.DoCommand(ctx, {{ $name }}, input)
         {{- else }}
-		_, err := service.DoQuery(ctx, {{ $name }}, input, s.readSync)
+		_, err = service.DoQuery(ctx, {{ $name }}, input, s.readSync)
         {{- end }}
 		return err
 	})
@@ -283,7 +283,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	{{- end }}
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
@@ -322,7 +322,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
     }
 	{{- else if .Scope.IsGlobal }}
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
@@ -335,9 +335,9 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
         ch := make(chan streams.Result)
         stream := streams.NewChannelStream(ch)
         {{- if .Type.IsCommand }}
-		err := service.DoCommandStream(srv.Context(), {{ $name }}, input, stream)
+		err = service.DoCommandStream(srv.Context(), {{ $name }}, input, stream)
         {{- else }}
-		err := service.DoQueryStream(srv.Context(), {{ $name }}, input, stream, s.readSync)
+		err = service.DoQueryStream(srv.Context(), {{ $name }}, input, stream, s.readSync)
         {{- end }}
 		if err != nil {
 		    return nil, err
@@ -426,7 +426,7 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	{{- end }}
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
@@ -440,8 +440,8 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	err = service.DoQueryStream(srv.Context(), {{ $name }}, input, stream, s.readSync)
     {{- end }}
 	{{- else if .Scope.IsGlobal }}
-	service := storage.ServiceID{
-		Type:      Type,
+	serviceInfo := storage.ServiceInfo{
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}

@@ -19,35 +19,35 @@ import (
 )
 
 // GetErrorFromStatus creates a typed error from a response status
-func GetErrorFromStatus(status SessionResponseStatus) error {
+func GetErrorFromStatus(status ResponseStatus) error {
 	switch status.Code {
-	case SessionResponseCode_OK:
+	case ResponseCode_OK:
 		return nil
-	case SessionResponseCode_ERROR:
+	case ResponseCode_ERROR:
 		return errors.NewUnknown(status.Message)
-	case SessionResponseCode_UNKNOWN:
+	case ResponseCode_UNKNOWN:
 		return errors.NewUnknown(status.Message)
-	case SessionResponseCode_CANCELED:
+	case ResponseCode_CANCELED:
 		return errors.NewCanceled(status.Message)
-	case SessionResponseCode_NOT_FOUND:
+	case ResponseCode_NOT_FOUND:
 		return errors.NewNotFound(status.Message)
-	case SessionResponseCode_ALREADY_EXISTS:
+	case ResponseCode_ALREADY_EXISTS:
 		return errors.NewAlreadyExists(status.Message)
-	case SessionResponseCode_UNAUTHORIZED:
+	case ResponseCode_UNAUTHORIZED:
 		return errors.NewUnauthorized(status.Message)
-	case SessionResponseCode_FORBIDDEN:
+	case ResponseCode_FORBIDDEN:
 		return errors.NewForbidden(status.Message)
-	case SessionResponseCode_CONFLICT:
+	case ResponseCode_CONFLICT:
 		return errors.NewConflict(status.Message)
-	case SessionResponseCode_INVALID:
+	case ResponseCode_INVALID:
 		return errors.NewInvalid(status.Message)
-	case SessionResponseCode_UNAVAILABLE:
+	case ResponseCode_UNAVAILABLE:
 		return errors.NewUnavailable(status.Message)
-	case SessionResponseCode_NOT_SUPPORTED:
+	case ResponseCode_NOT_SUPPORTED:
 		return errors.NewNotSupported(status.Message)
-	case SessionResponseCode_TIMEOUT:
+	case ResponseCode_TIMEOUT:
 		return errors.NewTimeout(status.Message)
-	case SessionResponseCode_INTERNAL:
+	case ResponseCode_INTERNAL:
 		return errors.NewInternal(status.Message)
 	default:
 		return errors.NewUnknown(status.Message)
@@ -55,43 +55,43 @@ func GetErrorFromStatus(status SessionResponseStatus) error {
 }
 
 // getStatus gets the proto status for the given error
-func getCode(err error) SessionResponseCode {
+func getCode(err error) ResponseCode {
 	if err == nil {
-		return SessionResponseCode_OK
+		return ResponseCode_OK
 	}
 
 	typed, ok := err.(*errors.TypedError)
 	if !ok {
-		return SessionResponseCode_ERROR
+		return ResponseCode_ERROR
 	}
 
 	switch typed.Type {
 	case errors.Unknown:
-		return SessionResponseCode_UNKNOWN
+		return ResponseCode_UNKNOWN
 	case errors.Canceled:
-		return SessionResponseCode_CANCELED
+		return ResponseCode_CANCELED
 	case errors.NotFound:
-		return SessionResponseCode_NOT_FOUND
+		return ResponseCode_NOT_FOUND
 	case errors.AlreadyExists:
-		return SessionResponseCode_ALREADY_EXISTS
+		return ResponseCode_ALREADY_EXISTS
 	case errors.Unauthorized:
-		return SessionResponseCode_UNAUTHORIZED
+		return ResponseCode_UNAUTHORIZED
 	case errors.Forbidden:
-		return SessionResponseCode_FORBIDDEN
+		return ResponseCode_FORBIDDEN
 	case errors.Conflict:
-		return SessionResponseCode_CONFLICT
+		return ResponseCode_CONFLICT
 	case errors.Invalid:
-		return SessionResponseCode_INVALID
+		return ResponseCode_INVALID
 	case errors.Unavailable:
-		return SessionResponseCode_UNAVAILABLE
+		return ResponseCode_UNAVAILABLE
 	case errors.NotSupported:
-		return SessionResponseCode_NOT_SUPPORTED
+		return ResponseCode_NOT_SUPPORTED
 	case errors.Timeout:
-		return SessionResponseCode_TIMEOUT
+		return ResponseCode_TIMEOUT
 	case errors.Internal:
-		return SessionResponseCode_INTERNAL
+		return ResponseCode_INTERNAL
 	default:
-		return SessionResponseCode_ERROR
+		return ResponseCode_ERROR
 	}
 }
 

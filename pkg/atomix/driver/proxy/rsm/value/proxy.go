@@ -12,7 +12,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-const Type storage.ServiceType = "Value"
+const Type = "Value"
 
 const (
 	setOp    storage.OperationID = 1
@@ -50,7 +50,7 @@ func (s *ProxyServer) Set(ctx context.Context, request *value.SetRequest) (*valu
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -89,7 +89,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *value.GetRequest) (*valu
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -131,7 +131,7 @@ func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueServic
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}

@@ -12,7 +12,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-const Type storage.ServiceType = "Election"
+const Type = "Election"
 
 const (
 	enterOp    storage.OperationID = 1
@@ -54,7 +54,7 @@ func (s *ProxyServer) Enter(ctx context.Context, request *election.EnterRequest)
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -93,7 +93,7 @@ func (s *ProxyServer) Withdraw(ctx context.Context, request *election.WithdrawRe
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -132,7 +132,7 @@ func (s *ProxyServer) Anoint(ctx context.Context, request *election.AnointReques
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -171,7 +171,7 @@ func (s *ProxyServer) Promote(ctx context.Context, request *election.PromoteRequ
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -210,7 +210,7 @@ func (s *ProxyServer) Evict(ctx context.Context, request *election.EvictRequest)
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -249,7 +249,7 @@ func (s *ProxyServer) GetTerm(ctx context.Context, request *election.GetTermRequ
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -291,7 +291,7 @@ func (s *ProxyServer) Events(request *election.EventsRequest, srv election.Leade
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}

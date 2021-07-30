@@ -14,7 +14,7 @@ import (
 	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
 )
 
-const Type storage.ServiceType = "Set"
+const Type = "Set"
 
 const (
 	sizeOp     storage.OperationID = 1
@@ -52,7 +52,7 @@ func (s *ProxyServer) Size(ctx context.Context, request *set.SizeRequest) (*set.
 	partitions := s.Partitions()
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -97,7 +97,7 @@ func (s *ProxyServer) Contains(ctx context.Context, request *set.ContainsRequest
 	partition := s.PartitionBy([]byte(partitionKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -133,7 +133,7 @@ func (s *ProxyServer) Add(ctx context.Context, request *set.AddRequest) (*set.Ad
 	partition := s.PartitionBy([]byte(partitionKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -169,7 +169,7 @@ func (s *ProxyServer) Remove(ctx context.Context, request *set.RemoveRequest) (*
 	partition := s.PartitionBy([]byte(partitionKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -204,7 +204,7 @@ func (s *ProxyServer) Clear(ctx context.Context, request *set.ClearRequest) (*se
 	partitions := s.Partitions()
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -213,7 +213,7 @@ func (s *ProxyServer) Clear(ctx context.Context, request *set.ClearRequest) (*se
 		if err != nil {
 			return err
 		}
-		_, err := service.DoCommand(ctx, clearOp, input)
+		_, err = service.DoCommand(ctx, clearOp, input)
 		return err
 	})
 	if err != nil {
@@ -236,8 +236,8 @@ func (s *ProxyServer) Events(request *set.EventsRequest, srv set.SetService_Even
 
 	ch := make(chan streams.Result)
 	stream := streams.NewChannelStream(ch)
-	service := storage.ServiceID{
-		Type:      Type,
+	serviceInfo := storage.ServiceInfo{
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -290,8 +290,8 @@ func (s *ProxyServer) Elements(request *set.ElementsRequest, srv set.SetService_
 
 	ch := make(chan streams.Result)
 	stream := streams.NewChannelStream(ch)
-	service := storage.ServiceID{
-		Type:      Type,
+	serviceInfo := storage.ServiceInfo{
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}

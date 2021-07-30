@@ -12,7 +12,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-const Type storage.ServiceType = "IndexedMap"
+const Type = "IndexedMap"
 
 const (
 	sizeOp       storage.OperationID = 1
@@ -58,7 +58,7 @@ func (s *ProxyServer) Size(ctx context.Context, request *indexedmap.SizeRequest)
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -97,7 +97,7 @@ func (s *ProxyServer) Put(ctx context.Context, request *indexedmap.PutRequest) (
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -136,7 +136,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *indexedmap.GetRequest) (
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -175,7 +175,7 @@ func (s *ProxyServer) FirstEntry(ctx context.Context, request *indexedmap.FirstE
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -214,7 +214,7 @@ func (s *ProxyServer) LastEntry(ctx context.Context, request *indexedmap.LastEnt
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -253,7 +253,7 @@ func (s *ProxyServer) PrevEntry(ctx context.Context, request *indexedmap.PrevEnt
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -292,7 +292,7 @@ func (s *ProxyServer) NextEntry(ctx context.Context, request *indexedmap.NextEnt
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -331,7 +331,7 @@ func (s *ProxyServer) Remove(ctx context.Context, request *indexedmap.RemoveRequ
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -370,7 +370,7 @@ func (s *ProxyServer) Clear(ctx context.Context, request *indexedmap.ClearReques
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -412,7 +412,7 @@ func (s *ProxyServer) Events(request *indexedmap.EventsRequest, srv indexedmap.I
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -469,7 +469,7 @@ func (s *ProxyServer) Entries(request *indexedmap.EntriesRequest, srv indexedmap
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}

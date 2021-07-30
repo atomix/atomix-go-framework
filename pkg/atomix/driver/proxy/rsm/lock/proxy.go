@@ -12,7 +12,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-const Type storage.ServiceType = "Lock"
+const Type = "Lock"
 
 const (
 	lockOp    storage.OperationID = 1
@@ -50,7 +50,7 @@ func (s *ProxyServer) Lock(ctx context.Context, request *lock.LockRequest) (*loc
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -101,7 +101,7 @@ func (s *ProxyServer) Unlock(ctx context.Context, request *lock.UnlockRequest) (
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
@@ -140,7 +140,7 @@ func (s *ProxyServer) GetLock(ctx context.Context, request *lock.GetLockRequest)
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
-		Type:      Type,
+		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
