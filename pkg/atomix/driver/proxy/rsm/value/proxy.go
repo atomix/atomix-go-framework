@@ -12,7 +12,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-const Type = "Value"
+const Type storage.ServiceType = "Value"
 
 const (
 	setOp    storage.OperationID = 1
@@ -49,17 +49,17 @@ func (s *ProxyServer) Set(ctx context.Context, request *value.SetRequest) (*valu
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoCommand(ctx, setOp, input)
+	output, err := service.DoCommand(ctx, setOp, input)
 	if err != nil {
 		log.Warnf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -88,17 +88,17 @@ func (s *ProxyServer) Get(ctx context.Context, request *value.GetRequest) (*valu
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoQuery(ctx, getOp, input, s.readSync)
+	output, err := service.DoQuery(ctx, getOp, input, s.readSync)
 	if err != nil {
 		log.Warnf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -130,16 +130,16 @@ func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueServic
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(srv.Context(), serviceInfo)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	err = session.DoCommandStream(srv.Context(), eventsOp, input, stream)
+	err = service.DoCommandStream(srv.Context(), eventsOp, input, stream)
 	if err != nil {
 		log.Warnf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)

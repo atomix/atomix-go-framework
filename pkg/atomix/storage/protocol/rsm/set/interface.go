@@ -4,6 +4,7 @@ package set
 import (
 	"fmt"
 	set "github.com/atomix/atomix-api/go/atomix/primitive/set"
+	errors "github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	util "github.com/atomix/atomix-go-framework/pkg/atomix/util"
 	proto "github.com/golang/protobuf/proto"
@@ -168,14 +169,14 @@ type Watcher interface {
 	Cancel()
 }
 
-func newWatcher(watcher rsm.SessionStateWatcher) Watcher {
+func newWatcher(watcher rsm.Watcher) Watcher {
 	return &serviceWatcher{
 		watcher: watcher,
 	}
 }
 
 type serviceWatcher struct {
-	watcher rsm.SessionStateWatcher
+	watcher rsm.Watcher
 }
 
 func (s *serviceWatcher) Cancel() {
@@ -444,6 +445,7 @@ type AddProposal interface {
 	Proposal
 	Request() (*set.AddRequest, error)
 	Reply(*set.AddResponse) error
+	Fail(error) error
 }
 
 func newAddProposal(command rsm.Command) AddProposal {
@@ -455,7 +457,8 @@ func newAddProposal(command rsm.Command) AddProposal {
 
 type addProposal struct {
 	Proposal
-	command rsm.Command
+	command  rsm.Command
+	complete bool
 }
 
 func (p *addProposal) Request() (*set.AddRequest, error) {
@@ -468,6 +471,9 @@ func (p *addProposal) Request() (*set.AddRequest, error) {
 }
 
 func (p *addProposal) Reply(response *set.AddResponse) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
 	log.Debugf("Sending AddProposal %s: %s", p, response)
 	output, err := proto.Marshal(response)
 	if err != nil {
@@ -475,6 +481,18 @@ func (p *addProposal) Reply(response *set.AddResponse) error {
 	}
 	p.command.Output(output, nil)
 	p.command.Close()
+	p.complete = true
+	return nil
+}
+
+func (p *addProposal) Fail(err error) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
+	log.Debugf("Failing AddProposal %s: %s", p, err)
+	p.command.Output(nil, err)
+	p.command.Close()
+	p.complete = true
 	return nil
 }
 
@@ -522,6 +540,7 @@ type RemoveProposal interface {
 	Proposal
 	Request() (*set.RemoveRequest, error)
 	Reply(*set.RemoveResponse) error
+	Fail(error) error
 }
 
 func newRemoveProposal(command rsm.Command) RemoveProposal {
@@ -533,7 +552,8 @@ func newRemoveProposal(command rsm.Command) RemoveProposal {
 
 type removeProposal struct {
 	Proposal
-	command rsm.Command
+	command  rsm.Command
+	complete bool
 }
 
 func (p *removeProposal) Request() (*set.RemoveRequest, error) {
@@ -546,6 +566,9 @@ func (p *removeProposal) Request() (*set.RemoveRequest, error) {
 }
 
 func (p *removeProposal) Reply(response *set.RemoveResponse) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
 	log.Debugf("Sending RemoveProposal %s: %s", p, response)
 	output, err := proto.Marshal(response)
 	if err != nil {
@@ -553,6 +576,18 @@ func (p *removeProposal) Reply(response *set.RemoveResponse) error {
 	}
 	p.command.Output(output, nil)
 	p.command.Close()
+	p.complete = true
+	return nil
+}
+
+func (p *removeProposal) Fail(err error) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
+	log.Debugf("Failing RemoveProposal %s: %s", p, err)
+	p.command.Output(nil, err)
+	p.command.Close()
+	p.complete = true
 	return nil
 }
 
@@ -600,6 +635,7 @@ type ClearProposal interface {
 	Proposal
 	Request() (*set.ClearRequest, error)
 	Reply(*set.ClearResponse) error
+	Fail(error) error
 }
 
 func newClearProposal(command rsm.Command) ClearProposal {
@@ -611,7 +647,8 @@ func newClearProposal(command rsm.Command) ClearProposal {
 
 type clearProposal struct {
 	Proposal
-	command rsm.Command
+	command  rsm.Command
+	complete bool
 }
 
 func (p *clearProposal) Request() (*set.ClearRequest, error) {
@@ -624,6 +661,9 @@ func (p *clearProposal) Request() (*set.ClearRequest, error) {
 }
 
 func (p *clearProposal) Reply(response *set.ClearResponse) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
 	log.Debugf("Sending ClearProposal %s: %s", p, response)
 	output, err := proto.Marshal(response)
 	if err != nil {
@@ -631,6 +671,18 @@ func (p *clearProposal) Reply(response *set.ClearResponse) error {
 	}
 	p.command.Output(output, nil)
 	p.command.Close()
+	p.complete = true
+	return nil
+}
+
+func (p *clearProposal) Fail(err error) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
+	log.Debugf("Failing ClearProposal %s: %s", p, err)
+	p.command.Output(nil, err)
+	p.command.Close()
+	p.complete = true
 	return nil
 }
 

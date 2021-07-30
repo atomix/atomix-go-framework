@@ -12,7 +12,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-const Type = "Election"
+const Type storage.ServiceType = "Election"
 
 const (
 	enterOp    storage.OperationID = 1
@@ -53,17 +53,17 @@ func (s *ProxyServer) Enter(ctx context.Context, request *election.EnterRequest)
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request EnterRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoCommand(ctx, enterOp, input)
+	output, err := service.DoCommand(ctx, enterOp, input)
 	if err != nil {
 		log.Warnf("Request EnterRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -92,17 +92,17 @@ func (s *ProxyServer) Withdraw(ctx context.Context, request *election.WithdrawRe
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request WithdrawRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoCommand(ctx, withdrawOp, input)
+	output, err := service.DoCommand(ctx, withdrawOp, input)
 	if err != nil {
 		log.Warnf("Request WithdrawRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -131,17 +131,17 @@ func (s *ProxyServer) Anoint(ctx context.Context, request *election.AnointReques
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request AnointRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoCommand(ctx, anointOp, input)
+	output, err := service.DoCommand(ctx, anointOp, input)
 	if err != nil {
 		log.Warnf("Request AnointRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -170,17 +170,17 @@ func (s *ProxyServer) Promote(ctx context.Context, request *election.PromoteRequ
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request PromoteRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoCommand(ctx, promoteOp, input)
+	output, err := service.DoCommand(ctx, promoteOp, input)
 	if err != nil {
 		log.Warnf("Request PromoteRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -209,17 +209,17 @@ func (s *ProxyServer) Evict(ctx context.Context, request *election.EvictRequest)
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request EvictRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoCommand(ctx, evictOp, input)
+	output, err := service.DoCommand(ctx, evictOp, input)
 	if err != nil {
 		log.Warnf("Request EvictRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -248,17 +248,17 @@ func (s *ProxyServer) GetTerm(ctx context.Context, request *election.GetTermRequ
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request GetTermRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoQuery(ctx, getTermOp, input, s.readSync)
+	output, err := service.DoQuery(ctx, getTermOp, input, s.readSync)
 	if err != nil {
 		log.Warnf("Request GetTermRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -290,16 +290,16 @@ func (s *ProxyServer) Events(request *election.EventsRequest, srv election.Leade
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(srv.Context(), serviceInfo)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	err = session.DoCommandStream(srv.Context(), eventsOp, input, stream)
+	err = service.DoCommandStream(srv.Context(), eventsOp, input, stream)
 	if err != nil {
 		log.Warnf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)

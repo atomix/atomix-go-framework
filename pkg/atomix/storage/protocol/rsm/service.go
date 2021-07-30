@@ -15,12 +15,17 @@
 package rsm
 
 import (
+	"bytes"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"io"
 	"time"
 )
 
+// ServiceType is a service type name
+type ServiceType string
+
 // ServiceID is a service identifier
-type ServiceID ServiceId
+type ServiceID uint64
 
 // Index is a service index
 type Index uint64
@@ -29,30 +34,22 @@ type Index uint64
 type ServiceContext interface {
 	// ID returns the service identifier
 	ID() ServiceID
+	// Type returns the service type
+	Type() ServiceType
+	// Namespace returns the service namespace
+	Namespace() string
+	// Name returns the service name
+	Name() string
 	// Index returns the current service index
 	Index() Index
-	setIndex(Index)
 	// Time returns the current service time
 	Time() time.Time
-	setTime(time.Time)
 	// Scheduler returns the service scheduler
 	Scheduler() Scheduler
 	// Sessions returns the open sessions
 	Sessions() Sessions
 	// Commands returns the pending commands
 	Commands() Commands
-}
-
-// OpenSessionService is an interface for listening to session open events
-type OpenSessionService interface {
-	// OpenSession is called when a session is opened for a service
-	OpenSession(Session)
-}
-
-// CloseSessionService is an interface for listening to session closed events
-type CloseSessionService interface {
-	// CloseSession is called when a session is closed for a service
-	CloseSession(Session)
 }
 
 // BackupService is an interface for backing up a service
@@ -76,4 +73,116 @@ type Service interface {
 	ExecuteCommand(Command) error
 	// ExecuteQuery executes a service query
 	ExecuteQuery(Query) error
+}
+
+func newService(manager *primitiveServiceManager) *primitiveService {
+	return &primitiveService{
+		manager: manager,
+	}
+}
+
+type primitiveService struct {
+	manager   *primitiveServiceManager
+	info      ServiceInfo
+	serviceID ServiceID
+	service   Service
+	sessions  *primitiveServiceSessions
+	commands  *primitiveCommands
+	index     Index
+}
+
+func (s *primitiveService) ID() ServiceID {
+	return s.serviceID
+}
+
+func (s *primitiveService) Type() ServiceType {
+	return s.info.Type
+}
+
+func (s *primitiveService) Namespace() string {
+	return s.info.Namespace
+}
+
+func (s *primitiveService) Name() string {
+	return s.info.Name
+}
+
+func (s *primitiveService) Index() Index {
+	return s.index
+}
+
+func (s *primitiveService) setIndex(index Index) {
+	s.index = index
+}
+
+func (s *primitiveService) Time() time.Time {
+	return s.manager.timestamp
+}
+
+func (s *primitiveService) Scheduler() Scheduler {
+	return s.manager.scheduler
+}
+
+func (s *primitiveService) Sessions() Sessions {
+	return s.sessions
+}
+
+func (s *primitiveService) Commands() Commands {
+	return s.commands
+}
+
+func (s *primitiveService) open(serviceID ServiceID, info ServiceInfo) error {
+	s.serviceID = serviceID
+	serviceType := s.manager.registry.GetService(info.Type)
+	if serviceType == nil {
+		return errors.NewInvalid("unknown service type '%s'", info.Type)
+	}
+	s.info = info
+	s.service = serviceType(s)
+	s.commands = newCommands()
+	s.sessions = newServiceSessions()
+	return nil
+}
+
+func (s *primitiveService) snapshot() (*ServiceSnapshot, error) {
+	sessions := make([]*ServiceSessionSnapshot, 0, len(s.sessions.sessions))
+	for _, session := range s.sessions.sessions {
+		sessionSnapshot, err := session.snapshot()
+		if err != nil {
+			return nil, err
+		}
+		sessions = append(sessions, sessionSnapshot)
+	}
+
+	var b bytes.Buffer
+	if err := s.service.Backup(&b); err != nil {
+		return nil, err
+	}
+	data := b.Bytes()
+
+	return &ServiceSnapshot{
+		ServiceID:   s.serviceID,
+		ServiceInfo: s.info,
+		Data:        data,
+		Sessions:    sessions,
+	}, nil
+}
+
+func (s *primitiveService) restore(snapshot *ServiceSnapshot) error {
+	s.serviceID = snapshot.ServiceID
+	s.info = snapshot.ServiceInfo
+	serviceType := s.manager.registry.GetService(snapshot.Type)
+	if serviceType == nil {
+		return errors.NewInvalid("unknown service type '%s'", snapshot.Type)
+	}
+	s.service = serviceType(s)
+	s.commands = newCommands()
+	s.sessions = newServiceSessions()
+	for _, sessionSnapshot := range snapshot.Sessions {
+		serviceSession := newServiceSession(s)
+		if err := serviceSession.restore(sessionSnapshot); err != nil {
+			return err
+		}
+	}
+	return s.service.Restore(bytes.NewReader(snapshot.Data))
 }

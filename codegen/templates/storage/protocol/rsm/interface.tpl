@@ -19,11 +19,7 @@ import (
 	{{ import "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm" }}
 	{{ import "github.com/atomix/atomix-go-framework/pkg/atomix/util" }}
 	{{ import "github.com/golang/protobuf/proto" }}
-	{{- range .Primitive.Methods }}
-	{{- if ( and .Response.IsUnary .Type.IsAsync ) }}
 	{{ import "github.com/atomix/atomix-go-framework/pkg/atomix/errors" }}
-	{{- end }}
-	{{- end }}
 	{{- $package := .Package }}
 	{{- range .Imports }}
 	{{ .Alias }} {{ .Path | quote }}
@@ -235,14 +231,14 @@ type {{ $serviceWatcherInt }} interface {
 	Cancel()
 }
 
-func {{ $newServiceWatcher }}(watcher rsm.SessionStateWatcher) {{ $serviceWatcherInt }} {
+func {{ $newServiceWatcher }}(watcher rsm.Watcher) {{ $serviceWatcherInt }} {
 	return &{{ $serviceWatcherImpl }}{
 		watcher: watcher,
 	}
 }
 
 type {{ $serviceWatcherImpl }} struct {
-	watcher rsm.SessionStateWatcher
+	watcher rsm.Watcher
 }
 
 func (s *{{ $serviceWatcherImpl }}) Cancel() {
@@ -435,55 +431,16 @@ var _ {{ $proposalsInt }} = &{{ $proposalsImpl }}{}
 type {{ $proposalInt }} interface {
     {{ $serviceProposalInt }}
     Request() (*{{ template "type" .Request.Type }}, error)
-    {{- if ( and .Response.IsUnary .Type.IsSync ) }}
-    Reply(*{{ template "type" .Response.Type }}) error
-    {{- else if ( and .Response.IsUnary .Type.IsAsync ) }}
+    {{- if .Response.IsUnary }}
     Reply(*{{ template "type" .Response.Type }}) error
     Fail(error) error
-    Close() error
     {{- else if .Response.IsStream }}
     Notify(*{{ template "type" .Response.Type }}) error
     Close() error
     {{- end }}
 }
 
-{{- if ( and .Response.IsUnary .Type.IsSync ) }}
-func {{ $newProposal }}(command rsm.Command) {{ $proposalInt }} {
-    return &{{ $proposalImpl }}{
-        {{ $serviceProposalInt }}: {{ $newServiceProposal }}(command),
-        command: command,
-    }
-}
-
-type {{ $proposalImpl }} struct {
-    {{ $serviceProposalInt }}
-    command rsm.Command
-}
-
-func (p *{{ $proposalImpl }}) Request() (*{{ template "type" .Request.Type }}, error) {
-    request := &{{ template "type" .Request.Type }}{}
-    if err := proto.Unmarshal(p.command.Input(), request); err != nil {
-        return nil, err
-    }
-    log.Debugf("Received {{ $proposalInt }} %s: %s", p, request)
-    return request, nil
-}
-
-func (p *{{ $proposalImpl }}) Reply(response *{{ template "type" .Response.Type }}) error {
-    log.Debugf("Sending {{ $proposalInt }} %s: %s", p, response)
-    output, err := proto.Marshal(response)
-    if err != nil {
-        return err
-    }
-    p.command.Output(output, nil)
-    p.command.Close()
-    return nil
-}
-
-func (p *{{ $proposalImpl }}) String() string {
-    return fmt.Sprintf("ProposalID=%d, SessionID=%d", p.ID(), p.Session().ID())
-}
-{{- else if ( and .Response.IsUnary .Type.IsAsync ) }}
+{{- if .Response.IsUnary }}
 func {{ $newProposal }}(command rsm.Command) {{ $proposalInt }} {
     return &{{ $proposalImpl }}{
         {{ $serviceProposalInt }}: {{ $newServiceProposal }}(command),
@@ -508,7 +465,7 @@ func (p *{{ $proposalImpl }}) Request() (*{{ template "type" .Request.Type }}, e
 
 func (p *{{ $proposalImpl }}) Reply(response *{{ template "type" .Response.Type }}) error {
     if p.complete {
-        return errors.NewConflict("reply already sent")
+        return errors.NewConflict("proposal is already complete")
     }
     log.Debugf("Sending {{ $proposalInt }} %s: %s", p, response)
     output, err := proto.Marshal(response)
@@ -523,21 +480,12 @@ func (p *{{ $proposalImpl }}) Reply(response *{{ template "type" .Response.Type 
 
 func (p *{{ $proposalImpl }}) Fail(err error) error {
     if p.complete {
-        return errors.NewConflict("reply already sent")
+        return errors.NewConflict("proposal is already complete")
     }
-    log.Debugf("Sending {{ $proposalInt }} %s: %s", p, err)
+    log.Debugf("Failing {{ $proposalInt }} %s: %s", p, err)
     p.command.Output(nil, err)
     p.command.Close()
     p.complete = true
-    return nil
-}
-
-func (p *{{ $proposalImpl }}) Close() error {
-    if p.complete {
-        return errors.NewConflict("reply already sent")
-    }
-    p.complete = true
-    p.command.Close()
     return nil
 }
 

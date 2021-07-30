@@ -4,6 +4,7 @@ package value
 import (
 	"fmt"
 	value "github.com/atomix/atomix-api/go/atomix/primitive/value"
+	errors "github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	util "github.com/atomix/atomix-go-framework/pkg/atomix/util"
 	proto "github.com/golang/protobuf/proto"
@@ -160,14 +161,14 @@ type Watcher interface {
 	Cancel()
 }
 
-func newWatcher(watcher rsm.SessionStateWatcher) Watcher {
+func newWatcher(watcher rsm.Watcher) Watcher {
 	return &serviceWatcher{
 		watcher: watcher,
 	}
 }
 
 type serviceWatcher struct {
-	watcher rsm.SessionStateWatcher
+	watcher rsm.Watcher
 }
 
 func (s *serviceWatcher) Cancel() {
@@ -336,6 +337,7 @@ type SetProposal interface {
 	Proposal
 	Request() (*value.SetRequest, error)
 	Reply(*value.SetResponse) error
+	Fail(error) error
 }
 
 func newSetProposal(command rsm.Command) SetProposal {
@@ -347,7 +349,8 @@ func newSetProposal(command rsm.Command) SetProposal {
 
 type setProposal struct {
 	Proposal
-	command rsm.Command
+	command  rsm.Command
+	complete bool
 }
 
 func (p *setProposal) Request() (*value.SetRequest, error) {
@@ -360,6 +363,9 @@ func (p *setProposal) Request() (*value.SetRequest, error) {
 }
 
 func (p *setProposal) Reply(response *value.SetResponse) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
 	log.Debugf("Sending SetProposal %s: %s", p, response)
 	output, err := proto.Marshal(response)
 	if err != nil {
@@ -367,6 +373,18 @@ func (p *setProposal) Reply(response *value.SetResponse) error {
 	}
 	p.command.Output(output, nil)
 	p.command.Close()
+	p.complete = true
+	return nil
+}
+
+func (p *setProposal) Fail(err error) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
+	log.Debugf("Failing SetProposal %s: %s", p, err)
+	p.command.Output(nil, err)
+	p.command.Close()
+	p.complete = true
 	return nil
 }
 

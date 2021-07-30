@@ -31,28 +31,28 @@ var _ = time.Kitchen
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
-type SessionStreamState int32
+type SessionCommandState int32
 
 const (
-	SessionStreamState_STREAM_CLOSED SessionStreamState = 0
-	SessionStreamState_STREAM_OPEN   SessionStreamState = 1
+	SessionCommandState_COMMAND_OPEN     SessionCommandState = 0
+	SessionCommandState_COMMAND_COMPLETE SessionCommandState = 1
 )
 
-var SessionStreamState_name = map[int32]string{
-	0: "STREAM_CLOSED",
-	1: "STREAM_OPEN",
+var SessionCommandState_name = map[int32]string{
+	0: "COMMAND_OPEN",
+	1: "COMMAND_COMPLETE",
 }
 
-var SessionStreamState_value = map[string]int32{
-	"STREAM_CLOSED": 0,
-	"STREAM_OPEN":   1,
+var SessionCommandState_value = map[string]int32{
+	"COMMAND_OPEN":     0,
+	"COMMAND_COMPLETE": 1,
 }
 
-func (x SessionStreamState) String() string {
-	return proto.EnumName(SessionStreamState_name, int32(x))
+func (x SessionCommandState) String() string {
+	return proto.EnumName(SessionCommandState_name, int32(x))
 }
 
-func (SessionStreamState) EnumDescriptor() ([]byte, []int) {
+func (SessionCommandState) EnumDescriptor() ([]byte, []int) {
 	return fileDescriptor_e3f642df445f73e7, []int{0}
 }
 
@@ -120,8 +120,8 @@ func (ResponseCode) EnumDescriptor() ([]byte, []int) {
 type StateMachineSnapshot struct {
 	Index     Index              `protobuf:"varint,1,opt,name=index,proto3,casttype=Index" json:"index,omitempty"`
 	Timestamp time.Time          `protobuf:"bytes,2,opt,name=timestamp,proto3,stdtime" json:"timestamp"`
-	Services  []*ServiceSnapshot `protobuf:"bytes,3,rep,name=services,proto3" json:"services,omitempty"`
-	Sessions  []*SessionSnapshot `protobuf:"bytes,4,rep,name=sessions,proto3" json:"sessions,omitempty"`
+	Sessions  []*SessionSnapshot `protobuf:"bytes,3,rep,name=sessions,proto3" json:"sessions,omitempty"`
+	Services  []*ServiceSnapshot `protobuf:"bytes,4,rep,name=services,proto3" json:"services,omitempty"`
 }
 
 func (m *StateMachineSnapshot) Reset()         { *m = StateMachineSnapshot{} }
@@ -171,13 +171,6 @@ func (m *StateMachineSnapshot) GetTimestamp() time.Time {
 	return time.Time{}
 }
 
-func (m *StateMachineSnapshot) GetServices() []*ServiceSnapshot {
-	if m != nil {
-		return m.Services
-	}
-	return nil
-}
-
 func (m *StateMachineSnapshot) GetSessions() []*SessionSnapshot {
 	if m != nil {
 		return m.Sessions
@@ -185,81 +178,24 @@ func (m *StateMachineSnapshot) GetSessions() []*SessionSnapshot {
 	return nil
 }
 
-type ServiceSnapshot struct {
-	ServiceID ServiceID `protobuf:"bytes,1,opt,name=service_id,json=serviceId,proto3,casttype=ServiceID" json:"service_id"`
-	Index     Index     `protobuf:"varint,2,opt,name=index,proto3,casttype=Index" json:"index,omitempty"`
-	Data      []byte    `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
-}
-
-func (m *ServiceSnapshot) Reset()         { *m = ServiceSnapshot{} }
-func (m *ServiceSnapshot) String() string { return proto.CompactTextString(m) }
-func (*ServiceSnapshot) ProtoMessage()    {}
-func (*ServiceSnapshot) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{1}
-}
-func (m *ServiceSnapshot) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *ServiceSnapshot) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_ServiceSnapshot.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *ServiceSnapshot) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ServiceSnapshot.Merge(m, src)
-}
-func (m *ServiceSnapshot) XXX_Size() int {
-	return m.Size()
-}
-func (m *ServiceSnapshot) XXX_DiscardUnknown() {
-	xxx_messageInfo_ServiceSnapshot.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ServiceSnapshot proto.InternalMessageInfo
-
-func (m *ServiceSnapshot) GetServiceID() ServiceID {
+func (m *StateMachineSnapshot) GetServices() []*ServiceSnapshot {
 	if m != nil {
-		return m.ServiceID
-	}
-	return ServiceID{}
-}
-
-func (m *ServiceSnapshot) GetIndex() Index {
-	if m != nil {
-		return m.Index
-	}
-	return 0
-}
-
-func (m *ServiceSnapshot) GetData() []byte {
-	if m != nil {
-		return m.Data
+		return m.Services
 	}
 	return nil
 }
 
 type SessionSnapshot struct {
-	SessionID       SessionID               `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3,casttype=SessionID" json:"session_id,omitempty"`
-	ServiceID       ServiceID               `protobuf:"bytes,2,opt,name=service_id,json=serviceId,proto3,casttype=ServiceID" json:"service_id"`
-	Timeout         time.Duration           `protobuf:"bytes,3,opt,name=timeout,proto3,stdduration" json:"timeout"`
-	LastUpdated     time.Time               `protobuf:"bytes,4,opt,name=last_updated,json=lastUpdated,proto3,stdtime" json:"last_updated"`
-	LastRequestID   RequestID               `protobuf:"varint,5,opt,name=last_request_id,json=lastRequestId,proto3,casttype=RequestID" json:"last_request_id,omitempty"`
-	PendingRequests []SessionCommandRequest `protobuf:"bytes,6,rep,name=pending_requests,json=pendingRequests,proto3" json:"pending_requests"`
-	Streams         []SessionStreamSnapshot `protobuf:"bytes,8,rep,name=streams,proto3" json:"streams"`
+	SessionID   SessionID     `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3,casttype=SessionID" json:"session_id,omitempty"`
+	Timeout     time.Duration `protobuf:"bytes,2,opt,name=timeout,proto3,stdduration" json:"timeout"`
+	LastUpdated time.Time     `protobuf:"bytes,3,opt,name=last_updated,json=lastUpdated,proto3,stdtime" json:"last_updated"`
 }
 
 func (m *SessionSnapshot) Reset()         { *m = SessionSnapshot{} }
 func (m *SessionSnapshot) String() string { return proto.CompactTextString(m) }
 func (*SessionSnapshot) ProtoMessage()    {}
 func (*SessionSnapshot) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{2}
+	return fileDescriptor_e3f642df445f73e7, []int{1}
 }
 func (m *SessionSnapshot) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -295,13 +231,6 @@ func (m *SessionSnapshot) GetSessionID() SessionID {
 	return 0
 }
 
-func (m *SessionSnapshot) GetServiceID() ServiceID {
-	if m != nil {
-		return m.ServiceID
-	}
-	return ServiceID{}
-}
-
 func (m *SessionSnapshot) GetTimeout() time.Duration {
 	if m != nil {
 		return m.Timeout
@@ -316,45 +245,25 @@ func (m *SessionSnapshot) GetLastUpdated() time.Time {
 	return time.Time{}
 }
 
-func (m *SessionSnapshot) GetLastRequestID() RequestID {
-	if m != nil {
-		return m.LastRequestID
-	}
-	return 0
+type SessionCommandSnapshot struct {
+	CommandID        CommandID                `protobuf:"varint,1,opt,name=command_id,json=commandId,proto3,casttype=CommandID" json:"command_id,omitempty"`
+	State            SessionCommandState      `protobuf:"varint,2,opt,name=state,proto3,enum=atomix.service.SessionCommandState" json:"state,omitempty"`
+	Request          *ServiceCommandRequest   `protobuf:"bytes,3,opt,name=request,proto3" json:"request,omitempty"`
+	PendingResponses []ServiceCommandResponse `protobuf:"bytes,4,rep,name=pending_responses,json=pendingResponses,proto3" json:"pending_responses"`
 }
 
-func (m *SessionSnapshot) GetPendingRequests() []SessionCommandRequest {
-	if m != nil {
-		return m.PendingRequests
-	}
-	return nil
+func (m *SessionCommandSnapshot) Reset()         { *m = SessionCommandSnapshot{} }
+func (m *SessionCommandSnapshot) String() string { return proto.CompactTextString(m) }
+func (*SessionCommandSnapshot) ProtoMessage()    {}
+func (*SessionCommandSnapshot) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e3f642df445f73e7, []int{2}
 }
-
-func (m *SessionSnapshot) GetStreams() []SessionStreamSnapshot {
-	if m != nil {
-		return m.Streams
-	}
-	return nil
-}
-
-type SessionStreamSnapshot struct {
-	Request          SessionCommandRequest    `protobuf:"bytes,1,opt,name=request,proto3" json:"request"`
-	State            SessionStreamState       `protobuf:"varint,2,opt,name=state,proto3,enum=atomix.service.SessionStreamState" json:"state,omitempty"`
-	PendingResponses []SessionCommandResponse `protobuf:"bytes,3,rep,name=pending_responses,json=pendingResponses,proto3" json:"pending_responses"`
-}
-
-func (m *SessionStreamSnapshot) Reset()         { *m = SessionStreamSnapshot{} }
-func (m *SessionStreamSnapshot) String() string { return proto.CompactTextString(m) }
-func (*SessionStreamSnapshot) ProtoMessage()    {}
-func (*SessionStreamSnapshot) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{3}
-}
-func (m *SessionStreamSnapshot) XXX_Unmarshal(b []byte) error {
+func (m *SessionCommandSnapshot) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *SessionStreamSnapshot) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *SessionCommandSnapshot) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_SessionStreamSnapshot.Marshal(b, m, deterministic)
+		return xxx_messageInfo_SessionCommandSnapshot.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalToSizedBuffer(b)
@@ -364,57 +273,65 @@ func (m *SessionStreamSnapshot) XXX_Marshal(b []byte, deterministic bool) ([]byt
 		return b[:n], nil
 	}
 }
-func (m *SessionStreamSnapshot) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SessionStreamSnapshot.Merge(m, src)
+func (m *SessionCommandSnapshot) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SessionCommandSnapshot.Merge(m, src)
 }
-func (m *SessionStreamSnapshot) XXX_Size() int {
+func (m *SessionCommandSnapshot) XXX_Size() int {
 	return m.Size()
 }
-func (m *SessionStreamSnapshot) XXX_DiscardUnknown() {
-	xxx_messageInfo_SessionStreamSnapshot.DiscardUnknown(m)
+func (m *SessionCommandSnapshot) XXX_DiscardUnknown() {
+	xxx_messageInfo_SessionCommandSnapshot.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_SessionStreamSnapshot proto.InternalMessageInfo
+var xxx_messageInfo_SessionCommandSnapshot proto.InternalMessageInfo
 
-func (m *SessionStreamSnapshot) GetRequest() SessionCommandRequest {
+func (m *SessionCommandSnapshot) GetCommandID() CommandID {
 	if m != nil {
-		return m.Request
+		return m.CommandID
 	}
-	return SessionCommandRequest{}
+	return 0
 }
 
-func (m *SessionStreamSnapshot) GetState() SessionStreamState {
+func (m *SessionCommandSnapshot) GetState() SessionCommandState {
 	if m != nil {
 		return m.State
 	}
-	return SessionStreamState_STREAM_CLOSED
+	return SessionCommandState_COMMAND_OPEN
 }
 
-func (m *SessionStreamSnapshot) GetPendingResponses() []SessionCommandResponse {
+func (m *SessionCommandSnapshot) GetRequest() *ServiceCommandRequest {
+	if m != nil {
+		return m.Request
+	}
+	return nil
+}
+
+func (m *SessionCommandSnapshot) GetPendingResponses() []ServiceCommandResponse {
 	if m != nil {
 		return m.PendingResponses
 	}
 	return nil
 }
 
-type ServiceId struct {
-	Type      string `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
-	Namespace string `protobuf:"bytes,2,opt,name=namespace,proto3" json:"namespace,omitempty"`
-	Name      string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+type ServiceSnapshot struct {
+	ServiceID   ServiceID `protobuf:"varint,1,opt,name=service_id,json=serviceId,proto3,casttype=ServiceID" json:"service_id,omitempty"`
+	ServiceInfo `protobuf:"bytes,2,opt,name=service_info,json=serviceInfo,proto3,embedded=service_info" json:"service_info"`
+	Data        []byte                    `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	Sessions    []*ServiceSessionSnapshot `protobuf:"bytes,4,rep,name=sessions,proto3" json:"sessions,omitempty"`
 }
 
-func (m *ServiceId) Reset()         { *m = ServiceId{} }
-func (m *ServiceId) String() string { return proto.CompactTextString(m) }
-func (*ServiceId) ProtoMessage()    {}
-func (*ServiceId) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{4}
+func (m *ServiceSnapshot) Reset()         { *m = ServiceSnapshot{} }
+func (m *ServiceSnapshot) String() string { return proto.CompactTextString(m) }
+func (*ServiceSnapshot) ProtoMessage()    {}
+func (*ServiceSnapshot) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e3f642df445f73e7, []int{3}
 }
-func (m *ServiceId) XXX_Unmarshal(b []byte) error {
+func (m *ServiceSnapshot) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *ServiceId) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *ServiceSnapshot) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_ServiceId.Marshal(b, m, deterministic)
+		return xxx_messageInfo_ServiceSnapshot.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalToSizedBuffer(b)
@@ -424,33 +341,145 @@ func (m *ServiceId) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 		return b[:n], nil
 	}
 }
-func (m *ServiceId) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ServiceId.Merge(m, src)
+func (m *ServiceSnapshot) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ServiceSnapshot.Merge(m, src)
 }
-func (m *ServiceId) XXX_Size() int {
+func (m *ServiceSnapshot) XXX_Size() int {
 	return m.Size()
 }
-func (m *ServiceId) XXX_DiscardUnknown() {
-	xxx_messageInfo_ServiceId.DiscardUnknown(m)
+func (m *ServiceSnapshot) XXX_DiscardUnknown() {
+	xxx_messageInfo_ServiceSnapshot.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_ServiceId proto.InternalMessageInfo
+var xxx_messageInfo_ServiceSnapshot proto.InternalMessageInfo
 
-func (m *ServiceId) GetType() string {
+func (m *ServiceSnapshot) GetServiceID() ServiceID {
+	if m != nil {
+		return m.ServiceID
+	}
+	return 0
+}
+
+func (m *ServiceSnapshot) GetData() []byte {
+	if m != nil {
+		return m.Data
+	}
+	return nil
+}
+
+func (m *ServiceSnapshot) GetSessions() []*ServiceSessionSnapshot {
+	if m != nil {
+		return m.Sessions
+	}
+	return nil
+}
+
+type ServiceSessionSnapshot struct {
+	SessionID SessionID                 `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3,casttype=SessionID" json:"session_id,omitempty"`
+	Commands  []*SessionCommandSnapshot `protobuf:"bytes,2,rep,name=commands,proto3" json:"commands,omitempty"`
+}
+
+func (m *ServiceSessionSnapshot) Reset()         { *m = ServiceSessionSnapshot{} }
+func (m *ServiceSessionSnapshot) String() string { return proto.CompactTextString(m) }
+func (*ServiceSessionSnapshot) ProtoMessage()    {}
+func (*ServiceSessionSnapshot) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e3f642df445f73e7, []int{4}
+}
+func (m *ServiceSessionSnapshot) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ServiceSessionSnapshot) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_ServiceSessionSnapshot.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *ServiceSessionSnapshot) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ServiceSessionSnapshot.Merge(m, src)
+}
+func (m *ServiceSessionSnapshot) XXX_Size() int {
+	return m.Size()
+}
+func (m *ServiceSessionSnapshot) XXX_DiscardUnknown() {
+	xxx_messageInfo_ServiceSessionSnapshot.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ServiceSessionSnapshot proto.InternalMessageInfo
+
+func (m *ServiceSessionSnapshot) GetSessionID() SessionID {
+	if m != nil {
+		return m.SessionID
+	}
+	return 0
+}
+
+func (m *ServiceSessionSnapshot) GetCommands() []*SessionCommandSnapshot {
+	if m != nil {
+		return m.Commands
+	}
+	return nil
+}
+
+type ServiceInfo struct {
+	Type      ServiceType `protobuf:"bytes,1,opt,name=type,proto3,casttype=ServiceType" json:"type,omitempty"`
+	Namespace string      `protobuf:"bytes,2,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Name      string      `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+}
+
+func (m *ServiceInfo) Reset()         { *m = ServiceInfo{} }
+func (m *ServiceInfo) String() string { return proto.CompactTextString(m) }
+func (*ServiceInfo) ProtoMessage()    {}
+func (*ServiceInfo) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e3f642df445f73e7, []int{5}
+}
+func (m *ServiceInfo) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ServiceInfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_ServiceInfo.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *ServiceInfo) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ServiceInfo.Merge(m, src)
+}
+func (m *ServiceInfo) XXX_Size() int {
+	return m.Size()
+}
+func (m *ServiceInfo) XXX_DiscardUnknown() {
+	xxx_messageInfo_ServiceInfo.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ServiceInfo proto.InternalMessageInfo
+
+func (m *ServiceInfo) GetType() ServiceType {
 	if m != nil {
 		return m.Type
 	}
 	return ""
 }
 
-func (m *ServiceId) GetNamespace() string {
+func (m *ServiceInfo) GetNamespace() string {
 	if m != nil {
 		return m.Namespace
 	}
 	return ""
 }
 
-func (m *ServiceId) GetName() string {
+func (m *ServiceInfo) GetName() string {
 	if m != nil {
 		return m.Name
 	}
@@ -465,7 +494,7 @@ func (m *PartitionConfigRequest) Reset()         { *m = PartitionConfigRequest{}
 func (m *PartitionConfigRequest) String() string { return proto.CompactTextString(m) }
 func (*PartitionConfigRequest) ProtoMessage()    {}
 func (*PartitionConfigRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{5}
+	return fileDescriptor_e3f642df445f73e7, []int{6}
 }
 func (m *PartitionConfigRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -510,7 +539,7 @@ func (m *PartitionConfigResponse) Reset()         { *m = PartitionConfigResponse
 func (m *PartitionConfigResponse) String() string { return proto.CompactTextString(m) }
 func (*PartitionConfigResponse) ProtoMessage()    {}
 func (*PartitionConfigResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{6}
+	return fileDescriptor_e3f642df445f73e7, []int{7}
 }
 func (m *PartitionConfigResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -562,7 +591,7 @@ func (m *PartitionCommandRequest) Reset()         { *m = PartitionCommandRequest
 func (m *PartitionCommandRequest) String() string { return proto.CompactTextString(m) }
 func (*PartitionCommandRequest) ProtoMessage()    {}
 func (*PartitionCommandRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{7}
+	return fileDescriptor_e3f642df445f73e7, []int{8}
 }
 func (m *PartitionCommandRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -613,7 +642,7 @@ func (m *PartitionCommandResponse) Reset()         { *m = PartitionCommandRespon
 func (m *PartitionCommandResponse) String() string { return proto.CompactTextString(m) }
 func (*PartitionCommandResponse) ProtoMessage()    {}
 func (*PartitionCommandResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{8}
+	return fileDescriptor_e3f642df445f73e7, []int{9}
 }
 func (m *PartitionCommandResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -663,7 +692,7 @@ func (m *CommandRequest) Reset()         { *m = CommandRequest{} }
 func (m *CommandRequest) String() string { return proto.CompactTextString(m) }
 func (*CommandRequest) ProtoMessage()    {}
 func (*CommandRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{9}
+	return fileDescriptor_e3f642df445f73e7, []int{10}
 }
 func (m *CommandRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -782,7 +811,7 @@ func (m *CommandResponse) Reset()         { *m = CommandResponse{} }
 func (m *CommandResponse) String() string { return proto.CompactTextString(m) }
 func (*CommandResponse) ProtoMessage()    {}
 func (*CommandResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{10}
+	return fileDescriptor_e3f642df445f73e7, []int{11}
 }
 func (m *CommandResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -888,15 +917,14 @@ func (*CommandResponse) XXX_OneofWrappers() []interface{} {
 }
 
 type OpenSessionRequest struct {
-	ServiceID ServiceID     `protobuf:"bytes,1,opt,name=service_id,json=serviceId,proto3,casttype=ServiceID" json:"service_id"`
-	Timeout   time.Duration `protobuf:"bytes,2,opt,name=timeout,proto3,stdduration" json:"timeout"`
+	Timeout time.Duration `protobuf:"bytes,1,opt,name=timeout,proto3,stdduration" json:"timeout"`
 }
 
 func (m *OpenSessionRequest) Reset()         { *m = OpenSessionRequest{} }
 func (m *OpenSessionRequest) String() string { return proto.CompactTextString(m) }
 func (*OpenSessionRequest) ProtoMessage()    {}
 func (*OpenSessionRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{11}
+	return fileDescriptor_e3f642df445f73e7, []int{12}
 }
 func (m *OpenSessionRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -925,13 +953,6 @@ func (m *OpenSessionRequest) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_OpenSessionRequest proto.InternalMessageInfo
 
-func (m *OpenSessionRequest) GetServiceID() ServiceID {
-	if m != nil {
-		return m.ServiceID
-	}
-	return ServiceID{}
-}
-
 func (m *OpenSessionRequest) GetTimeout() time.Duration {
 	if m != nil {
 		return m.Timeout
@@ -947,7 +968,7 @@ func (m *OpenSessionResponse) Reset()         { *m = OpenSessionResponse{} }
 func (m *OpenSessionResponse) String() string { return proto.CompactTextString(m) }
 func (*OpenSessionResponse) ProtoMessage()    {}
 func (*OpenSessionResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{12}
+	return fileDescriptor_e3f642df445f73e7, []int{13}
 }
 func (m *OpenSessionResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -984,14 +1005,16 @@ func (m *OpenSessionResponse) GetSessionID() SessionID {
 }
 
 type KeepAliveRequest struct {
-	Sessions map[SessionID]*SessionKeepAlive `protobuf:"bytes,1,rep,name=sessions,proto3,castkey=SessionID" json:"sessions,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	SessionID     SessionID `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3,casttype=SessionID" json:"session_id,omitempty"`
+	LastRequestID RequestID `protobuf:"varint,2,opt,name=last_request_id,json=lastRequestId,proto3,casttype=RequestID" json:"last_request_id,omitempty"`
+	RequestFilter []byte    `protobuf:"bytes,3,opt,name=request_filter,json=requestFilter,proto3" json:"request_filter,omitempty"`
 }
 
 func (m *KeepAliveRequest) Reset()         { *m = KeepAliveRequest{} }
 func (m *KeepAliveRequest) String() string { return proto.CompactTextString(m) }
 func (*KeepAliveRequest) ProtoMessage()    {}
 func (*KeepAliveRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{13}
+	return fileDescriptor_e3f642df445f73e7, []int{14}
 }
 func (m *KeepAliveRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1020,9 +1043,23 @@ func (m *KeepAliveRequest) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_KeepAliveRequest proto.InternalMessageInfo
 
-func (m *KeepAliveRequest) GetSessions() map[SessionID]*SessionKeepAlive {
+func (m *KeepAliveRequest) GetSessionID() SessionID {
 	if m != nil {
-		return m.Sessions
+		return m.SessionID
+	}
+	return 0
+}
+
+func (m *KeepAliveRequest) GetLastRequestID() RequestID {
+	if m != nil {
+		return m.LastRequestID
+	}
+	return 0
+}
+
+func (m *KeepAliveRequest) GetRequestFilter() []byte {
+	if m != nil {
+		return m.RequestFilter
 	}
 	return nil
 }
@@ -1034,7 +1071,7 @@ func (m *KeepAliveResponse) Reset()         { *m = KeepAliveResponse{} }
 func (m *KeepAliveResponse) String() string { return proto.CompactTextString(m) }
 func (*KeepAliveResponse) ProtoMessage()    {}
 func (*KeepAliveResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{14}
+	return fileDescriptor_e3f642df445f73e7, []int{15}
 }
 func (m *KeepAliveResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1063,102 +1100,6 @@ func (m *KeepAliveResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_KeepAliveResponse proto.InternalMessageInfo
 
-type SessionKeepAlive struct {
-	PendingRequests []byte                         `protobuf:"bytes,1,opt,name=pending_requests,json=pendingRequests,proto3" json:"pending_requests,omitempty"`
-	ResponseStreams map[RequestID]*StreamKeepAlive `protobuf:"bytes,2,rep,name=response_streams,json=responseStreams,proto3,castkey=RequestID" json:"response_streams,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-}
-
-func (m *SessionKeepAlive) Reset()         { *m = SessionKeepAlive{} }
-func (m *SessionKeepAlive) String() string { return proto.CompactTextString(m) }
-func (*SessionKeepAlive) ProtoMessage()    {}
-func (*SessionKeepAlive) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{15}
-}
-func (m *SessionKeepAlive) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *SessionKeepAlive) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_SessionKeepAlive.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *SessionKeepAlive) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SessionKeepAlive.Merge(m, src)
-}
-func (m *SessionKeepAlive) XXX_Size() int {
-	return m.Size()
-}
-func (m *SessionKeepAlive) XXX_DiscardUnknown() {
-	xxx_messageInfo_SessionKeepAlive.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SessionKeepAlive proto.InternalMessageInfo
-
-func (m *SessionKeepAlive) GetPendingRequests() []byte {
-	if m != nil {
-		return m.PendingRequests
-	}
-	return nil
-}
-
-func (m *SessionKeepAlive) GetResponseStreams() map[RequestID]*StreamKeepAlive {
-	if m != nil {
-		return m.ResponseStreams
-	}
-	return nil
-}
-
-type StreamKeepAlive struct {
-	CompleteResponseID ResponseID `protobuf:"varint,1,opt,name=complete_response_id,json=completeResponseId,proto3,casttype=ResponseID" json:"complete_response_id,omitempty"`
-}
-
-func (m *StreamKeepAlive) Reset()         { *m = StreamKeepAlive{} }
-func (m *StreamKeepAlive) String() string { return proto.CompactTextString(m) }
-func (*StreamKeepAlive) ProtoMessage()    {}
-func (*StreamKeepAlive) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{16}
-}
-func (m *StreamKeepAlive) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *StreamKeepAlive) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_StreamKeepAlive.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *StreamKeepAlive) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_StreamKeepAlive.Merge(m, src)
-}
-func (m *StreamKeepAlive) XXX_Size() int {
-	return m.Size()
-}
-func (m *StreamKeepAlive) XXX_DiscardUnknown() {
-	xxx_messageInfo_StreamKeepAlive.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_StreamKeepAlive proto.InternalMessageInfo
-
-func (m *StreamKeepAlive) GetCompleteResponseID() ResponseID {
-	if m != nil {
-		return m.CompleteResponseID
-	}
-	return 0
-}
-
 type CloseSessionRequest struct {
 	SessionID SessionID `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3,casttype=SessionID" json:"session_id,omitempty"`
 }
@@ -1167,7 +1108,7 @@ func (m *CloseSessionRequest) Reset()         { *m = CloseSessionRequest{} }
 func (m *CloseSessionRequest) String() string { return proto.CompactTextString(m) }
 func (*CloseSessionRequest) ProtoMessage()    {}
 func (*CloseSessionRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{17}
+	return fileDescriptor_e3f642df445f73e7, []int{16}
 }
 func (m *CloseSessionRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1210,7 +1151,7 @@ func (m *CloseSessionResponse) Reset()         { *m = CloseSessionResponse{} }
 func (m *CloseSessionResponse) String() string { return proto.CompactTextString(m) }
 func (*CloseSessionResponse) ProtoMessage()    {}
 func (*CloseSessionResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{18}
+	return fileDescriptor_e3f642df445f73e7, []int{17}
 }
 func (m *CloseSessionResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1240,16 +1181,19 @@ func (m *CloseSessionResponse) XXX_DiscardUnknown() {
 var xxx_messageInfo_CloseSessionResponse proto.InternalMessageInfo
 
 type SessionCommandRequest struct {
-	SessionID SessionID         `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3,casttype=SessionID" json:"session_id,omitempty"`
-	RequestID RequestID         `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3,casttype=RequestID" json:"request_id,omitempty"`
-	Operation *OperationRequest `protobuf:"bytes,3,opt,name=operation,proto3" json:"operation,omitempty"`
+	SessionID SessionID `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3,casttype=SessionID" json:"session_id,omitempty"`
+	// Types that are valid to be assigned to Request:
+	//	*SessionCommandRequest_CreateService
+	//	*SessionCommandRequest_CloseService
+	//	*SessionCommandRequest_ServiceCommand
+	Request isSessionCommandRequest_Request `protobuf_oneof:"request"`
 }
 
 func (m *SessionCommandRequest) Reset()         { *m = SessionCommandRequest{} }
 func (m *SessionCommandRequest) String() string { return proto.CompactTextString(m) }
 func (*SessionCommandRequest) ProtoMessage()    {}
 func (*SessionCommandRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{19}
+	return fileDescriptor_e3f642df445f73e7, []int{18}
 }
 func (m *SessionCommandRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1278,6 +1222,33 @@ func (m *SessionCommandRequest) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_SessionCommandRequest proto.InternalMessageInfo
 
+type isSessionCommandRequest_Request interface {
+	isSessionCommandRequest_Request()
+	MarshalTo([]byte) (int, error)
+	Size() int
+}
+
+type SessionCommandRequest_CreateService struct {
+	CreateService *CreateServiceRequest `protobuf:"bytes,2,opt,name=create_service,json=createService,proto3,oneof" json:"create_service,omitempty"`
+}
+type SessionCommandRequest_CloseService struct {
+	CloseService *CloseServiceRequest `protobuf:"bytes,3,opt,name=close_service,json=closeService,proto3,oneof" json:"close_service,omitempty"`
+}
+type SessionCommandRequest_ServiceCommand struct {
+	ServiceCommand *ServiceCommandRequest `protobuf:"bytes,4,opt,name=service_command,json=serviceCommand,proto3,oneof" json:"service_command,omitempty"`
+}
+
+func (*SessionCommandRequest_CreateService) isSessionCommandRequest_Request()  {}
+func (*SessionCommandRequest_CloseService) isSessionCommandRequest_Request()   {}
+func (*SessionCommandRequest_ServiceCommand) isSessionCommandRequest_Request() {}
+
+func (m *SessionCommandRequest) GetRequest() isSessionCommandRequest_Request {
+	if m != nil {
+		return m.Request
+	}
+	return nil
+}
+
 func (m *SessionCommandRequest) GetSessionID() SessionID {
 	if m != nil {
 		return m.SessionID
@@ -1285,30 +1256,49 @@ func (m *SessionCommandRequest) GetSessionID() SessionID {
 	return 0
 }
 
-func (m *SessionCommandRequest) GetRequestID() RequestID {
-	if m != nil {
-		return m.RequestID
-	}
-	return 0
-}
-
-func (m *SessionCommandRequest) GetOperation() *OperationRequest {
-	if m != nil {
-		return m.Operation
+func (m *SessionCommandRequest) GetCreateService() *CreateServiceRequest {
+	if x, ok := m.GetRequest().(*SessionCommandRequest_CreateService); ok {
+		return x.CreateService
 	}
 	return nil
 }
 
+func (m *SessionCommandRequest) GetCloseService() *CloseServiceRequest {
+	if x, ok := m.GetRequest().(*SessionCommandRequest_CloseService); ok {
+		return x.CloseService
+	}
+	return nil
+}
+
+func (m *SessionCommandRequest) GetServiceCommand() *ServiceCommandRequest {
+	if x, ok := m.GetRequest().(*SessionCommandRequest_ServiceCommand); ok {
+		return x.ServiceCommand
+	}
+	return nil
+}
+
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*SessionCommandRequest) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
+		(*SessionCommandRequest_CreateService)(nil),
+		(*SessionCommandRequest_CloseService)(nil),
+		(*SessionCommandRequest_ServiceCommand)(nil),
+	}
+}
+
 type SessionCommandResponse struct {
-	ResponseID ResponseID         `protobuf:"varint,1,opt,name=response_id,json=responseId,proto3,casttype=ResponseID" json:"response_id,omitempty"`
-	Operation  *OperationResponse `protobuf:"bytes,2,opt,name=operation,proto3" json:"operation,omitempty"`
+	// Types that are valid to be assigned to Response:
+	//	*SessionCommandResponse_CreateService
+	//	*SessionCommandResponse_CloseService
+	//	*SessionCommandResponse_ServiceCommand
+	Response isSessionCommandResponse_Response `protobuf_oneof:"response"`
 }
 
 func (m *SessionCommandResponse) Reset()         { *m = SessionCommandResponse{} }
 func (m *SessionCommandResponse) String() string { return proto.CompactTextString(m) }
 func (*SessionCommandResponse) ProtoMessage()    {}
 func (*SessionCommandResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{20}
+	return fileDescriptor_e3f642df445f73e7, []int{19}
 }
 func (m *SessionCommandResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1337,14 +1327,330 @@ func (m *SessionCommandResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_SessionCommandResponse proto.InternalMessageInfo
 
-func (m *SessionCommandResponse) GetResponseID() ResponseID {
+type isSessionCommandResponse_Response interface {
+	isSessionCommandResponse_Response()
+	MarshalTo([]byte) (int, error)
+	Size() int
+}
+
+type SessionCommandResponse_CreateService struct {
+	CreateService *CreateServiceResponse `protobuf:"bytes,1,opt,name=create_service,json=createService,proto3,oneof" json:"create_service,omitempty"`
+}
+type SessionCommandResponse_CloseService struct {
+	CloseService *CloseServiceResponse `protobuf:"bytes,2,opt,name=close_service,json=closeService,proto3,oneof" json:"close_service,omitempty"`
+}
+type SessionCommandResponse_ServiceCommand struct {
+	ServiceCommand *ServiceCommandResponse `protobuf:"bytes,3,opt,name=service_command,json=serviceCommand,proto3,oneof" json:"service_command,omitempty"`
+}
+
+func (*SessionCommandResponse_CreateService) isSessionCommandResponse_Response()  {}
+func (*SessionCommandResponse_CloseService) isSessionCommandResponse_Response()   {}
+func (*SessionCommandResponse_ServiceCommand) isSessionCommandResponse_Response() {}
+
+func (m *SessionCommandResponse) GetResponse() isSessionCommandResponse_Response {
+	if m != nil {
+		return m.Response
+	}
+	return nil
+}
+
+func (m *SessionCommandResponse) GetCreateService() *CreateServiceResponse {
+	if x, ok := m.GetResponse().(*SessionCommandResponse_CreateService); ok {
+		return x.CreateService
+	}
+	return nil
+}
+
+func (m *SessionCommandResponse) GetCloseService() *CloseServiceResponse {
+	if x, ok := m.GetResponse().(*SessionCommandResponse_CloseService); ok {
+		return x.CloseService
+	}
+	return nil
+}
+
+func (m *SessionCommandResponse) GetServiceCommand() *ServiceCommandResponse {
+	if x, ok := m.GetResponse().(*SessionCommandResponse_ServiceCommand); ok {
+		return x.ServiceCommand
+	}
+	return nil
+}
+
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*SessionCommandResponse) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
+		(*SessionCommandResponse_CreateService)(nil),
+		(*SessionCommandResponse_CloseService)(nil),
+		(*SessionCommandResponse_ServiceCommand)(nil),
+	}
+}
+
+type CreateServiceRequest struct {
+	ServiceInfo `protobuf:"bytes,1,opt,name=info,proto3,embedded=info" json:"info"`
+}
+
+func (m *CreateServiceRequest) Reset()         { *m = CreateServiceRequest{} }
+func (m *CreateServiceRequest) String() string { return proto.CompactTextString(m) }
+func (*CreateServiceRequest) ProtoMessage()    {}
+func (*CreateServiceRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e3f642df445f73e7, []int{20}
+}
+func (m *CreateServiceRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *CreateServiceRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_CreateServiceRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *CreateServiceRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CreateServiceRequest.Merge(m, src)
+}
+func (m *CreateServiceRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *CreateServiceRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_CreateServiceRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_CreateServiceRequest proto.InternalMessageInfo
+
+type CreateServiceResponse struct {
+	ServiceID ServiceID `protobuf:"varint,1,opt,name=service_id,json=serviceId,proto3,casttype=ServiceID" json:"service_id,omitempty"`
+}
+
+func (m *CreateServiceResponse) Reset()         { *m = CreateServiceResponse{} }
+func (m *CreateServiceResponse) String() string { return proto.CompactTextString(m) }
+func (*CreateServiceResponse) ProtoMessage()    {}
+func (*CreateServiceResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e3f642df445f73e7, []int{21}
+}
+func (m *CreateServiceResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *CreateServiceResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_CreateServiceResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *CreateServiceResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CreateServiceResponse.Merge(m, src)
+}
+func (m *CreateServiceResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *CreateServiceResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_CreateServiceResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_CreateServiceResponse proto.InternalMessageInfo
+
+func (m *CreateServiceResponse) GetServiceID() ServiceID {
+	if m != nil {
+		return m.ServiceID
+	}
+	return 0
+}
+
+type CloseServiceRequest struct {
+	ServiceID ServiceID `protobuf:"varint,1,opt,name=service_id,json=serviceId,proto3,casttype=ServiceID" json:"service_id,omitempty"`
+}
+
+func (m *CloseServiceRequest) Reset()         { *m = CloseServiceRequest{} }
+func (m *CloseServiceRequest) String() string { return proto.CompactTextString(m) }
+func (*CloseServiceRequest) ProtoMessage()    {}
+func (*CloseServiceRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e3f642df445f73e7, []int{22}
+}
+func (m *CloseServiceRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *CloseServiceRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_CloseServiceRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *CloseServiceRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CloseServiceRequest.Merge(m, src)
+}
+func (m *CloseServiceRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *CloseServiceRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_CloseServiceRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_CloseServiceRequest proto.InternalMessageInfo
+
+func (m *CloseServiceRequest) GetServiceID() ServiceID {
+	if m != nil {
+		return m.ServiceID
+	}
+	return 0
+}
+
+type CloseServiceResponse struct {
+}
+
+func (m *CloseServiceResponse) Reset()         { *m = CloseServiceResponse{} }
+func (m *CloseServiceResponse) String() string { return proto.CompactTextString(m) }
+func (*CloseServiceResponse) ProtoMessage()    {}
+func (*CloseServiceResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e3f642df445f73e7, []int{23}
+}
+func (m *CloseServiceResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *CloseServiceResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_CloseServiceResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *CloseServiceResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CloseServiceResponse.Merge(m, src)
+}
+func (m *CloseServiceResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *CloseServiceResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_CloseServiceResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_CloseServiceResponse proto.InternalMessageInfo
+
+type ServiceCommandRequest struct {
+	ServiceID ServiceID         `protobuf:"varint,1,opt,name=service_id,json=serviceId,proto3,casttype=ServiceID" json:"service_id,omitempty"`
+	RequestID RequestID         `protobuf:"varint,2,opt,name=request_id,json=requestId,proto3,casttype=RequestID" json:"request_id,omitempty"`
+	Operation *OperationRequest `protobuf:"bytes,3,opt,name=operation,proto3" json:"operation,omitempty"`
+}
+
+func (m *ServiceCommandRequest) Reset()         { *m = ServiceCommandRequest{} }
+func (m *ServiceCommandRequest) String() string { return proto.CompactTextString(m) }
+func (*ServiceCommandRequest) ProtoMessage()    {}
+func (*ServiceCommandRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e3f642df445f73e7, []int{24}
+}
+func (m *ServiceCommandRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ServiceCommandRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_ServiceCommandRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *ServiceCommandRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ServiceCommandRequest.Merge(m, src)
+}
+func (m *ServiceCommandRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *ServiceCommandRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_ServiceCommandRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ServiceCommandRequest proto.InternalMessageInfo
+
+func (m *ServiceCommandRequest) GetServiceID() ServiceID {
+	if m != nil {
+		return m.ServiceID
+	}
+	return 0
+}
+
+func (m *ServiceCommandRequest) GetRequestID() RequestID {
+	if m != nil {
+		return m.RequestID
+	}
+	return 0
+}
+
+func (m *ServiceCommandRequest) GetOperation() *OperationRequest {
+	if m != nil {
+		return m.Operation
+	}
+	return nil
+}
+
+type ServiceCommandResponse struct {
+	ResponseID ResponseID         `protobuf:"varint,1,opt,name=response_id,json=responseId,proto3,casttype=ResponseID" json:"response_id,omitempty"`
+	Operation  *OperationResponse `protobuf:"bytes,2,opt,name=operation,proto3" json:"operation,omitempty"`
+}
+
+func (m *ServiceCommandResponse) Reset()         { *m = ServiceCommandResponse{} }
+func (m *ServiceCommandResponse) String() string { return proto.CompactTextString(m) }
+func (*ServiceCommandResponse) ProtoMessage()    {}
+func (*ServiceCommandResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e3f642df445f73e7, []int{25}
+}
+func (m *ServiceCommandResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ServiceCommandResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_ServiceCommandResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *ServiceCommandResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ServiceCommandResponse.Merge(m, src)
+}
+func (m *ServiceCommandResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *ServiceCommandResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_ServiceCommandResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ServiceCommandResponse proto.InternalMessageInfo
+
+func (m *ServiceCommandResponse) GetResponseID() ResponseID {
 	if m != nil {
 		return m.ResponseID
 	}
 	return 0
 }
 
-func (m *SessionCommandResponse) GetOperation() *OperationResponse {
+func (m *ServiceCommandResponse) GetOperation() *OperationResponse {
 	if m != nil {
 		return m.Operation
 	}
@@ -1361,7 +1667,7 @@ func (m *PartitionQueryRequest) Reset()         { *m = PartitionQueryRequest{} }
 func (m *PartitionQueryRequest) String() string { return proto.CompactTextString(m) }
 func (*PartitionQueryRequest) ProtoMessage()    {}
 func (*PartitionQueryRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{21}
+	return fileDescriptor_e3f642df445f73e7, []int{26}
 }
 func (m *PartitionQueryRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1419,7 +1725,7 @@ func (m *PartitionQueryResponse) Reset()         { *m = PartitionQueryResponse{}
 func (m *PartitionQueryResponse) String() string { return proto.CompactTextString(m) }
 func (*PartitionQueryResponse) ProtoMessage()    {}
 func (*PartitionQueryResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{22}
+	return fileDescriptor_e3f642df445f73e7, []int{27}
 }
 func (m *PartitionQueryResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1466,7 +1772,7 @@ func (m *QueryRequest) Reset()         { *m = QueryRequest{} }
 func (m *QueryRequest) String() string { return proto.CompactTextString(m) }
 func (*QueryRequest) ProtoMessage()    {}
 func (*QueryRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{23}
+	return fileDescriptor_e3f642df445f73e7, []int{28}
 }
 func (m *QueryRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1545,7 +1851,7 @@ func (m *QueryResponse) Reset()         { *m = QueryResponse{} }
 func (m *QueryResponse) String() string { return proto.CompactTextString(m) }
 func (*QueryResponse) ProtoMessage()    {}
 func (*QueryResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{24}
+	return fileDescriptor_e3f642df445f73e7, []int{29}
 }
 func (m *QueryResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1581,7 +1887,7 @@ type isQueryResponse_Response interface {
 }
 
 type QueryResponse_SessionQuery struct {
-	SessionQuery *SessionQueryResponse `protobuf:"bytes,4,opt,name=session_query,json=sessionQuery,proto3,oneof" json:"session_query,omitempty"`
+	SessionQuery *SessionQueryResponse `protobuf:"bytes,1,opt,name=session_query,json=sessionQuery,proto3,oneof" json:"session_query,omitempty"`
 }
 
 func (*QueryResponse_SessionQuery) isQueryResponse_Response() {}
@@ -1608,16 +1914,17 @@ func (*QueryResponse) XXX_OneofWrappers() []interface{} {
 }
 
 type SessionQueryRequest struct {
-	SessionID     SessionID         `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3,casttype=SessionID" json:"session_id,omitempty"`
-	LastRequestID RequestID         `protobuf:"varint,2,opt,name=last_request_id,json=lastRequestId,proto3,casttype=RequestID" json:"last_request_id,omitempty"`
-	Operation     *OperationRequest `protobuf:"bytes,3,opt,name=operation,proto3" json:"operation,omitempty"`
+	SessionID SessionID `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3,casttype=SessionID" json:"session_id,omitempty"`
+	// Types that are valid to be assigned to Request:
+	//	*SessionQueryRequest_ServiceQuery
+	Request isSessionQueryRequest_Request `protobuf_oneof:"request"`
 }
 
 func (m *SessionQueryRequest) Reset()         { *m = SessionQueryRequest{} }
 func (m *SessionQueryRequest) String() string { return proto.CompactTextString(m) }
 func (*SessionQueryRequest) ProtoMessage()    {}
 func (*SessionQueryRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{25}
+	return fileDescriptor_e3f642df445f73e7, []int{30}
 }
 func (m *SessionQueryRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1646,6 +1953,25 @@ func (m *SessionQueryRequest) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_SessionQueryRequest proto.InternalMessageInfo
 
+type isSessionQueryRequest_Request interface {
+	isSessionQueryRequest_Request()
+	MarshalTo([]byte) (int, error)
+	Size() int
+}
+
+type SessionQueryRequest_ServiceQuery struct {
+	ServiceQuery *ServiceQueryRequest `protobuf:"bytes,2,opt,name=service_query,json=serviceQuery,proto3,oneof" json:"service_query,omitempty"`
+}
+
+func (*SessionQueryRequest_ServiceQuery) isSessionQueryRequest_Request() {}
+
+func (m *SessionQueryRequest) GetRequest() isSessionQueryRequest_Request {
+	if m != nil {
+		return m.Request
+	}
+	return nil
+}
+
 func (m *SessionQueryRequest) GetSessionID() SessionID {
 	if m != nil {
 		return m.SessionID
@@ -1653,29 +1979,31 @@ func (m *SessionQueryRequest) GetSessionID() SessionID {
 	return 0
 }
 
-func (m *SessionQueryRequest) GetLastRequestID() RequestID {
-	if m != nil {
-		return m.LastRequestID
-	}
-	return 0
-}
-
-func (m *SessionQueryRequest) GetOperation() *OperationRequest {
-	if m != nil {
-		return m.Operation
+func (m *SessionQueryRequest) GetServiceQuery() *ServiceQueryRequest {
+	if x, ok := m.GetRequest().(*SessionQueryRequest_ServiceQuery); ok {
+		return x.ServiceQuery
 	}
 	return nil
 }
 
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*SessionQueryRequest) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
+		(*SessionQueryRequest_ServiceQuery)(nil),
+	}
+}
+
 type SessionQueryResponse struct {
-	Operation *OperationResponse `protobuf:"bytes,1,opt,name=operation,proto3" json:"operation,omitempty"`
+	// Types that are valid to be assigned to Response:
+	//	*SessionQueryResponse_ServiceQuery
+	Response isSessionQueryResponse_Response `protobuf_oneof:"response"`
 }
 
 func (m *SessionQueryResponse) Reset()         { *m = SessionQueryResponse{} }
 func (m *SessionQueryResponse) String() string { return proto.CompactTextString(m) }
 func (*SessionQueryResponse) ProtoMessage()    {}
 func (*SessionQueryResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{26}
+	return fileDescriptor_e3f642df445f73e7, []int{31}
 }
 func (m *SessionQueryResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1704,7 +2032,137 @@ func (m *SessionQueryResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_SessionQueryResponse proto.InternalMessageInfo
 
-func (m *SessionQueryResponse) GetOperation() *OperationResponse {
+type isSessionQueryResponse_Response interface {
+	isSessionQueryResponse_Response()
+	MarshalTo([]byte) (int, error)
+	Size() int
+}
+
+type SessionQueryResponse_ServiceQuery struct {
+	ServiceQuery *ServiceQueryResponse `protobuf:"bytes,2,opt,name=service_query,json=serviceQuery,proto3,oneof" json:"service_query,omitempty"`
+}
+
+func (*SessionQueryResponse_ServiceQuery) isSessionQueryResponse_Response() {}
+
+func (m *SessionQueryResponse) GetResponse() isSessionQueryResponse_Response {
+	if m != nil {
+		return m.Response
+	}
+	return nil
+}
+
+func (m *SessionQueryResponse) GetServiceQuery() *ServiceQueryResponse {
+	if x, ok := m.GetResponse().(*SessionQueryResponse_ServiceQuery); ok {
+		return x.ServiceQuery
+	}
+	return nil
+}
+
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*SessionQueryResponse) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
+		(*SessionQueryResponse_ServiceQuery)(nil),
+	}
+}
+
+type ServiceQueryRequest struct {
+	ServiceID ServiceID         `protobuf:"varint,1,opt,name=service_id,json=serviceId,proto3,casttype=ServiceID" json:"service_id,omitempty"`
+	Operation *OperationRequest `protobuf:"bytes,2,opt,name=operation,proto3" json:"operation,omitempty"`
+}
+
+func (m *ServiceQueryRequest) Reset()         { *m = ServiceQueryRequest{} }
+func (m *ServiceQueryRequest) String() string { return proto.CompactTextString(m) }
+func (*ServiceQueryRequest) ProtoMessage()    {}
+func (*ServiceQueryRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e3f642df445f73e7, []int{32}
+}
+func (m *ServiceQueryRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ServiceQueryRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_ServiceQueryRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *ServiceQueryRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ServiceQueryRequest.Merge(m, src)
+}
+func (m *ServiceQueryRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *ServiceQueryRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_ServiceQueryRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ServiceQueryRequest proto.InternalMessageInfo
+
+func (m *ServiceQueryRequest) GetServiceID() ServiceID {
+	if m != nil {
+		return m.ServiceID
+	}
+	return 0
+}
+
+func (m *ServiceQueryRequest) GetOperation() *OperationRequest {
+	if m != nil {
+		return m.Operation
+	}
+	return nil
+}
+
+type ServiceQueryResponse struct {
+	ResponseID ResponseID         `protobuf:"varint,1,opt,name=response_id,json=responseId,proto3,casttype=ResponseID" json:"response_id,omitempty"`
+	Operation  *OperationResponse `protobuf:"bytes,2,opt,name=operation,proto3" json:"operation,omitempty"`
+}
+
+func (m *ServiceQueryResponse) Reset()         { *m = ServiceQueryResponse{} }
+func (m *ServiceQueryResponse) String() string { return proto.CompactTextString(m) }
+func (*ServiceQueryResponse) ProtoMessage()    {}
+func (*ServiceQueryResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e3f642df445f73e7, []int{33}
+}
+func (m *ServiceQueryResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ServiceQueryResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_ServiceQueryResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *ServiceQueryResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ServiceQueryResponse.Merge(m, src)
+}
+func (m *ServiceQueryResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *ServiceQueryResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_ServiceQueryResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ServiceQueryResponse proto.InternalMessageInfo
+
+func (m *ServiceQueryResponse) GetResponseID() ResponseID {
+	if m != nil {
+		return m.ResponseID
+	}
+	return 0
+}
+
+func (m *ServiceQueryResponse) GetOperation() *OperationResponse {
 	if m != nil {
 		return m.Operation
 	}
@@ -1720,7 +2178,7 @@ func (m *OperationRequest) Reset()         { *m = OperationRequest{} }
 func (m *OperationRequest) String() string { return proto.CompactTextString(m) }
 func (*OperationRequest) ProtoMessage()    {}
 func (*OperationRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{27}
+	return fileDescriptor_e3f642df445f73e7, []int{34}
 }
 func (m *OperationRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1772,7 +2230,7 @@ func (m *OperationResponse) Reset()         { *m = OperationResponse{} }
 func (m *OperationResponse) String() string { return proto.CompactTextString(m) }
 func (*OperationResponse) ProtoMessage()    {}
 func (*OperationResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{28}
+	return fileDescriptor_e3f642df445f73e7, []int{35}
 }
 func (m *OperationResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1824,7 +2282,7 @@ func (m *ResponseStatus) Reset()         { *m = ResponseStatus{} }
 func (m *ResponseStatus) String() string { return proto.CompactTextString(m) }
 func (*ResponseStatus) ProtoMessage()    {}
 func (*ResponseStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e3f642df445f73e7, []int{29}
+	return fileDescriptor_e3f642df445f73e7, []int{36}
 }
 func (m *ResponseStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1868,13 +2326,14 @@ func (m *ResponseStatus) GetMessage() string {
 }
 
 func init() {
-	proto.RegisterEnum("atomix.service.SessionStreamState", SessionStreamState_name, SessionStreamState_value)
+	proto.RegisterEnum("atomix.service.SessionCommandState", SessionCommandState_name, SessionCommandState_value)
 	proto.RegisterEnum("atomix.service.ResponseCode", ResponseCode_name, ResponseCode_value)
 	proto.RegisterType((*StateMachineSnapshot)(nil), "atomix.service.StateMachineSnapshot")
-	proto.RegisterType((*ServiceSnapshot)(nil), "atomix.service.ServiceSnapshot")
 	proto.RegisterType((*SessionSnapshot)(nil), "atomix.service.SessionSnapshot")
-	proto.RegisterType((*SessionStreamSnapshot)(nil), "atomix.service.SessionStreamSnapshot")
-	proto.RegisterType((*ServiceId)(nil), "atomix.service.ServiceId")
+	proto.RegisterType((*SessionCommandSnapshot)(nil), "atomix.service.SessionCommandSnapshot")
+	proto.RegisterType((*ServiceSnapshot)(nil), "atomix.service.ServiceSnapshot")
+	proto.RegisterType((*ServiceSessionSnapshot)(nil), "atomix.service.ServiceSessionSnapshot")
+	proto.RegisterType((*ServiceInfo)(nil), "atomix.service.ServiceInfo")
 	proto.RegisterType((*PartitionConfigRequest)(nil), "atomix.service.PartitionConfigRequest")
 	proto.RegisterType((*PartitionConfigResponse)(nil), "atomix.service.PartitionConfigResponse")
 	proto.RegisterType((*PartitionCommandRequest)(nil), "atomix.service.PartitionCommandRequest")
@@ -1884,21 +2343,25 @@ func init() {
 	proto.RegisterType((*OpenSessionRequest)(nil), "atomix.service.OpenSessionRequest")
 	proto.RegisterType((*OpenSessionResponse)(nil), "atomix.service.OpenSessionResponse")
 	proto.RegisterType((*KeepAliveRequest)(nil), "atomix.service.KeepAliveRequest")
-	proto.RegisterMapType((map[SessionID]*SessionKeepAlive)(nil), "atomix.service.KeepAliveRequest.SessionsEntry")
 	proto.RegisterType((*KeepAliveResponse)(nil), "atomix.service.KeepAliveResponse")
-	proto.RegisterType((*SessionKeepAlive)(nil), "atomix.service.SessionKeepAlive")
-	proto.RegisterMapType((map[RequestID]*StreamKeepAlive)(nil), "atomix.service.SessionKeepAlive.ResponseStreamsEntry")
-	proto.RegisterType((*StreamKeepAlive)(nil), "atomix.service.StreamKeepAlive")
 	proto.RegisterType((*CloseSessionRequest)(nil), "atomix.service.CloseSessionRequest")
 	proto.RegisterType((*CloseSessionResponse)(nil), "atomix.service.CloseSessionResponse")
 	proto.RegisterType((*SessionCommandRequest)(nil), "atomix.service.SessionCommandRequest")
 	proto.RegisterType((*SessionCommandResponse)(nil), "atomix.service.SessionCommandResponse")
+	proto.RegisterType((*CreateServiceRequest)(nil), "atomix.service.CreateServiceRequest")
+	proto.RegisterType((*CreateServiceResponse)(nil), "atomix.service.CreateServiceResponse")
+	proto.RegisterType((*CloseServiceRequest)(nil), "atomix.service.CloseServiceRequest")
+	proto.RegisterType((*CloseServiceResponse)(nil), "atomix.service.CloseServiceResponse")
+	proto.RegisterType((*ServiceCommandRequest)(nil), "atomix.service.ServiceCommandRequest")
+	proto.RegisterType((*ServiceCommandResponse)(nil), "atomix.service.ServiceCommandResponse")
 	proto.RegisterType((*PartitionQueryRequest)(nil), "atomix.service.PartitionQueryRequest")
 	proto.RegisterType((*PartitionQueryResponse)(nil), "atomix.service.PartitionQueryResponse")
 	proto.RegisterType((*QueryRequest)(nil), "atomix.service.QueryRequest")
 	proto.RegisterType((*QueryResponse)(nil), "atomix.service.QueryResponse")
 	proto.RegisterType((*SessionQueryRequest)(nil), "atomix.service.SessionQueryRequest")
 	proto.RegisterType((*SessionQueryResponse)(nil), "atomix.service.SessionQueryResponse")
+	proto.RegisterType((*ServiceQueryRequest)(nil), "atomix.service.ServiceQueryRequest")
+	proto.RegisterType((*ServiceQueryResponse)(nil), "atomix.service.ServiceQueryResponse")
 	proto.RegisterType((*OperationRequest)(nil), "atomix.service.OperationRequest")
 	proto.RegisterType((*OperationResponse)(nil), "atomix.service.OperationResponse")
 	proto.RegisterType((*ResponseStatus)(nil), "atomix.service.ResponseStatus")
@@ -1909,118 +2372,124 @@ func init() {
 }
 
 var fileDescriptor_e3f642df445f73e7 = []byte{
-	// 1766 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xb4, 0x57, 0xcd, 0x6f, 0xdb, 0xc8,
-	0x15, 0x17, 0xf5, 0x61, 0x9b, 0x4f, 0x92, 0x45, 0x4f, 0xbc, 0xae, 0x2a, 0xa4, 0x92, 0xcb, 0xfd,
-	0xa8, 0x77, 0x0f, 0x72, 0xe0, 0x62, 0x8b, 0x6c, 0xbb, 0x9b, 0x85, 0x64, 0xd1, 0xb1, 0x6a, 0x45,
-	0x72, 0x28, 0xc9, 0xbb, 0x6e, 0xb3, 0x15, 0xb8, 0xe2, 0x44, 0x11, 0x2c, 0x89, 0x8a, 0x48, 0xa5,
-	0xf1, 0xb5, 0x40, 0xcf, 0x0d, 0x50, 0x14, 0xc8, 0xa1, 0x87, 0xfe, 0x01, 0xed, 0xff, 0x91, 0x43,
-	0x0b, 0xe4, 0x18, 0xf4, 0xe0, 0x14, 0xce, 0x35, 0xb7, 0xa2, 0x97, 0x9c, 0x8a, 0x19, 0x0e, 0xbf,
-	0x49, 0x2b, 0x89, 0xbd, 0x27, 0x72, 0xde, 0xbc, 0xf7, 0xe6, 0xf7, 0xde, 0xbc, 0xaf, 0x81, 0x4f,
-	0x15, 0x43, 0x1b, 0x0f, 0x1f, 0x6f, 0xeb, 0x86, 0x36, 0x53, 0x06, 0x78, 0x7b, 0x3a, 0xd3, 0x0c,
-	0xad, 0xaf, 0x8d, 0xb6, 0x67, 0xfa, 0x78, 0x5b, 0xc7, 0xb3, 0x47, 0xc3, 0x3e, 0x2e, 0x53, 0x22,
-	0x5a, 0x35, 0x59, 0xcb, 0x8c, 0x5a, 0x28, 0x0e, 0x34, 0x6d, 0x30, 0x62, 0x22, 0xdf, 0xcf, 0xef,
-	0x6f, 0xab, 0xf3, 0x99, 0x62, 0x0c, 0xb5, 0x89, 0xc9, 0x5f, 0x28, 0xf9, 0xf7, 0x8d, 0xe1, 0x18,
-	0xeb, 0x86, 0x32, 0x9e, 0x32, 0x86, 0xf5, 0x81, 0x36, 0xd0, 0xe8, 0xef, 0x36, 0xf9, 0x33, 0xa9,
-	0xe2, 0xff, 0x38, 0x58, 0x6f, 0x1b, 0x8a, 0x81, 0xef, 0x28, 0xfd, 0x07, 0xc3, 0x09, 0x6e, 0x4f,
-	0x94, 0xa9, 0xfe, 0x40, 0x33, 0x50, 0x09, 0x52, 0xc3, 0x89, 0x8a, 0x1f, 0xe7, 0xb9, 0x4d, 0x6e,
-	0x2b, 0x59, 0xe5, 0xdf, 0x9c, 0x95, 0x52, 0x75, 0x42, 0x90, 0x4d, 0x3a, 0xaa, 0x02, 0x6f, 0x1f,
-	0x91, 0x8f, 0x6f, 0x72, 0x5b, 0xe9, 0x9d, 0x42, 0xd9, 0x04, 0x51, 0xb6, 0x40, 0x94, 0x3b, 0x16,
-	0x47, 0x75, 0xe5, 0xd9, 0x59, 0x29, 0xf6, 0xe4, 0x65, 0x89, 0x93, 0x1d, 0x31, 0xf4, 0x2b, 0x58,
-	0x61, 0xf6, 0xe9, 0xf9, 0xc4, 0x66, 0x62, 0x2b, 0xbd, 0x53, 0x2a, 0x7b, 0xed, 0x2e, 0xb7, 0xcd,
-	0xaf, 0x85, 0x4b, 0xb6, 0x05, 0x4c, 0x61, 0x5d, 0x1f, 0x6a, 0x13, 0x3d, 0x9f, 0x8c, 0x12, 0xa6,
-	0xfb, 0x6e, 0x61, 0x53, 0x40, 0xfc, 0x1b, 0x07, 0x39, 0x9f, 0x6a, 0xf4, 0x2d, 0x00, 0x13, 0xec,
-	0x0d, 0x55, 0x6a, 0x77, 0x7a, 0xe7, 0xc7, 0x11, 0x78, 0xea, 0x6a, 0xb5, 0x48, 0x2c, 0x3a, 0x3f,
-	0x2b, 0xf1, 0x16, 0xa9, 0xf6, 0xc6, 0xbd, 0x90, 0x79, 0xdd, 0x62, 0x75, 0x9c, 0x19, 0x8f, 0x70,
-	0x26, 0x82, 0xa4, 0xaa, 0x18, 0x4a, 0x3e, 0xb1, 0xc9, 0x6d, 0x65, 0x64, 0xfa, 0x2f, 0xfe, 0x25,
-	0x49, 0x20, 0x7a, 0x0c, 0x40, 0x5f, 0x10, 0x88, 0x94, 0x64, 0x41, 0x4c, 0x56, 0x0b, 0x26, 0x06,
-	0x4a, 0xb5, 0x30, 0xb0, 0x05, 0xc1, 0x60, 0xfe, 0xaa, 0x3e, 0xeb, 0xe2, 0x57, 0x68, 0xdd, 0x57,
-	0xb0, 0x4c, 0xae, 0x54, 0x9b, 0x1b, 0x14, 0x3f, 0x51, 0xeb, 0x8f, 0x83, 0x1a, 0x0b, 0x56, 0x33,
-	0x0c, 0x9e, 0x92, 0x30, 0xb0, 0x64, 0xd0, 0x6d, 0xc8, 0x8c, 0x14, 0xdd, 0xe8, 0xcd, 0xa7, 0xaa,
-	0x62, 0x60, 0x35, 0x9f, 0x7c, 0x87, 0x58, 0x4a, 0x13, 0xc9, 0xae, 0x29, 0x88, 0xf6, 0x20, 0x47,
-	0x15, 0xcd, 0xf0, 0xc3, 0x39, 0xd6, 0x0d, 0x62, 0x66, 0x8a, 0x7a, 0xa8, 0x78, 0x7e, 0x56, 0xca,
-	0x36, 0x14, 0xdd, 0x90, 0xcd, 0x1d, 0xd3, 0x16, 0x7b, 0x21, 0x67, 0x47, 0xae, 0x3d, 0x15, 0x1d,
-	0x81, 0x30, 0xc5, 0x13, 0x75, 0x38, 0x19, 0x58, 0xaa, 0xf4, 0xfc, 0x12, 0x0d, 0xb0, 0x8f, 0x23,
-	0x02, 0x6c, 0x57, 0x1b, 0x8f, 0x95, 0x89, 0xca, 0x54, 0x54, 0x93, 0x04, 0x9f, 0x9c, 0x63, 0x4a,
-	0x18, 0x55, 0x47, 0x12, 0x2c, 0xeb, 0xc6, 0x0c, 0x2b, 0x63, 0x3d, 0xbf, 0x72, 0xa1, 0xba, 0x36,
-	0xe5, 0xb2, 0x2e, 0x9d, 0xa9, 0xb3, 0x64, 0xc5, 0xff, 0x72, 0xf0, 0x41, 0x28, 0x23, 0x39, 0x80,
-	0x01, 0x66, 0xd1, 0xfb, 0x4e, 0x78, 0x2d, 0x59, 0x74, 0x13, 0x52, 0x3a, 0x29, 0x09, 0x34, 0x48,
-	0x56, 0x77, 0xc4, 0x8b, 0x51, 0x12, 0x4e, 0xd9, 0x14, 0x40, 0xc7, 0xb0, 0xe6, 0x78, 0x4e, 0x9f,
-	0x6a, 0x13, 0xdd, 0x4e, 0xec, 0x4f, 0x16, 0x41, 0x31, 0xd9, 0x19, 0x16, 0xc1, 0xf6, 0x1d, 0xd3,
-	0x22, 0xde, 0x05, 0x3b, 0xf8, 0x54, 0x92, 0x2e, 0xc6, 0xe9, 0x14, 0x53, 0x2b, 0x79, 0x99, 0xfe,
-	0xa3, 0xeb, 0xc0, 0x4f, 0x94, 0x31, 0xd6, 0xa7, 0x4a, 0xdf, 0x44, 0xce, 0xcb, 0x0e, 0x81, 0x48,
-	0x90, 0x05, 0x0d, 0x50, 0x5e, 0xa6, 0xff, 0xe2, 0x6f, 0x61, 0xe3, 0x50, 0x99, 0x19, 0x43, 0x83,
-	0xc2, 0x98, 0xdc, 0x1f, 0x5a, 0x57, 0x85, 0x2a, 0x90, 0x99, 0x5a, 0x3b, 0x56, 0xa2, 0x65, 0x69,
-	0x18, 0xa5, 0x6d, 0x09, 0x1a, 0x44, 0xee, 0xa5, 0x9c, 0xb6, 0x65, 0xea, 0xaa, 0xd8, 0x82, 0x1f,
-	0x05, 0x94, 0x9b, 0xb6, 0xa0, 0x0d, 0x58, 0x1a, 0x61, 0x45, 0xc5, 0x33, 0x86, 0x9f, 0xad, 0x88,
-	0x05, 0xf7, 0xb5, 0xd1, 0x48, 0xfb, 0x3d, 0x9e, 0xe9, 0xf9, 0xf8, 0x66, 0x82, 0x58, 0x60, 0x13,
-	0xc4, 0xbf, 0x72, 0x1e, 0x8d, 0xee, 0x0b, 0xbc, 0x02, 0xbc, 0xe8, 0x96, 0x13, 0x3b, 0x66, 0x6d,
-	0x28, 0xfa, 0x2f, 0xec, 0xc2, 0xa0, 0x11, 0xbf, 0x83, 0x7c, 0x10, 0x1d, 0x33, 0xb8, 0x02, 0x2b,
-	0x56, 0x38, 0xb0, 0xc0, 0x2c, 0x45, 0x2a, 0xf7, 0x84, 0x81, 0x2d, 0x26, 0xfe, 0x31, 0x01, 0xab,
-	0x3e, 0xa3, 0x6f, 0xb9, 0x1b, 0x10, 0xb7, 0xb0, 0x68, 0x24, 0xfd, 0xcd, 0xe7, 0x36, 0x64, 0xb4,
-	0x29, 0x9e, 0xf4, 0x58, 0x89, 0x64, 0x66, 0x07, 0xa2, 0xbd, 0x35, 0xc5, 0x13, 0x16, 0xab, 0xec,
-	0xe4, 0xfd, 0x98, 0x9c, 0xd6, 0x1c, 0x2a, 0xaa, 0x00, 0x9c, 0x60, 0x3c, 0xed, 0x29, 0xa3, 0xe1,
-	0x23, 0xcc, 0x4a, 0xe0, 0xa6, 0x5f, 0xcd, 0x01, 0xc6, 0xd3, 0x0a, 0x61, 0x70, 0x94, 0xf0, 0x27,
-	0x16, 0x0d, 0xfd, 0x1a, 0xb2, 0xfd, 0x91, 0xa6, 0x63, 0x1b, 0x8c, 0x59, 0x04, 0x3f, 0x0c, 0xb8,
-	0x89, 0x30, 0x05, 0xd0, 0x64, 0xfa, 0x2e, 0x32, 0x3a, 0x84, 0x9c, 0xd5, 0x23, 0xfa, 0xa6, 0xc7,
-	0x68, 0x19, 0x7c, 0xdb, 0x6a, 0xb0, 0x1f, 0x93, 0x57, 0x75, 0xcf, 0x46, 0x95, 0xb7, 0x63, 0x43,
-	0x7c, 0x1d, 0x87, 0x9c, 0xff, 0x7a, 0x17, 0x8e, 0x0a, 0xfb, 0xa1, 0x9e, 0xfe, 0xf0, 0x42, 0x4f,
-	0x9b, 0xba, 0xfd, 0xae, 0xae, 0x86, 0xb8, 0xfa, 0xa7, 0x17, 0xb8, 0xda, 0xd6, 0xe2, 0xf2, 0xf5,
-	0x41, 0xb8, 0xaf, 0x3f, 0xba, 0xd8, 0xd7, 0xb6, 0x26, 0xaf, 0xb3, 0xef, 0x46, 0x39, 0xfb, 0x2d,
-	0xeb, 0x5d, 0x88, 0xb7, 0xc1, 0xc9, 0x16, 0xf1, 0x1f, 0x1c, 0xa0, 0x60, 0x00, 0xfe, 0x80, 0x93,
-	0x8a, 0xab, 0x97, 0xc7, 0xdf, 0xbd, 0x97, 0x8b, 0x87, 0x70, 0x2d, 0xe4, 0x16, 0x2f, 0x31, 0xb6,
-	0x88, 0xff, 0xe4, 0x40, 0xf0, 0xe7, 0x0e, 0x3a, 0x76, 0x8d, 0x7e, 0x1c, 0x6d, 0x2f, 0xe5, 0x45,
-	0xf9, 0x66, 0xf9, 0x5f, 0x97, 0x26, 0xc6, 0xec, 0xb4, 0x9a, 0xfd, 0xc3, 0x4b, 0xf7, 0x81, 0xb6,
-	0xba, 0xc2, 0x77, 0x90, 0xf5, 0x70, 0x22, 0x01, 0x12, 0x27, 0xf8, 0xd4, 0x04, 0x2d, 0x93, 0x5f,
-	0xf4, 0x0b, 0x48, 0x3d, 0x52, 0x46, 0x73, 0xcc, 0x3c, 0xb4, 0x19, 0x71, 0xd3, 0x0e, 0x02, 0x93,
-	0xfd, 0x97, 0xf1, 0x9b, 0x9c, 0x78, 0x0d, 0xd6, 0x02, 0xe1, 0x29, 0xfe, 0x39, 0x0e, 0x82, 0x5f,
-	0x08, 0x7d, 0x1a, 0x32, 0x85, 0x70, 0x74, 0x3c, 0x0c, 0x0c, 0x16, 0x1a, 0x08, 0x56, 0xc4, 0xf4,
-	0xac, 0x09, 0x23, 0x4e, 0xdd, 0xf2, 0xf9, 0x22, 0x6c, 0x65, 0x0b, 0x84, 0xd9, 0xcd, 0xdd, 0xde,
-	0x71, 0xe6, 0xa3, 0xdc, 0xcc, 0xcb, 0x54, 0xe8, 0xc3, 0x7a, 0x98, 0x5c, 0x88, 0xaf, 0x3e, 0xf7,
-	0xfa, 0x2a, 0x38, 0xa1, 0x53, 0xf1, 0x50, 0x57, 0x0d, 0x21, 0xe7, 0xdb, 0x45, 0x47, 0xb0, 0xde,
-	0xd7, 0xc6, 0xd3, 0x11, 0x36, 0xb0, 0x3d, 0x60, 0x38, 0x11, 0xf5, 0xd1, 0xf9, 0x59, 0x09, 0xed,
-	0xb2, 0x7d, 0x0b, 0x1f, 0x0d, 0x2d, 0x70, 0x56, 0x32, 0xea, 0xfb, 0x39, 0x54, 0x12, 0xb6, 0x21,
-	0x95, 0xf5, 0x32, 0x61, 0xbb, 0x01, 0xeb, 0x61, 0xf5, 0x43, 0xfc, 0x97, 0x33, 0xbc, 0xf9, 0xda,
-	0xd9, 0x25, 0x46, 0xfb, 0x2f, 0x00, 0x5c, 0x33, 0x6f, 0xdc, 0x11, 0x8d, 0x98, 0x77, 0xf9, 0x99,
-	0x3d, 0xeb, 0xde, 0x02, 0x5e, 0x9b, 0x62, 0x33, 0xa1, 0xa3, 0x5a, 0x57, 0xcb, 0x62, 0x60, 0x1a,
-	0x64, 0x47, 0x44, 0x7c, 0xca, 0xc1, 0x46, 0x78, 0x65, 0x43, 0x5f, 0x41, 0x3a, 0x78, 0x47, 0xd7,
-	0xcf, 0x3d, 0xb7, 0xe1, 0xbb, 0x1b, 0x98, 0xd9, 0x77, 0x82, 0xbe, 0x76, 0x23, 0x8b, 0x87, 0x57,
-	0x7a, 0x17, 0x32, 0x53, 0xce, 0x0d, 0xed, 0xef, 0x1c, 0x7c, 0x60, 0x8f, 0x24, 0x77, 0xe7, 0x78,
-	0x76, 0x7a, 0x85, 0xe3, 0xd2, 0x97, 0xfe, 0x71, 0xe9, 0xba, 0x1f, 0x9b, 0xfb, 0x44, 0xff, 0x84,
-	0x8d, 0x20, 0xa9, 0x9f, 0x4e, 0xfa, 0xd4, 0xe1, 0x2b, 0x32, 0xfd, 0x17, 0x8f, 0x5d, 0xd3, 0x28,
-	0x93, 0x65, 0x8e, 0xfc, 0x3a, 0x30, 0x3e, 0xfd, 0x24, 0xe2, 0xb0, 0x88, 0xe1, 0xe9, 0x4f, 0x1c,
-	0x64, 0x3c, 0x0e, 0xd8, 0x02, 0xa0, 0x2f, 0xa5, 0x88, 0xb6, 0xcd, 0x93, 0x4d, 0xfa, 0x4b, 0x06,
-	0x13, 0x2b, 0x2a, 0x1f, 0x12, 0x0d, 0x51, 0xbd, 0x9b, 0xc5, 0x80, 0xfb, 0x14, 0xd2, 0x2b, 0x75,
-	0x17, 0xd9, 0x3d, 0x46, 0x3c, 0x80, 0xac, 0xd7, 0xc6, 0x03, 0xff, 0x39, 0x11, 0x4d, 0xd9, 0x7b,
-	0x8e, 0xd3, 0x94, 0x3d, 0x07, 0xb9, 0x3b, 0xe8, 0x0b, 0x0e, 0xae, 0x85, 0x80, 0xbb, 0x4c, 0xba,
-	0x85, 0xbc, 0x33, 0xe3, 0xef, 0xf3, 0xce, 0xbc, 0x6c, 0xee, 0x7d, 0x03, 0xeb, 0x61, 0xee, 0xf0,
-	0x66, 0x0e, 0xf7, 0x1e, 0x99, 0x73, 0x02, 0x82, 0xff, 0x5c, 0x92, 0x33, 0x36, 0x83, 0x2f, 0x67,
-	0x6c, 0x5e, 0x33, 0x67, 0x5c, 0x4b, 0x3a, 0xbc, 0xb1, 0x85, 0x8a, 0xd6, 0xdd, 0xbd, 0x20, 0xc3,
-	0x4a, 0xbd, 0x38, 0x80, 0xb5, 0x00, 0x18, 0xf4, 0x25, 0x2c, 0x91, 0x17, 0xe5, 0x5c, 0x67, 0xf8,
-	0x03, 0x8f, 0x11, 0xa7, 0xfd, 0x10, 0x2e, 0x16, 0xf1, 0x4c, 0x26, 0xe2, 0xa0, 0x7b, 0xb0, 0xea,
-	0x95, 0x42, 0x37, 0x20, 0xd9, 0xd7, 0x54, 0x33, 0xa9, 0x56, 0x83, 0x19, 0x6c, 0x71, 0xef, 0x6a,
-	0x2a, 0x96, 0x29, 0x27, 0xca, 0xc3, 0xf2, 0x18, 0xeb, 0xba, 0x32, 0xb0, 0x9e, 0x98, 0xd6, 0xf2,
-	0xb3, 0x9b, 0x80, 0x82, 0xef, 0x62, 0xb4, 0x06, 0xd9, 0x76, 0x47, 0x96, 0x2a, 0x77, 0x7a, 0xbb,
-	0x8d, 0x56, 0x5b, 0xaa, 0x09, 0x31, 0x94, 0x83, 0x34, 0x23, 0xb5, 0x0e, 0xa5, 0xa6, 0xc0, 0x7d,
-	0xf6, 0x6f, 0x0e, 0x32, 0xee, 0xa3, 0xd0, 0x12, 0xc4, 0x5b, 0x07, 0x42, 0x0c, 0xf1, 0x90, 0x92,
-	0x64, 0xb9, 0x25, 0x0b, 0x1c, 0x4a, 0xc3, 0x72, 0xb7, 0x79, 0xd0, 0x6c, 0x7d, 0xd3, 0x14, 0xe2,
-	0x28, 0x03, 0x2b, 0xbb, 0x95, 0xe6, 0xae, 0xd4, 0x90, 0x6a, 0x42, 0x02, 0x65, 0x81, 0x6f, 0xb6,
-	0x3a, 0xbd, 0xbd, 0x56, 0xb7, 0x59, 0x13, 0x92, 0x08, 0xc1, 0x6a, 0xa5, 0x21, 0x4b, 0x95, 0xda,
-	0x71, 0x4f, 0xfa, 0xb6, 0xde, 0xee, 0xb4, 0x85, 0x14, 0x12, 0x20, 0xd3, 0x6d, 0x56, 0xba, 0x9d,
-	0xfd, 0x96, 0x5c, 0xff, 0x8d, 0x54, 0x13, 0x96, 0x88, 0xd0, 0x5e, 0x4b, 0xae, 0xd6, 0x6b, 0x35,
-	0xa9, 0x29, 0x2c, 0x53, 0x8d, 0xad, 0xe6, 0x5e, 0xa3, 0xbe, 0xdb, 0x11, 0x56, 0xc8, 0x61, 0xf5,
-	0xe6, 0x51, 0xa5, 0x51, 0xaf, 0x09, 0x3c, 0x81, 0xdb, 0x6d, 0x56, 0x8e, 0x2a, 0xf5, 0x46, 0xa5,
-	0xda, 0x90, 0x04, 0x20, 0x26, 0x91, 0xf3, 0xda, 0xdd, 0xc3, 0xc3, 0x96, 0xdc, 0x91, 0x6a, 0x42,
-	0x9a, 0x08, 0x74, 0xea, 0x77, 0xa4, 0x56, 0xb7, 0x23, 0x64, 0x88, 0xae, 0x7a, 0xb3, 0x23, 0xc9,
-	0xcd, 0x4a, 0x43, 0xc8, 0xee, 0xbc, 0x4e, 0x80, 0x60, 0x97, 0x35, 0x36, 0x71, 0xa2, 0x7b, 0xc0,
-	0xdf, 0xc6, 0x86, 0xf9, 0x2a, 0x46, 0x81, 0x41, 0x39, 0xfc, 0x4d, 0x5e, 0xf8, 0xd9, 0x42, 0x3e,
-	0x16, 0x3b, 0x47, 0x90, 0xa2, 0xf9, 0x80, 0x3e, 0x8e, 0x94, 0x70, 0x57, 0x82, 0xc2, 0x27, 0x8b,
-	0xd8, 0x98, 0xde, 0xdf, 0x41, 0x9a, 0x12, 0xcc, 0xfb, 0xbd, 0x62, 0xed, 0x37, 0x38, 0x74, 0x0f,
-	0x96, 0x59, 0x0b, 0x45, 0x17, 0xd9, 0xea, 0x1e, 0x1a, 0x0a, 0x5b, 0x8b, 0x19, 0x19, 0x7a, 0x15,
-	0xb2, 0x8c, 0xc4, 0xf0, 0x5f, 0xfd, 0x19, 0x37, 0xb8, 0x6a, 0xfe, 0xd9, 0x79, 0x91, 0x7b, 0x7e,
-	0x5e, 0xe4, 0xfe, 0x73, 0x5e, 0xe4, 0x9e, 0xbc, 0x2a, 0xc6, 0x9e, 0xbf, 0x2a, 0xc6, 0x5e, 0xbc,
-	0x2a, 0xc6, 0xbe, 0x5f, 0xa2, 0xef, 0x87, 0x9f, 0xff, 0x3f, 0x00, 0x00, 0xff, 0xff, 0x02, 0xca,
-	0x4e, 0x7c, 0x03, 0x17, 0x00, 0x00,
+	// 1860 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xc4, 0x58, 0x4b, 0x6f, 0xdb, 0xd8,
+	0x15, 0x36, 0x65, 0xf9, 0xc1, 0xa3, 0x87, 0x99, 0x1b, 0x27, 0x55, 0xdd, 0x54, 0x4a, 0x99, 0x49,
+	0xea, 0xce, 0xc2, 0x0e, 0xd2, 0x55, 0xd0, 0x49, 0x02, 0xc9, 0x92, 0x27, 0xaa, 0x65, 0xd2, 0xb9,
+	0x92, 0x33, 0x4d, 0x3b, 0xad, 0xcb, 0x11, 0xaf, 0x15, 0x21, 0x12, 0xa9, 0x11, 0xe9, 0x74, 0xf2,
+	0x03, 0xba, 0x6e, 0x16, 0x45, 0x3b, 0x8b, 0xee, 0x0b, 0x14, 0xfd, 0x09, 0xfd, 0x01, 0x83, 0x02,
+	0x05, 0xb2, 0xe8, 0xa2, 0xe8, 0xc2, 0x2d, 0x9c, 0x6d, 0x51, 0x74, 0xd3, 0x4d, 0x56, 0xc5, 0x7d,
+	0x90, 0xbc, 0xe2, 0xc3, 0x86, 0xab, 0x00, 0xb3, 0x12, 0xef, 0xe1, 0x79, 0x7e, 0x3c, 0xe7, 0xe3,
+	0xa1, 0xe0, 0x7b, 0x96, 0xef, 0x8e, 0x87, 0x5f, 0x6c, 0x7b, 0xbe, 0x3b, 0xb5, 0x06, 0x64, 0x7b,
+	0x32, 0x75, 0x7d, 0xb7, 0xef, 0x8e, 0xb6, 0xa7, 0xde, 0x78, 0xdb, 0x23, 0xd3, 0x97, 0xc3, 0x3e,
+	0xd9, 0x62, 0x42, 0x54, 0xe6, 0xaa, 0x5b, 0x42, 0xba, 0x51, 0x1d, 0xb8, 0xee, 0x60, 0x24, 0x4c,
+	0x3e, 0x3b, 0x39, 0xde, 0xb6, 0x4f, 0xa6, 0x96, 0x3f, 0x74, 0x1d, 0xae, 0xbf, 0x51, 0x8b, 0xdf,
+	0xf7, 0x87, 0x63, 0xe2, 0xf9, 0xd6, 0x78, 0x22, 0x14, 0xd6, 0x07, 0xee, 0xc0, 0x65, 0x97, 0xdb,
+	0xf4, 0x8a, 0x4b, 0xf5, 0xff, 0x2a, 0xb0, 0xde, 0xf5, 0x2d, 0x9f, 0xec, 0x5b, 0xfd, 0xe7, 0x43,
+	0x87, 0x74, 0x1d, 0x6b, 0xe2, 0x3d, 0x77, 0x7d, 0x54, 0x83, 0xa5, 0xa1, 0x63, 0x93, 0x2f, 0x2a,
+	0xca, 0x4d, 0x65, 0x33, 0xdf, 0x50, 0xdf, 0x9d, 0xd6, 0x96, 0xda, 0x54, 0x80, 0xb9, 0x1c, 0x35,
+	0x40, 0x0d, 0x43, 0x54, 0x72, 0x37, 0x95, 0xcd, 0xc2, 0xbd, 0x8d, 0x2d, 0x9e, 0xc4, 0x56, 0x90,
+	0xc4, 0x56, 0x2f, 0xd0, 0x68, 0xac, 0x7e, 0x75, 0x5a, 0x5b, 0x78, 0xfd, 0x8f, 0x9a, 0x82, 0x23,
+	0x33, 0xf4, 0x03, 0x58, 0xf5, 0x88, 0xe7, 0x0d, 0x5d, 0xc7, 0xab, 0x2c, 0xde, 0x5c, 0xdc, 0x2c,
+	0xdc, 0xab, 0x6d, 0xcd, 0xd6, 0xbd, 0xd5, 0xe5, 0xf7, 0x83, 0xbc, 0x70, 0x68, 0xc0, 0x8d, 0x99,
+	0x92, 0x57, 0xc9, 0x67, 0x19, 0xb3, 0x5f, 0xd9, 0x98, 0x1b, 0xe8, 0x7f, 0x55, 0x60, 0x2d, 0xe6,
+	0x1a, 0xdd, 0x07, 0x10, 0xce, 0x8f, 0x86, 0xb6, 0xa8, 0x7b, 0xe3, 0xec, 0xb4, 0xa6, 0x0a, 0xc5,
+	0x76, 0xf3, 0x9d, 0x7c, 0xc0, 0xaa, 0xd0, 0x6e, 0xdb, 0xe8, 0x01, 0xac, 0xd0, 0xaa, 0xdc, 0x13,
+	0x5f, 0x40, 0xf1, 0xcd, 0x04, 0x14, 0x4d, 0xf1, 0xbc, 0x38, 0x12, 0x5f, 0x52, 0x24, 0x02, 0x1b,
+	0xf4, 0x31, 0x14, 0x47, 0x96, 0xe7, 0x1f, 0x9d, 0x4c, 0x6c, 0xcb, 0x27, 0x76, 0x65, 0xf1, 0x12,
+	0x70, 0x16, 0xa8, 0xe5, 0x21, 0x37, 0xd4, 0xff, 0x90, 0x83, 0xeb, 0x22, 0xc1, 0x1d, 0x77, 0x3c,
+	0xb6, 0x1c, 0x5b, 0xae, 0xae, 0xcf, 0x45, 0xb1, 0xea, 0x84, 0x22, 0xaf, 0x2e, 0x3c, 0x60, 0x55,
+	0x68, 0xb7, 0x6d, 0x74, 0x1f, 0x96, 0x3c, 0xda, 0x23, 0xac, 0xb6, 0xf2, 0xbd, 0x5b, 0x19, 0xcf,
+	0x28, 0x88, 0x48, 0x55, 0x31, 0xb7, 0x40, 0x8f, 0x60, 0x65, 0x4a, 0x3e, 0x3f, 0x21, 0x9e, 0x2f,
+	0x8a, 0xba, 0x9d, 0xf1, 0x8c, 0x84, 0x31, 0xe6, 0xca, 0x38, 0xb0, 0x42, 0xcf, 0xe0, 0xca, 0x84,
+	0x38, 0xf6, 0xd0, 0x19, 0x1c, 0x4d, 0x89, 0x37, 0x71, 0x1d, 0x2f, 0x7c, 0xdc, 0x77, 0x2e, 0x72,
+	0xc5, 0xd5, 0x1b, 0x79, 0x8a, 0x15, 0xd6, 0x84, 0x9b, 0x40, 0xec, 0xe9, 0xff, 0x66, 0x3d, 0x30,
+	0xd3, 0x21, 0xbc, 0x07, 0x98, 0x28, 0xd1, 0x03, 0x4c, 0x1a, 0xf4, 0x80, 0x38, 0xd0, 0x1e, 0xe0,
+	0x97, 0x36, 0x7a, 0x0c, 0xc5, 0xd0, 0xd4, 0x39, 0x76, 0x45, 0x23, 0x7c, 0x2b, 0x23, 0xc9, 0xb6,
+	0x73, 0xec, 0xf2, 0xa7, 0xf8, 0xe6, 0x94, 0x3e, 0x45, 0x2f, 0x12, 0x23, 0x04, 0x79, 0xdb, 0xf2,
+	0x2d, 0x86, 0x58, 0x11, 0xb3, 0x6b, 0xd4, 0x90, 0x46, 0xe5, 0xfc, 0xf2, 0x33, 0x27, 0x46, 0xff,
+	0xad, 0x42, 0xbb, 0x23, 0x4d, 0x69, 0x9e, 0xde, 0x6f, 0xc0, 0xaa, 0x68, 0x15, 0xaf, 0x92, 0xcb,
+	0xca, 0x2c, 0xad, 0x25, 0x71, 0x68, 0xa7, 0xdb, 0x50, 0x90, 0x70, 0x41, 0xb7, 0x20, 0xef, 0xbf,
+	0x9a, 0x10, 0x96, 0x87, 0xda, 0x58, 0x7b, 0x77, 0x5a, 0x0b, 0x6e, 0xf7, 0x5e, 0x4d, 0x08, 0x66,
+	0x37, 0xd1, 0x0d, 0x50, 0x1d, 0x6b, 0x4c, 0xbc, 0x89, 0xd5, 0xe7, 0x9d, 0xa9, 0xe2, 0x48, 0x40,
+	0x31, 0xa4, 0x07, 0x86, 0xa1, 0x8a, 0xd9, 0xb5, 0xfe, 0x13, 0xb8, 0x7e, 0x60, 0x4d, 0xfd, 0xa1,
+	0xcf, 0x72, 0x71, 0x8e, 0x87, 0x03, 0xd1, 0x6e, 0xa8, 0x0e, 0xc5, 0x49, 0x70, 0x27, 0x00, 0xa0,
+	0xd4, 0xa8, 0x9e, 0x9d, 0xd6, 0x0a, 0xa1, 0x05, 0x83, 0x40, 0x3e, 0xe2, 0x42, 0x68, 0xd3, 0xb6,
+	0x75, 0x13, 0xbe, 0x91, 0x70, 0xce, 0x3b, 0x0d, 0x5d, 0x87, 0xe5, 0x11, 0xb1, 0x6c, 0x32, 0xe5,
+	0x05, 0x61, 0x71, 0xa2, 0x15, 0x1c, 0xbb, 0xa3, 0x91, 0xfb, 0x0b, 0x32, 0xe5, 0xd0, 0xa9, 0x38,
+	0x12, 0xe8, 0xbf, 0x53, 0x66, 0x3c, 0xca, 0xe3, 0xf1, 0x1e, 0xf2, 0x45, 0x0f, 0xa3, 0xc9, 0xe4,
+	0x9d, 0x5a, 0x8d, 0x3f, 0xb5, 0xd9, 0x98, 0x62, 0x8c, 0x02, 0x23, 0xfd, 0xa7, 0x50, 0x49, 0x66,
+	0x27, 0x0a, 0xae, 0xc3, 0x6a, 0x30, 0xac, 0x2c, 0xb5, 0x14, 0x6a, 0x4e, 0x1f, 0xd2, 0xd0, 0x4c,
+	0xff, 0xe5, 0x22, 0x94, 0x63, 0x45, 0x3f, 0x94, 0xdf, 0x38, 0xca, 0x85, 0x14, 0x99, 0x8f, 0xbf,
+	0x6d, 0x3e, 0x86, 0xa2, 0x3b, 0x21, 0xce, 0x91, 0x68, 0x5d, 0x51, 0xb6, 0x1e, 0xcf, 0xcc, 0x9c,
+	0x10, 0x47, 0x34, 0xac, 0x88, 0xfc, 0x78, 0x01, 0x17, 0xdc, 0x48, 0x8a, 0xea, 0x00, 0x2f, 0x08,
+	0x99, 0x1c, 0x59, 0xa3, 0xe1, 0x4b, 0x22, 0x78, 0xed, 0x66, 0xdc, 0xcd, 0x1e, 0x21, 0x93, 0x3a,
+	0x55, 0x88, 0x9c, 0xa8, 0x2f, 0x02, 0x19, 0xfa, 0x21, 0x94, 0xfa, 0x23, 0xd7, 0x23, 0x61, 0x32,
+	0x79, 0xe6, 0x25, 0x41, 0xad, 0x3b, 0x54, 0x29, 0x91, 0x4d, 0xb1, 0x2f, 0x89, 0xd1, 0x01, 0xac,
+	0x05, 0xb3, 0x2b, 0x06, 0xaa, 0xb2, 0x94, 0xc5, 0xb5, 0xf2, 0x1c, 0x46, 0xfe, 0xca, 0xde, 0xcc,
+	0x8d, 0x86, 0x1a, 0xf6, 0x86, 0xfe, 0xaf, 0x1c, 0xac, 0xc5, 0x1f, 0xef, 0x85, 0xbb, 0xc1, 0xe3,
+	0x54, 0xa4, 0x6f, 0x9d, 0x8b, 0x34, 0xf7, 0x1d, 0x87, 0xba, 0x91, 0x02, 0xf5, 0x77, 0xce, 0x81,
+	0x3a, 0xf4, 0x22, 0x61, 0xbd, 0x97, 0x8e, 0xf5, 0x07, 0xe7, 0x63, 0x1d, 0x7a, 0x9a, 0x05, 0xfb,
+	0x49, 0x16, 0xd8, 0x77, 0x2e, 0x02, 0x3b, 0x74, 0x18, 0x47, 0x1b, 0xa2, 0x69, 0xd1, 0xbb, 0x80,
+	0x92, 0xfd, 0x27, 0xaf, 0x17, 0xca, 0xe5, 0xd7, 0x0b, 0xfd, 0x00, 0xae, 0xa6, 0x40, 0x3d, 0x07,
+	0xe7, 0xeb, 0x7f, 0x52, 0x40, 0x8b, 0x37, 0xf8, 0x3c, 0xef, 0x90, 0x5d, 0x58, 0x63, 0x0b, 0x90,
+	0xe8, 0x3a, 0x6a, 0x9f, 0x63, 0xf6, 0x94, 0xd2, 0x4a, 0x1d, 0xcb, 0xf3, 0x45, 0x10, 0xee, 0x23,
+	0x3c, 0xe0, 0xd2, 0x48, 0xba, 0x67, 0xa3, 0xdb, 0x50, 0x0e, 0x5c, 0x1c, 0x0f, 0x47, 0x3e, 0x99,
+	0x8a, 0x77, 0x68, 0x49, 0x48, 0x77, 0x99, 0x50, 0xbf, 0x0a, 0x57, 0x12, 0x3d, 0x43, 0x51, 0x4a,
+	0x99, 0xb6, 0x79, 0x50, 0xba, 0x0e, 0xeb, 0x69, 0x3d, 0xa5, 0xff, 0x39, 0x07, 0xd7, 0x52, 0x47,
+	0x71, 0x1e, 0x08, 0xf7, 0xa1, 0xdc, 0x9f, 0x12, 0xcb, 0xa7, 0x6d, 0xce, 0x1a, 0x50, 0x4c, 0x5d,
+	0xb2, 0xcd, 0x99, 0x96, 0x78, 0x9f, 0x46, 0x1c, 0x50, 0xea, 0xcb, 0x72, 0x99, 0xa0, 0xb8, 0xb7,
+	0xc5, 0x73, 0x09, 0x2a, 0xe6, 0x2c, 0x98, 0x19, 0xee, 0x8b, 0x11, 0x14, 0xdf, 0x8c, 0x82, 0x99,
+	0xc9, 0x5f, 0x62, 0x19, 0xe4, 0x23, 0x23, 0xdf, 0x90, 0x09, 0xea, 0xd7, 0x89, 0x95, 0x37, 0x6c,
+	0x70, 0x23, 0x01, 0x89, 0x92, 0x1e, 0x36, 0x06, 0x49, 0x38, 0xa9, 0x31, 0x4c, 0xf6, 0xe2, 0x98,
+	0xe4, 0xce, 0x25, 0x92, 0xb8, 0xb7, 0x59, 0x50, 0x9e, 0x24, 0x41, 0x59, 0xcc, 0x22, 0x92, 0xb4,
+	0xb5, 0x36, 0x05, 0x15, 0x99, 0x48, 0x9e, 0xc0, 0x7a, 0xda, 0x83, 0x46, 0xf7, 0x21, 0xcf, 0xb6,
+	0x53, 0xe5, 0x32, 0xdb, 0x29, 0x33, 0xd1, 0x31, 0x5c, 0x4b, 0x05, 0x6a, 0x8e, 0xa5, 0x59, 0x1a,
+	0xba, 0x58, 0x96, 0xff, 0xb7, 0xc7, 0x68, 0xe8, 0x66, 0x92, 0xd4, 0xff, 0xa2, 0xd0, 0xa1, 0x4b,
+	0x69, 0xaf, 0x79, 0x76, 0xfe, 0xfb, 0x00, 0x09, 0xca, 0x62, 0xa6, 0x19, 0x74, 0xa5, 0x4e, 0x43,
+	0xaa, 0x7a, 0x08, 0xaa, 0x3b, 0x21, 0x9c, 0xb4, 0xb3, 0x76, 0x08, 0x33, 0x50, 0x08, 0x3e, 0x8b,
+	0x22, 0x13, 0xfd, 0xcb, 0x68, 0x99, 0x8f, 0xf7, 0xfd, 0x03, 0x28, 0x04, 0x7d, 0x10, 0x55, 0x74,
+	0xe3, 0xec, 0xb4, 0x06, 0x81, 0x0a, 0xcb, 0x4b, 0x3a, 0x61, 0x08, 0x0c, 0xda, 0x36, 0x7a, 0x24,
+	0x67, 0x96, 0x4b, 0x7f, 0xe5, 0x4a, 0x99, 0x71, 0x3b, 0x39, 0xb5, 0x3f, 0x2a, 0x70, 0x2d, 0xdc,
+	0x0d, 0x9f, 0x9c, 0x90, 0xe9, 0xab, 0xf7, 0xb8, 0xb7, 0x7e, 0x14, 0xdf, 0x5b, 0x6f, 0xc4, 0x73,
+	0x93, 0x23, 0xc6, 0xb6, 0x56, 0xfa, 0x59, 0xe0, 0xbd, 0x72, 0xfa, 0x0c, 0xf0, 0x55, 0xcc, 0xae,
+	0xf5, 0x67, 0xd2, 0x67, 0x81, 0xb0, 0x15, 0x40, 0x3e, 0x4a, 0xec, 0xb1, 0xdf, 0xce, 0x08, 0x96,
+	0xb1, 0xc5, 0xfe, 0x4a, 0x81, 0xe2, 0x0c, 0x00, 0x9b, 0x00, 0xec, 0x45, 0x97, 0xb1, 0x3f, 0xa9,
+	0xf4, 0x26, 0xbb, 0xa4, 0x04, 0x1c, 0xbc, 0x0a, 0x3e, 0xa7, 0x1e, 0xb2, 0x96, 0x28, 0xc1, 0x7d,
+	0x72, 0x14, 0xca, 0x35, 0x9e, 0x24, 0x96, 0xe9, 0xf2, 0x39, 0x94, 0x66, 0x6b, 0xdc, 0x8b, 0xc7,
+	0x51, 0xd2, 0x49, 0x6d, 0x36, 0x4e, 0x44, 0x6a, 0x33, 0x81, 0x64, 0x06, 0xfa, 0xbd, 0x02, 0x57,
+	0x53, 0x92, 0x9b, 0xe7, 0x1d, 0xc7, 0x30, 0xe1, 0x93, 0x7a, 0x01, 0x26, 0xec, 0x37, 0x89, 0x49,
+	0x24, 0x96, 0x31, 0x71, 0x61, 0x3d, 0xad, 0x3a, 0x0e, 0x4d, 0x32, 0xdc, 0x07, 0xe7, 0x87, 0x93,
+	0xa1, 0x91, 0xe2, 0xc9, 0xd0, 0xbc, 0x66, 0xd0, 0x24, 0x72, 0x9c, 0x87, 0x89, 0x1e, 0x26, 0x87,
+	0xf6, 0x52, 0x74, 0xf2, 0x1b, 0x85, 0x82, 0x90, 0xac, 0xe3, 0x6b, 0x27, 0x93, 0x17, 0xa0, 0xc5,
+	0xf3, 0xa6, 0x34, 0x12, 0x2a, 0xc4, 0x68, 0x24, 0xd4, 0xe5, 0x34, 0x22, 0x1d, 0xd9, 0x87, 0x85,
+	0x38, 0xd8, 0x68, 0x1d, 0x96, 0x5e, 0x5a, 0xa3, 0x13, 0xfe, 0x0e, 0x2f, 0x62, 0x7e, 0xd0, 0x07,
+	0x70, 0x25, 0x91, 0x0c, 0xfa, 0x08, 0x96, 0x3d, 0xdf, 0xf2, 0x4f, 0x3c, 0x31, 0x1a, 0x89, 0x0f,
+	0xe5, 0x40, 0xb3, 0xcb, 0xb4, 0x04, 0x09, 0x08, 0x9b, 0x8c, 0x40, 0x9f, 0x42, 0x79, 0xd6, 0x0a,
+	0xdd, 0x85, 0x7c, 0xdf, 0xb5, 0x39, 0xcf, 0x94, 0x93, 0xa4, 0x16, 0x68, 0xef, 0xb8, 0x36, 0xc1,
+	0x4c, 0x13, 0x55, 0x60, 0x65, 0x4c, 0x3c, 0xcf, 0x1a, 0x04, 0x7f, 0x7f, 0x04, 0xc7, 0x0f, 0x1f,
+	0x84, 0x93, 0x27, 0xff, 0x27, 0x87, 0x34, 0x28, 0xee, 0x98, 0xfb, 0xfb, 0x75, 0xa3, 0x79, 0x64,
+	0x1e, 0xb4, 0x0c, 0x6d, 0x01, 0xad, 0x83, 0x16, 0x48, 0x76, 0xcc, 0xfd, 0x83, 0x4e, 0xab, 0xd7,
+	0xd2, 0x94, 0x0f, 0xff, 0xae, 0x40, 0x51, 0x8e, 0x87, 0x96, 0x21, 0x67, 0xee, 0x69, 0x0b, 0x48,
+	0x85, 0xa5, 0x16, 0xc6, 0x26, 0xd6, 0x14, 0x54, 0x80, 0x95, 0x43, 0x63, 0xcf, 0x30, 0x3f, 0x31,
+	0xb4, 0x1c, 0x2a, 0xc2, 0xea, 0x4e, 0xdd, 0xd8, 0x69, 0x75, 0x5a, 0x4d, 0x6d, 0x11, 0x95, 0x40,
+	0x35, 0xcc, 0xde, 0xd1, 0xae, 0x79, 0x68, 0x34, 0xb5, 0x3c, 0x42, 0x50, 0xae, 0x77, 0x70, 0xab,
+	0xde, 0x7c, 0x76, 0xd4, 0xfa, 0x51, 0xbb, 0xdb, 0xeb, 0x6a, 0x4b, 0x34, 0x93, 0x43, 0xa3, 0x7e,
+	0xd8, 0x7b, 0x6c, 0xe2, 0xf6, 0x8f, 0x5b, 0x4d, 0x6d, 0x99, 0x1a, 0xed, 0x9a, 0xb8, 0xd1, 0x6e,
+	0x36, 0x5b, 0x86, 0xb6, 0xc2, 0x3c, 0x9a, 0xc6, 0x6e, 0xa7, 0xbd, 0xd3, 0xd3, 0x56, 0x69, 0xb0,
+	0xb6, 0xf1, 0xb4, 0xde, 0x69, 0x37, 0x35, 0x15, 0xad, 0x41, 0xe1, 0xd0, 0xa8, 0x3f, 0xad, 0xb7,
+	0x3b, 0xf5, 0x46, 0xa7, 0xa5, 0x01, 0xba, 0x02, 0x25, 0x1a, 0xaf, 0x7b, 0x78, 0x70, 0x60, 0xe2,
+	0x5e, 0xab, 0xa9, 0x15, 0xa8, 0x41, 0xaf, 0xbd, 0xdf, 0x32, 0x0f, 0x7b, 0x5a, 0x91, 0xfa, 0x6a,
+	0x1b, 0xbd, 0x16, 0x36, 0xea, 0x1d, 0xad, 0x74, 0xef, 0x3f, 0x8b, 0xa0, 0x85, 0x74, 0x1f, 0x2c,
+	0x63, 0x3f, 0x87, 0xc2, 0x27, 0x96, 0xdf, 0x7f, 0xce, 0xff, 0xb8, 0x41, 0x89, 0x15, 0x2c, 0xfd,
+	0x6f, 0xa3, 0x8d, 0xef, 0x5e, 0xa8, 0xc7, 0x41, 0xbc, 0xab, 0xa0, 0xa7, 0xb0, 0xc4, 0xe6, 0x0a,
+	0xdd, 0xce, 0xb4, 0x91, 0xa9, 0x60, 0xe3, 0xce, 0x45, 0x6a, 0xa2, 0x39, 0x7f, 0x06, 0x05, 0x26,
+	0xe8, 0xfa, 0x53, 0x62, 0x8d, 0xdf, 0xb3, 0xf7, 0xbb, 0x0a, 0xfa, 0x14, 0x56, 0x44, 0x0f, 0xa1,
+	0xf3, 0xaa, 0x95, 0x17, 0xaa, 0x8d, 0xcd, 0x8b, 0x15, 0x45, 0xf6, 0x36, 0x94, 0xc2, 0x0e, 0x65,
+	0xf9, 0xbf, 0xff, 0x18, 0x77, 0x95, 0x46, 0xe5, 0xab, 0xb3, 0xaa, 0xf2, 0xe6, 0xac, 0xaa, 0xfc,
+	0xf3, 0xac, 0xaa, 0xbc, 0x7e, 0x5b, 0x5d, 0x78, 0xf3, 0xb6, 0xba, 0xf0, 0xb7, 0xb7, 0xd5, 0x85,
+	0xcf, 0x96, 0xd9, 0xf7, 0xf3, 0xf7, 0xff, 0x17, 0x00, 0x00, 0xff, 0xff, 0x01, 0x68, 0x35, 0x40,
+	0x99, 0x19, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -2035,7 +2504,7 @@ const _ = grpc.SupportPackageIsVersion4
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type PartitionServiceClient interface {
-	GetConfig(ctx context.Context, in *PartitionConfigRequest, opts ...grpc.CallOption) (*PartitionConfigResponse, error)
+	WatchConfig(ctx context.Context, in *PartitionConfigRequest, opts ...grpc.CallOption) (PartitionService_WatchConfigClient, error)
 	Query(ctx context.Context, in *PartitionQueryRequest, opts ...grpc.CallOption) (*PartitionQueryResponse, error)
 	QueryStream(ctx context.Context, in *PartitionQueryRequest, opts ...grpc.CallOption) (PartitionService_QueryStreamClient, error)
 	Command(ctx context.Context, in *PartitionCommandRequest, opts ...grpc.CallOption) (*PartitionCommandResponse, error)
@@ -2050,13 +2519,36 @@ func NewPartitionServiceClient(cc *grpc.ClientConn) PartitionServiceClient {
 	return &partitionServiceClient{cc}
 }
 
-func (c *partitionServiceClient) GetConfig(ctx context.Context, in *PartitionConfigRequest, opts ...grpc.CallOption) (*PartitionConfigResponse, error) {
-	out := new(PartitionConfigResponse)
-	err := c.cc.Invoke(ctx, "/atomix.service.PartitionService/GetConfig", in, out, opts...)
+func (c *partitionServiceClient) WatchConfig(ctx context.Context, in *PartitionConfigRequest, opts ...grpc.CallOption) (PartitionService_WatchConfigClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_PartitionService_serviceDesc.Streams[0], "/atomix.service.PartitionService/WatchConfig", opts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &partitionServiceWatchConfigClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type PartitionService_WatchConfigClient interface {
+	Recv() (*PartitionConfigResponse, error)
+	grpc.ClientStream
+}
+
+type partitionServiceWatchConfigClient struct {
+	grpc.ClientStream
+}
+
+func (x *partitionServiceWatchConfigClient) Recv() (*PartitionConfigResponse, error) {
+	m := new(PartitionConfigResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 func (c *partitionServiceClient) Query(ctx context.Context, in *PartitionQueryRequest, opts ...grpc.CallOption) (*PartitionQueryResponse, error) {
@@ -2069,7 +2561,7 @@ func (c *partitionServiceClient) Query(ctx context.Context, in *PartitionQueryRe
 }
 
 func (c *partitionServiceClient) QueryStream(ctx context.Context, in *PartitionQueryRequest, opts ...grpc.CallOption) (PartitionService_QueryStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_PartitionService_serviceDesc.Streams[0], "/atomix.service.PartitionService/QueryStream", opts...)
+	stream, err := c.cc.NewStream(ctx, &_PartitionService_serviceDesc.Streams[1], "/atomix.service.PartitionService/QueryStream", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2110,7 +2602,7 @@ func (c *partitionServiceClient) Command(ctx context.Context, in *PartitionComma
 }
 
 func (c *partitionServiceClient) CommandStream(ctx context.Context, in *PartitionCommandRequest, opts ...grpc.CallOption) (PartitionService_CommandStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_PartitionService_serviceDesc.Streams[1], "/atomix.service.PartitionService/CommandStream", opts...)
+	stream, err := c.cc.NewStream(ctx, &_PartitionService_serviceDesc.Streams[2], "/atomix.service.PartitionService/CommandStream", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2143,7 +2635,7 @@ func (x *partitionServiceCommandStreamClient) Recv() (*PartitionCommandResponse,
 
 // PartitionServiceServer is the server API for PartitionService service.
 type PartitionServiceServer interface {
-	GetConfig(context.Context, *PartitionConfigRequest) (*PartitionConfigResponse, error)
+	WatchConfig(*PartitionConfigRequest, PartitionService_WatchConfigServer) error
 	Query(context.Context, *PartitionQueryRequest) (*PartitionQueryResponse, error)
 	QueryStream(*PartitionQueryRequest, PartitionService_QueryStreamServer) error
 	Command(context.Context, *PartitionCommandRequest) (*PartitionCommandResponse, error)
@@ -2154,8 +2646,8 @@ type PartitionServiceServer interface {
 type UnimplementedPartitionServiceServer struct {
 }
 
-func (*UnimplementedPartitionServiceServer) GetConfig(ctx context.Context, req *PartitionConfigRequest) (*PartitionConfigResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetConfig not implemented")
+func (*UnimplementedPartitionServiceServer) WatchConfig(req *PartitionConfigRequest, srv PartitionService_WatchConfigServer) error {
+	return status.Errorf(codes.Unimplemented, "method WatchConfig not implemented")
 }
 func (*UnimplementedPartitionServiceServer) Query(ctx context.Context, req *PartitionQueryRequest) (*PartitionQueryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Query not implemented")
@@ -2174,22 +2666,25 @@ func RegisterPartitionServiceServer(s *grpc.Server, srv PartitionServiceServer) 
 	s.RegisterService(&_PartitionService_serviceDesc, srv)
 }
 
-func _PartitionService_GetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PartitionConfigRequest)
-	if err := dec(in); err != nil {
-		return nil, err
+func _PartitionService_WatchConfig_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(PartitionConfigRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
 	}
-	if interceptor == nil {
-		return srv.(PartitionServiceServer).GetConfig(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/atomix.service.PartitionService/GetConfig",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PartitionServiceServer).GetConfig(ctx, req.(*PartitionConfigRequest))
-	}
-	return interceptor(ctx, in, info, handler)
+	return srv.(PartitionServiceServer).WatchConfig(m, &partitionServiceWatchConfigServer{stream})
+}
+
+type PartitionService_WatchConfigServer interface {
+	Send(*PartitionConfigResponse) error
+	grpc.ServerStream
+}
+
+type partitionServiceWatchConfigServer struct {
+	grpc.ServerStream
+}
+
+func (x *partitionServiceWatchConfigServer) Send(m *PartitionConfigResponse) error {
+	return x.ServerStream.SendMsg(m)
 }
 
 func _PartitionService_Query_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -2275,10 +2770,6 @@ var _PartitionService_serviceDesc = grpc.ServiceDesc{
 	HandlerType: (*PartitionServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "GetConfig",
-			Handler:    _PartitionService_GetConfig_Handler,
-		},
-		{
 			MethodName: "Query",
 			Handler:    _PartitionService_Query_Handler,
 		},
@@ -2288,6 +2779,11 @@ var _PartitionService_serviceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "WatchConfig",
+			Handler:       _PartitionService_WatchConfig_Handler,
+			ServerStreams: true,
+		},
 		{
 			StreamName:    "QueryStream",
 			Handler:       _PartitionService_QueryStream_Handler,
@@ -2322,10 +2818,10 @@ func (m *StateMachineSnapshot) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.Sessions) > 0 {
-		for iNdEx := len(m.Sessions) - 1; iNdEx >= 0; iNdEx-- {
+	if len(m.Services) > 0 {
+		for iNdEx := len(m.Services) - 1; iNdEx >= 0; iNdEx-- {
 			{
-				size, err := m.Sessions[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				size, err := m.Services[iNdEx].MarshalToSizedBuffer(dAtA[:i])
 				if err != nil {
 					return 0, err
 				}
@@ -2336,10 +2832,10 @@ func (m *StateMachineSnapshot) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 			dAtA[i] = 0x22
 		}
 	}
-	if len(m.Services) > 0 {
-		for iNdEx := len(m.Services) - 1; iNdEx >= 0; iNdEx-- {
+	if len(m.Sessions) > 0 {
+		for iNdEx := len(m.Sessions) - 1; iNdEx >= 0; iNdEx-- {
 			{
-				size, err := m.Services[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				size, err := m.Sessions[iNdEx].MarshalToSizedBuffer(dAtA[:i])
 				if err != nil {
 					return 0, err
 				}
@@ -2366,51 +2862,6 @@ func (m *StateMachineSnapshot) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *ServiceSnapshot) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *ServiceSnapshot) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *ServiceSnapshot) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	if len(m.Data) > 0 {
-		i -= len(m.Data)
-		copy(dAtA[i:], m.Data)
-		i = encodeVarintService(dAtA, i, uint64(len(m.Data)))
-		i--
-		dAtA[i] = 0x1a
-	}
-	if m.Index != 0 {
-		i = encodeVarintService(dAtA, i, uint64(m.Index))
-		i--
-		dAtA[i] = 0x10
-	}
-	{
-		size, err := m.ServiceID.MarshalToSizedBuffer(dAtA[:i])
-		if err != nil {
-			return 0, err
-		}
-		i -= size
-		i = encodeVarintService(dAtA, i, uint64(size))
-	}
-	i--
-	dAtA[i] = 0xa
-	return len(dAtA) - i, nil
-}
-
 func (m *SessionSnapshot) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -2431,63 +2882,20 @@ func (m *SessionSnapshot) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.Streams) > 0 {
-		for iNdEx := len(m.Streams) - 1; iNdEx >= 0; iNdEx-- {
-			{
-				size, err := m.Streams[iNdEx].MarshalToSizedBuffer(dAtA[:i])
-				if err != nil {
-					return 0, err
-				}
-				i -= size
-				i = encodeVarintService(dAtA, i, uint64(size))
-			}
-			i--
-			dAtA[i] = 0x42
-		}
+	n2, err2 := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.LastUpdated, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdTime(m.LastUpdated):])
+	if err2 != nil {
+		return 0, err2
 	}
-	if len(m.PendingRequests) > 0 {
-		for iNdEx := len(m.PendingRequests) - 1; iNdEx >= 0; iNdEx-- {
-			{
-				size, err := m.PendingRequests[iNdEx].MarshalToSizedBuffer(dAtA[:i])
-				if err != nil {
-					return 0, err
-				}
-				i -= size
-				i = encodeVarintService(dAtA, i, uint64(size))
-			}
-			i--
-			dAtA[i] = 0x32
-		}
-	}
-	if m.LastRequestID != 0 {
-		i = encodeVarintService(dAtA, i, uint64(m.LastRequestID))
-		i--
-		dAtA[i] = 0x28
-	}
-	n3, err3 := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.LastUpdated, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdTime(m.LastUpdated):])
+	i -= n2
+	i = encodeVarintService(dAtA, i, uint64(n2))
+	i--
+	dAtA[i] = 0x1a
+	n3, err3 := github_com_gogo_protobuf_types.StdDurationMarshalTo(m.Timeout, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdDuration(m.Timeout):])
 	if err3 != nil {
 		return 0, err3
 	}
 	i -= n3
 	i = encodeVarintService(dAtA, i, uint64(n3))
-	i--
-	dAtA[i] = 0x22
-	n4, err4 := github_com_gogo_protobuf_types.StdDurationMarshalTo(m.Timeout, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdDuration(m.Timeout):])
-	if err4 != nil {
-		return 0, err4
-	}
-	i -= n4
-	i = encodeVarintService(dAtA, i, uint64(n4))
-	i--
-	dAtA[i] = 0x1a
-	{
-		size, err := m.ServiceID.MarshalToSizedBuffer(dAtA[:i])
-		if err != nil {
-			return 0, err
-		}
-		i -= size
-		i = encodeVarintService(dAtA, i, uint64(size))
-	}
 	i--
 	dAtA[i] = 0x12
 	if m.SessionID != 0 {
@@ -2498,7 +2906,7 @@ func (m *SessionSnapshot) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *SessionStreamSnapshot) Marshal() (dAtA []byte, err error) {
+func (m *SessionCommandSnapshot) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -2508,12 +2916,12 @@ func (m *SessionStreamSnapshot) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *SessionStreamSnapshot) MarshalTo(dAtA []byte) (int, error) {
+func (m *SessionCommandSnapshot) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *SessionStreamSnapshot) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *SessionCommandSnapshot) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -2529,28 +2937,35 @@ func (m *SessionStreamSnapshot) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 				i = encodeVarintService(dAtA, i, uint64(size))
 			}
 			i--
-			dAtA[i] = 0x1a
+			dAtA[i] = 0x22
 		}
+	}
+	if m.Request != nil {
+		{
+			size, err := m.Request.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintService(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
 	}
 	if m.State != 0 {
 		i = encodeVarintService(dAtA, i, uint64(m.State))
 		i--
 		dAtA[i] = 0x10
 	}
-	{
-		size, err := m.Request.MarshalToSizedBuffer(dAtA[:i])
-		if err != nil {
-			return 0, err
-		}
-		i -= size
-		i = encodeVarintService(dAtA, i, uint64(size))
+	if m.CommandID != 0 {
+		i = encodeVarintService(dAtA, i, uint64(m.CommandID))
+		i--
+		dAtA[i] = 0x8
 	}
-	i--
-	dAtA[i] = 0xa
 	return len(dAtA) - i, nil
 }
 
-func (m *ServiceId) Marshal() (dAtA []byte, err error) {
+func (m *ServiceSnapshot) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -2560,12 +2975,113 @@ func (m *ServiceId) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *ServiceId) MarshalTo(dAtA []byte) (int, error) {
+func (m *ServiceSnapshot) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *ServiceId) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *ServiceSnapshot) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Sessions) > 0 {
+		for iNdEx := len(m.Sessions) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Sessions[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintService(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x22
+		}
+	}
+	if len(m.Data) > 0 {
+		i -= len(m.Data)
+		copy(dAtA[i:], m.Data)
+		i = encodeVarintService(dAtA, i, uint64(len(m.Data)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	{
+		size, err := m.ServiceInfo.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintService(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0x12
+	if m.ServiceID != 0 {
+		i = encodeVarintService(dAtA, i, uint64(m.ServiceID))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *ServiceSessionSnapshot) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ServiceSessionSnapshot) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ServiceSessionSnapshot) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Commands) > 0 {
+		for iNdEx := len(m.Commands) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Commands[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintService(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	if m.SessionID != 0 {
+		i = encodeVarintService(dAtA, i, uint64(m.SessionID))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *ServiceInfo) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ServiceInfo) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ServiceInfo) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -2762,12 +3278,12 @@ func (m *CommandRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		}
 	}
 	if m.Timestamp != nil {
-		n9, err9 := github_com_gogo_protobuf_types.StdTimeMarshalTo(*m.Timestamp, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdTime(*m.Timestamp):])
-		if err9 != nil {
-			return 0, err9
+		n8, err8 := github_com_gogo_protobuf_types.StdTimeMarshalTo(*m.Timestamp, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdTime(*m.Timestamp):])
+		if err8 != nil {
+			return 0, err8
 		}
-		i -= n9
-		i = encodeVarintService(dAtA, i, uint64(n9))
+		i -= n8
+		i = encodeVarintService(dAtA, i, uint64(n8))
 		i--
 		dAtA[i] = 0xa
 	}
@@ -2999,22 +3515,12 @@ func (m *OpenSessionRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	n18, err18 := github_com_gogo_protobuf_types.StdDurationMarshalTo(m.Timeout, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdDuration(m.Timeout):])
-	if err18 != nil {
-		return 0, err18
+	n17, err17 := github_com_gogo_protobuf_types.StdDurationMarshalTo(m.Timeout, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdDuration(m.Timeout):])
+	if err17 != nil {
+		return 0, err17
 	}
-	i -= n18
-	i = encodeVarintService(dAtA, i, uint64(n18))
-	i--
-	dAtA[i] = 0x12
-	{
-		size, err := m.ServiceID.MarshalToSizedBuffer(dAtA[:i])
-		if err != nil {
-			return 0, err
-		}
-		i -= size
-		i = encodeVarintService(dAtA, i, uint64(size))
-	}
+	i -= n17
+	i = encodeVarintService(dAtA, i, uint64(n17))
 	i--
 	dAtA[i] = 0xa
 	return len(dAtA) - i, nil
@@ -3068,29 +3574,22 @@ func (m *KeepAliveRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.Sessions) > 0 {
-		for k := range m.Sessions {
-			v := m.Sessions[k]
-			baseI := i
-			if v != nil {
-				{
-					size, err := v.MarshalToSizedBuffer(dAtA[:i])
-					if err != nil {
-						return 0, err
-					}
-					i -= size
-					i = encodeVarintService(dAtA, i, uint64(size))
-				}
-				i--
-				dAtA[i] = 0x12
-			}
-			i = encodeVarintService(dAtA, i, uint64(k))
-			i--
-			dAtA[i] = 0x8
-			i = encodeVarintService(dAtA, i, uint64(baseI-i))
-			i--
-			dAtA[i] = 0xa
-		}
+	if len(m.RequestFilter) > 0 {
+		i -= len(m.RequestFilter)
+		copy(dAtA[i:], m.RequestFilter)
+		i = encodeVarintService(dAtA, i, uint64(len(m.RequestFilter)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if m.LastRequestID != 0 {
+		i = encodeVarintService(dAtA, i, uint64(m.LastRequestID))
+		i--
+		dAtA[i] = 0x10
+	}
+	if m.SessionID != 0 {
+		i = encodeVarintService(dAtA, i, uint64(m.SessionID))
+		i--
+		dAtA[i] = 0x8
 	}
 	return len(dAtA) - i, nil
 }
@@ -3115,88 +3614,6 @@ func (m *KeepAliveResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	return len(dAtA) - i, nil
-}
-
-func (m *SessionKeepAlive) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *SessionKeepAlive) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *SessionKeepAlive) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	if len(m.ResponseStreams) > 0 {
-		for k := range m.ResponseStreams {
-			v := m.ResponseStreams[k]
-			baseI := i
-			if v != nil {
-				{
-					size, err := v.MarshalToSizedBuffer(dAtA[:i])
-					if err != nil {
-						return 0, err
-					}
-					i -= size
-					i = encodeVarintService(dAtA, i, uint64(size))
-				}
-				i--
-				dAtA[i] = 0x12
-			}
-			i = encodeVarintService(dAtA, i, uint64(k))
-			i--
-			dAtA[i] = 0x8
-			i = encodeVarintService(dAtA, i, uint64(baseI-i))
-			i--
-			dAtA[i] = 0x12
-		}
-	}
-	if len(m.PendingRequests) > 0 {
-		i -= len(m.PendingRequests)
-		copy(dAtA[i:], m.PendingRequests)
-		i = encodeVarintService(dAtA, i, uint64(len(m.PendingRequests)))
-		i--
-		dAtA[i] = 0xa
-	}
-	return len(dAtA) - i, nil
-}
-
-func (m *StreamKeepAlive) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *StreamKeepAlive) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *StreamKeepAlive) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	if m.CompleteResponseID != 0 {
-		i = encodeVarintService(dAtA, i, uint64(m.CompleteResponseID))
-		i--
-		dAtA[i] = 0x8
-	}
 	return len(dAtA) - i, nil
 }
 
@@ -3271,6 +3688,313 @@ func (m *SessionCommandRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Request != nil {
+		{
+			size := m.Request.Size()
+			i -= size
+			if _, err := m.Request.MarshalTo(dAtA[i:]); err != nil {
+				return 0, err
+			}
+		}
+	}
+	if m.SessionID != 0 {
+		i = encodeVarintService(dAtA, i, uint64(m.SessionID))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *SessionCommandRequest_CreateService) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *SessionCommandRequest_CreateService) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	if m.CreateService != nil {
+		{
+			size, err := m.CreateService.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintService(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
+	return len(dAtA) - i, nil
+}
+func (m *SessionCommandRequest_CloseService) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *SessionCommandRequest_CloseService) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	if m.CloseService != nil {
+		{
+			size, err := m.CloseService.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintService(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
+	}
+	return len(dAtA) - i, nil
+}
+func (m *SessionCommandRequest_ServiceCommand) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *SessionCommandRequest_ServiceCommand) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	if m.ServiceCommand != nil {
+		{
+			size, err := m.ServiceCommand.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintService(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x22
+	}
+	return len(dAtA) - i, nil
+}
+func (m *SessionCommandResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *SessionCommandResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *SessionCommandResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.Response != nil {
+		{
+			size := m.Response.Size()
+			i -= size
+			if _, err := m.Response.MarshalTo(dAtA[i:]); err != nil {
+				return 0, err
+			}
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *SessionCommandResponse_CreateService) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *SessionCommandResponse_CreateService) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	if m.CreateService != nil {
+		{
+			size, err := m.CreateService.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintService(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+func (m *SessionCommandResponse_CloseService) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *SessionCommandResponse_CloseService) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	if m.CloseService != nil {
+		{
+			size, err := m.CloseService.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintService(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
+	return len(dAtA) - i, nil
+}
+func (m *SessionCommandResponse_ServiceCommand) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *SessionCommandResponse_ServiceCommand) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	if m.ServiceCommand != nil {
+		{
+			size, err := m.ServiceCommand.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintService(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
+	}
+	return len(dAtA) - i, nil
+}
+func (m *CreateServiceRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *CreateServiceRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *CreateServiceRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	{
+		size, err := m.ServiceInfo.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintService(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *CreateServiceResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *CreateServiceResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *CreateServiceResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.ServiceID != 0 {
+		i = encodeVarintService(dAtA, i, uint64(m.ServiceID))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *CloseServiceRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *CloseServiceRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *CloseServiceRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.ServiceID != 0 {
+		i = encodeVarintService(dAtA, i, uint64(m.ServiceID))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *CloseServiceResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *CloseServiceResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *CloseServiceResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	return len(dAtA) - i, nil
+}
+
+func (m *ServiceCommandRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ServiceCommandRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ServiceCommandRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
 	if m.Operation != nil {
 		{
 			size, err := m.Operation.MarshalToSizedBuffer(dAtA[:i])
@@ -3288,15 +4012,15 @@ func (m *SessionCommandRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x10
 	}
-	if m.SessionID != 0 {
-		i = encodeVarintService(dAtA, i, uint64(m.SessionID))
+	if m.ServiceID != 0 {
+		i = encodeVarintService(dAtA, i, uint64(m.ServiceID))
 		i--
 		dAtA[i] = 0x8
 	}
 	return len(dAtA) - i, nil
 }
 
-func (m *SessionCommandResponse) Marshal() (dAtA []byte, err error) {
+func (m *ServiceCommandResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -3306,12 +4030,12 @@ func (m *SessionCommandResponse) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *SessionCommandResponse) MarshalTo(dAtA []byte) (int, error) {
+func (m *ServiceCommandResponse) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *SessionCommandResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *ServiceCommandResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -3524,7 +4248,7 @@ func (m *QueryResponse_SessionQuery) MarshalToSizedBuffer(dAtA []byte) (int, err
 			i = encodeVarintService(dAtA, i, uint64(size))
 		}
 		i--
-		dAtA[i] = 0x22
+		dAtA[i] = 0xa
 	}
 	return len(dAtA) - i, nil
 }
@@ -3548,22 +4272,14 @@ func (m *SessionQueryRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.Operation != nil {
+	if m.Request != nil {
 		{
-			size, err := m.Operation.MarshalToSizedBuffer(dAtA[:i])
-			if err != nil {
+			size := m.Request.Size()
+			i -= size
+			if _, err := m.Request.MarshalTo(dAtA[i:]); err != nil {
 				return 0, err
 			}
-			i -= size
-			i = encodeVarintService(dAtA, i, uint64(size))
 		}
-		i--
-		dAtA[i] = 0x1a
-	}
-	if m.LastRequestID != 0 {
-		i = encodeVarintService(dAtA, i, uint64(m.LastRequestID))
-		i--
-		dAtA[i] = 0x10
 	}
 	if m.SessionID != 0 {
 		i = encodeVarintService(dAtA, i, uint64(m.SessionID))
@@ -3573,6 +4289,27 @@ func (m *SessionQueryRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *SessionQueryRequest_ServiceQuery) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *SessionQueryRequest_ServiceQuery) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	if m.ServiceQuery != nil {
+		{
+			size, err := m.ServiceQuery.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintService(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
+	return len(dAtA) - i, nil
+}
 func (m *SessionQueryResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -3593,6 +4330,59 @@ func (m *SessionQueryResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Response != nil {
+		{
+			size := m.Response.Size()
+			i -= size
+			if _, err := m.Response.MarshalTo(dAtA[i:]); err != nil {
+				return 0, err
+			}
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *SessionQueryResponse_ServiceQuery) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *SessionQueryResponse_ServiceQuery) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	if m.ServiceQuery != nil {
+		{
+			size, err := m.ServiceQuery.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintService(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
+	return len(dAtA) - i, nil
+}
+func (m *ServiceQueryRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ServiceQueryRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ServiceQueryRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
 	if m.Operation != nil {
 		{
 			size, err := m.Operation.MarshalToSizedBuffer(dAtA[:i])
@@ -3603,7 +4393,52 @@ func (m *SessionQueryResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 			i = encodeVarintService(dAtA, i, uint64(size))
 		}
 		i--
-		dAtA[i] = 0xa
+		dAtA[i] = 0x12
+	}
+	if m.ServiceID != 0 {
+		i = encodeVarintService(dAtA, i, uint64(m.ServiceID))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *ServiceQueryResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ServiceQueryResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ServiceQueryResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.Operation != nil {
+		{
+			size, err := m.Operation.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintService(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
+	if m.ResponseID != 0 {
+		i = encodeVarintService(dAtA, i, uint64(m.ResponseID))
+		i--
+		dAtA[i] = 0x8
 	}
 	return len(dAtA) - i, nil
 }
@@ -3740,35 +4575,17 @@ func (m *StateMachineSnapshot) Size() (n int) {
 	}
 	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.Timestamp)
 	n += 1 + l + sovService(uint64(l))
-	if len(m.Services) > 0 {
-		for _, e := range m.Services {
-			l = e.Size()
-			n += 1 + l + sovService(uint64(l))
-		}
-	}
 	if len(m.Sessions) > 0 {
 		for _, e := range m.Sessions {
 			l = e.Size()
 			n += 1 + l + sovService(uint64(l))
 		}
 	}
-	return n
-}
-
-func (m *ServiceSnapshot) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	l = m.ServiceID.Size()
-	n += 1 + l + sovService(uint64(l))
-	if m.Index != 0 {
-		n += 1 + sovService(uint64(m.Index))
-	}
-	l = len(m.Data)
-	if l > 0 {
-		n += 1 + l + sovService(uint64(l))
+	if len(m.Services) > 0 {
+		for _, e := range m.Services {
+			l = e.Size()
+			n += 1 + l + sovService(uint64(l))
+		}
 	}
 	return n
 }
@@ -3782,40 +4599,28 @@ func (m *SessionSnapshot) Size() (n int) {
 	if m.SessionID != 0 {
 		n += 1 + sovService(uint64(m.SessionID))
 	}
-	l = m.ServiceID.Size()
-	n += 1 + l + sovService(uint64(l))
 	l = github_com_gogo_protobuf_types.SizeOfStdDuration(m.Timeout)
 	n += 1 + l + sovService(uint64(l))
 	l = github_com_gogo_protobuf_types.SizeOfStdTime(m.LastUpdated)
 	n += 1 + l + sovService(uint64(l))
-	if m.LastRequestID != 0 {
-		n += 1 + sovService(uint64(m.LastRequestID))
-	}
-	if len(m.PendingRequests) > 0 {
-		for _, e := range m.PendingRequests {
-			l = e.Size()
-			n += 1 + l + sovService(uint64(l))
-		}
-	}
-	if len(m.Streams) > 0 {
-		for _, e := range m.Streams {
-			l = e.Size()
-			n += 1 + l + sovService(uint64(l))
-		}
-	}
 	return n
 }
 
-func (m *SessionStreamSnapshot) Size() (n int) {
+func (m *SessionCommandSnapshot) Size() (n int) {
 	if m == nil {
 		return 0
 	}
 	var l int
 	_ = l
-	l = m.Request.Size()
-	n += 1 + l + sovService(uint64(l))
+	if m.CommandID != 0 {
+		n += 1 + sovService(uint64(m.CommandID))
+	}
 	if m.State != 0 {
 		n += 1 + sovService(uint64(m.State))
+	}
+	if m.Request != nil {
+		l = m.Request.Size()
+		n += 1 + l + sovService(uint64(l))
 	}
 	if len(m.PendingResponses) > 0 {
 		for _, e := range m.PendingResponses {
@@ -3826,7 +4631,49 @@ func (m *SessionStreamSnapshot) Size() (n int) {
 	return n
 }
 
-func (m *ServiceId) Size() (n int) {
+func (m *ServiceSnapshot) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.ServiceID != 0 {
+		n += 1 + sovService(uint64(m.ServiceID))
+	}
+	l = m.ServiceInfo.Size()
+	n += 1 + l + sovService(uint64(l))
+	l = len(m.Data)
+	if l > 0 {
+		n += 1 + l + sovService(uint64(l))
+	}
+	if len(m.Sessions) > 0 {
+		for _, e := range m.Sessions {
+			l = e.Size()
+			n += 1 + l + sovService(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *ServiceSessionSnapshot) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.SessionID != 0 {
+		n += 1 + sovService(uint64(m.SessionID))
+	}
+	if len(m.Commands) > 0 {
+		for _, e := range m.Commands {
+			l = e.Size()
+			n += 1 + l + sovService(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *ServiceInfo) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -4036,8 +4883,6 @@ func (m *OpenSessionRequest) Size() (n int) {
 	}
 	var l int
 	_ = l
-	l = m.ServiceID.Size()
-	n += 1 + l + sovService(uint64(l))
 	l = github_com_gogo_protobuf_types.SizeOfStdDuration(m.Timeout)
 	n += 1 + l + sovService(uint64(l))
 	return n
@@ -4061,18 +4906,15 @@ func (m *KeepAliveRequest) Size() (n int) {
 	}
 	var l int
 	_ = l
-	if len(m.Sessions) > 0 {
-		for k, v := range m.Sessions {
-			_ = k
-			_ = v
-			l = 0
-			if v != nil {
-				l = v.Size()
-				l += 1 + sovService(uint64(l))
-			}
-			mapEntrySize := 1 + sovService(uint64(k)) + l
-			n += mapEntrySize + 1 + sovService(uint64(mapEntrySize))
-		}
+	if m.SessionID != 0 {
+		n += 1 + sovService(uint64(m.SessionID))
+	}
+	if m.LastRequestID != 0 {
+		n += 1 + sovService(uint64(m.LastRequestID))
+	}
+	l = len(m.RequestFilter)
+	if l > 0 {
+		n += 1 + l + sovService(uint64(l))
 	}
 	return n
 }
@@ -4083,44 +4925,6 @@ func (m *KeepAliveResponse) Size() (n int) {
 	}
 	var l int
 	_ = l
-	return n
-}
-
-func (m *SessionKeepAlive) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	l = len(m.PendingRequests)
-	if l > 0 {
-		n += 1 + l + sovService(uint64(l))
-	}
-	if len(m.ResponseStreams) > 0 {
-		for k, v := range m.ResponseStreams {
-			_ = k
-			_ = v
-			l = 0
-			if v != nil {
-				l = v.Size()
-				l += 1 + sovService(uint64(l))
-			}
-			mapEntrySize := 1 + sovService(uint64(k)) + l
-			n += mapEntrySize + 1 + sovService(uint64(mapEntrySize))
-		}
-	}
-	return n
-}
-
-func (m *StreamKeepAlive) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	if m.CompleteResponseID != 0 {
-		n += 1 + sovService(uint64(m.CompleteResponseID))
-	}
 	return n
 }
 
@@ -4154,6 +4958,149 @@ func (m *SessionCommandRequest) Size() (n int) {
 	if m.SessionID != 0 {
 		n += 1 + sovService(uint64(m.SessionID))
 	}
+	if m.Request != nil {
+		n += m.Request.Size()
+	}
+	return n
+}
+
+func (m *SessionCommandRequest_CreateService) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.CreateService != nil {
+		l = m.CreateService.Size()
+		n += 1 + l + sovService(uint64(l))
+	}
+	return n
+}
+func (m *SessionCommandRequest_CloseService) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.CloseService != nil {
+		l = m.CloseService.Size()
+		n += 1 + l + sovService(uint64(l))
+	}
+	return n
+}
+func (m *SessionCommandRequest_ServiceCommand) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.ServiceCommand != nil {
+		l = m.ServiceCommand.Size()
+		n += 1 + l + sovService(uint64(l))
+	}
+	return n
+}
+func (m *SessionCommandResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.Response != nil {
+		n += m.Response.Size()
+	}
+	return n
+}
+
+func (m *SessionCommandResponse_CreateService) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.CreateService != nil {
+		l = m.CreateService.Size()
+		n += 1 + l + sovService(uint64(l))
+	}
+	return n
+}
+func (m *SessionCommandResponse_CloseService) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.CloseService != nil {
+		l = m.CloseService.Size()
+		n += 1 + l + sovService(uint64(l))
+	}
+	return n
+}
+func (m *SessionCommandResponse_ServiceCommand) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.ServiceCommand != nil {
+		l = m.ServiceCommand.Size()
+		n += 1 + l + sovService(uint64(l))
+	}
+	return n
+}
+func (m *CreateServiceRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = m.ServiceInfo.Size()
+	n += 1 + l + sovService(uint64(l))
+	return n
+}
+
+func (m *CreateServiceResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.ServiceID != 0 {
+		n += 1 + sovService(uint64(m.ServiceID))
+	}
+	return n
+}
+
+func (m *CloseServiceRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.ServiceID != 0 {
+		n += 1 + sovService(uint64(m.ServiceID))
+	}
+	return n
+}
+
+func (m *CloseServiceResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
+func (m *ServiceCommandRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.ServiceID != 0 {
+		n += 1 + sovService(uint64(m.ServiceID))
+	}
 	if m.RequestID != 0 {
 		n += 1 + sovService(uint64(m.RequestID))
 	}
@@ -4164,7 +5111,7 @@ func (m *SessionCommandRequest) Size() (n int) {
 	return n
 }
 
-func (m *SessionCommandResponse) Size() (n int) {
+func (m *ServiceCommandResponse) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -4268,8 +5215,56 @@ func (m *SessionQueryRequest) Size() (n int) {
 	if m.SessionID != 0 {
 		n += 1 + sovService(uint64(m.SessionID))
 	}
-	if m.LastRequestID != 0 {
-		n += 1 + sovService(uint64(m.LastRequestID))
+	if m.Request != nil {
+		n += m.Request.Size()
+	}
+	return n
+}
+
+func (m *SessionQueryRequest_ServiceQuery) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.ServiceQuery != nil {
+		l = m.ServiceQuery.Size()
+		n += 1 + l + sovService(uint64(l))
+	}
+	return n
+}
+func (m *SessionQueryResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.Response != nil {
+		n += m.Response.Size()
+	}
+	return n
+}
+
+func (m *SessionQueryResponse_ServiceQuery) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.ServiceQuery != nil {
+		l = m.ServiceQuery.Size()
+		n += 1 + l + sovService(uint64(l))
+	}
+	return n
+}
+func (m *ServiceQueryRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.ServiceID != 0 {
+		n += 1 + sovService(uint64(m.ServiceID))
 	}
 	if m.Operation != nil {
 		l = m.Operation.Size()
@@ -4278,12 +5273,15 @@ func (m *SessionQueryRequest) Size() (n int) {
 	return n
 }
 
-func (m *SessionQueryResponse) Size() (n int) {
+func (m *ServiceQueryResponse) Size() (n int) {
 	if m == nil {
 		return 0
 	}
 	var l int
 	_ = l
+	if m.ResponseID != 0 {
+		n += 1 + sovService(uint64(m.ResponseID))
+	}
 	if m.Operation != nil {
 		l = m.Operation.Size()
 		n += 1 + l + sovService(uint64(l))
@@ -4427,40 +5425,6 @@ func (m *StateMachineSnapshot) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Services", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowService
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthService
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthService
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Services = append(m.Services, &ServiceSnapshot{})
-			if err := m.Services[len(m.Services)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 4:
-			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Sessions", wireType)
 			}
 			var msglen int
@@ -4493,62 +5457,9 @@ func (m *StateMachineSnapshot) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipService(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthService
-			}
-			if (iNdEx + skippy) < 0 {
-				return ErrInvalidLengthService
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *ServiceSnapshot) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowService
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: ServiceSnapshot: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ServiceSnapshot: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
+		case 4:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ServiceID", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Services", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -4575,61 +5486,9 @@ func (m *ServiceSnapshot) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.ServiceID.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			m.Services = append(m.Services, &ServiceSnapshot{})
+			if err := m.Services[len(m.Services)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
-			}
-			iNdEx = postIndex
-		case 2:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Index", wireType)
-			}
-			m.Index = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowService
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.Index |= Index(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Data", wireType)
-			}
-			var byteLen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowService
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				byteLen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if byteLen < 0 {
-				return ErrInvalidLengthService
-			}
-			postIndex := iNdEx + byteLen
-			if postIndex < 0 {
-				return ErrInvalidLengthService
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Data = append(m.Data[:0], dAtA[iNdEx:postIndex]...)
-			if m.Data == nil {
-				m.Data = []byte{}
 			}
 			iNdEx = postIndex
 		default:
@@ -4706,39 +5565,6 @@ func (m *SessionSnapshot) Unmarshal(dAtA []byte) error {
 			}
 		case 2:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ServiceID", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowService
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthService
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthService
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if err := m.ServiceID.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 3:
-			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Timeout", wireType)
 			}
 			var msglen int
@@ -4770,7 +5596,7 @@ func (m *SessionSnapshot) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 4:
+		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field LastUpdated", wireType)
 			}
@@ -4803,93 +5629,6 @@ func (m *SessionSnapshot) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 5:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field LastRequestID", wireType)
-			}
-			m.LastRequestID = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowService
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.LastRequestID |= RequestID(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 6:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field PendingRequests", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowService
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthService
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthService
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.PendingRequests = append(m.PendingRequests, SessionCommandRequest{})
-			if err := m.PendingRequests[len(m.PendingRequests)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 8:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Streams", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowService
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthService
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthService
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Streams = append(m.Streams, SessionStreamSnapshot{})
-			if err := m.Streams[len(m.Streams)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipService(dAtA[iNdEx:])
@@ -4914,7 +5653,7 @@ func (m *SessionSnapshot) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *SessionStreamSnapshot) Unmarshal(dAtA []byte) error {
+func (m *SessionCommandSnapshot) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -4937,13 +5676,51 @@ func (m *SessionStreamSnapshot) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: SessionStreamSnapshot: wiretype end group for non-group")
+			return fmt.Errorf("proto: SessionCommandSnapshot: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: SessionStreamSnapshot: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: SessionCommandSnapshot: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CommandID", wireType)
+			}
+			m.CommandID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.CommandID |= CommandID(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field State", wireType)
+			}
+			m.State = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.State |= SessionCommandState(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Request", wireType)
 			}
@@ -4972,30 +5749,14 @@ func (m *SessionStreamSnapshot) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
+			if m.Request == nil {
+				m.Request = &ServiceCommandRequest{}
+			}
 			if err := m.Request.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
-		case 2:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field State", wireType)
-			}
-			m.State = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowService
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.State |= SessionStreamState(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 3:
+		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field PendingResponses", wireType)
 			}
@@ -5024,7 +5785,7 @@ func (m *SessionStreamSnapshot) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.PendingResponses = append(m.PendingResponses, SessionCommandResponse{})
+			m.PendingResponses = append(m.PendingResponses, ServiceCommandResponse{})
 			if err := m.PendingResponses[len(m.PendingResponses)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
@@ -5053,7 +5814,7 @@ func (m *SessionStreamSnapshot) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *ServiceId) Unmarshal(dAtA []byte) error {
+func (m *ServiceSnapshot) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -5076,10 +5837,289 @@ func (m *ServiceId) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: ServiceId: wiretype end group for non-group")
+			return fmt.Errorf("proto: ServiceSnapshot: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ServiceId: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ServiceSnapshot: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ServiceID", wireType)
+			}
+			m.ServiceID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ServiceID |= ServiceID(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ServiceInfo", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthService
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthService
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ServiceInfo.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Data", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthService
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthService
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Data = append(m.Data[:0], dAtA[iNdEx:postIndex]...)
+			if m.Data == nil {
+				m.Data = []byte{}
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Sessions", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthService
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthService
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Sessions = append(m.Sessions, &ServiceSessionSnapshot{})
+			if err := m.Sessions[len(m.Sessions)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipService(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthService
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthService
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ServiceSessionSnapshot) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowService
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ServiceSessionSnapshot: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ServiceSessionSnapshot: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SessionID", wireType)
+			}
+			m.SessionID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.SessionID |= SessionID(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Commands", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthService
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthService
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Commands = append(m.Commands, &SessionCommandSnapshot{})
+			if err := m.Commands[len(m.Commands)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipService(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthService
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthService
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ServiceInfo) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowService
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ServiceInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ServiceInfo: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -5112,7 +6152,7 @@ func (m *ServiceId) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Type = string(dAtA[iNdEx:postIndex])
+			m.Type = ServiceType(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -6054,39 +7094,6 @@ func (m *OpenSessionRequest) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ServiceID", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowService
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthService
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthService
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if err := m.ServiceID.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Timeout", wireType)
 			}
 			var msglen int
@@ -6244,10 +7251,10 @@ func (m *KeepAliveRequest) Unmarshal(dAtA []byte) error {
 		}
 		switch fieldNum {
 		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Sessions", wireType)
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SessionID", wireType)
 			}
-			var msglen int
+			m.SessionID = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowService
@@ -6257,106 +7264,63 @@ func (m *KeepAliveRequest) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				msglen |= int(b&0x7F) << shift
+				m.SessionID |= SessionID(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			if msglen < 0 {
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastRequestID", wireType)
+			}
+			m.LastRequestID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.LastRequestID |= RequestID(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RequestFilter", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
 				return ErrInvalidLengthService
 			}
-			postIndex := iNdEx + msglen
+			postIndex := iNdEx + byteLen
 			if postIndex < 0 {
 				return ErrInvalidLengthService
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.Sessions == nil {
-				m.Sessions = make(map[SessionID]*SessionKeepAlive)
+			m.RequestFilter = append(m.RequestFilter[:0], dAtA[iNdEx:postIndex]...)
+			if m.RequestFilter == nil {
+				m.RequestFilter = []byte{}
 			}
-			var mapkey uint64
-			var mapvalue *SessionKeepAlive
-			for iNdEx < postIndex {
-				entryPreIndex := iNdEx
-				var wire uint64
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return ErrIntOverflowService
-					}
-					if iNdEx >= l {
-						return io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					wire |= uint64(b&0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-				fieldNum := int32(wire >> 3)
-				if fieldNum == 1 {
-					for shift := uint(0); ; shift += 7 {
-						if shift >= 64 {
-							return ErrIntOverflowService
-						}
-						if iNdEx >= l {
-							return io.ErrUnexpectedEOF
-						}
-						b := dAtA[iNdEx]
-						iNdEx++
-						mapkey |= uint64(b&0x7F) << shift
-						if b < 0x80 {
-							break
-						}
-					}
-				} else if fieldNum == 2 {
-					var mapmsglen int
-					for shift := uint(0); ; shift += 7 {
-						if shift >= 64 {
-							return ErrIntOverflowService
-						}
-						if iNdEx >= l {
-							return io.ErrUnexpectedEOF
-						}
-						b := dAtA[iNdEx]
-						iNdEx++
-						mapmsglen |= int(b&0x7F) << shift
-						if b < 0x80 {
-							break
-						}
-					}
-					if mapmsglen < 0 {
-						return ErrInvalidLengthService
-					}
-					postmsgIndex := iNdEx + mapmsglen
-					if postmsgIndex < 0 {
-						return ErrInvalidLengthService
-					}
-					if postmsgIndex > l {
-						return io.ErrUnexpectedEOF
-					}
-					mapvalue = &SessionKeepAlive{}
-					if err := mapvalue.Unmarshal(dAtA[iNdEx:postmsgIndex]); err != nil {
-						return err
-					}
-					iNdEx = postmsgIndex
-				} else {
-					iNdEx = entryPreIndex
-					skippy, err := skipService(dAtA[iNdEx:])
-					if err != nil {
-						return err
-					}
-					if skippy < 0 {
-						return ErrInvalidLengthService
-					}
-					if (iNdEx + skippy) > postIndex {
-						return io.ErrUnexpectedEOF
-					}
-					iNdEx += skippy
-				}
-			}
-			m.Sessions[SessionID(mapkey)] = mapvalue
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -6411,280 +7375,6 @@ func (m *KeepAliveResponse) Unmarshal(dAtA []byte) error {
 			return fmt.Errorf("proto: KeepAliveResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
-		default:
-			iNdEx = preIndex
-			skippy, err := skipService(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthService
-			}
-			if (iNdEx + skippy) < 0 {
-				return ErrInvalidLengthService
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *SessionKeepAlive) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowService
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: SessionKeepAlive: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: SessionKeepAlive: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field PendingRequests", wireType)
-			}
-			var byteLen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowService
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				byteLen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if byteLen < 0 {
-				return ErrInvalidLengthService
-			}
-			postIndex := iNdEx + byteLen
-			if postIndex < 0 {
-				return ErrInvalidLengthService
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.PendingRequests = append(m.PendingRequests[:0], dAtA[iNdEx:postIndex]...)
-			if m.PendingRequests == nil {
-				m.PendingRequests = []byte{}
-			}
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ResponseStreams", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowService
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthService
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthService
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.ResponseStreams == nil {
-				m.ResponseStreams = make(map[RequestID]*StreamKeepAlive)
-			}
-			var mapkey uint64
-			var mapvalue *StreamKeepAlive
-			for iNdEx < postIndex {
-				entryPreIndex := iNdEx
-				var wire uint64
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return ErrIntOverflowService
-					}
-					if iNdEx >= l {
-						return io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					wire |= uint64(b&0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-				fieldNum := int32(wire >> 3)
-				if fieldNum == 1 {
-					for shift := uint(0); ; shift += 7 {
-						if shift >= 64 {
-							return ErrIntOverflowService
-						}
-						if iNdEx >= l {
-							return io.ErrUnexpectedEOF
-						}
-						b := dAtA[iNdEx]
-						iNdEx++
-						mapkey |= uint64(b&0x7F) << shift
-						if b < 0x80 {
-							break
-						}
-					}
-				} else if fieldNum == 2 {
-					var mapmsglen int
-					for shift := uint(0); ; shift += 7 {
-						if shift >= 64 {
-							return ErrIntOverflowService
-						}
-						if iNdEx >= l {
-							return io.ErrUnexpectedEOF
-						}
-						b := dAtA[iNdEx]
-						iNdEx++
-						mapmsglen |= int(b&0x7F) << shift
-						if b < 0x80 {
-							break
-						}
-					}
-					if mapmsglen < 0 {
-						return ErrInvalidLengthService
-					}
-					postmsgIndex := iNdEx + mapmsglen
-					if postmsgIndex < 0 {
-						return ErrInvalidLengthService
-					}
-					if postmsgIndex > l {
-						return io.ErrUnexpectedEOF
-					}
-					mapvalue = &StreamKeepAlive{}
-					if err := mapvalue.Unmarshal(dAtA[iNdEx:postmsgIndex]); err != nil {
-						return err
-					}
-					iNdEx = postmsgIndex
-				} else {
-					iNdEx = entryPreIndex
-					skippy, err := skipService(dAtA[iNdEx:])
-					if err != nil {
-						return err
-					}
-					if skippy < 0 {
-						return ErrInvalidLengthService
-					}
-					if (iNdEx + skippy) > postIndex {
-						return io.ErrUnexpectedEOF
-					}
-					iNdEx += skippy
-				}
-			}
-			m.ResponseStreams[RequestID(mapkey)] = mapvalue
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipService(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthService
-			}
-			if (iNdEx + skippy) < 0 {
-				return ErrInvalidLengthService
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *StreamKeepAlive) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowService
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: StreamKeepAlive: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: StreamKeepAlive: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field CompleteResponseID", wireType)
-			}
-			m.CompleteResponseID = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowService
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.CompleteResponseID |= ResponseID(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipService(dAtA[iNdEx:])
@@ -6883,6 +7573,624 @@ func (m *SessionCommandRequest) Unmarshal(dAtA []byte) error {
 				}
 			}
 		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CreateService", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthService
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthService
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &CreateServiceRequest{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.Request = &SessionCommandRequest_CreateService{v}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CloseService", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthService
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthService
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &CloseServiceRequest{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.Request = &SessionCommandRequest_CloseService{v}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ServiceCommand", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthService
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthService
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &ServiceCommandRequest{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.Request = &SessionCommandRequest_ServiceCommand{v}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipService(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthService
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthService
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *SessionCommandResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowService
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: SessionCommandResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: SessionCommandResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CreateService", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthService
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthService
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &CreateServiceResponse{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.Response = &SessionCommandResponse_CreateService{v}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CloseService", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthService
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthService
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &CloseServiceResponse{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.Response = &SessionCommandResponse_CloseService{v}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ServiceCommand", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthService
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthService
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &ServiceCommandResponse{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.Response = &SessionCommandResponse_ServiceCommand{v}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipService(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthService
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthService
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CreateServiceRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowService
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CreateServiceRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CreateServiceRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ServiceInfo", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthService
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthService
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ServiceInfo.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipService(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthService
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthService
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CreateServiceResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowService
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CreateServiceResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CreateServiceResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ServiceID", wireType)
+			}
+			m.ServiceID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ServiceID |= ServiceID(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipService(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthService
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthService
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CloseServiceRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowService
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CloseServiceRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CloseServiceRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ServiceID", wireType)
+			}
+			m.ServiceID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ServiceID |= ServiceID(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipService(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthService
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthService
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CloseServiceResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowService
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CloseServiceResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CloseServiceResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipService(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthService
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthService
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ServiceCommandRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowService
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ServiceCommandRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ServiceCommandRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ServiceID", wireType)
+			}
+			m.ServiceID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ServiceID |= ServiceID(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field RequestID", wireType)
 			}
@@ -6961,7 +8269,7 @@ func (m *SessionCommandRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *SessionCommandResponse) Unmarshal(dAtA []byte) error {
+func (m *ServiceCommandResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -6984,10 +8292,10 @@ func (m *SessionCommandResponse) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: SessionCommandResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: ServiceCommandResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: SessionCommandResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ServiceCommandResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -7416,7 +8724,7 @@ func (m *QueryResponse) Unmarshal(dAtA []byte) error {
 			return fmt.Errorf("proto: QueryResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
-		case 4:
+		case 1:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field SessionQuery", wireType)
 			}
@@ -7524,10 +8832,10 @@ func (m *SessionQueryRequest) Unmarshal(dAtA []byte) error {
 				}
 			}
 		case 2:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field LastRequestID", wireType)
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ServiceQuery", wireType)
 			}
-			m.LastRequestID = 0
+			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowService
@@ -7537,12 +8845,188 @@ func (m *SessionQueryRequest) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.LastRequestID |= RequestID(b&0x7F) << shift
+				msglen |= int(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-		case 3:
+			if msglen < 0 {
+				return ErrInvalidLengthService
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthService
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &ServiceQueryRequest{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.Request = &SessionQueryRequest_ServiceQuery{v}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipService(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthService
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthService
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *SessionQueryResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowService
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: SessionQueryResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: SessionQueryResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ServiceQuery", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthService
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthService
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &ServiceQueryResponse{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.Response = &SessionQueryResponse_ServiceQuery{v}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipService(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthService
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthService
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ServiceQueryRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowService
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ServiceQueryRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ServiceQueryRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ServiceID", wireType)
+			}
+			m.ServiceID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ServiceID |= ServiceID(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Operation", wireType)
 			}
@@ -7602,7 +9086,7 @@ func (m *SessionQueryRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *SessionQueryResponse) Unmarshal(dAtA []byte) error {
+func (m *ServiceQueryResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -7625,13 +9109,32 @@ func (m *SessionQueryResponse) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: SessionQueryResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: ServiceQueryResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: SessionQueryResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ServiceQueryResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResponseID", wireType)
+			}
+			m.ResponseID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ResponseID |= ResponseID(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Operation", wireType)
 			}

@@ -4,6 +4,7 @@ package _map
 import (
 	"fmt"
 	_map "github.com/atomix/atomix-api/go/atomix/primitive/map"
+	errors "github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	util "github.com/atomix/atomix-go-framework/pkg/atomix/util"
 	proto "github.com/golang/protobuf/proto"
@@ -168,14 +169,14 @@ type Watcher interface {
 	Cancel()
 }
 
-func newWatcher(watcher rsm.SessionStateWatcher) Watcher {
+func newWatcher(watcher rsm.Watcher) Watcher {
 	return &serviceWatcher{
 		watcher: watcher,
 	}
 }
 
 type serviceWatcher struct {
-	watcher rsm.SessionStateWatcher
+	watcher rsm.Watcher
 }
 
 func (s *serviceWatcher) Cancel() {
@@ -400,6 +401,7 @@ type PutProposal interface {
 	Proposal
 	Request() (*_map.PutRequest, error)
 	Reply(*_map.PutResponse) error
+	Fail(error) error
 }
 
 func newPutProposal(command rsm.Command) PutProposal {
@@ -411,7 +413,8 @@ func newPutProposal(command rsm.Command) PutProposal {
 
 type putProposal struct {
 	Proposal
-	command rsm.Command
+	command  rsm.Command
+	complete bool
 }
 
 func (p *putProposal) Request() (*_map.PutRequest, error) {
@@ -424,6 +427,9 @@ func (p *putProposal) Request() (*_map.PutRequest, error) {
 }
 
 func (p *putProposal) Reply(response *_map.PutResponse) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
 	log.Debugf("Sending PutProposal %s: %s", p, response)
 	output, err := proto.Marshal(response)
 	if err != nil {
@@ -431,6 +437,18 @@ func (p *putProposal) Reply(response *_map.PutResponse) error {
 	}
 	p.command.Output(output, nil)
 	p.command.Close()
+	p.complete = true
+	return nil
+}
+
+func (p *putProposal) Fail(err error) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
+	log.Debugf("Failing PutProposal %s: %s", p, err)
+	p.command.Output(nil, err)
+	p.command.Close()
+	p.complete = true
 	return nil
 }
 
@@ -522,6 +540,7 @@ type RemoveProposal interface {
 	Proposal
 	Request() (*_map.RemoveRequest, error)
 	Reply(*_map.RemoveResponse) error
+	Fail(error) error
 }
 
 func newRemoveProposal(command rsm.Command) RemoveProposal {
@@ -533,7 +552,8 @@ func newRemoveProposal(command rsm.Command) RemoveProposal {
 
 type removeProposal struct {
 	Proposal
-	command rsm.Command
+	command  rsm.Command
+	complete bool
 }
 
 func (p *removeProposal) Request() (*_map.RemoveRequest, error) {
@@ -546,6 +566,9 @@ func (p *removeProposal) Request() (*_map.RemoveRequest, error) {
 }
 
 func (p *removeProposal) Reply(response *_map.RemoveResponse) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
 	log.Debugf("Sending RemoveProposal %s: %s", p, response)
 	output, err := proto.Marshal(response)
 	if err != nil {
@@ -553,6 +576,18 @@ func (p *removeProposal) Reply(response *_map.RemoveResponse) error {
 	}
 	p.command.Output(output, nil)
 	p.command.Close()
+	p.complete = true
+	return nil
+}
+
+func (p *removeProposal) Fail(err error) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
+	log.Debugf("Failing RemoveProposal %s: %s", p, err)
+	p.command.Output(nil, err)
+	p.command.Close()
+	p.complete = true
 	return nil
 }
 
@@ -600,6 +635,7 @@ type ClearProposal interface {
 	Proposal
 	Request() (*_map.ClearRequest, error)
 	Reply(*_map.ClearResponse) error
+	Fail(error) error
 }
 
 func newClearProposal(command rsm.Command) ClearProposal {
@@ -611,7 +647,8 @@ func newClearProposal(command rsm.Command) ClearProposal {
 
 type clearProposal struct {
 	Proposal
-	command rsm.Command
+	command  rsm.Command
+	complete bool
 }
 
 func (p *clearProposal) Request() (*_map.ClearRequest, error) {
@@ -624,6 +661,9 @@ func (p *clearProposal) Request() (*_map.ClearRequest, error) {
 }
 
 func (p *clearProposal) Reply(response *_map.ClearResponse) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
 	log.Debugf("Sending ClearProposal %s: %s", p, response)
 	output, err := proto.Marshal(response)
 	if err != nil {
@@ -631,6 +671,18 @@ func (p *clearProposal) Reply(response *_map.ClearResponse) error {
 	}
 	p.command.Output(output, nil)
 	p.command.Close()
+	p.complete = true
+	return nil
+}
+
+func (p *clearProposal) Fail(err error) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
+	log.Debugf("Failing ClearProposal %s: %s", p, err)
+	p.command.Output(nil, err)
+	p.command.Close()
+	p.complete = true
 	return nil
 }
 

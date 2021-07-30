@@ -18,25 +18,29 @@ import (
 	"context"
 	"fmt"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
-	"sync"
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/attributes"
 	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/serviceconfig"
 )
 
-type Resolver struct {
-	mu            sync.Mutex
-	clientConn    resolver.ClientConn
-	resolverConn  *grpc.ClientConn
-	serviceConfig *serviceconfig.ParseResult
+const resolverName = "rsm"
+
+func newResolver(partition rsm.PartitionID) resolver.Builder {
+	return &ResolverBuilder{
+		partitionID: partition,
+	}
 }
 
-var _ resolver.Builder = (*Resolver)(nil)
+type ResolverBuilder struct {
+	partitionID rsm.PartitionID
+}
 
-func (r *Resolver) Build(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOptions) (resolver.Resolver, error) {
-	r.clientConn = cc
+func (b *ResolverBuilder) Scheme() string {
+	return resolverName
+}
+
+func (b *ResolverBuilder) Build(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOptions) (resolver.Resolver, error) {
 	var dialOpts []grpc.DialOption
 	if opts.DialCreds != nil {
 		dialOpts = append(
@@ -44,44 +48,59 @@ func (r *Resolver) Build(target resolver.Target, cc resolver.ClientConn, opts re
 			grpc.WithTransportCredentials(opts.DialCreds),
 		)
 	}
-	r.serviceConfig = r.clientConn.ParseServiceConfig(
-		fmt.Sprintf(`{"loadBalancingConfig":[{"%s":{}}]}`, resolverName),
-	)
-	var err error
-	r.resolverConn, err = grpc.Dial(target.Endpoint, dialOpts...)
+	resolverConn, err := grpc.Dial(target.Endpoint, dialOpts...)
 	if err != nil {
 		return nil, err
 	}
-	r.ResolveNow(resolver.ResolveNowOptions{})
-	return r, nil
+
+	serviceConfig := cc.ParseServiceConfig(
+		fmt.Sprintf(`{"loadBalancingConfig":[{"%s":{}}]}`, resolverName),
+	)
+
+	resolver := &Resolver{
+		partitionID:   b.partitionID,
+		clientConn:    cc,
+		resolverConn:  resolverConn,
+		serviceConfig: serviceConfig,
+	}
+	err = resolver.start()
+	if err != nil {
+		return nil, err
+	}
+	return resolver, nil
 }
 
-const resolverName = "rsm"
+var _ resolver.Builder = (*ResolverBuilder)(nil)
 
-func (r *Resolver) Scheme() string {
-	return resolverName
+type Resolver struct {
+	partitionID   rsm.PartitionID
+	clientConn    resolver.ClientConn
+	resolverConn  *grpc.ClientConn
+	serviceConfig *serviceconfig.ParseResult
 }
 
-func init() {
-	resolver.Register(&Resolver{})
-}
-
-var _ resolver.Resolver = (*Resolver)(nil)
-
-func (r *Resolver) ResolveNow(resolver.ResolveNowOptions) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+func (r *Resolver) start() error {
 	client := rsm.NewPartitionServiceClient(r.resolverConn)
-	ctx := context.Background()
 	request := &rsm.PartitionConfigRequest{
 		PartitionID: r.partitionID,
 	}
-	response, err := client.GetConfig(ctx, request)
+	stream, err := client.WatchConfig(context.Background(), request)
 	if err != nil {
-		log.Error("failed to resolve server", err)
-		return
+		return err
 	}
+	go func() {
+		for {
+			response, err := stream.Recv()
+			if err != nil {
+				return
+			}
+			r.updateState(response)
+		}
+	}()
+	return nil
+}
 
+func (r *Resolver) updateState(response *rsm.PartitionConfigResponse) {
 	var addrs []resolver.Address
 	addrs = append(addrs, resolver.Address{
 		Addr: response.Leader,
@@ -107,8 +126,12 @@ func (r *Resolver) ResolveNow(resolver.ResolveNowOptions) {
 	})
 }
 
+func (r *Resolver) ResolveNow(resolver.ResolveNowOptions) {}
+
 func (r *Resolver) Close() {
 	if err := r.resolverConn.Close(); err != nil {
 		log.Error("failed to close conn", err)
 	}
 }
+
+var _ resolver.Resolver = (*Resolver)(nil)

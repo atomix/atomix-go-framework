@@ -12,7 +12,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-const Type = "Lock"
+const Type storage.ServiceType = "Lock"
 
 const (
 	lockOp    storage.OperationID = 1
@@ -49,19 +49,19 @@ func (s *ProxyServer) Lock(ctx context.Context, request *lock.LockRequest) (*loc
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		return nil, err
 	}
 
 	ch := make(chan streams.Result)
 	stream := streams.NewChannelStream(ch)
-	err = session.DoCommandStream(ctx, lockOp, input, stream)
+	err = service.DoCommandStream(ctx, lockOp, input, stream)
 	if err != nil {
 		log.Warnf("Request LockRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -100,17 +100,17 @@ func (s *ProxyServer) Unlock(ctx context.Context, request *lock.UnlockRequest) (
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request UnlockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoCommand(ctx, unlockOp, input)
+	output, err := service.DoCommand(ctx, unlockOp, input)
 	if err != nil {
 		log.Warnf("Request UnlockRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -139,17 +139,17 @@ func (s *ProxyServer) GetLock(ctx context.Context, request *lock.GetLockRequest)
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request GetLockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoQuery(ctx, getLockOp, input, s.readSync)
+	output, err := service.DoQuery(ctx, getLockOp, input, s.readSync)
 	if err != nil {
 		log.Warnf("Request GetLockRequest failed: %v", err)
 		return nil, errors.Proto(err)

@@ -25,39 +25,42 @@ import "gogoproto/gogo.proto";
 message StateMachineSnapshot {
     uint64 index = 1 [(gogoproto.casttype) = "Index"];
     google.protobuf.Timestamp timestamp = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
-    repeated ServiceSnapshot services = 3;
-    repeated SessionSnapshot sessions = 4;
-}
-
-message ServiceSnapshot {
-    ServiceId service_id = 1 [(gogoproto.customname) = "ServiceID", (gogoproto.casttype) = "ServiceID", (gogoproto.nullable) = false];
-    uint64 index = 2 [(gogoproto.casttype) = "Index"];
-    bytes data = 3;
+    repeated SessionSnapshot sessions = 3;
+    repeated ServiceSnapshot services = 4;
 }
 
 message SessionSnapshot {
     uint64 session_id = 1 [(gogoproto.customname) = "SessionID", (gogoproto.casttype) = "SessionID"];
-    ServiceId service_id = 2 [(gogoproto.customname) = "ServiceID", (gogoproto.casttype) = "ServiceID", (gogoproto.nullable) = false];
-    google.protobuf.Duration timeout = 3 [(gogoproto.stdduration) = true, (gogoproto.nullable) = false];
-    google.protobuf.Timestamp last_updated = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
-    uint64 last_request_id = 5 [(gogoproto.customname) = "LastRequestID", (gogoproto.casttype) = "RequestID"];
-    repeated SessionCommandRequest pending_requests = 6 [(gogoproto.nullable) = false];
-    repeated SessionStreamSnapshot streams = 8 [(gogoproto.nullable) = false];
+    google.protobuf.Duration timeout = 2 [(gogoproto.stdduration) = true, (gogoproto.nullable) = false];
+    google.protobuf.Timestamp last_updated = 3 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
 }
 
-message SessionStreamSnapshot {
-    SessionCommandRequest request = 1 [(gogoproto.nullable) = false];
-    SessionStreamState state = 2;
-    repeated SessionCommandResponse pending_responses = 3 [(gogoproto.nullable) = false];
+message SessionCommandSnapshot {
+    uint64 command_id = 1 [(gogoproto.customname) = "CommandID", (gogoproto.casttype) = "CommandID"];
+    SessionCommandState state = 2;
+    ServiceCommandRequest request = 3;
+    repeated ServiceCommandResponse pending_responses = 4 [(gogoproto.nullable) = false];
 }
 
-enum SessionStreamState {
-    STREAM_CLOSED = 0;
-    STREAM_OPEN = 1;
+enum SessionCommandState {
+    COMMAND_OPEN = 0;
+    COMMAND_COMPLETE = 1;
 }
 
-message ServiceId {
-    string type = 1;
+message ServiceSnapshot {
+    uint64 service_id = 1 [(gogoproto.customname) = "ServiceID", (gogoproto.casttype) = "ServiceID"];
+    ServiceInfo service_info = 2 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+    bytes data = 3;
+    repeated ServiceSessionSnapshot sessions = 4;
+}
+
+message ServiceSessionSnapshot {
+    uint64 session_id = 1 [(gogoproto.customname) = "SessionID", (gogoproto.casttype) = "SessionID"];
+    repeated SessionCommandSnapshot commands = 2;
+}
+
+message ServiceInfo {
+    string type = 1 [(gogoproto.casttype) = "ServiceType"];
     string namespace = 2;
     string name = 3;
 }
@@ -101,8 +104,7 @@ message CommandResponse {
 }
 
 message OpenSessionRequest {
-    ServiceId service_id = 1 [(gogoproto.customname) = "ServiceID", (gogoproto.casttype) = "ServiceID", (gogoproto.nullable) = false];
-    google.protobuf.Duration timeout = 2 [(gogoproto.stdduration) = true, (gogoproto.nullable) = false];
+    google.protobuf.Duration timeout = 1 [(gogoproto.stdduration) = true, (gogoproto.nullable) = false];
 }
 
 message OpenSessionResponse {
@@ -110,20 +112,13 @@ message OpenSessionResponse {
 }
 
 message KeepAliveRequest {
-    map<uint64, SessionKeepAlive> sessions = 1 [(gogoproto.castkey) = "SessionID"];
+    uint64 session_id = 1 [(gogoproto.customname) = "SessionID", (gogoproto.casttype) = "SessionID"];
+    uint64 last_request_id = 2 [(gogoproto.customname) = "LastRequestID", (gogoproto.casttype) = "RequestID"];
+    bytes request_filter = 3;
 }
 
 message KeepAliveResponse {
 
-}
-
-message SessionKeepAlive {
-    bytes pending_requests = 1;
-    map<uint64, StreamKeepAlive> response_streams = 2 [(gogoproto.castkey) = "RequestID"];
-}
-
-message StreamKeepAlive {
-    uint64 complete_response_id = 1 [(gogoproto.customname) = "CompleteResponseID", (gogoproto.casttype) = "ResponseID"];
 }
 
 message CloseSessionRequest {
@@ -136,11 +131,44 @@ message CloseSessionResponse {
 
 message SessionCommandRequest {
     uint64 session_id = 1 [(gogoproto.customname) = "SessionID", (gogoproto.casttype) = "SessionID"];
+    oneof request {
+        CreateServiceRequest create_service = 2;
+        CloseServiceRequest close_service = 3;
+        ServiceCommandRequest service_command = 4;
+    }
+}
+
+message SessionCommandResponse {
+    oneof response {
+        CreateServiceResponse create_service = 1;
+        CloseServiceResponse close_service = 2;
+        ServiceCommandResponse service_command = 3;
+    }
+}
+
+message CreateServiceRequest {
+    ServiceInfo info = 1 [(gogoproto.nullable) = false, (gogoproto.embed) = true];
+}
+
+message CreateServiceResponse {
+    uint64 service_id = 1 [(gogoproto.customname) = "ServiceID", (gogoproto.casttype) = "ServiceID"];
+}
+
+message CloseServiceRequest {
+    uint64 service_id = 1 [(gogoproto.customname) = "ServiceID", (gogoproto.casttype) = "ServiceID"];
+}
+
+message CloseServiceResponse {
+
+}
+
+message ServiceCommandRequest {
+    uint64 service_id = 1 [(gogoproto.customname) = "ServiceID", (gogoproto.casttype) = "ServiceID"];
     uint64 request_id = 2 [(gogoproto.customname) = "RequestID", (gogoproto.casttype) = "RequestID"];
     OperationRequest operation = 3;
 }
 
-message SessionCommandResponse {
+message ServiceCommandResponse {
     uint64 response_id = 1 [(gogoproto.customname) = "ResponseID", (gogoproto.casttype) = "ResponseID"];
     OperationResponse operation = 2;
 }
@@ -164,18 +192,31 @@ message QueryRequest {
 
 message QueryResponse {
     oneof response {
-        SessionQueryResponse session_query = 4;
+        SessionQueryResponse session_query = 1;
     }
 }
 
 message SessionQueryRequest {
     uint64 session_id = 1 [(gogoproto.customname) = "SessionID", (gogoproto.casttype) = "SessionID"];
-    uint64 last_request_id = 2 [(gogoproto.customname) = "LastRequestID", (gogoproto.casttype) = "RequestID"];
-    OperationRequest operation = 3;
+    oneof request {
+        ServiceQueryRequest service_query = 2;
+    }
 }
 
 message SessionQueryResponse {
-    OperationResponse operation = 1;
+    oneof response {
+        ServiceQueryResponse service_query = 2;
+    }
+}
+
+message ServiceQueryRequest {
+    uint64 service_id = 1 [(gogoproto.customname) = "ServiceID", (gogoproto.casttype) = "ServiceID"];
+    OperationRequest operation = 2;
+}
+
+message ServiceQueryResponse {
+    uint64 response_id = 1 [(gogoproto.customname) = "ResponseID", (gogoproto.casttype) = "ResponseID"];
+    OperationResponse operation = 2;
 }
 
 message OperationRequest {
@@ -211,7 +252,7 @@ enum ResponseCode {
 }
 
 service PartitionService {
-    rpc GetConfig (PartitionConfigRequest) returns (PartitionConfigResponse);
+    rpc WatchConfig (PartitionConfigRequest) returns (stream PartitionConfigResponse);
     rpc Query (PartitionQueryRequest) returns (PartitionQueryResponse);
     rpc QueryStream (PartitionQueryRequest) returns (stream PartitionQueryResponse);
     rpc Command (PartitionCommandRequest) returns (PartitionCommandResponse);

@@ -15,44 +15,48 @@
 package rsm
 
 import (
-	"sync"
+	"math/rand"
 	"sync/atomic"
 
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/balancer/base"
 )
 
-var _ base.PickerBuilder = (*Picker)(nil)
+func init() {
+	balancer.Register(base.NewBalancerBuilder(resolverName, &PickerBuilder{}, base.Config{}))
+}
+
+type PickerBuilder struct{}
+
+func (p *PickerBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
+	var leader balancer.SubConn
+	var followers []balancer.SubConn
+	for sc, scInfo := range info.ReadySCs {
+		isLeader := scInfo.Address.Attributes.Value("is_leader").(bool)
+		if isLeader {
+			leader = sc
+			continue
+		}
+		followers = append(followers, sc)
+	}
+	if leader == nil {
+		leader = followers[rand.Intn(len(followers))]
+	}
+	return &Picker{
+		leader:    leader,
+		followers: followers,
+	}
+}
+
+var _ base.PickerBuilder = (*PickerBuilder)(nil)
 
 type Picker struct {
-	mu        sync.RWMutex
 	leader    balancer.SubConn
 	followers []balancer.SubConn
 	current   uint64
 }
 
-func (p *Picker) Build(buildInfo base.PickerBuildInfo) balancer.Picker {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	var followers []balancer.SubConn
-	for sc, scInfo := range buildInfo.ReadySCs {
-		isLeader := scInfo.Address.Attributes.Value("is_leader").(bool)
-		if isLeader {
-			p.leader = sc
-			continue
-		}
-		followers = append(followers, sc)
-	}
-	p.followers = followers
-	return p
-}
-
-var _ balancer.Picker = (*Picker)(nil)
-
-func (p *Picker) Pick(info balancer.PickInfo) (
-	balancer.PickResult, error) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
+func (p *Picker) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
 	var result balancer.PickResult
 	if info.FullMethodName == "Command" ||
 		info.FullMethodName == "CommandStream" ||
@@ -75,8 +79,4 @@ func (p *Picker) nextFollower() balancer.SubConn {
 	return p.followers[idx]
 }
 
-func init() {
-	balancer.Register(
-		base.NewBalancerBuilder(resolverName, &Picker{}, base.Config{}),
-	)
-}
+var _ balancer.Picker = (*Picker)(nil)

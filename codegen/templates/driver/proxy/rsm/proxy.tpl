@@ -93,7 +93,7 @@ import (
 	{{- end }}
 )
 
-const {{ printf "%sType" .Generator.Prefix }} = {{ .Primitive.Name | quote }}
+const {{ printf "%sType" .Generator.Prefix }} storage.ServiceType = {{ .Primitive.Name | quote }}
 {{ $root := . }}
 const (
     {{- range .Primitive.Methods }}
@@ -151,20 +151,20 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
     partition := s.PartitionBy([]byte(clusterKey))
 	{{- end }}
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
         log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 		return nil, errors.Proto(err)
 	}
     {{- if .Type.IsCommand }}
-	output, err := session.DoCommand(ctx, {{ $name }}, input)
+	output, err := service.DoCommand(ctx, {{ $name }}, input)
     {{- else }}
-	output, err := session.DoQuery(ctx, {{ $name }}, input, s.readSync)
+	output, err := service.DoQuery(ctx, {{ $name }}, input, s.readSync)
     {{- end }}
 	if err != nil {
         log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
@@ -184,33 +184,33 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
     {{- $aggregates = true }}
     {{- end }}
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
 	{{- if .Response.Aggregates }}
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
-        session, err := partitions[i].GetSession(ctx, service)
+        service, err := partitions[i].GetService(ctx, serviceInfo)
         if err != nil {
             return nil, err
         }
         {{- if .Type.IsCommand }}
-		return session.DoCommand(ctx, {{ $name }}, input)
+		return service.DoCommand(ctx, {{ $name }}, input)
         {{- else }}
-		return session.DoQuery(ctx, {{ $name }}, input, s.readSync)
+		return service.DoQuery(ctx, {{ $name }}, input, s.readSync)
         {{- end }}
 	})
 	{{- else }}
 	err = async.IterAsync(len(partitions), func(i int) error {
-        session, err := partitions[i].GetSession(ctx, service)
+        service, err := partitions[i].GetService(ctx, serviceInfo)
         if err != nil {
             return err
         }
         {{- if .Type.IsCommand }}
-		_, err := session.DoCommand(ctx, {{ $name }}, input)
+		_, err := service.DoCommand(ctx, {{ $name }}, input)
         {{- else }}
-		_, err := session.DoQuery(ctx, {{ $name }}, input, s.readSync)
+		_, err := service.DoQuery(ctx, {{ $name }}, input, s.readSync)
         {{- end }}
 		return err
 	})
@@ -282,12 +282,12 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
     partition := s.PartitionBy([]byte(clusterKey))
 	{{- end }}
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
     if err != nil {
         return nil, err
     }
@@ -295,9 +295,9 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
     ch := make(chan streams.Result)
 	stream := streams.NewChannelStream(ch)
 	{{- if .Type.IsCommand }}
-	err = session.DoCommandStream(ctx, {{ $name }}, input, stream)
+	err = service.DoCommandStream(ctx, {{ $name }}, input, stream)
 	{{- else }}
-	err = session.DoQueryStream(ctx, {{ $name }}, input, stream, s.readSync)
+	err = service.DoQueryStream(ctx, {{ $name }}, input, stream, s.readSync)
 	{{- end }}
 	if err != nil {
         log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
@@ -321,23 +321,23 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
         return nil, errors.Proto(err)
     }
 	{{- else if .Scope.IsGlobal }}
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
 	partitions := s.Partitions()
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
-        session, err := partitions[i].GetSession(ctx, service)
+        service, err := partitions[i].GetService(srv.Context(), serviceInfo)
         if err != nil {
             return nil, err
         }
         ch := make(chan streams.Result)
         stream := streams.NewChannelStream(ch)
         {{- if .Type.IsCommand }}
-		err := session.DoCommandStream(srv.Context(), {{ $name }}, input, stream)
+		err := service.DoCommandStream(srv.Context(), {{ $name }}, input, stream)
         {{- else }}
-		err := session.DoQueryStream(srv.Context(), {{ $name }}, input, stream, s.readSync)
+		err := service.DoQueryStream(srv.Context(), {{ $name }}, input, stream, s.readSync)
         {{- end }}
 		if err != nil {
 		    return nil, err
@@ -425,19 +425,19 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
     partition := s.PartitionBy([]byte(clusterKey))
 	{{- end }}
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
-    session, err := partition.GetSession(ctx, service)
+    service, err := partition.GetService(srv.Context(), serviceInfo)
     if err != nil {
-        return nil, err
+        return err
     }
     {{- if .Type.IsCommand }}
-	err = session.DoCommandStream(srv.Context(), {{ $name }}, input, stream)
+	err = service.DoCommandStream(srv.Context(), {{ $name }}, input, stream)
     {{- else }}
-	err = session.DoQueryStream(srv.Context(), {{ $name }}, input, stream, s.readSync)
+	err = service.DoQueryStream(srv.Context(), {{ $name }}, input, stream, s.readSync)
     {{- end }}
 	{{- else if .Scope.IsGlobal }}
 	service := storage.ServiceID{
@@ -447,14 +447,14 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	}
 	partitions := s.Partitions()
 	err = async.IterAsync(len(partitions), func(i int) error {
-        session, err := partitions[i].GetSession(ctx, service)
+        service, err := partitions[i].GetService(srv.Context(), serviceInfo)
         if err != nil {
-            return nil, err
+            return err
         }
         {{- if .Type.IsCommand }}
-		return session.DoCommandStream(srv.Context(), {{ $name }}, input, stream)
+		return service.DoCommandStream(srv.Context(), {{ $name }}, input, stream)
         {{- else }}
-		return session.DoQueryStream(srv.Context(), {{ $name }}, input, stream, s.readSync)
+		return service.DoQueryStream(srv.Context(), {{ $name }}, input, stream, s.readSync)
         {{- end }}
 	})
 	{{- end }}

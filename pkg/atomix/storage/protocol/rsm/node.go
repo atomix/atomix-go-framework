@@ -43,7 +43,7 @@ type Node struct {
 }
 
 // RegisterService registers a primitive service
-func (n *Node) RegisterService(t string, f NewServiceFunc) {
+func (n *Node) RegisterService(t ServiceType, f NewServiceFunc) {
 	n.registry.Register(t, f)
 }
 
@@ -57,7 +57,7 @@ func (n *Node) Start() error {
 	}
 	err := member.Serve(
 		cluster.WithService(func(server *grpc.Server) {
-			RegisterStorageServiceServer(server, &Server{Protocol: n.protocol})
+			RegisterPartitionServiceServer(server, &Server{Protocol: n.protocol})
 		}),
 		cluster.WithService(func(server *grpc.Server) {
 			protocolapi.RegisterProtocolConfigServiceServer(server, protocol.NewServer(n.Cluster))

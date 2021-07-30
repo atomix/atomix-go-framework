@@ -161,14 +161,14 @@ type Watcher interface {
 	Cancel()
 }
 
-func newWatcher(watcher rsm.SessionStateWatcher) Watcher {
+func newWatcher(watcher rsm.Watcher) Watcher {
 	return &serviceWatcher{
 		watcher: watcher,
 	}
 }
 
 type serviceWatcher struct {
-	watcher rsm.SessionStateWatcher
+	watcher rsm.Watcher
 }
 
 func (s *serviceWatcher) Cancel() {
@@ -338,7 +338,6 @@ type LockProposal interface {
 	Request() (*lock.LockRequest, error)
 	Reply(*lock.LockResponse) error
 	Fail(error) error
-	Close() error
 }
 
 func newLockProposal(command rsm.Command) LockProposal {
@@ -365,7 +364,7 @@ func (p *lockProposal) Request() (*lock.LockRequest, error) {
 
 func (p *lockProposal) Reply(response *lock.LockResponse) error {
 	if p.complete {
-		return errors.NewConflict("reply already sent")
+		return errors.NewConflict("proposal is already complete")
 	}
 	log.Debugf("Sending LockProposal %s: %s", p, response)
 	output, err := proto.Marshal(response)
@@ -380,21 +379,12 @@ func (p *lockProposal) Reply(response *lock.LockResponse) error {
 
 func (p *lockProposal) Fail(err error) error {
 	if p.complete {
-		return errors.NewConflict("reply already sent")
+		return errors.NewConflict("proposal is already complete")
 	}
-	log.Debugf("Sending LockProposal %s: %s", p, err)
+	log.Debugf("Failing LockProposal %s: %s", p, err)
 	p.command.Output(nil, err)
 	p.command.Close()
 	p.complete = true
-	return nil
-}
-
-func (p *lockProposal) Close() error {
-	if p.complete {
-		return errors.NewConflict("reply already sent")
-	}
-	p.complete = true
-	p.command.Close()
 	return nil
 }
 
@@ -442,6 +432,7 @@ type UnlockProposal interface {
 	Proposal
 	Request() (*lock.UnlockRequest, error)
 	Reply(*lock.UnlockResponse) error
+	Fail(error) error
 }
 
 func newUnlockProposal(command rsm.Command) UnlockProposal {
@@ -453,7 +444,8 @@ func newUnlockProposal(command rsm.Command) UnlockProposal {
 
 type unlockProposal struct {
 	Proposal
-	command rsm.Command
+	command  rsm.Command
+	complete bool
 }
 
 func (p *unlockProposal) Request() (*lock.UnlockRequest, error) {
@@ -466,6 +458,9 @@ func (p *unlockProposal) Request() (*lock.UnlockRequest, error) {
 }
 
 func (p *unlockProposal) Reply(response *lock.UnlockResponse) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
 	log.Debugf("Sending UnlockProposal %s: %s", p, response)
 	output, err := proto.Marshal(response)
 	if err != nil {
@@ -473,6 +468,18 @@ func (p *unlockProposal) Reply(response *lock.UnlockResponse) error {
 	}
 	p.command.Output(output, nil)
 	p.command.Close()
+	p.complete = true
+	return nil
+}
+
+func (p *unlockProposal) Fail(err error) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
+	log.Debugf("Failing UnlockProposal %s: %s", p, err)
+	p.command.Output(nil, err)
+	p.command.Close()
+	p.complete = true
 	return nil
 }
 

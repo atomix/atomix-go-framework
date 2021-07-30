@@ -14,7 +14,7 @@ import (
 	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
 )
 
-const Type = "Set"
+const Type storage.ServiceType = "Set"
 
 const (
 	sizeOp     storage.OperationID = 1
@@ -51,17 +51,17 @@ func (s *ProxyServer) Size(ctx context.Context, request *set.SizeRequest) (*set.
 	}
 	partitions := s.Partitions()
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
-		session, err := partitions[i].GetSession(ctx, service)
+		service, err := partitions[i].GetService(ctx, serviceInfo)
 		if err != nil {
 			return nil, err
 		}
-		return session.DoQuery(ctx, sizeOp, input, s.readSync)
+		return service.DoQuery(ctx, sizeOp, input, s.readSync)
 	})
 	if err != nil {
 		log.Warnf("Request SizeRequest failed: %v", err)
@@ -96,17 +96,17 @@ func (s *ProxyServer) Contains(ctx context.Context, request *set.ContainsRequest
 	partitionKey := request.Element.Value
 	partition := s.PartitionBy([]byte(partitionKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request ContainsRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoQuery(ctx, containsOp, input, s.readSync)
+	output, err := service.DoQuery(ctx, containsOp, input, s.readSync)
 	if err != nil {
 		log.Warnf("Request ContainsRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -132,17 +132,17 @@ func (s *ProxyServer) Add(ctx context.Context, request *set.AddRequest) (*set.Ad
 	partitionKey := request.Element.Value
 	partition := s.PartitionBy([]byte(partitionKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request AddRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoCommand(ctx, addOp, input)
+	output, err := service.DoCommand(ctx, addOp, input)
 	if err != nil {
 		log.Warnf("Request AddRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -168,17 +168,17 @@ func (s *ProxyServer) Remove(ctx context.Context, request *set.RemoveRequest) (*
 	partitionKey := request.Element.Value
 	partition := s.PartitionBy([]byte(partitionKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoCommand(ctx, removeOp, input)
+	output, err := service.DoCommand(ctx, removeOp, input)
 	if err != nil {
 		log.Warnf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -203,17 +203,17 @@ func (s *ProxyServer) Clear(ctx context.Context, request *set.ClearRequest) (*se
 	}
 	partitions := s.Partitions()
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
 	err = async.IterAsync(len(partitions), func(i int) error {
-		session, err := partitions[i].GetSession(ctx, service)
+		service, err := partitions[i].GetService(ctx, serviceInfo)
 		if err != nil {
 			return err
 		}
-		_, err := session.DoCommand(ctx, clearOp, input)
+		_, err := service.DoCommand(ctx, clearOp, input)
 		return err
 	})
 	if err != nil {
@@ -243,11 +243,11 @@ func (s *ProxyServer) Events(request *set.EventsRequest, srv set.SetService_Even
 	}
 	partitions := s.Partitions()
 	err = async.IterAsync(len(partitions), func(i int) error {
-		session, err := partitions[i].GetSession(ctx, service)
+		service, err := partitions[i].GetService(srv.Context(), serviceInfo)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		return session.DoCommandStream(srv.Context(), eventsOp, input, stream)
+		return service.DoCommandStream(srv.Context(), eventsOp, input, stream)
 	})
 	if err != nil {
 		log.Warnf("Request EventsRequest failed: %v", err)
@@ -297,11 +297,11 @@ func (s *ProxyServer) Elements(request *set.ElementsRequest, srv set.SetService_
 	}
 	partitions := s.Partitions()
 	err = async.IterAsync(len(partitions), func(i int) error {
-		session, err := partitions[i].GetSession(ctx, service)
+		service, err := partitions[i].GetService(srv.Context(), serviceInfo)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		return session.DoQueryStream(srv.Context(), elementsOp, input, stream, s.readSync)
+		return service.DoQueryStream(srv.Context(), elementsOp, input, stream, s.readSync)
 	})
 	if err != nil {
 		log.Warnf("Request ElementsRequest failed: %v", err)

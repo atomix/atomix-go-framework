@@ -4,6 +4,7 @@ package election
 import (
 	"fmt"
 	election "github.com/atomix/atomix-api/go/atomix/primitive/election"
+	errors "github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	util "github.com/atomix/atomix-go-framework/pkg/atomix/util"
 	proto "github.com/golang/protobuf/proto"
@@ -168,14 +169,14 @@ type Watcher interface {
 	Cancel()
 }
 
-func newWatcher(watcher rsm.SessionStateWatcher) Watcher {
+func newWatcher(watcher rsm.Watcher) Watcher {
 	return &serviceWatcher{
 		watcher: watcher,
 	}
 }
 
 type serviceWatcher struct {
-	watcher rsm.SessionStateWatcher
+	watcher rsm.Watcher
 }
 
 func (s *serviceWatcher) Cancel() {
@@ -368,6 +369,7 @@ type EnterProposal interface {
 	Proposal
 	Request() (*election.EnterRequest, error)
 	Reply(*election.EnterResponse) error
+	Fail(error) error
 }
 
 func newEnterProposal(command rsm.Command) EnterProposal {
@@ -379,7 +381,8 @@ func newEnterProposal(command rsm.Command) EnterProposal {
 
 type enterProposal struct {
 	Proposal
-	command rsm.Command
+	command  rsm.Command
+	complete bool
 }
 
 func (p *enterProposal) Request() (*election.EnterRequest, error) {
@@ -392,6 +395,9 @@ func (p *enterProposal) Request() (*election.EnterRequest, error) {
 }
 
 func (p *enterProposal) Reply(response *election.EnterResponse) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
 	log.Debugf("Sending EnterProposal %s: %s", p, response)
 	output, err := proto.Marshal(response)
 	if err != nil {
@@ -399,6 +405,18 @@ func (p *enterProposal) Reply(response *election.EnterResponse) error {
 	}
 	p.command.Output(output, nil)
 	p.command.Close()
+	p.complete = true
+	return nil
+}
+
+func (p *enterProposal) Fail(err error) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
+	log.Debugf("Failing EnterProposal %s: %s", p, err)
+	p.command.Output(nil, err)
+	p.command.Close()
+	p.complete = true
 	return nil
 }
 
@@ -446,6 +464,7 @@ type WithdrawProposal interface {
 	Proposal
 	Request() (*election.WithdrawRequest, error)
 	Reply(*election.WithdrawResponse) error
+	Fail(error) error
 }
 
 func newWithdrawProposal(command rsm.Command) WithdrawProposal {
@@ -457,7 +476,8 @@ func newWithdrawProposal(command rsm.Command) WithdrawProposal {
 
 type withdrawProposal struct {
 	Proposal
-	command rsm.Command
+	command  rsm.Command
+	complete bool
 }
 
 func (p *withdrawProposal) Request() (*election.WithdrawRequest, error) {
@@ -470,6 +490,9 @@ func (p *withdrawProposal) Request() (*election.WithdrawRequest, error) {
 }
 
 func (p *withdrawProposal) Reply(response *election.WithdrawResponse) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
 	log.Debugf("Sending WithdrawProposal %s: %s", p, response)
 	output, err := proto.Marshal(response)
 	if err != nil {
@@ -477,6 +500,18 @@ func (p *withdrawProposal) Reply(response *election.WithdrawResponse) error {
 	}
 	p.command.Output(output, nil)
 	p.command.Close()
+	p.complete = true
+	return nil
+}
+
+func (p *withdrawProposal) Fail(err error) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
+	log.Debugf("Failing WithdrawProposal %s: %s", p, err)
+	p.command.Output(nil, err)
+	p.command.Close()
+	p.complete = true
 	return nil
 }
 
@@ -524,6 +559,7 @@ type AnointProposal interface {
 	Proposal
 	Request() (*election.AnointRequest, error)
 	Reply(*election.AnointResponse) error
+	Fail(error) error
 }
 
 func newAnointProposal(command rsm.Command) AnointProposal {
@@ -535,7 +571,8 @@ func newAnointProposal(command rsm.Command) AnointProposal {
 
 type anointProposal struct {
 	Proposal
-	command rsm.Command
+	command  rsm.Command
+	complete bool
 }
 
 func (p *anointProposal) Request() (*election.AnointRequest, error) {
@@ -548,6 +585,9 @@ func (p *anointProposal) Request() (*election.AnointRequest, error) {
 }
 
 func (p *anointProposal) Reply(response *election.AnointResponse) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
 	log.Debugf("Sending AnointProposal %s: %s", p, response)
 	output, err := proto.Marshal(response)
 	if err != nil {
@@ -555,6 +595,18 @@ func (p *anointProposal) Reply(response *election.AnointResponse) error {
 	}
 	p.command.Output(output, nil)
 	p.command.Close()
+	p.complete = true
+	return nil
+}
+
+func (p *anointProposal) Fail(err error) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
+	log.Debugf("Failing AnointProposal %s: %s", p, err)
+	p.command.Output(nil, err)
+	p.command.Close()
+	p.complete = true
 	return nil
 }
 
@@ -602,6 +654,7 @@ type PromoteProposal interface {
 	Proposal
 	Request() (*election.PromoteRequest, error)
 	Reply(*election.PromoteResponse) error
+	Fail(error) error
 }
 
 func newPromoteProposal(command rsm.Command) PromoteProposal {
@@ -613,7 +666,8 @@ func newPromoteProposal(command rsm.Command) PromoteProposal {
 
 type promoteProposal struct {
 	Proposal
-	command rsm.Command
+	command  rsm.Command
+	complete bool
 }
 
 func (p *promoteProposal) Request() (*election.PromoteRequest, error) {
@@ -626,6 +680,9 @@ func (p *promoteProposal) Request() (*election.PromoteRequest, error) {
 }
 
 func (p *promoteProposal) Reply(response *election.PromoteResponse) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
 	log.Debugf("Sending PromoteProposal %s: %s", p, response)
 	output, err := proto.Marshal(response)
 	if err != nil {
@@ -633,6 +690,18 @@ func (p *promoteProposal) Reply(response *election.PromoteResponse) error {
 	}
 	p.command.Output(output, nil)
 	p.command.Close()
+	p.complete = true
+	return nil
+}
+
+func (p *promoteProposal) Fail(err error) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
+	log.Debugf("Failing PromoteProposal %s: %s", p, err)
+	p.command.Output(nil, err)
+	p.command.Close()
+	p.complete = true
 	return nil
 }
 
@@ -680,6 +749,7 @@ type EvictProposal interface {
 	Proposal
 	Request() (*election.EvictRequest, error)
 	Reply(*election.EvictResponse) error
+	Fail(error) error
 }
 
 func newEvictProposal(command rsm.Command) EvictProposal {
@@ -691,7 +761,8 @@ func newEvictProposal(command rsm.Command) EvictProposal {
 
 type evictProposal struct {
 	Proposal
-	command rsm.Command
+	command  rsm.Command
+	complete bool
 }
 
 func (p *evictProposal) Request() (*election.EvictRequest, error) {
@@ -704,6 +775,9 @@ func (p *evictProposal) Request() (*election.EvictRequest, error) {
 }
 
 func (p *evictProposal) Reply(response *election.EvictResponse) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
 	log.Debugf("Sending EvictProposal %s: %s", p, response)
 	output, err := proto.Marshal(response)
 	if err != nil {
@@ -711,6 +785,18 @@ func (p *evictProposal) Reply(response *election.EvictResponse) error {
 	}
 	p.command.Output(output, nil)
 	p.command.Close()
+	p.complete = true
+	return nil
+}
+
+func (p *evictProposal) Fail(err error) error {
+	if p.complete {
+		return errors.NewConflict("proposal is already complete")
+	}
+	log.Debugf("Failing EvictProposal %s: %s", p, err)
+	p.command.Output(nil, err)
+	p.command.Close()
+	p.complete = true
 	return nil
 }
 

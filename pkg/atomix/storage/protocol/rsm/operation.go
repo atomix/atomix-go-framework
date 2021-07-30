@@ -30,3 +30,17 @@ type Operation interface {
 	// Close closes the operation
 	Close()
 }
+
+func newOperation(session Session) *primitiveOperation {
+	return &primitiveOperation{
+		session: session,
+	}
+}
+
+type primitiveOperation struct {
+	session Session
+}
+
+func (o *primitiveOperation) Session() Session {
+	return o.session
+}

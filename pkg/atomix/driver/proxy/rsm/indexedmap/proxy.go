@@ -12,7 +12,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-const Type = "IndexedMap"
+const Type storage.ServiceType = "IndexedMap"
 
 const (
 	sizeOp       storage.OperationID = 1
@@ -57,17 +57,17 @@ func (s *ProxyServer) Size(ctx context.Context, request *indexedmap.SizeRequest)
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request SizeRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoQuery(ctx, sizeOp, input, s.readSync)
+	output, err := service.DoQuery(ctx, sizeOp, input, s.readSync)
 	if err != nil {
 		log.Warnf("Request SizeRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -96,17 +96,17 @@ func (s *ProxyServer) Put(ctx context.Context, request *indexedmap.PutRequest) (
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request PutRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoCommand(ctx, putOp, input)
+	output, err := service.DoCommand(ctx, putOp, input)
 	if err != nil {
 		log.Warnf("Request PutRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -135,17 +135,17 @@ func (s *ProxyServer) Get(ctx context.Context, request *indexedmap.GetRequest) (
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoQuery(ctx, getOp, input, s.readSync)
+	output, err := service.DoQuery(ctx, getOp, input, s.readSync)
 	if err != nil {
 		log.Warnf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -174,17 +174,17 @@ func (s *ProxyServer) FirstEntry(ctx context.Context, request *indexedmap.FirstE
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request FirstEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoQuery(ctx, firstEntryOp, input, s.readSync)
+	output, err := service.DoQuery(ctx, firstEntryOp, input, s.readSync)
 	if err != nil {
 		log.Warnf("Request FirstEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -213,17 +213,17 @@ func (s *ProxyServer) LastEntry(ctx context.Context, request *indexedmap.LastEnt
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request LastEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoQuery(ctx, lastEntryOp, input, s.readSync)
+	output, err := service.DoQuery(ctx, lastEntryOp, input, s.readSync)
 	if err != nil {
 		log.Warnf("Request LastEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -252,17 +252,17 @@ func (s *ProxyServer) PrevEntry(ctx context.Context, request *indexedmap.PrevEnt
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request PrevEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoQuery(ctx, prevEntryOp, input, s.readSync)
+	output, err := service.DoQuery(ctx, prevEntryOp, input, s.readSync)
 	if err != nil {
 		log.Warnf("Request PrevEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -291,17 +291,17 @@ func (s *ProxyServer) NextEntry(ctx context.Context, request *indexedmap.NextEnt
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request NextEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoQuery(ctx, nextEntryOp, input, s.readSync)
+	output, err := service.DoQuery(ctx, nextEntryOp, input, s.readSync)
 	if err != nil {
 		log.Warnf("Request NextEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -330,17 +330,17 @@ func (s *ProxyServer) Remove(ctx context.Context, request *indexedmap.RemoveRequ
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoCommand(ctx, removeOp, input)
+	output, err := service.DoCommand(ctx, removeOp, input)
 	if err != nil {
 		log.Warnf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -369,17 +369,17 @@ func (s *ProxyServer) Clear(ctx context.Context, request *indexedmap.ClearReques
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request ClearRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoCommand(ctx, clearOp, input)
+	output, err := service.DoCommand(ctx, clearOp, input)
 	if err != nil {
 		log.Warnf("Request ClearRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -411,16 +411,16 @@ func (s *ProxyServer) Events(request *indexedmap.EventsRequest, srv indexedmap.I
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(srv.Context(), serviceInfo)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	err = session.DoCommandStream(srv.Context(), eventsOp, input, stream)
+	err = service.DoCommandStream(srv.Context(), eventsOp, input, stream)
 	if err != nil {
 		log.Warnf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
@@ -468,16 +468,16 @@ func (s *ProxyServer) Entries(request *indexedmap.EntriesRequest, srv indexedmap
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(srv.Context(), serviceInfo)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	err = session.DoQueryStream(srv.Context(), entriesOp, input, stream, s.readSync)
+	err = service.DoQueryStream(srv.Context(), entriesOp, input, stream, s.readSync)
 	if err != nil {
 		log.Warnf("Request EntriesRequest failed: %v", err)
 		return errors.Proto(err)

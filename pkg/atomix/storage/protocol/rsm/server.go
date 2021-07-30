@@ -27,6 +27,26 @@ type Server struct {
 	Protocol Protocol
 }
 
+func (s *Server) WatchConfig(request *PartitionConfigRequest, server PartitionService_WatchConfigServer) error {
+	log.Debugf("Received PartitionConfigRequest %+v", request)
+	partition := s.Protocol.Partition(request.PartitionID)
+	ch := make(chan PartitionConfig)
+	if err := partition.WatchConfig(server.Context(), ch); err != nil {
+		return err
+	}
+	for event := range ch {
+		response := &PartitionConfigResponse{
+			Leader:    event.Leader,
+			Followers: event.Followers,
+		}
+		log.Debugf("Sending PartitionConfigResponse %+v", response)
+		if err := server.Send(response); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *Server) GetConfig(ctx context.Context, request *PartitionConfigRequest) (*PartitionConfigResponse, error) {
 	log.Debugf("Received PartitionConfigRequest %+v", request)
 	// If the client requires a leader and is not the leader, return an error

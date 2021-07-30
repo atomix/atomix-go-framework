@@ -15,9 +15,11 @@
 package rsm
 
 import (
+	"container/list"
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
@@ -28,129 +30,178 @@ import (
 	"io"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
-// newSession creates a new Session for the given partition
+const chanBufSize = 1000
+
+// SessionOption implements a session option
+type SessionOption interface {
+	prepare(options *sessionOptions)
+}
+
+// WithSessionTimeout returns a session SessionOption to configure the session timeout
+func WithSessionTimeout(timeout time.Duration) SessionOption {
+	return sessionTimeoutOption{timeout: timeout}
+}
+
+type sessionTimeoutOption struct {
+	timeout time.Duration
+}
+
+func (o sessionTimeoutOption) prepare(options *sessionOptions) {
+	options.timeout = o.timeout
+}
+
+type sessionOptions struct {
+	timeout time.Duration
+}
+
+// NewSession creates a new Session for the given partition
 // name is the name of the primitive
 // handler is the primitive's session handler
-func newSession(conn *grpc.ClientConn, partitionID rsm.PartitionID, serviceID rsm.ServiceID) *Session {
+func NewSession(partition cluster.Partition, opts ...SessionOption) *Session {
+	options := &sessionOptions{
+		timeout: time.Minute,
+	}
+	for i := range opts {
+		opts[i].prepare(options)
+	}
 	return &Session{
-		conn:            conn,
-		partitionID:     partitionID,
-		serviceID:       serviceID,
-		pendingRequests: make(map[rsm.RequestID]bool),
-		responseStreams: make(map[rsm.RequestID]*responseStream),
+		partition: partition,
+		Timeout:   options.timeout,
+		services:  make(map[rsm.ServiceInfo]*Service),
 	}
 }
 
 // Session maintains the session for a primitive
 type Session struct {
-	conn            *grpc.ClientConn
-	partitionID     rsm.PartitionID
-	sessionID       rsm.SessionID
-	serviceID       rsm.ServiceID
-	lastIndex       rsm.Index
-	indexMu         sync.RWMutex
-	requestID       uint64
-	responseID      uint64
-	pendingRequests map[rsm.RequestID]bool
-	responseStreams map[rsm.RequestID]*responseStream
-	stateMu         sync.RWMutex
+	partition   cluster.Partition
+	Timeout     time.Duration
+	partitionID rsm.PartitionID
+	sessionID   rsm.SessionID
+	lastIndex   *sessionIndex
+	requestID   *sessionRequestID
+	requestCh   chan sessionRequestEvent
+	conn        *grpc.ClientConn
+	client      rsm.PartitionServiceClient
+	services    map[rsm.ServiceInfo]*Service
+	servicesMu  sync.RWMutex
 }
 
-// DoCommand submits a command to the service
-func (s *Session) DoCommand(ctx context.Context, operationID rsm.OperationID, input []byte) ([]byte, error) {
-	requestID := rsm.RequestID(atomic.AddUint64(&s.requestID, 1))
-	client := rsm.NewPartitionServiceClient(s.conn)
+func (s *Session) GetService(ctx context.Context, serviceInfo rsm.ServiceInfo) (*Service, error) {
+	if service, ok := s.getService(serviceInfo); ok {
+		return service, nil
+	}
+
+	s.servicesMu.Lock()
+	defer s.servicesMu.Unlock()
+
+	service, ok := s.services[serviceInfo]
+	if ok {
+		return service, nil
+	}
+
+	service = newService(s, serviceInfo)
+	if err := service.open(ctx); err != nil {
+		return nil, err
+	}
+	s.services[serviceInfo] = service
+	return service, nil
+}
+
+func (s *Session) getService(serviceID rsm.ServiceInfo) (*Service, bool) {
+	s.servicesMu.RLock()
+	defer s.servicesMu.RUnlock()
+	service, ok := s.services[serviceID]
+	return service, ok
+}
+
+// doCommand submits a command to the service
+func (s *Session) doCommand(ctx context.Context, serviceID rsm.ServiceID, operationID rsm.OperationID, input []byte) ([]byte, error) {
+	requestID := s.requestID.Next()
 	request := &rsm.PartitionCommandRequest{
-		PartitionID: s.partitionID,
+		PartitionID: rsm.PartitionID(s.partition.ID()),
 		Request: rsm.CommandRequest{
 			Request: &rsm.CommandRequest_SessionCommand{
 				SessionCommand: &rsm.SessionCommandRequest{
 					SessionID: s.sessionID,
-					RequestID: requestID,
-					Operation: &rsm.OperationRequest{
-						OperationID: operationID,
-						Value:       input,
+					Request: &rsm.SessionCommandRequest_ServiceCommand{
+						ServiceCommand: &rsm.ServiceCommandRequest{
+							ServiceID: serviceID,
+							RequestID: requestID,
+							Operation: &rsm.OperationRequest{
+								OperationID: operationID,
+								Value:       input,
+							},
+						},
 					},
 				},
 			},
 		},
 	}
 
-	s.stateMu.Lock()
-	s.pendingRequests[requestID] = true
-	s.stateMu.Unlock()
+	s.requestCh <- sessionRequestEvent{
+		eventType: sessionRequestEventStart,
+		requestID: requestID,
+	}
 
-	response, err := client.Command(ctx, request, retry.WithRetryOn(codes.Unavailable, codes.Unknown))
+	response, err := s.client.Command(ctx, request, retry.WithRetryOn(codes.Unavailable, codes.Unknown))
 	if err != nil {
 		return nil, errors.From(err)
 	}
 
-	s.stateMu.Lock()
-	delete(s.pendingRequests, requestID)
-	s.stateMu.Unlock()
+	s.lastIndex.Update(response.Response.Index)
 
-	s.indexMu.RLock()
-	if response.Response.Index > s.lastIndex {
-		s.indexMu.RUnlock()
-		s.indexMu.Lock()
-		if response.Response.Index > s.lastIndex {
-			s.lastIndex = response.Response.Index
-		}
-		s.indexMu.Unlock()
-	} else {
-		s.indexMu.RUnlock()
+	s.requestCh <- sessionRequestEvent{
+		eventType: sessionRequestEventEnd,
+		requestID: requestID,
 	}
 
-	result := response.Response.GetSessionCommand().Operation
+	result := response.Response.GetSessionCommand().GetServiceCommand().Operation
 	if result.Status.Code != rsm.ResponseCode_OK {
 		return nil, rsm.GetErrorFromStatus(result.Status)
 	}
 	return result.Value, nil
 }
 
-// DoCommandStream submits a streaming command to the service
-func (s *Session) DoCommandStream(ctx context.Context, operationID rsm.OperationID, input []byte, stream streams.WriteStream) error {
-	requestID := rsm.RequestID(atomic.AddUint64(&s.requestID, 1))
+// doCommandStream submits a streaming command to the service
+func (s *Session) doCommandStream(ctx context.Context, serviceID rsm.ServiceID, operationID rsm.OperationID, input []byte, stream streams.WriteStream) error {
+	requestID := s.requestID.Next()
 	request := &rsm.PartitionCommandRequest{
 		PartitionID: s.partitionID,
 		Request: rsm.CommandRequest{
 			Request: &rsm.CommandRequest_SessionCommand{
 				SessionCommand: &rsm.SessionCommandRequest{
 					SessionID: s.sessionID,
-					RequestID: requestID,
-					Operation: &rsm.OperationRequest{
-						OperationID: operationID,
-						Value:       input,
+					Request: &rsm.SessionCommandRequest_ServiceCommand{
+						ServiceCommand: &rsm.ServiceCommandRequest{
+							ServiceID: serviceID,
+							RequestID: requestID,
+							Operation: &rsm.OperationRequest{
+								OperationID: operationID,
+								Value:       input,
+							},
+						},
 					},
 				},
 			},
 		},
 	}
 
-	streamState := &responseStream{}
-	s.stateMu.Lock()
-	s.pendingRequests[requestID] = true
-	s.responseStreams[requestID] = streamState
-	s.stateMu.Unlock()
+	s.requestCh <- sessionRequestEvent{
+		eventType: sessionRequestEventStart,
+		requestID: requestID,
+	}
 
-	client := rsm.NewPartitionServiceClient(s.conn)
-	responseStream, err := client.CommandStream(ctx, request, retry.WithRetryOn(codes.Unavailable, codes.Unknown))
+	responseStream, err := s.client.CommandStream(ctx, request, retry.WithRetryOn(codes.Unavailable, codes.Unknown))
 	if err != nil {
 		return errors.From(err)
 	}
 
 	go func() {
 		defer stream.Close()
-		defer func() {
-			s.stateMu.Lock()
-			delete(s.pendingRequests, requestID)
-			delete(s.responseStreams, requestID)
-			s.stateMu.Unlock()
-		}()
-
-		var lastResponseID uint64
+		var lastResponseID rsm.ResponseID
 		for {
 			response, err := responseStream.Recv()
 			if err == io.EOF {
@@ -160,89 +211,89 @@ func (s *Session) DoCommandStream(ctx context.Context, operationID rsm.Operation
 				break
 			}
 
-			responseID := uint64(response.Response.GetSessionCommand().ResponseID)
-			if responseID == lastResponseID+1 {
-				lastResponseID = responseID
-				atomic.StoreUint64(&streamState.responseID, lastResponseID)
-				result := response.Response.GetSessionCommand().Operation
+			s.lastIndex.Update(response.Response.Index)
+
+			responseID := response.Response.GetSessionCommand().GetServiceCommand().ResponseID
+			if responseID > lastResponseID {
+				result := response.Response.GetSessionCommand().GetServiceCommand().Operation
 				if result.Status.Code != rsm.ResponseCode_OK {
 					stream.Error(rsm.GetErrorFromStatus(result.Status))
 				} else {
 					stream.Value(result.Value)
 				}
+				s.requestCh <- sessionRequestEvent{
+					eventType:  sessionRequestEventReceive,
+					requestID:  requestID,
+					responseID: responseID,
+				}
+				lastResponseID = responseID
 			}
 		}
 	}()
 	return nil
 }
 
-// DoQuery submits a query to the service
-func (s *Session) DoQuery(ctx context.Context, operationID rsm.OperationID, input []byte, sync bool) ([]byte, error) {
-	lastRequestID := rsm.RequestID(atomic.LoadUint64(&s.requestID))
-
-	s.indexMu.RLock()
-	lastIndex := s.lastIndex
-	s.indexMu.RUnlock()
-
-	client := rsm.NewPartitionServiceClient(s.conn)
+// doQuery submits a query to the service
+func (s *Session) doQuery(ctx context.Context, serviceID rsm.ServiceID, operationID rsm.OperationID, input []byte, sync bool) ([]byte, error) {
 	request := &rsm.PartitionQueryRequest{
 		PartitionID: s.partitionID,
 		Sync:        sync,
 		Request: rsm.QueryRequest{
-			LastIndex: lastIndex,
+			LastIndex: s.lastIndex.Get(),
 			Request: &rsm.QueryRequest_SessionQuery{
 				SessionQuery: &rsm.SessionQueryRequest{
-					SessionID:     s.sessionID,
-					LastRequestID: lastRequestID,
-					Operation: &rsm.OperationRequest{
-						OperationID: operationID,
-						Value:       input,
+					SessionID: s.sessionID,
+					Request: &rsm.SessionQueryRequest_ServiceQuery{
+						ServiceQuery: &rsm.ServiceQueryRequest{
+							ServiceID: serviceID,
+							Operation: &rsm.OperationRequest{
+								OperationID: operationID,
+								Value:       input,
+							},
+						},
 					},
 				},
 			},
 		},
 	}
 
-	response, err := client.Query(ctx, request, retry.WithRetryOn(codes.Unavailable, codes.Unknown))
+	response, err := s.client.Query(ctx, request, retry.WithRetryOn(codes.Unavailable, codes.Unknown))
 	if err != nil {
 		return nil, errors.From(err)
 	}
 
-	result := response.Response.GetSessionQuery().Operation
+	result := response.Response.GetSessionQuery().GetServiceQuery().Operation
 	if result.Status.Code != rsm.ResponseCode_OK {
 		return nil, rsm.GetErrorFromStatus(result.Status)
 	}
 	return result.Value, nil
 }
 
-// DoQueryStream submits a streaming query to the service
-func (s *Session) DoQueryStream(ctx context.Context, operationID rsm.OperationID, input []byte, stream streams.WriteStream, sync bool) error {
-	lastRequestID := rsm.RequestID(atomic.LoadUint64(&s.requestID))
-
-	s.indexMu.RLock()
-	lastIndex := s.lastIndex
-	s.indexMu.RUnlock()
-
+// doQueryStream submits a streaming query to the service
+func (s *Session) doQueryStream(ctx context.Context, serviceID rsm.ServiceID, operationID rsm.OperationID, input []byte, stream streams.WriteStream, sync bool) error {
 	request := &rsm.PartitionQueryRequest{
 		PartitionID: s.partitionID,
 		Sync:        sync,
 		Request: rsm.QueryRequest{
-			LastIndex: lastIndex,
+			LastIndex: s.lastIndex.Get(),
 			Request: &rsm.QueryRequest_SessionQuery{
 				SessionQuery: &rsm.SessionQueryRequest{
-					SessionID:     s.sessionID,
-					LastRequestID: lastRequestID,
-					Operation: &rsm.OperationRequest{
-						OperationID: operationID,
-						Value:       input,
+					SessionID: s.sessionID,
+					Request: &rsm.SessionQueryRequest_ServiceQuery{
+						ServiceQuery: &rsm.ServiceQueryRequest{
+							ServiceID: serviceID,
+							Operation: &rsm.OperationRequest{
+								OperationID: operationID,
+								Value:       input,
+							},
+						},
 					},
 				},
 			},
 		},
 	}
 
-	client := rsm.NewPartitionServiceClient(s.conn)
-	responseStream, err := client.QueryStream(ctx, request, retry.WithRetryOn(codes.Unavailable, codes.Unknown))
+	responseStream, err := s.client.QueryStream(ctx, request, retry.WithRetryOn(codes.Unavailable, codes.Unknown))
 	if err != nil {
 		return errors.From(err)
 	}
@@ -258,7 +309,7 @@ func (s *Session) DoQueryStream(ctx context.Context, operationID rsm.OperationID
 				break
 			}
 
-			result := response.Response.GetSessionQuery().Operation
+			result := response.Response.GetSessionQuery().GetServiceQuery().Operation
 			if result.Status.Code != rsm.ResponseCode_OK {
 				stream.Error(rsm.GetErrorFromStatus(result.Status))
 			} else {
@@ -270,30 +321,139 @@ func (s *Session) DoQueryStream(ctx context.Context, operationID rsm.OperationID
 }
 
 func (s *Session) open(ctx context.Context) error {
-	client := rsm.NewPartitionServiceClient(s.conn)
+	conn, err := s.partition.Connect(ctx,
+		cluster.WithDialOption(grpc.WithInsecure()),
+		cluster.WithDialOption(grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"rsm"}`)),
+		cluster.WithDialOption(grpc.WithResolvers(newResolver(s.partitionID))),
+		cluster.WithDialOption(grpc.WithUnaryInterceptor(retry.RetryingUnaryClientInterceptor(retry.WithRetryOn(codes.Unavailable, codes.Unknown)))),
+		cluster.WithDialOption(grpc.WithStreamInterceptor(retry.RetryingStreamClientInterceptor(retry.WithRetryOn(codes.Unavailable, codes.Unknown)))))
+	if err != nil {
+		return err
+	}
+	s.conn = conn
+	s.client = rsm.NewPartitionServiceClient(s.conn)
+
 	request := &rsm.PartitionCommandRequest{
-		PartitionID: s.partitionID,
 		Request: rsm.CommandRequest{
 			Request: &rsm.CommandRequest_OpenSession{
 				OpenSession: &rsm.OpenSessionRequest{
-					ServiceID: s.serviceID,
+					Timeout: s.Timeout,
 				},
 			},
 		},
 	}
-	response, err := client.Command(ctx, request)
+
+	response, err := s.client.Command(ctx, request)
 	if err != nil {
 		return errors.From(err)
 	}
+
 	s.sessionID = response.Response.GetOpenSession().SessionID
-	s.lastIndex = rsm.Index(s.sessionID)
+	s.lastIndex.Update(response.Response.Index)
+
+	s.requestCh = make(chan sessionRequestEvent, chanBufSize)
+	go func() {
+		ticker := time.NewTicker(s.Timeout / 4)
+		var requestID rsm.RequestID
+		queue := make(map[rsm.RequestID]*list.List)
+		requests := make(map[rsm.RequestID]*sessionStream)
+		for {
+			select {
+			case requestEvent := <-s.requestCh:
+				nextRequestID := requestID + 1
+				if requestEvent.requestID == nextRequestID {
+					requestID = requestEvent.requestID
+				} else if requestEvent.requestID > nextRequestID {
+					queuedRequests, ok := queue[requestEvent.requestID]
+					if !ok {
+						queuedRequests = list.New()
+						queue[requestEvent.requestID] = queuedRequests
+					}
+					queuedRequests.PushBack(requestEvent)
+					continue
+				}
+
+				switch requestEvent.eventType {
+				case sessionRequestEventStart:
+					requests[requestEvent.requestID] = &sessionStream{}
+				case sessionRequestEventReceive:
+					request, ok := requests[requestEvent.requestID]
+					if ok {
+						if requestEvent.responseID > request.responseID {
+							request.responseID = requestEvent.responseID
+						}
+					}
+				case sessionRequestEventEnd:
+					delete(requests, requestEvent.requestID)
+				}
+
+				queuedRequests, ok := queue[requestEvent.requestID]
+				if ok {
+					queuedRequest := queuedRequests.Front()
+					for queuedRequest != nil {
+						switch requestEvent.eventType {
+						case sessionRequestEventStart:
+							requests[requestEvent.requestID] = &sessionStream{}
+						case sessionRequestEventReceive:
+							request, ok := requests[requestEvent.requestID]
+							if ok {
+								if requestEvent.responseID > request.responseID {
+									request.responseID = requestEvent.responseID
+								}
+							}
+						case sessionRequestEventEnd:
+							delete(requests, requestEvent.requestID)
+						}
+						queuedRequest = queuedRequest.Next()
+					}
+					delete(queue, requestEvent.requestID)
+				}
+			case <-ticker.C:
+				requestFilter := bloom.NewWithEstimates(uint(len(requests)), 0.1)
+				for requestID, stream := range requests {
+					requestBytes := make([]byte, 8)
+					binary.BigEndian.PutUint64(requestBytes, uint64(requestID))
+					responseBytes := make([]byte, 8)
+					binary.BigEndian.PutUint64(responseBytes, uint64(stream.responseID))
+					allBytes := append(requestBytes, responseBytes...)
+					requestFilter.Add(requestBytes)
+					requestFilter.Add(allBytes)
+				}
+				go s.keepAliveSessions(context.Background(), requestID, requestFilter)
+			}
+		}
+	}()
+	return nil
+}
+
+func (s *Session) keepAliveSessions(ctx context.Context, requestID rsm.RequestID, requestFilter *bloom.BloomFilter) error {
+	requestFilterBytes, err := json.Marshal(requestFilter)
+	if err != nil {
+		return err
+	}
+
+	request := &rsm.PartitionCommandRequest{
+		Request: rsm.CommandRequest{
+			Request: &rsm.CommandRequest_KeepAlive{
+				KeepAlive: &rsm.KeepAliveRequest{
+					SessionID:     s.sessionID,
+					LastRequestID: requestID,
+					RequestFilter: requestFilterBytes,
+				},
+			},
+		},
+	}
+
+	response, err := s.client.Command(ctx, request)
+	if err != nil {
+		return errors.From(err)
+	}
+	s.lastIndex.Update(response.Response.Index)
 	return nil
 }
 
 func (s *Session) close(ctx context.Context) error {
-	client := rsm.NewPartitionServiceClient(s.conn)
 	request := &rsm.PartitionCommandRequest{
-		PartitionID: s.partitionID,
 		Request: rsm.CommandRequest{
 			Request: &rsm.CommandRequest_CloseSession{
 				CloseSession: &rsm.CloseSessionRequest{
@@ -302,41 +462,61 @@ func (s *Session) close(ctx context.Context) error {
 			},
 		},
 	}
-	_, err := client.Command(ctx, request)
+
+	_, err := s.client.Command(ctx, request)
 	if err != nil {
 		return errors.From(err)
 	}
 	return nil
 }
 
-func (s *Session) getState() *rsm.SessionKeepAlive {
-	s.stateMu.RLock()
-	defer s.stateMu.RUnlock()
-	streamStates := make(map[rsm.RequestID]*rsm.StreamKeepAlive)
-	for requestID, responseStream := range s.responseStreams {
-		streamStates[requestID] = &rsm.StreamKeepAlive{
-			CompleteResponseID: rsm.ResponseID(atomic.LoadUint64(&responseStream.responseID)),
+type sessionIndex struct {
+	value uint64
+}
+
+func (i *sessionIndex) Update(index rsm.Index) {
+	update := uint64(index)
+	for {
+		current := atomic.LoadUint64(&i.value)
+		if current < update {
+			updated := atomic.CompareAndSwapUint64(&i.value, current, update)
+			if updated {
+				break
+			}
+		} else {
+			break
 		}
-	}
-
-	requestFilter := bloom.NewWithEstimates(uint(len(s.pendingRequests)), 0.1)
-	for requestID := range s.pendingRequests {
-		bytes := make([]byte, 8)
-		binary.BigEndian.PutUint64(bytes, uint64(requestID))
-		requestFilter.Add(bytes)
-	}
-
-	requestFilterBytes, err := json.Marshal(requestFilter)
-	if err != nil {
-		panic(err)
-	}
-
-	return &rsm.SessionKeepAlive{
-		PendingRequests: requestFilterBytes,
-		ResponseStreams: streamStates,
 	}
 }
 
-type responseStream struct {
-	responseID uint64
+func (i *sessionIndex) Get() rsm.Index {
+	value := atomic.LoadUint64(&i.value)
+	return rsm.Index(value)
+}
+
+type sessionRequestID struct {
+	value uint64
+}
+
+func (i *sessionRequestID) Next() rsm.RequestID {
+	value := atomic.AddUint64(&i.value, 1)
+	return rsm.RequestID(value)
+}
+
+type sessionRequestEventType int
+
+const (
+	sessionRequestEventStart sessionRequestEventType = iota
+	sessionRequestEventReceive
+	sessionRequestEventEnd
+)
+
+type sessionRequestEvent struct {
+	requestID  rsm.RequestID
+	responseID rsm.ResponseID
+	eventType  sessionRequestEventType
+}
+
+type sessionStream struct {
+	responseID rsm.ResponseID
 }

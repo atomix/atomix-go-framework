@@ -19,10 +19,10 @@ type NewServiceFunc func(context ServiceContext) Service
 
 // Registry is the default primitive registry
 type Registry struct {
-	services map[string]NewServiceFunc
+	services map[ServiceType]NewServiceFunc
 }
 
-func (r *Registry) Register(primitiveType string, primitive NewServiceFunc) {
+func (r *Registry) Register(primitiveType ServiceType, primitive NewServiceFunc) {
 	r.services[primitiveType] = primitive
 }
 
@@ -34,13 +34,13 @@ func (r *Registry) GetServices() []NewServiceFunc {
 	return services
 }
 
-func (r *Registry) GetService(primitiveType string) NewServiceFunc {
+func (r *Registry) GetService(primitiveType ServiceType) NewServiceFunc {
 	return r.services[primitiveType]
 }
 
 // NewRegistry creates a new primitive registry
 func NewRegistry() *Registry {
 	return &Registry{
-		services: make(map[string]NewServiceFunc),
+		services: make(map[ServiceType]NewServiceFunc),
 	}
 }

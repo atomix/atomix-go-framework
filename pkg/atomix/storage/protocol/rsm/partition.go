@@ -22,6 +22,12 @@ import (
 // PartitionID is a partition identifier
 type PartitionID int
 
+// PartitionConfig is the partition configuration
+type PartitionConfig struct {
+	Leader    string
+	Followers []string
+}
+
 // Partition is the interface for a partition client
 type Partition interface {
 	// MustLeader returns whether the client can only be used on the leader
@@ -35,6 +41,9 @@ type Partition interface {
 
 	// Followers returns the followers
 	Followers() []string
+
+	// WatchConfig watches the partition configuration for changes
+	WatchConfig(ctx context.Context, ch chan<- PartitionConfig) error
 
 	// SyncCommand executes a write request
 	SyncCommand(ctx context.Context, input []byte, stream stream.WriteStream) error

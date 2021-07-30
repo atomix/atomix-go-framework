@@ -11,7 +11,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-const Type = "Counter"
+const Type storage.ServiceType = "Counter"
 
 const (
 	setOp       storage.OperationID = 1
@@ -49,17 +49,17 @@ func (s *ProxyServer) Set(ctx context.Context, request *counter.SetRequest) (*co
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoCommand(ctx, setOp, input)
+	output, err := service.DoCommand(ctx, setOp, input)
 	if err != nil {
 		log.Warnf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -88,17 +88,17 @@ func (s *ProxyServer) Get(ctx context.Context, request *counter.GetRequest) (*co
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoQuery(ctx, getOp, input, s.readSync)
+	output, err := service.DoQuery(ctx, getOp, input, s.readSync)
 	if err != nil {
 		log.Warnf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -127,17 +127,17 @@ func (s *ProxyServer) Increment(ctx context.Context, request *counter.IncrementR
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request IncrementRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoCommand(ctx, incrementOp, input)
+	output, err := service.DoCommand(ctx, incrementOp, input)
 	if err != nil {
 		log.Warnf("Request IncrementRequest failed: %v", err)
 		return nil, errors.Proto(err)
@@ -166,17 +166,17 @@ func (s *ProxyServer) Decrement(ctx context.Context, request *counter.DecrementR
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
-	service := storage.ServiceID{
+	serviceInfo := storage.ServiceInfo{
 		Type:      Type,
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
-	session, err := partition.GetSession(ctx, service)
+	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request DecrementRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	output, err := session.DoCommand(ctx, decrementOp, input)
+	output, err := service.DoCommand(ctx, decrementOp, input)
 	if err != nil {
 		log.Warnf("Request DecrementRequest failed: %v", err)
 		return nil, errors.Proto(err)

@@ -19,7 +19,6 @@ import (
 	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	storage "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/util/async"
 	"google.golang.org/grpc"
 )
@@ -46,13 +45,8 @@ func (s *PrimitiveServer) Create(ctx context.Context, request *primitiveapi.Crea
 		request.Headers.PrimitiveID.Namespace = s.env.Namespace
 	}
 	partitions := s.Partitions()
-	serviceID := storage.ServiceID{
-		Type:      request.Headers.PrimitiveID.Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
-	}
 	err := async.IterAsync(len(partitions), func(i int) error {
-		_, err := partitions[i].GetSession(ctx, serviceID)
+		_, err := partitions[i].GetService(ctx, request.Headers.PrimitiveID)
 		return err
 	})
 	if err != nil {
@@ -70,13 +64,8 @@ func (s *PrimitiveServer) Close(ctx context.Context, request *primitiveapi.Close
 		request.Headers.PrimitiveID.Namespace = s.env.Namespace
 	}
 	partitions := s.Partitions()
-	serviceID := storage.ServiceID{
-		Type:      request.Headers.PrimitiveID.Type,
-		Namespace: request.Headers.PrimitiveID.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
-	}
 	err := async.IterAsync(len(partitions), func(i int) error {
-		session, ok := partitions[i].sessions[serviceID]
+		session, ok := partitions[i].getService(request.Headers.PrimitiveID)
 		if !ok {
 			return nil
 		}
