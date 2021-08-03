@@ -108,11 +108,7 @@ func (s *primitiveService) Name() string {
 }
 
 func (s *primitiveService) Index() Index {
-	return s.index
-}
-
-func (s *primitiveService) setIndex(index Index) {
-	s.index = index
+	return s.manager.index
 }
 
 func (s *primitiveService) Time() time.Time {
