@@ -16,7 +16,6 @@ package gossip
 
 import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/util/async"
 )
 
@@ -39,7 +38,6 @@ func NewClient(cluster cluster.Cluster) *Client {
 // Client is a client for communicating with the storage layer
 type Client struct {
 	Cluster    cluster.Cluster
-	clock      time.Clock
 	partitions []*PartitionClient
 }
 

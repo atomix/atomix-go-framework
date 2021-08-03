@@ -166,4 +166,3 @@ func (c EpochTimestampCodec) EncodeTimestamp(timestamp Timestamp) metaapi.Timest
 func (c EpochTimestampCodec) DecodeTimestamp(timestamp metaapi.Timestamp) (Timestamp, error) {
 	return NewEpochTimestamp(Epoch(timestamp.GetEpochTimestamp().Epoch.Num), LogicalTime(timestamp.GetEpochTimestamp().Sequence.Num)), nil
 }
-

@@ -14,6 +14,7 @@
 
 package meta
 
+// CodegenMeta is the metadata for the code generator
 type CodegenMeta struct {
 	Generator GeneratorMeta
 	Location  LocationMeta
@@ -22,6 +23,7 @@ type CodegenMeta struct {
 	Primitive PrimitiveMeta
 }
 
+// GeneratorMeta is the metadata for the code generator
 type GeneratorMeta struct {
 	Prefix string
 }
@@ -80,6 +82,7 @@ type ServiceMeta struct {
 	Methods []MethodMeta
 }
 
+// StateMeta is metadata for a service state
 type StateMeta struct {
 	IsDiscrete   bool
 	IsContinuous bool
@@ -88,6 +91,7 @@ type StateMeta struct {
 	Digest       *FieldRefMeta
 }
 
+// ServiceTypeMeta is metadata for a service type
 type ServiceTypeMeta struct {
 	Name    string
 	Package PackageMeta
@@ -161,6 +165,7 @@ type ResponseMeta struct {
 	IsStream   bool
 }
 
+// AggregatorMeta is the metadata for response aggregation
 type AggregatorMeta struct {
 	FieldRefMeta
 	IsChooseFirst bool

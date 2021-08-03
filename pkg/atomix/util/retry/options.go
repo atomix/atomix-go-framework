@@ -21,24 +21,28 @@ import (
 	"time"
 )
 
+// WithPerCallTimeout sets the per-call retry timeout
 func WithPerCallTimeout(t time.Duration) CallOption {
 	return newCallOption(func(opts *callOptions) {
 		opts.perCallTimeout = &t
 	})
 }
 
+// WithInterval sets the base retry interval
 func WithInterval(d time.Duration) CallOption {
 	return newCallOption(func(opts *callOptions) {
 		opts.initialInterval = &d
 	})
 }
 
+// WithMaxInterval sets the maximum retry interval
 func WithMaxInterval(d time.Duration) CallOption {
 	return newCallOption(func(opts *callOptions) {
 		opts.maxInterval = &d
 	})
 }
 
+// WithRetryOn sets the codes on which to retry a request
 func WithRetryOn(codes ...codes.Code) CallOption {
 	return newCallOption(func(opts *callOptions) {
 		opts.codes = codes
@@ -51,6 +55,7 @@ func newCallOption(f func(opts *callOptions)) CallOption {
 	}
 }
 
+// CallOption is a retrying interceptor call option
 type CallOption struct {
 	grpc.EmptyCallOption // make sure we implement private after() and before() fields so we don't panic.
 	applyFunc            func(opts *callOptions)

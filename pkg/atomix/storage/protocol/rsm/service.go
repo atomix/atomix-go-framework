@@ -88,7 +88,6 @@ type primitiveService struct {
 	service   Service
 	sessions  *primitiveServiceSessions
 	commands  *primitiveCommands
-	index     Index
 }
 
 func (s *primitiveService) ID() ServiceID {

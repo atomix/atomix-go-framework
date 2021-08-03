@@ -330,9 +330,9 @@ func (m *primitiveServiceManager) createService(request *CreateServiceRequest, s
 		m.services[service.ID()] = service
 	}
 
-	serviceSession, ok := session.getService(service.serviceID)
+	_, ok := session.getService(service.serviceID)
 	if !ok {
-		serviceSession = newServiceSession(service)
+		serviceSession := newServiceSession(service)
 		if err := serviceSession.open(session.sessionID); err != nil {
 			stream.Error(err)
 			return
@@ -378,7 +378,10 @@ func (m *primitiveServiceManager) keepAlive(request *KeepAliveRequest, stream st
 		log.Warn("Failed to decode request filter", err)
 	}
 
-	session.keepAlive(request.LastRequestID, requestFilter)
+	if err := session.keepAlive(request.LastRequestID, requestFilter); err != nil {
+		stream.Error(err)
+		return
+	}
 	stream.Value(&KeepAliveResponse{})
 }
 

@@ -67,22 +67,26 @@ type ObjectMeta struct {
 	Tombstone bool
 }
 
+// AsObject returns the metadata as a non-tombstone
 func (m ObjectMeta) AsObject() ObjectMeta {
 	copy := m
 	copy.Tombstone = false
 	return copy
 }
 
+// AsTombstone returns the metadata as a tombstone
 func (m ObjectMeta) AsTombstone() ObjectMeta {
 	copy := m
 	copy.Tombstone = true
 	return copy
 }
 
+// Meta implements the Object interface
 func (m ObjectMeta) Meta() ObjectMeta {
 	return m
 }
 
+// Proto returns the metadata in Protobuf format
 func (m ObjectMeta) Proto() metaapi.ObjectMeta {
 	meta := metaapi.ObjectMeta{}
 	if m.Revision > 0 {
