@@ -151,7 +151,8 @@ func (s *primitiveSession) close() error {
 
 func newServiceSession(service *primitiveService) *primitiveServiceSession {
 	return &primitiveServiceSession{
-		service: service,
+		service:  service,
+		watchers: make(map[string]func(SessionState)),
 	}
 }
 
@@ -289,6 +290,7 @@ func newServiceSessionCommand(session *primitiveServiceSession) *primitiveServic
 	return &primitiveServiceSessionCommand{
 		primitiveOperation: newOperation(session),
 		session:            session,
+		watchers:           make(map[string]func(CommandState)),
 	}
 }
 

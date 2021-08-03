@@ -39,7 +39,7 @@ func (p *PickerBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
 		}
 		followers = append(followers, sc)
 	}
-	if leader == nil {
+	if leader == nil && len(followers) > 0 {
 		leader = followers[rand.Intn(len(followers))]
 	}
 	return &Picker{
