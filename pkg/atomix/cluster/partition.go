@@ -29,11 +29,12 @@ type PartitionID uint32
 // NewPartition returns a new replica
 func NewPartition(config protocolapi.ProtocolPartition, cluster Cluster) Partition {
 	return &partition{
-		id:           PartitionID(config.PartitionID),
-		cluster:      cluster,
-		host:         config.Host,
-		port:         int(config.APIPort),
-		replicasByID: make(map[ReplicaID]*Replica),
+		id:               PartitionID(config.PartitionID),
+		cluster:          cluster,
+		host:             config.Host,
+		port:             int(config.APIPort),
+		replicasByID:     make(map[ReplicaID]*Replica),
+		readReplicasByID: make(map[ReplicaID]*Replica),
 	}
 }
 
@@ -49,6 +50,10 @@ type Partition interface {
 	Replica(id ReplicaID) (*Replica, bool)
 	// Replicas returns the set of all replicas in the partition
 	Replicas() []*Replica
+	// ReadReplica looks up a read replica in the partition
+	ReadReplica(id ReplicaID) (*Replica, bool)
+	// ReadReplicas returns the set of all read replicas in the partition
+	ReadReplicas() []*Replica
 	// Connect connects to the partition
 	Connect(ctx context.Context, opts ...ConnectOption) (*grpc.ClientConn, error)
 	// Watch watches the partition for changes
@@ -62,17 +67,19 @@ type ConfigurablePartition interface {
 
 // partition is a cluster partition
 type partition struct {
-	id           PartitionID
-	host         string
-	port         int
-	cluster      Cluster
-	replicas     ReplicaSet
-	replicasByID map[ReplicaID]*Replica
-	watchers     []chan<- ReplicaSet
-	configMu     sync.RWMutex
-	updateMu     sync.Mutex
-	conn         *grpc.ClientConn
-	connMu       sync.RWMutex
+	id               PartitionID
+	host             string
+	port             int
+	cluster          Cluster
+	replicas         ReplicaSet
+	replicasByID     map[ReplicaID]*Replica
+	readReplicas     ReplicaSet
+	readReplicasByID map[ReplicaID]*Replica
+	watchers         []chan<- ReplicaSet
+	configMu         sync.RWMutex
+	updateMu         sync.Mutex
+	conn             *grpc.ClientConn
+	connMu           sync.RWMutex
 }
 
 func (p *partition) ID() PartitionID {
@@ -108,6 +115,21 @@ func (p *partition) Replicas() []*Replica {
 	defer p.configMu.RUnlock()
 	replicas := make([]*Replica, len(p.replicas))
 	copy(replicas, p.replicas)
+	return replicas
+}
+
+// ReadReplica returns a read replica by ID
+func (p *partition) ReadReplica(id ReplicaID) (*Replica, bool) {
+	replica, ok := p.readReplicasByID[id]
+	return replica, ok
+}
+
+// ReadReplicas returns the current read replicas
+func (p *partition) ReadReplicas() []*Replica {
+	p.configMu.RLock()
+	defer p.configMu.RUnlock()
+	replicas := make([]*Replica, len(p.readReplicas))
+	copy(replicas, p.readReplicas)
 	return replicas
 }
 
@@ -153,6 +175,8 @@ func (p *partition) Update(config protocolapi.ProtocolPartition) error {
 
 	replicas := make(ReplicaSet, 0, len(config.Replicas))
 	replicasByID := make(map[ReplicaID]*Replica)
+	readReplicas := make(ReplicaSet, 0, len(config.ReadReplicas))
+	readReplicasByID := make(map[ReplicaID]*Replica)
 	for _, id := range config.Replicas {
 		replicaID := ReplicaID(id)
 		replica, ok := p.cluster.Replica(replicaID)
@@ -163,9 +187,25 @@ func (p *partition) Update(config protocolapi.ProtocolPartition) error {
 		replicasByID[replicaID] = replica
 	}
 
+	for _, id := range config.ReadReplicas {
+		replicaID := ReplicaID(id)
+		replica, ok := p.cluster.Replica(replicaID)
+		if !ok {
+			return errors.NewNotFound("replica '%s' not a member of the cluster", replicaID)
+		}
+		readReplicas = append(readReplicas, replica)
+		readReplicasByID[replicaID] = replica
+	}
+
 	for id := range p.replicasByID {
 		if _, ok := replicasByID[id]; !ok {
 			delete(p.replicasByID, id)
+		}
+	}
+
+	for id := range p.readReplicasByID {
+		if _, ok := readReplicasByID[id]; !ok {
+			delete(p.readReplicasByID, id)
 		}
 	}
 
@@ -174,7 +214,14 @@ func (p *partition) Update(config protocolapi.ProtocolPartition) error {
 			p.replicasByID[id] = replica
 		}
 	}
+
+	for id, replica := range readReplicasByID {
+		if _, ok := p.readReplicasByID[id]; !ok {
+			p.readReplicasByID[id] = replica
+		}
+	}
 	p.replicas = replicas
+	p.readReplicas = readReplicas
 	p.configMu.Unlock()
 
 	p.configMu.RLock()
