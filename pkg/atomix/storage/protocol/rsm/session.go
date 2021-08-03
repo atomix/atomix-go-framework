@@ -296,7 +296,8 @@ type primitiveServiceSessionCommand struct {
 	*primitiveOperation
 	commandID  CommandID
 	session    *primitiveServiceSession
-	state      SessionCommandState
+	state      CommandState
+	watchers   map[string]func(CommandState)
 	request    *ServiceCommandRequest
 	responses  *list.List
 	responseID ResponseID
@@ -311,6 +312,18 @@ func (c *primitiveServiceSessionCommand) OperationID() OperationID {
 	return c.request.Operation.OperationID
 }
 
+func (c *primitiveServiceSessionCommand) State() CommandState {
+	return c.state
+}
+
+func (c *primitiveServiceSessionCommand) Watch(f func(state CommandState)) Watcher {
+	id := uuid.New().String()
+	c.watchers[id] = f
+	return &primitiveSessionWatcher{func() {
+		delete(c.watchers, id)
+	}}
+}
+
 func (c *primitiveServiceSessionCommand) Input() []byte {
 	return c.request.Operation.Value
 }
@@ -319,7 +332,7 @@ func (c *primitiveServiceSessionCommand) open(id CommandID, request *ServiceComm
 	c.commandID = id
 	c.request = request
 	c.responses = list.New()
-	c.state = SessionCommandState_COMMAND_OPEN
+	c.state = CommandOpen
 	c.stream = stream
 	c.session.commands.add(c)
 	c.session.service.commands.add(c)
@@ -333,9 +346,16 @@ func (c *primitiveServiceSessionCommand) snapshot() (*SessionCommandSnapshot, er
 		responses = append(responses, elem.Value.(ServiceCommandResponse))
 		elem = elem.Next()
 	}
+	var state SessionCommandState
+	switch c.state {
+	case CommandOpen:
+		state = SessionCommandState_COMMAND_OPEN
+	case CommandComplete:
+		state = SessionCommandState_COMMAND_COMPLETE
+	}
 	return &SessionCommandSnapshot{
 		CommandID:        c.commandID,
-		State:            c.state,
+		State:            state,
 		Request:          c.request,
 		PendingResponses: responses,
 	}, nil
@@ -343,7 +363,12 @@ func (c *primitiveServiceSessionCommand) snapshot() (*SessionCommandSnapshot, er
 
 func (c *primitiveServiceSessionCommand) restore(snapshot *SessionCommandSnapshot) error {
 	c.commandID = snapshot.CommandID
-	c.state = snapshot.State
+	switch snapshot.State {
+	case SessionCommandState_COMMAND_OPEN:
+		c.state = CommandOpen
+	case SessionCommandState_COMMAND_COMPLETE:
+		c.state = CommandComplete
+	}
 	c.request = snapshot.Request
 	c.responses = list.New()
 	for _, response := range snapshot.PendingResponses {
@@ -381,9 +406,12 @@ func (c *primitiveServiceSessionCommand) Output(bytes []byte, err error) {
 }
 
 func (c *primitiveServiceSessionCommand) Close() {
-	c.state = SessionCommandState_COMMAND_COMPLETE
 	c.session.service.commands.remove(c)
 	c.session.commands.remove(c)
+	c.state = CommandComplete
+	for _, watcher := range c.watchers {
+		watcher(CommandComplete)
+	}
 	c.stream.Close()
 }
 

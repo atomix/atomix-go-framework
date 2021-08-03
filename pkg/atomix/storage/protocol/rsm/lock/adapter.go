@@ -5,6 +5,7 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
+	"github.com/gogo/protobuf/proto"
 	"io"
 )
 
@@ -41,48 +42,82 @@ type ServiceAdaptor struct {
 	rsm Service
 }
 
-func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) error {
+func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 	switch command.OperationID() {
 	case 1:
-		p := newLockProposal(command)
-		log.Debugf("Proposing LockProposal %s", p)
-		err := s.rsm.Lock(p)
+		p, err := newLockProposal(command)
 		if err != nil {
-			log.Warn(err)
-			return err
+			err = errors.NewInternal(err.Error())
+			log.Error(err)
+			command.Output(nil, err)
+			return
 		}
-		return nil
+
+		log.Debugf("Proposal LockProposal %s", p)
+		s.rsm.Lock(p)
 	case 2:
-		p := newUnlockProposal(command)
-		log.Debugf("Proposing UnlockProposal %s", p)
-		err := s.rsm.Unlock(p)
+		p, err := newUnlockProposal(command)
 		if err != nil {
-			log.Warn(err)
-			return err
+			err = errors.NewInternal(err.Error())
+			log.Error(err)
+			command.Output(nil, err)
+			return
 		}
-		return nil
+
+		log.Debugf("Proposal UnlockProposal %s", p)
+		response, err := s.rsm.Unlock(p)
+		if err != nil {
+			log.Warnf("Proposal UnlockProposal %s failed: %v", p, err)
+			command.Output(nil, err)
+		} else {
+			output, err := proto.Marshal(response)
+			if err != nil {
+				err = errors.NewInternal(err.Error())
+				log.Errorf("Proposal UnlockProposal %s failed: %v", p, err)
+				command.Output(nil, err)
+			} else {
+				log.Errorf("Proposal UnlockProposal %s complete: %+v", p, response)
+				command.Output(output, nil)
+			}
+		}
 	default:
 		err := errors.NewNotSupported("unknown operation %d", command.OperationID())
 		log.Warn(err)
-		return err
+		command.Output(nil, err)
 	}
 }
 
-func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) error {
+func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 	switch query.OperationID() {
 	case 3:
-		q := newGetLockQuery(query)
-		log.Debugf("Querying GetLockQuery %s", q)
-		err := s.rsm.GetLock(q)
+		q, err := newGetLockQuery(query)
 		if err != nil {
-			log.Warn(err)
-			return err
+			err = errors.NewInternal(err.Error())
+			log.Error(err)
+			query.Output(nil, err)
+			return
 		}
-		return nil
+
+		log.Debugf("Querying GetLockQuery %s", q)
+		response, err := s.rsm.GetLock(q)
+		if err != nil {
+			log.Warnf("Querying GetLockQuery %s failed: %v", q, err)
+			query.Output(nil, err)
+		} else {
+			output, err := proto.Marshal(response)
+			if err != nil {
+				err = errors.NewInternal(err.Error())
+				log.Errorf("Querying GetLockQuery %s failed: %v", q, err)
+				query.Output(nil, err)
+			} else {
+				log.Errorf("Querying GetLockQuery %s complete: %+v", q, response)
+				query.Output(output, nil)
+			}
+		}
 	default:
 		err := errors.NewNotSupported("unknown operation %d", query.OperationID())
 		log.Warn(err)
-		return err
+		query.Output(nil, err)
 	}
 }
 func (s *ServiceAdaptor) Backup(writer io.Writer) error {

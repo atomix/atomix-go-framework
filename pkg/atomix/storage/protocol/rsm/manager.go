@@ -308,11 +308,7 @@ func (m *primitiveServiceManager) serviceCommand(request *ServiceCommandRequest,
 		stream.Close()
 		return
 	}
-
-	if err := service.service.ExecuteCommand(command); err != nil {
-		command.Output(nil, errors.NewInternal(err.Error()))
-		command.Close()
-	}
+	service.service.ExecuteCommand(command)
 }
 
 func (m *primitiveServiceManager) createService(request *CreateServiceRequest, session *primitiveSession, stream streams.WriteStream) {
@@ -475,9 +471,5 @@ func (m *primitiveServiceManager) serviceQuery(request *ServiceQueryRequest, ses
 		stream.Close()
 		return
 	}
-
-	if err := service.service.ExecuteQuery(query); err != nil {
-		query.Output(nil, errors.NewInternal(err.Error()))
-		query.Close()
-	}
+	service.service.ExecuteQuery(query)
 }

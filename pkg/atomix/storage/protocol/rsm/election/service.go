@@ -70,16 +70,13 @@ func (e *electionService) watchSession(candidateID string, session Session) {
 	})
 }
 
-func (e *electionService) notify(event electionapi.Event) error {
+func (e *electionService) notify(event electionapi.Event) {
 	output := &electionapi.EventsResponse{
 		Event: event,
 	}
 	for _, events := range e.Proposals().Events().List() {
-		if err := events.Notify(output); err != nil {
-			return err
-		}
+		events.Notify(output)
 	}
-	return nil
 }
 
 func (e *electionService) updateTerm(newCandidates []string) (electionapi.Term, error) {
@@ -116,110 +113,88 @@ func (e *electionService) updateTerm(newCandidates []string) (electionapi.Term, 
 
 	e.term = newTerm
 
-	err := e.notify(electionapi.Event{
+	e.notify(electionapi.Event{
 		Type: electionapi.Event_CHANGED,
 		Term: newTerm,
 	})
-	if err != nil {
-		return electionapi.Term{}, err
-	}
 	return newTerm, nil
 }
 
-func (e *electionService) Enter(enter EnterProposal) error {
-	request, err := enter.Request()
-	if err != nil {
-		return err
-	}
-	e.watchSession(request.CandidateID, enter.Session())
+func (e *electionService) Enter(enter EnterProposal) (*electionapi.EnterResponse, error) {
+	e.watchSession(enter.Request().CandidateID, enter.Session())
 
 	candidates := e.term.Candidates[:]
-	if !sliceContains(candidates, request.CandidateID) {
-		candidates = append(candidates, request.CandidateID)
+	if !sliceContains(candidates, enter.Request().CandidateID) {
+		candidates = append(candidates, enter.Request().CandidateID)
 	}
 
 	term, err := e.updateTerm(candidates)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return enter.Reply(&electionapi.EnterResponse{
+	return &electionapi.EnterResponse{
 		Term: term,
-	})
+	}, nil
 }
 
-func (e *electionService) Withdraw(withdraw WithdrawProposal) error {
-	request, err := withdraw.Request()
-	if err != nil {
-		return err
-	}
-
+func (e *electionService) Withdraw(withdraw WithdrawProposal) (*electionapi.WithdrawResponse, error) {
 	candidates := make([]string, 0, len(e.term.Candidates))
 	for _, candidate := range e.term.Candidates {
-		if candidate != request.CandidateID {
+		if candidate != withdraw.Request().CandidateID {
 			candidates = append(candidates, candidate)
 		}
 	}
 
 	term, err := e.updateTerm(candidates)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return withdraw.Reply(&electionapi.WithdrawResponse{
+	return &electionapi.WithdrawResponse{
 		Term: term,
-	})
+	}, nil
 }
 
-func (e *electionService) Anoint(anoint AnointProposal) error {
-	request, err := anoint.Request()
-	if err != nil {
-		return err
-	}
-
-	if !sliceContains(e.term.Candidates, request.CandidateID) {
-		return errors.NewInvalid("not a candidate")
+func (e *electionService) Anoint(anoint AnointProposal) (*electionapi.AnointResponse, error) {
+	if !sliceContains(e.term.Candidates, anoint.Request().CandidateID) {
+		return nil, errors.NewInvalid("not a candidate")
 	}
 
 	candidates := make([]string, 0, len(e.term.Candidates))
-	candidates = append(candidates, request.CandidateID)
+	candidates = append(candidates, anoint.Request().CandidateID)
 	for _, candidate := range e.term.Candidates {
-		if candidate != request.CandidateID {
+		if candidate != anoint.Request().CandidateID {
 			candidates = append(candidates, candidate)
 		}
 	}
 
 	term, err := e.updateTerm(candidates)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return anoint.Reply(&electionapi.AnointResponse{
+	return &electionapi.AnointResponse{
 		Term: term,
-	})
+	}, nil
 }
 
-func (e *electionService) Promote(promote PromoteProposal) error {
-	request, err := promote.Request()
-	if err != nil {
-		return err
-	}
-
-	if !sliceContains(e.term.Candidates, request.CandidateID) {
-		return errors.NewInvalid("not a candidate")
+func (e *electionService) Promote(promote PromoteProposal) (*electionapi.PromoteResponse, error) {
+	if !sliceContains(e.term.Candidates, promote.Request().CandidateID) {
+		return nil, errors.NewInvalid("not a candidate")
 	}
 
 	var index int
 	for i, candidate := range e.term.Candidates {
-		if candidate == request.CandidateID {
+		if candidate == promote.Request().CandidateID {
 			index = i
 			break
 		}
 	}
 
 	if index == 0 {
-		return promote.Reply(&electionapi.PromoteResponse{
+		return &electionapi.PromoteResponse{
 			Term: e.term,
-		})
+		}, nil
 	}
 
 	candidates := make([]string, len(e.term.Candidates))
@@ -227,7 +202,7 @@ func (e *electionService) Promote(promote PromoteProposal) error {
 		if i < index-1 {
 			candidates[i] = candidate
 		} else if i == index-1 {
-			candidates[i] = request.CandidateID
+			candidates[i] = promote.Request().CandidateID
 		} else if i == index {
 			candidates[i] = e.term.Candidates[i-1]
 		} else {
@@ -237,47 +212,42 @@ func (e *electionService) Promote(promote PromoteProposal) error {
 
 	term, err := e.updateTerm(candidates)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return promote.Reply(&electionapi.PromoteResponse{
+	return &electionapi.PromoteResponse{
 		Term: term,
-	})
+	}, nil
 }
 
-func (e *electionService) Evict(evict EvictProposal) error {
-	request, err := evict.Request()
-	if err != nil {
-		return err
-	}
-
-	if !sliceContains(e.term.Candidates, request.CandidateID) {
-		return errors.NewInvalid("not a candidate")
+func (e *electionService) Evict(evict EvictProposal) (*electionapi.EvictResponse, error) {
+	if !sliceContains(e.term.Candidates, evict.Request().CandidateID) {
+		return nil, errors.NewInvalid("not a candidate")
 	}
 
 	candidates := make([]string, 0, len(e.term.Candidates))
 	for _, candidate := range e.term.Candidates {
-		if candidate != request.CandidateID {
+		if candidate != evict.Request().CandidateID {
 			candidates = append(candidates, candidate)
 		}
 	}
 
 	term, err := e.updateTerm(candidates)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return evict.Reply(&electionapi.EvictResponse{
+	return &electionapi.EvictResponse{
 		Term: term,
-	})
+	}, nil
 }
 
-func (e *electionService) GetTerm(getTerm GetTermQuery) error {
-	return getTerm.Reply(&electionapi.GetTermResponse{
+func (e *electionService) GetTerm(GetTermQuery) (*electionapi.GetTermResponse, error) {
+	return &electionapi.GetTermResponse{
 		Term: e.term,
-	})
+	}, nil
 }
 
-func (e *electionService) Events(events EventsProposal) error {
-	return nil
+func (e *electionService) Events(events EventsProposal) {
+	events.Notify(&electionapi.EventsResponse{})
 }
 
 func slicesMatch(s1, s2 []string) bool {

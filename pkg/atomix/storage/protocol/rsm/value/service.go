@@ -56,34 +56,26 @@ func (v *valueService) Restore(reader SnapshotReader) error {
 	return nil
 }
 
-func (v *valueService) notify(event valueapi.Event) error {
+func (v *valueService) notify(event valueapi.Event) {
 	output := &valueapi.EventsResponse{
 		Event: event,
 	}
 	for _, events := range v.Proposals().Events().List() {
-		if err := events.Notify(output); err != nil {
-			return err
-		}
+		events.Notify(output)
 	}
-	return nil
 }
 
-func (v *valueService) Set(set SetProposal) error {
-	request, err := set.Request()
-	if err != nil {
-		return err
-	}
-
-	for _, precondition := range request.Preconditions {
+func (v *valueService) Set(set SetProposal) (*valueapi.SetResponse, error) {
+	for _, precondition := range set.Request().Preconditions {
 		switch p := precondition.Precondition.(type) {
 		case *valueapi.Precondition_Metadata:
 			if !meta.Equal(v.value.ObjectMeta, *p.Metadata) {
-				return errors.NewConflict("metadata precondition failed")
+				return nil, errors.NewConflict("metadata precondition failed")
 			}
 		}
 	}
 
-	meta := request.Value.ObjectMeta
+	meta := set.Request().Value.ObjectMeta
 	if meta.Revision == nil {
 		if v.value.Revision != nil {
 			meta.Revision = &metaapi.Revision{
@@ -98,28 +90,25 @@ func (v *valueService) Set(set SetProposal) error {
 
 	value := valueapi.Value{
 		ObjectMeta: meta,
-		Value:      request.Value.Value,
+		Value:      set.Request().Value.Value,
 	}
 	v.value = value
 
-	err = v.notify(valueapi.Event{
+	v.notify(valueapi.Event{
 		Type:  valueapi.Event_UPDATE,
 		Value: v.value,
 	})
-	if err != nil {
-		return err
-	}
-	return set.Reply(&valueapi.SetResponse{
+	return &valueapi.SetResponse{
 		Value: value,
-	})
+	}, nil
 }
 
-func (v *valueService) Get(get GetQuery) error {
-	return get.Reply(&valueapi.GetResponse{
+func (v *valueService) Get(GetQuery) (*valueapi.GetResponse, error) {
+	return &valueapi.GetResponse{
 		Value: v.value,
-	})
+	}, nil
 }
 
-func (v *valueService) Events(events EventsProposal) error {
-	return nil
+func (v *valueService) Events(events EventsProposal) {
+	events.Notify(&valueapi.EventsResponse{})
 }

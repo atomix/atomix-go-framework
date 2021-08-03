@@ -5,6 +5,7 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
+	"github.com/gogo/protobuf/proto"
 	"io"
 )
 
@@ -45,84 +46,182 @@ type ServiceAdaptor struct {
 	rsm Service
 }
 
-func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) error {
+func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 	switch command.OperationID() {
 	case 1:
-		p := newEnterProposal(command)
-		log.Debugf("Proposing EnterProposal %s", p)
-		err := s.rsm.Enter(p)
+		p, err := newEnterProposal(command)
 		if err != nil {
-			log.Warn(err)
-			return err
+			err = errors.NewInternal(err.Error())
+			log.Error(err)
+			command.Output(nil, err)
+			return
 		}
-		return nil
+
+		log.Debugf("Proposal EnterProposal %s", p)
+		response, err := s.rsm.Enter(p)
+		if err != nil {
+			log.Warnf("Proposal EnterProposal %s failed: %v", p, err)
+			command.Output(nil, err)
+		} else {
+			output, err := proto.Marshal(response)
+			if err != nil {
+				err = errors.NewInternal(err.Error())
+				log.Errorf("Proposal EnterProposal %s failed: %v", p, err)
+				command.Output(nil, err)
+			} else {
+				log.Errorf("Proposal EnterProposal %s complete: %+v", p, response)
+				command.Output(output, nil)
+			}
+		}
 	case 2:
-		p := newWithdrawProposal(command)
-		log.Debugf("Proposing WithdrawProposal %s", p)
-		err := s.rsm.Withdraw(p)
+		p, err := newWithdrawProposal(command)
 		if err != nil {
-			log.Warn(err)
-			return err
+			err = errors.NewInternal(err.Error())
+			log.Error(err)
+			command.Output(nil, err)
+			return
 		}
-		return nil
+
+		log.Debugf("Proposal WithdrawProposal %s", p)
+		response, err := s.rsm.Withdraw(p)
+		if err != nil {
+			log.Warnf("Proposal WithdrawProposal %s failed: %v", p, err)
+			command.Output(nil, err)
+		} else {
+			output, err := proto.Marshal(response)
+			if err != nil {
+				err = errors.NewInternal(err.Error())
+				log.Errorf("Proposal WithdrawProposal %s failed: %v", p, err)
+				command.Output(nil, err)
+			} else {
+				log.Errorf("Proposal WithdrawProposal %s complete: %+v", p, response)
+				command.Output(output, nil)
+			}
+		}
 	case 3:
-		p := newAnointProposal(command)
-		log.Debugf("Proposing AnointProposal %s", p)
-		err := s.rsm.Anoint(p)
+		p, err := newAnointProposal(command)
 		if err != nil {
-			log.Warn(err)
-			return err
+			err = errors.NewInternal(err.Error())
+			log.Error(err)
+			command.Output(nil, err)
+			return
 		}
-		return nil
+
+		log.Debugf("Proposal AnointProposal %s", p)
+		response, err := s.rsm.Anoint(p)
+		if err != nil {
+			log.Warnf("Proposal AnointProposal %s failed: %v", p, err)
+			command.Output(nil, err)
+		} else {
+			output, err := proto.Marshal(response)
+			if err != nil {
+				err = errors.NewInternal(err.Error())
+				log.Errorf("Proposal AnointProposal %s failed: %v", p, err)
+				command.Output(nil, err)
+			} else {
+				log.Errorf("Proposal AnointProposal %s complete: %+v", p, response)
+				command.Output(output, nil)
+			}
+		}
 	case 4:
-		p := newPromoteProposal(command)
-		log.Debugf("Proposing PromoteProposal %s", p)
-		err := s.rsm.Promote(p)
+		p, err := newPromoteProposal(command)
 		if err != nil {
-			log.Warn(err)
-			return err
+			err = errors.NewInternal(err.Error())
+			log.Error(err)
+			command.Output(nil, err)
+			return
 		}
-		return nil
+
+		log.Debugf("Proposal PromoteProposal %s", p)
+		response, err := s.rsm.Promote(p)
+		if err != nil {
+			log.Warnf("Proposal PromoteProposal %s failed: %v", p, err)
+			command.Output(nil, err)
+		} else {
+			output, err := proto.Marshal(response)
+			if err != nil {
+				err = errors.NewInternal(err.Error())
+				log.Errorf("Proposal PromoteProposal %s failed: %v", p, err)
+				command.Output(nil, err)
+			} else {
+				log.Errorf("Proposal PromoteProposal %s complete: %+v", p, response)
+				command.Output(output, nil)
+			}
+		}
 	case 5:
-		p := newEvictProposal(command)
-		log.Debugf("Proposing EvictProposal %s", p)
-		err := s.rsm.Evict(p)
+		p, err := newEvictProposal(command)
 		if err != nil {
-			log.Warn(err)
-			return err
+			err = errors.NewInternal(err.Error())
+			log.Error(err)
+			command.Output(nil, err)
+			return
 		}
-		return nil
+
+		log.Debugf("Proposal EvictProposal %s", p)
+		response, err := s.rsm.Evict(p)
+		if err != nil {
+			log.Warnf("Proposal EvictProposal %s failed: %v", p, err)
+			command.Output(nil, err)
+		} else {
+			output, err := proto.Marshal(response)
+			if err != nil {
+				err = errors.NewInternal(err.Error())
+				log.Errorf("Proposal EvictProposal %s failed: %v", p, err)
+				command.Output(nil, err)
+			} else {
+				log.Errorf("Proposal EvictProposal %s complete: %+v", p, response)
+				command.Output(output, nil)
+			}
+		}
 	case 7:
-		p := newEventsProposal(command)
-		log.Debugf("Proposing EventsProposal %s", p)
-		err := s.rsm.Events(p)
+		p, err := newEventsProposal(command)
 		if err != nil {
-			log.Warn(err)
-			return err
+			err = errors.NewInternal(err.Error())
+			log.Error(err)
+			command.Output(nil, err)
+			return
 		}
-		return nil
+
+		log.Debugf("Proposal EventsProposal %s", p)
+		s.rsm.Events(p)
 	default:
 		err := errors.NewNotSupported("unknown operation %d", command.OperationID())
 		log.Warn(err)
-		return err
+		command.Output(nil, err)
 	}
 }
 
-func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) error {
+func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 	switch query.OperationID() {
 	case 6:
-		q := newGetTermQuery(query)
-		log.Debugf("Querying GetTermQuery %s", q)
-		err := s.rsm.GetTerm(q)
+		q, err := newGetTermQuery(query)
 		if err != nil {
-			log.Warn(err)
-			return err
+			err = errors.NewInternal(err.Error())
+			log.Error(err)
+			query.Output(nil, err)
+			return
 		}
-		return nil
+
+		log.Debugf("Querying GetTermQuery %s", q)
+		response, err := s.rsm.GetTerm(q)
+		if err != nil {
+			log.Warnf("Querying GetTermQuery %s failed: %v", q, err)
+			query.Output(nil, err)
+		} else {
+			output, err := proto.Marshal(response)
+			if err != nil {
+				err = errors.NewInternal(err.Error())
+				log.Errorf("Querying GetTermQuery %s failed: %v", q, err)
+				query.Output(nil, err)
+			} else {
+				log.Errorf("Querying GetTermQuery %s complete: %+v", q, response)
+				query.Output(output, nil)
+			}
+		}
 	default:
 		err := errors.NewNotSupported("unknown operation %d", query.OperationID())
 		log.Warn(err)
-		return err
+		query.Output(nil, err)
 	}
 }
 func (s *ServiceAdaptor) Backup(writer io.Writer) error {

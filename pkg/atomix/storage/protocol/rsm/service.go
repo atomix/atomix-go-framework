@@ -70,9 +70,9 @@ type Service interface {
 	RestoreService
 	ServiceContext
 	// ExecuteCommand executes a service command
-	ExecuteCommand(Command) error
+	ExecuteCommand(Command)
 	// ExecuteQuery executes a service query
-	ExecuteQuery(Query) error
+	ExecuteQuery(Query)
 }
 
 func newService(manager *primitiveServiceManager) *primitiveService {
@@ -138,9 +138,9 @@ func (s *primitiveService) open(serviceID ServiceID, info ServiceInfo) error {
 		return errors.NewInvalid("unknown service type '%s'", info.Type)
 	}
 	s.info = info
-	s.service = serviceType(s)
 	s.commands = newCommands()
 	s.sessions = newServiceSessions()
+	s.service = serviceType(s)
 	return nil
 }
 
@@ -175,9 +175,9 @@ func (s *primitiveService) restore(snapshot *ServiceSnapshot) error {
 	if serviceType == nil {
 		return errors.NewInvalid("unknown service type '%s'", snapshot.Type)
 	}
-	s.service = serviceType(s)
 	s.commands = newCommands()
 	s.sessions = newServiceSessions()
+	s.service = serviceType(s)
 	for _, sessionSnapshot := range snapshot.Sessions {
 		serviceSession := newServiceSession(s)
 		if err := serviceSession.restore(sessionSnapshot); err != nil {

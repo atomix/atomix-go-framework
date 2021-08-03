@@ -68,18 +68,13 @@ func (l *lockService) Restore(reader SnapshotReader) error {
 	return nil
 }
 
-func (l *lockService) Lock(lock LockProposal) error {
-	request, err := lock.Request()
-	if err != nil {
-		return err
-	}
-
+func (l *lockService) Lock(lock LockProposal) {
 	lockRequest := LockRequest{
 		ProposalID: lock.ID(),
 		SessionID:  lock.Session().ID(),
 	}
-	if request.Timeout != nil {
-		expire := l.Scheduler().Time().Add(*request.Timeout)
+	if lock.Request().Timeout != nil {
+		expire := l.Scheduler().Time().Add(*lock.Request().Timeout)
 		lockRequest.Expire = &expire
 	}
 
@@ -94,7 +89,7 @@ func (l *lockService) Lock(lock LockProposal) error {
 				delete(l.watchers, lock.ID())
 			}
 		})
-		return lock.Reply(&lockapi.LockResponse{
+		lock.Reply(&lockapi.LockResponse{
 			Lock: lockapi.Lock{
 				ObjectMeta: metaapi.ObjectMeta{
 					Revision: &metaapi.Revision{
@@ -104,10 +99,10 @@ func (l *lockService) Lock(lock LockProposal) error {
 				State: lockapi.Lock_LOCKED,
 			},
 		})
-	} else if request.Timeout != nil && int64(*request.Timeout) == 0 {
+	} else if lock.Request().Timeout != nil && int64(*lock.Request().Timeout) == 0 {
 		// If the timeout is 0, that indicates this is a tryLock request. Immediately fail the request.
-		return lock.Fail(errors.NewTimeout("lock request timed out"))
-	} else if request.Timeout != nil {
+		lock.Fail(errors.NewTimeout("lock request timed out"))
+	} else if lock.Request().Timeout != nil {
 		// If a timeout exists, add the request to the queue and set a timer. Note that the lock request expiration
 		// time is based on the *state machine* time - not the system time - to ensure consistency across servers.
 		element := l.queue.PushBack(lockRequest)
@@ -135,16 +130,15 @@ func (l *lockService) Lock(lock LockProposal) error {
 			}
 		})
 	}
-	return nil
 }
 
-func (l *lockService) Unlock(unlock UnlockProposal) error {
+func (l *lockService) Unlock(unlock UnlockProposal) (*lockapi.UnlockResponse, error) {
 	if l.owner != nil {
 		// If the commit's session does not match the current lock holder, preserve the existing lock.
 		// If the current lock ID does not match the requested lock ID, preserve the existing lock.
 		// However, ensure the associated lock request is removed from the queue.
 		if unlock.Session().ID() != l.owner.SessionID {
-			return errors.NewConflict("not the lock owner")
+			return nil, errors.NewConflict("not the lock owner")
 		}
 
 		// The lock has been released. Populate the lock from the queue.
@@ -173,7 +167,7 @@ func (l *lockService) Unlock(unlock UnlockProposal) error {
 						State: lockapi.Lock_LOCKED,
 					},
 				})
-				return unlock.Reply(&lockapi.UnlockResponse{
+				return &lockapi.UnlockResponse{
 					Lock: lockapi.Lock{
 						ObjectMeta: metaapi.ObjectMeta{
 							Revision: &metaapi.Revision{
@@ -182,27 +176,27 @@ func (l *lockService) Unlock(unlock UnlockProposal) error {
 						},
 						State: lockapi.Lock_LOCKED,
 					},
-				})
+				}, nil
 			}
 		} else {
 			l.owner = nil
-			return unlock.Reply(&lockapi.UnlockResponse{
+			return &lockapi.UnlockResponse{
 				Lock: lockapi.Lock{
 					State: lockapi.Lock_UNLOCKED,
 				},
-			})
+			}, nil
 		}
 	}
-	return unlock.Reply(&lockapi.UnlockResponse{
+	return &lockapi.UnlockResponse{
 		Lock: lockapi.Lock{
 			State: lockapi.Lock_UNLOCKED,
 		},
-	})
+	}, nil
 }
 
-func (l *lockService) GetLock(get GetLockQuery) error {
+func (l *lockService) GetLock(get GetLockQuery) (*lockapi.GetLockResponse, error) {
 	if l.owner != nil {
-		return get.Reply(&lockapi.GetLockResponse{
+		return &lockapi.GetLockResponse{
 			Lock: lockapi.Lock{
 				ObjectMeta: metaapi.ObjectMeta{
 					Revision: &metaapi.Revision{
@@ -211,13 +205,13 @@ func (l *lockService) GetLock(get GetLockQuery) error {
 				},
 				State: lockapi.Lock_LOCKED,
 			},
-		})
+		}, nil
 	}
-	return get.Reply(&lockapi.GetLockResponse{
+	return &lockapi.GetLockResponse{
 		Lock: lockapi.Lock{
 			State: lockapi.Lock_UNLOCKED,
 		},
-	})
+	}, nil
 }
 
 func (l *lockService) unlock(session Session) {

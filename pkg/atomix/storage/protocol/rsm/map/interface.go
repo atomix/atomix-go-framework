@@ -3,12 +3,13 @@ package _map
 
 import (
 	"fmt"
-	_map "github.com/atomix/atomix-api/go/atomix/primitive/map"
 	errors "github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	util "github.com/atomix/atomix-go-framework/pkg/atomix/util"
 	proto "github.com/golang/protobuf/proto"
 	"io"
+
+	_map "github.com/atomix/atomix-api/go/atomix/primitive/map"
 )
 
 type Service interface {
@@ -16,19 +17,19 @@ type Service interface {
 	Backup(SnapshotWriter) error
 	Restore(SnapshotReader) error
 	// Size returns the size of the map
-	Size(SizeQuery) error
+	Size(SizeQuery) (*_map.SizeResponse, error)
 	// Put puts an entry into the map
-	Put(PutProposal) error
+	Put(PutProposal) (*_map.PutResponse, error)
 	// Get gets the entry for a key
-	Get(GetQuery) error
+	Get(GetQuery) (*_map.GetResponse, error)
 	// Remove removes an entry from the map
-	Remove(RemoveProposal) error
+	Remove(RemoveProposal) (*_map.RemoveResponse, error)
 	// Clear removes all entries from the map
-	Clear(ClearProposal) error
+	Clear(ClearProposal) (*_map.ClearResponse, error)
 	// Events listens for change events
-	Events(EventsProposal) error
+	Events(EventsProposal)
 	// Entries lists all entries in the map
-	Entries(EntriesQuery) error
+	Entries(EntriesQuery)
 }
 
 type ServiceContext interface {
@@ -264,10 +265,19 @@ var _ Proposals = &serviceProposals{}
 
 type ProposalID uint64
 
+type ProposalState int
+
+const (
+	ProposalComplete ProposalState = iota
+	ProposalOpen
+)
+
 type Proposal interface {
 	fmt.Stringer
 	ID() ProposalID
 	Session() Session
+	State() ProposalState
+	Watch(func(ProposalState)) Watcher
 }
 
 func newProposal(command rsm.Command) Proposal {
@@ -286,6 +296,16 @@ func (p *serviceProposal) ID() ProposalID {
 
 func (p *serviceProposal) Session() Session {
 	return newSession(p.command.Session())
+}
+
+func (p *serviceProposal) State() ProposalState {
+	return ProposalState(p.command.State())
+}
+
+func (p *serviceProposal) Watch(f func(ProposalState)) Watcher {
+	return newWatcher(p.command.Watch(func(state rsm.CommandState) {
+		f(ProposalState(state))
+	}))
 }
 
 func (p *serviceProposal) String() string {
@@ -321,40 +341,29 @@ var _ Query = &serviceQuery{}
 
 type SizeQuery interface {
 	Query
-	Request() (*_map.SizeRequest, error)
-	Reply(*_map.SizeResponse) error
+	Request() *_map.SizeRequest
 }
 
-func newSizeQuery(query rsm.Query) SizeQuery {
-	return &sizeQuery{
-		Query: newQuery(query),
-		query: query,
+func newSizeQuery(query rsm.Query) (SizeQuery, error) {
+	request := &_map.SizeRequest{}
+	if err := proto.Unmarshal(query.Input(), request); err != nil {
+		return nil, err
 	}
+	return &sizeQuery{
+		Query:   newQuery(query),
+		query:   query,
+		request: request,
+	}, nil
 }
 
 type sizeQuery struct {
 	Query
-	query rsm.Query
+	query   rsm.Query
+	request *_map.SizeRequest
 }
 
-func (p *sizeQuery) Request() (*_map.SizeRequest, error) {
-	request := &_map.SizeRequest{}
-	if err := proto.Unmarshal(p.query.Input(), request); err != nil {
-		return nil, err
-	}
-	log.Debugf("Received SizeQuery %s: %s", p, request)
-	return request, nil
-}
-
-func (p *sizeQuery) Reply(response *_map.SizeResponse) error {
-	log.Debugf("Sending SizeQuery %s: %s", p, response)
-	output, err := proto.Marshal(response)
-	if err != nil {
-		return err
-	}
-	p.query.Output(output, nil)
-	p.query.Close()
-	return nil
+func (p *sizeQuery) Request() *_map.SizeRequest {
+	return p.request
 }
 
 func (p *sizeQuery) String() string {
@@ -383,14 +392,24 @@ func (p *putProposals) Get(id ProposalID) (PutProposal, bool) {
 	if !ok {
 		return nil, false
 	}
-	return newPutProposal(command), true
+	proposal, err := newPutProposal(command)
+	if err != nil {
+		log.Error(err)
+		return nil, false
+	}
+	return proposal, true
 }
 
 func (p *putProposals) List() []PutProposal {
 	commands := p.commands.List(rsm.OperationID(2))
 	proposals := make([]PutProposal, len(commands))
 	for i, command := range commands {
-		proposals[i] = newPutProposal(command)
+		proposal, err := newPutProposal(command)
+		if err != nil {
+			log.Error(err)
+		} else {
+			proposals[i] = proposal
+		}
 	}
 	return proposals
 }
@@ -399,57 +418,29 @@ var _ PutProposals = &putProposals{}
 
 type PutProposal interface {
 	Proposal
-	Request() (*_map.PutRequest, error)
-	Reply(*_map.PutResponse) error
-	Fail(error) error
+	Request() *_map.PutRequest
 }
 
-func newPutProposal(command rsm.Command) PutProposal {
+func newPutProposal(command rsm.Command) (PutProposal, error) {
+	request := &_map.PutRequest{}
+	if err := proto.Unmarshal(command.Input(), request); err != nil {
+		return nil, err
+	}
 	return &putProposal{
 		Proposal: newProposal(command),
 		command:  command,
-	}
+		request:  request,
+	}, nil
 }
 
 type putProposal struct {
 	Proposal
-	command  rsm.Command
-	complete bool
+	command rsm.Command
+	request *_map.PutRequest
 }
 
-func (p *putProposal) Request() (*_map.PutRequest, error) {
-	request := &_map.PutRequest{}
-	if err := proto.Unmarshal(p.command.Input(), request); err != nil {
-		return nil, err
-	}
-	log.Debugf("Received PutProposal %s: %s", p, request)
-	return request, nil
-}
-
-func (p *putProposal) Reply(response *_map.PutResponse) error {
-	if p.complete {
-		return errors.NewConflict("proposal is already complete")
-	}
-	log.Debugf("Sending PutProposal %s: %s", p, response)
-	output, err := proto.Marshal(response)
-	if err != nil {
-		return err
-	}
-	p.command.Output(output, nil)
-	p.command.Close()
-	p.complete = true
-	return nil
-}
-
-func (p *putProposal) Fail(err error) error {
-	if p.complete {
-		return errors.NewConflict("proposal is already complete")
-	}
-	log.Debugf("Failing PutProposal %s: %s", p, err)
-	p.command.Output(nil, err)
-	p.command.Close()
-	p.complete = true
-	return nil
+func (p *putProposal) Request() *_map.PutRequest {
+	return p.request
 }
 
 func (p *putProposal) String() string {
@@ -460,40 +451,29 @@ var _ PutProposal = &putProposal{}
 
 type GetQuery interface {
 	Query
-	Request() (*_map.GetRequest, error)
-	Reply(*_map.GetResponse) error
+	Request() *_map.GetRequest
 }
 
-func newGetQuery(query rsm.Query) GetQuery {
-	return &getQuery{
-		Query: newQuery(query),
-		query: query,
+func newGetQuery(query rsm.Query) (GetQuery, error) {
+	request := &_map.GetRequest{}
+	if err := proto.Unmarshal(query.Input(), request); err != nil {
+		return nil, err
 	}
+	return &getQuery{
+		Query:   newQuery(query),
+		query:   query,
+		request: request,
+	}, nil
 }
 
 type getQuery struct {
 	Query
-	query rsm.Query
+	query   rsm.Query
+	request *_map.GetRequest
 }
 
-func (p *getQuery) Request() (*_map.GetRequest, error) {
-	request := &_map.GetRequest{}
-	if err := proto.Unmarshal(p.query.Input(), request); err != nil {
-		return nil, err
-	}
-	log.Debugf("Received GetQuery %s: %s", p, request)
-	return request, nil
-}
-
-func (p *getQuery) Reply(response *_map.GetResponse) error {
-	log.Debugf("Sending GetQuery %s: %s", p, response)
-	output, err := proto.Marshal(response)
-	if err != nil {
-		return err
-	}
-	p.query.Output(output, nil)
-	p.query.Close()
-	return nil
+func (p *getQuery) Request() *_map.GetRequest {
+	return p.request
 }
 
 func (p *getQuery) String() string {
@@ -522,14 +502,24 @@ func (p *removeProposals) Get(id ProposalID) (RemoveProposal, bool) {
 	if !ok {
 		return nil, false
 	}
-	return newRemoveProposal(command), true
+	proposal, err := newRemoveProposal(command)
+	if err != nil {
+		log.Error(err)
+		return nil, false
+	}
+	return proposal, true
 }
 
 func (p *removeProposals) List() []RemoveProposal {
 	commands := p.commands.List(rsm.OperationID(4))
 	proposals := make([]RemoveProposal, len(commands))
 	for i, command := range commands {
-		proposals[i] = newRemoveProposal(command)
+		proposal, err := newRemoveProposal(command)
+		if err != nil {
+			log.Error(err)
+		} else {
+			proposals[i] = proposal
+		}
 	}
 	return proposals
 }
@@ -538,57 +528,29 @@ var _ RemoveProposals = &removeProposals{}
 
 type RemoveProposal interface {
 	Proposal
-	Request() (*_map.RemoveRequest, error)
-	Reply(*_map.RemoveResponse) error
-	Fail(error) error
+	Request() *_map.RemoveRequest
 }
 
-func newRemoveProposal(command rsm.Command) RemoveProposal {
+func newRemoveProposal(command rsm.Command) (RemoveProposal, error) {
+	request := &_map.RemoveRequest{}
+	if err := proto.Unmarshal(command.Input(), request); err != nil {
+		return nil, err
+	}
 	return &removeProposal{
 		Proposal: newProposal(command),
 		command:  command,
-	}
+		request:  request,
+	}, nil
 }
 
 type removeProposal struct {
 	Proposal
-	command  rsm.Command
-	complete bool
+	command rsm.Command
+	request *_map.RemoveRequest
 }
 
-func (p *removeProposal) Request() (*_map.RemoveRequest, error) {
-	request := &_map.RemoveRequest{}
-	if err := proto.Unmarshal(p.command.Input(), request); err != nil {
-		return nil, err
-	}
-	log.Debugf("Received RemoveProposal %s: %s", p, request)
-	return request, nil
-}
-
-func (p *removeProposal) Reply(response *_map.RemoveResponse) error {
-	if p.complete {
-		return errors.NewConflict("proposal is already complete")
-	}
-	log.Debugf("Sending RemoveProposal %s: %s", p, response)
-	output, err := proto.Marshal(response)
-	if err != nil {
-		return err
-	}
-	p.command.Output(output, nil)
-	p.command.Close()
-	p.complete = true
-	return nil
-}
-
-func (p *removeProposal) Fail(err error) error {
-	if p.complete {
-		return errors.NewConflict("proposal is already complete")
-	}
-	log.Debugf("Failing RemoveProposal %s: %s", p, err)
-	p.command.Output(nil, err)
-	p.command.Close()
-	p.complete = true
-	return nil
+func (p *removeProposal) Request() *_map.RemoveRequest {
+	return p.request
 }
 
 func (p *removeProposal) String() string {
@@ -617,14 +579,24 @@ func (p *clearProposals) Get(id ProposalID) (ClearProposal, bool) {
 	if !ok {
 		return nil, false
 	}
-	return newClearProposal(command), true
+	proposal, err := newClearProposal(command)
+	if err != nil {
+		log.Error(err)
+		return nil, false
+	}
+	return proposal, true
 }
 
 func (p *clearProposals) List() []ClearProposal {
 	commands := p.commands.List(rsm.OperationID(5))
 	proposals := make([]ClearProposal, len(commands))
 	for i, command := range commands {
-		proposals[i] = newClearProposal(command)
+		proposal, err := newClearProposal(command)
+		if err != nil {
+			log.Error(err)
+		} else {
+			proposals[i] = proposal
+		}
 	}
 	return proposals
 }
@@ -633,57 +605,29 @@ var _ ClearProposals = &clearProposals{}
 
 type ClearProposal interface {
 	Proposal
-	Request() (*_map.ClearRequest, error)
-	Reply(*_map.ClearResponse) error
-	Fail(error) error
+	Request() *_map.ClearRequest
 }
 
-func newClearProposal(command rsm.Command) ClearProposal {
+func newClearProposal(command rsm.Command) (ClearProposal, error) {
+	request := &_map.ClearRequest{}
+	if err := proto.Unmarshal(command.Input(), request); err != nil {
+		return nil, err
+	}
 	return &clearProposal{
 		Proposal: newProposal(command),
 		command:  command,
-	}
+		request:  request,
+	}, nil
 }
 
 type clearProposal struct {
 	Proposal
-	command  rsm.Command
-	complete bool
+	command rsm.Command
+	request *_map.ClearRequest
 }
 
-func (p *clearProposal) Request() (*_map.ClearRequest, error) {
-	request := &_map.ClearRequest{}
-	if err := proto.Unmarshal(p.command.Input(), request); err != nil {
-		return nil, err
-	}
-	log.Debugf("Received ClearProposal %s: %s", p, request)
-	return request, nil
-}
-
-func (p *clearProposal) Reply(response *_map.ClearResponse) error {
-	if p.complete {
-		return errors.NewConflict("proposal is already complete")
-	}
-	log.Debugf("Sending ClearProposal %s: %s", p, response)
-	output, err := proto.Marshal(response)
-	if err != nil {
-		return err
-	}
-	p.command.Output(output, nil)
-	p.command.Close()
-	p.complete = true
-	return nil
-}
-
-func (p *clearProposal) Fail(err error) error {
-	if p.complete {
-		return errors.NewConflict("proposal is already complete")
-	}
-	log.Debugf("Failing ClearProposal %s: %s", p, err)
-	p.command.Output(nil, err)
-	p.command.Close()
-	p.complete = true
-	return nil
+func (p *clearProposal) Request() *_map.ClearRequest {
+	return p.request
 }
 
 func (p *clearProposal) String() string {
@@ -712,14 +656,24 @@ func (p *eventsProposals) Get(id ProposalID) (EventsProposal, bool) {
 	if !ok {
 		return nil, false
 	}
-	return newEventsProposal(command), true
+	proposal, err := newEventsProposal(command)
+	if err != nil {
+		log.Error(err)
+		return nil, false
+	}
+	return proposal, true
 }
 
 func (p *eventsProposals) List() []EventsProposal {
 	commands := p.commands.List(rsm.OperationID(6))
 	proposals := make([]EventsProposal, len(commands))
 	for i, command := range commands {
-		proposals[i] = newEventsProposal(command)
+		proposal, err := newEventsProposal(command)
+		if err != nil {
+			log.Error(err)
+		} else {
+			proposals[i] = proposal
+		}
 	}
 	return proposals
 }
@@ -728,45 +682,55 @@ var _ EventsProposals = &eventsProposals{}
 
 type EventsProposal interface {
 	Proposal
-	Request() (*_map.EventsRequest, error)
-	Notify(*_map.EventsResponse) error
-	Close() error
+	Request() *_map.EventsRequest
+	Notify(*_map.EventsResponse)
+	Close()
 }
 
-func newEventsProposal(command rsm.Command) EventsProposal {
+func newEventsProposal(command rsm.Command) (EventsProposal, error) {
+	request := &_map.EventsRequest{}
+	if err := proto.Unmarshal(command.Input(), request); err != nil {
+		return nil, err
+	}
 	return &eventsProposal{
 		Proposal: newProposal(command),
 		command:  command,
-	}
+		request:  request,
+	}, nil
 }
 
 type eventsProposal struct {
 	Proposal
 	command rsm.Command
+	request *_map.EventsRequest
+	closed  bool
 }
 
-func (p *eventsProposal) Request() (*_map.EventsRequest, error) {
-	request := &_map.EventsRequest{}
-	if err := proto.Unmarshal(p.command.Input(), request); err != nil {
-		return nil, err
+func (p *eventsProposal) Request() *_map.EventsRequest {
+	return p.request
+}
+
+func (p *eventsProposal) Notify(response *_map.EventsResponse) {
+	if p.closed {
+		return
 	}
-	log.Debugf("Received EventsProposal %s: %s", p, request)
-	return request, nil
-}
-
-func (p *eventsProposal) Notify(response *_map.EventsResponse) error {
 	log.Debugf("Notifying EventsProposal %s: %s", p, response)
 	output, err := proto.Marshal(response)
 	if err != nil {
-		return err
+		err = errors.NewInternal(err.Error())
+		log.Errorf("Notifying EventsProposal %s failed: %v", p, err)
+		p.command.Output(nil, err)
+		p.command.Close()
+		p.closed = true
+	} else {
+		log.Debugf("Notifying EventsProposal %s: %s", p, response)
+		p.command.Output(output, nil)
 	}
-	p.command.Output(output, nil)
-	return nil
 }
 
-func (p *eventsProposal) Close() error {
+func (p *eventsProposal) Close() {
 	p.command.Close()
-	return nil
+	p.closed = true
 }
 
 func (p *eventsProposal) String() string {
@@ -777,45 +741,55 @@ var _ EventsProposal = &eventsProposal{}
 
 type EntriesQuery interface {
 	Query
-	Request() (*_map.EntriesRequest, error)
-	Notify(*_map.EntriesResponse) error
-	Close() error
+	Request() *_map.EntriesRequest
+	Notify(*_map.EntriesResponse)
+	Close()
 }
 
-func newEntriesQuery(query rsm.Query) EntriesQuery {
-	return &entriesQuery{
-		Query: newQuery(query),
-		query: query,
+func newEntriesQuery(query rsm.Query) (EntriesQuery, error) {
+	request := &_map.EntriesRequest{}
+	if err := proto.Unmarshal(query.Input(), request); err != nil {
+		return nil, err
 	}
+	return &entriesQuery{
+		Query:   newQuery(query),
+		query:   query,
+		request: request,
+	}, nil
 }
 
 type entriesQuery struct {
 	Query
-	query rsm.Query
+	query   rsm.Query
+	request *_map.EntriesRequest
+	closed  bool
 }
 
-func (p *entriesQuery) Request() (*_map.EntriesRequest, error) {
-	request := &_map.EntriesRequest{}
-	if err := proto.Unmarshal(p.query.Input(), request); err != nil {
-		return nil, err
+func (p *entriesQuery) Request() *_map.EntriesRequest {
+	return p.request
+}
+
+func (p *entriesQuery) Notify(response *_map.EntriesResponse) {
+	if p.closed {
+		return
 	}
-	log.Debugf("Received EntriesQuery %s: %s", p, request)
-	return request, nil
-}
-
-func (p *entriesQuery) Notify(response *_map.EntriesResponse) error {
 	log.Debugf("Notifying EntriesQuery %s: %s", p, response)
 	output, err := proto.Marshal(response)
 	if err != nil {
-		return err
+		err = errors.NewInternal(err.Error())
+		log.Errorf("Notifying EntriesQuery %s failed: %v", p, err)
+		p.query.Output(nil, err)
+		p.query.Close()
+		p.closed = true
+	} else {
+		log.Debugf("Notifying EntriesQuery %s: %s", p, response)
+		p.query.Output(output, nil)
 	}
-	p.query.Output(output, nil)
-	return nil
 }
 
-func (p *entriesQuery) Close() error {
+func (p *entriesQuery) Close() {
 	p.query.Close()
-	return nil
+	p.closed = true
 }
 
 func (p *entriesQuery) String() string {

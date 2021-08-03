@@ -64,200 +64,153 @@ func (l *listService) Restore(reader SnapshotReader) error {
 	return nil
 }
 
-func (l *listService) notify(event listapi.Event) error {
+func (l *listService) notify(event listapi.Event) {
 	output := &listapi.EventsResponse{
 		Event: event,
 	}
 	for _, events := range l.Proposals().Events().List() {
-		if err := events.Notify(output); err != nil {
-			return err
-		}
+		events.Notify(output)
 	}
-	return nil
 }
 
-func (l *listService) Size(size SizeQuery) error {
-	return size.Reply(&listapi.SizeResponse{
+func (l *listService) Size(SizeQuery) (*listapi.SizeResponse, error) {
+	return &listapi.SizeResponse{
 		Size_: uint32(len(l.items)),
-	})
+	}, nil
 }
 
-func (l *listService) Append(app AppendProposal) error {
-	request, err := app.Request()
-	if err != nil {
-		return err
-	}
-
+func (l *listService) Append(app AppendProposal) (*listapi.AppendResponse, error) {
 	index := len(l.items)
-	l.items = append(l.items, request.Value)
-	err = l.notify(listapi.Event{
+	l.items = append(l.items, app.Request().Value)
+	l.notify(listapi.Event{
 		Type: listapi.Event_ADD,
 		Item: listapi.Item{
 			Index: uint32(index),
-			Value: request.Value,
+			Value: app.Request().Value,
 		},
 	})
-	if err != nil {
-		return err
-	}
-	return app.Reply(&listapi.AppendResponse{})
+	return &listapi.AppendResponse{}, nil
 }
 
-func (l *listService) Insert(insert InsertProposal) error {
-	request, err := insert.Request()
-	if err != nil {
-		return err
-	}
-
-	index := request.Item.Index
+func (l *listService) Insert(insert InsertProposal) (*listapi.InsertResponse, error) {
+	index := insert.Request().Item.Index
 	if index >= uint32(len(l.items)) {
-		return errors.NewInvalid("index %d out of bounds", index)
+		return nil, errors.NewInvalid("index %d out of bounds", index)
 	}
 
 	oldValue := l.items[index]
-	if err := checkPreconditions(oldValue, request.Preconditions); err != nil {
-		return err
+	if err := checkPreconditions(oldValue, insert.Request().Preconditions); err != nil {
+		return nil, err
 	}
 
-	value := request.Item.Value
+	value := insert.Request().Item.Value
 	values := append(l.items, value)
 	copy(values[index+1:], values[index:])
 	values[index] = value
 	l.items = values
 
-	err = l.notify(listapi.Event{
+	l.notify(listapi.Event{
 		Type: listapi.Event_ADD,
 		Item: listapi.Item{
 			Index: uint32(index),
 			Value: value,
 		},
 	})
-	if err != nil {
-		return err
-	}
-	return insert.Reply(&listapi.InsertResponse{})
+	return &listapi.InsertResponse{}, nil
 }
 
-func (l *listService) Get(get GetQuery) error {
-	request, err := get.Request()
-	if err != nil {
-		return err
-	}
-
-	index := int(request.Index)
+func (l *listService) Get(get GetQuery) (*listapi.GetResponse, error) {
+	index := int(get.Request().Index)
 	if index >= len(l.items) {
-		return errors.NewInvalid("index %d out of bounds", index)
+		return nil, errors.NewInvalid("index %d out of bounds", index)
 	}
 	value := l.items[index]
-	return get.Reply(&listapi.GetResponse{
+	return &listapi.GetResponse{
 		Item: listapi.Item{
 			Index: uint32(index),
 			Value: value,
 		},
-	})
+	}, nil
 }
 
-func (l *listService) Set(set SetProposal) error {
-	request, err := set.Request()
-	if err != nil {
-		return err
-	}
-
-	index := request.Item.Index
+func (l *listService) Set(set SetProposal) (*listapi.SetResponse, error) {
+	index := set.Request().Item.Index
 	if index >= uint32(len(l.items)) {
-		return errors.NewInvalid("index %d out of bounds", index)
+		return nil, errors.NewInvalid("index %d out of bounds", index)
 	}
 
 	oldValue := l.items[index]
-	if err := checkPreconditions(oldValue, request.Preconditions); err != nil {
-		return err
+	if err := checkPreconditions(oldValue, set.Request().Preconditions); err != nil {
+		return nil, err
 	}
 
-	newValue := request.Item.Value
+	newValue := set.Request().Item.Value
 	l.items[index] = newValue
 
-	err = l.notify(listapi.Event{
+	l.notify(listapi.Event{
 		Type: listapi.Event_REMOVE,
 		Item: listapi.Item{
-			Index: uint32(index),
+			Index: index,
 			Value: oldValue,
 		},
 	})
-	if err != nil {
-		return err
-	}
-	err = l.notify(listapi.Event{
+	l.notify(listapi.Event{
 		Type: listapi.Event_ADD,
 		Item: listapi.Item{
-			Index: uint32(index),
+			Index: index,
 			Value: newValue,
 		},
 	})
-	if err != nil {
-		return err
-	}
-	return set.Reply(&listapi.SetResponse{})
+	return &listapi.SetResponse{}, nil
 }
 
-func (l *listService) Remove(remove RemoveProposal) error {
-	request, err := remove.Request()
-	if err != nil {
-		return err
-	}
-
-	index := request.Index
+func (l *listService) Remove(remove RemoveProposal) (*listapi.RemoveResponse, error) {
+	index := remove.Request().Index
 	if index >= uint32(len(l.items)) {
-		return errors.NewInvalid("index %d out of bounds", index)
+		return nil, errors.NewInvalid("index %d out of bounds", index)
 	}
 
 	value := l.items[index]
-	if err := checkPreconditions(value, request.Preconditions); err != nil {
-		return err
+	if err := checkPreconditions(value, remove.Request().Preconditions); err != nil {
+		return nil, err
 	}
 
 	l.items = append(l.items[:index], l.items[index+1:]...)
 
-	err = l.notify(listapi.Event{
+	l.notify(listapi.Event{
 		Type: listapi.Event_REMOVE,
 		Item: listapi.Item{
-			Index: uint32(index),
+			Index: index,
 			Value: value,
 		},
 	})
-	if err != nil {
-		return err
-	}
-	return remove.Reply(&listapi.RemoveResponse{
+	return &listapi.RemoveResponse{
 		Item: listapi.Item{
-			Index: uint32(index),
+			Index: index,
 			Value: value,
 		},
-	})
+	}, nil
 }
 
-func (l *listService) Clear(clear ClearProposal) error {
+func (l *listService) Clear(ClearProposal) (*listapi.ClearResponse, error) {
 	l.items = []listapi.Value{}
-	return clear.Reply(&listapi.ClearResponse{})
+	return &listapi.ClearResponse{}, nil
 }
 
-func (l *listService) Events(events EventsProposal) error {
-	return nil
+func (l *listService) Events(events EventsProposal) {
+	events.Notify(&listapi.EventsResponse{})
 }
 
-func (l *listService) Elements(elements ElementsQuery) error {
+func (l *listService) Elements(elements ElementsQuery) {
 	defer elements.Close()
 	for index, value := range l.items {
-		err := elements.Notify(&listapi.ElementsResponse{
+		elements.Notify(&listapi.ElementsResponse{
 			Item: listapi.Item{
 				Index: uint32(index),
 				Value: value,
 			},
 		})
-		if err != nil {
-			return err
-		}
 	}
-	return nil
 }
 
 func checkPreconditions(value listapi.Value, preconditions []listapi.Precondition) error {

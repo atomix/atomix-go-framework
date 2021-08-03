@@ -66,9 +66,20 @@ func (s *primitiveCommands) List(operationID OperationID) []Command {
 
 var _ Commands = (*primitiveCommands)(nil)
 
+type CommandState int
+
+const (
+	CommandComplete CommandState = iota
+	CommandOpen
+)
+
 // Command is a command operation
 type Command interface {
 	Operation
 	// ID returns the command identifier
 	ID() CommandID
+	// State returns the current command state
+	State() CommandState
+	// Watch watches the command state
+	Watch(f func(CommandState)) Watcher
 }

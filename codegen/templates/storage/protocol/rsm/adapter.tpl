@@ -17,6 +17,7 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/gogo/protobuf/proto"
 )
 
 var log = logging.GetLogger("atomix", {{ .Primitive.Name | lower | quote }}, "service")
@@ -59,51 +60,91 @@ type {{ $serviceImpl }} struct {
 {{- $newServiceSnapshotWriter := printf "new%sSnapshotWriter" .Generator.Prefix }}
 {{- $newServiceSnapshotReader := printf "new%sSnapshotReader" .Generator.Prefix }}
 
-func (s *{{ $serviceImpl }}) ExecuteCommand(command rsm.Command) error {
+func (s *{{ $serviceImpl }}) ExecuteCommand(command rsm.Command) {
     switch command.OperationID() {
     {{- range .Primitive.Methods }}
     {{- if .Type.IsCommand }}
     {{- $proposalInt := printf "%sProposal" .Name }}
     {{- $newProposal := printf "new%sProposal" .Name }}
     case {{ .ID }}:
-        p := {{ $newProposal }}(command)
-        log.Debugf("Proposing {{ $proposalInt }} %s", p)
-        err := s.rsm.{{ .Name }}(p)
-        if err !=  nil {
-            log.Warn(err)
-            return err
+        p, err := {{ $newProposal }}(command)
+        if err != nil {
+            err = errors.NewInternal(err.Error())
+            log.Error(err)
+            command.Output(nil, err)
+            return
         }
-        return nil
+
+        log.Debugf("Proposal {{ $proposalInt }} %s", p)
+        {{- if (and .Response.IsUnary .Type.IsSync ) }}
+        response, err := s.rsm.{{ .Name }}(p)
+        if err != nil {
+            log.Warnf("Proposal {{ $proposalInt }} %s failed: %v", p, err)
+            command.Output(nil, err)
+        } else {
+            output, err := proto.Marshal(response)
+            if err != nil {
+                err = errors.NewInternal(err.Error())
+                log.Errorf("Proposal {{ $proposalInt }} %s failed: %v", p, err)
+                command.Output(nil, err)
+            } else {
+                log.Errorf("Proposal {{ $proposalInt }} %s complete: %+v", p, response)
+                command.Output(output, nil)
+            }
+        }
+        {{- else }}
+        s.rsm.{{ .Name }}(p)
+        {{- end }}
     {{- end }}
     {{- end }}
     default:
         err := errors.NewNotSupported("unknown operation %d", command.OperationID())
         log.Warn(err)
-        return err
+        command.Output(nil, err)
     }
 }
 
-func (s *{{ $serviceImpl }}) ExecuteQuery(query rsm.Query) error {
+func (s *{{ $serviceImpl }}) ExecuteQuery(query rsm.Query) {
     switch query.OperationID() {
     {{- range .Primitive.Methods }}
     {{- if .Type.IsQuery }}
     {{- $queryInt := printf "%sQuery" .Name }}
     {{- $newQuery := printf "new%sQuery" .Name }}
     case {{ .ID }}:
-        q := {{ $newQuery }}(query)
-        log.Debugf("Querying {{ $queryInt }} %s", q)
-        err := s.rsm.{{ .Name }}(q)
-        if err !=  nil {
-            log.Warn(err)
-            return err
+        q, err := {{ $newQuery }}(query)
+        if err != nil {
+            err = errors.NewInternal(err.Error())
+            log.Error(err)
+            query.Output(nil, err)
+            return
         }
-        return nil
+
+        log.Debugf("Querying {{ $queryInt }} %s", q)
+        {{- if .Response.IsUnary }}
+        response, err := s.rsm.{{ .Name }}(q)
+        if err != nil {
+            log.Warnf("Querying {{ $queryInt }} %s failed: %v", q, err)
+            query.Output(nil, err)
+        } else {
+            output, err := proto.Marshal(response)
+            if err != nil {
+                err = errors.NewInternal(err.Error())
+                log.Errorf("Querying {{ $queryInt }} %s failed: %v", q, err)
+                query.Output(nil, err)
+            } else {
+                log.Errorf("Querying {{ $queryInt }} %s complete: %+v", q, response)
+                query.Output(output, nil)
+            }
+        }
+        {{- else if .Response.IsStream }}
+        s.rsm.{{ .Name }}(q)
+        {{- end }}
     {{- end }}
     {{- end }}
     default:
         err := errors.NewNotSupported("unknown operation %d", query.OperationID())
         log.Warn(err)
-        return err
+        query.Output(nil, err)
     }
 }
 

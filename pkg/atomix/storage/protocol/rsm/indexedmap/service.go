@@ -104,62 +104,54 @@ func (m *indexedMapService) Restore(reader SnapshotReader) error {
 	return nil
 }
 
-func (m *indexedMapService) notify(event *indexedmapapi.EventsResponse) error {
+func (m *indexedMapService) notify(event *indexedmapapi.EventsResponse) {
 	for proposalID, listener := range m.listeners {
 		if (listener.Key == "" && listener.Index == 0) ||
 			(listener.Key != "" && listener.Key == event.Event.Entry.Key) ||
 			(listener.Index != 0 && listener.Index == event.Event.Entry.Index) {
 			proposal, ok := m.Proposals().Events().Get(proposalID)
 			if ok {
-				if err := proposal.Notify(event); err != nil {
-					return err
-				}
+				proposal.Notify(event)
 			} else {
 				delete(m.listeners, proposalID)
 			}
 		}
 	}
-	return nil
 }
 
-func (m *indexedMapService) Size(size SizeQuery) error {
-	return size.Reply(&indexedmapapi.SizeResponse{
+func (m *indexedMapService) Size(size SizeQuery) (*indexedmapapi.SizeResponse, error) {
+	return &indexedmapapi.SizeResponse{
 		Size_: uint32(len(m.entries)),
-	})
+	}, nil
 }
 
-func (m *indexedMapService) Put(put PutProposal) error {
-	request, err := put.Request()
-	if err != nil {
-		return err
-	}
-
+func (m *indexedMapService) Put(put PutProposal) (*indexedmapapi.PutResponse, error) {
 	var oldEntry *LinkedMapEntryValue
-	if request.Entry.Index > 0 {
-		oldEntry = m.indexes[request.Entry.Index]
-		if oldEntry != nil && oldEntry.Key != request.Entry.Key {
-			return errors.NewAlreadyExists("entry already exists at index %d with key %s", request.Entry.Index, request.Entry.Key)
+	if put.Request().Entry.Index > 0 {
+		oldEntry = m.indexes[put.Request().Entry.Index]
+		if oldEntry != nil && oldEntry.Key != put.Request().Entry.Key {
+			return nil, errors.NewAlreadyExists("entry already exists at index %d with key %s", put.Request().Entry.Index, put.Request().Entry.Key)
 		}
 	} else {
-		oldEntry = m.entries[request.Entry.Key]
+		oldEntry = m.entries[put.Request().Entry.Key]
 	}
 
 	var entry *IndexedMapEntry
 	if oldEntry != nil {
 		entry = oldEntry.IndexedMapEntry
 	}
-	if err := checkPreconditions(entry, request.Preconditions); err != nil {
-		return err
+	if err := checkPreconditions(entry, put.Request().Preconditions); err != nil {
+		return nil, err
 	}
 
 	if oldEntry == nil {
 		// Increment the index for a new entry
 		var index uint64
-		if request.Entry.Index > 0 {
-			if request.Entry.Index > m.lastIndex {
-				m.lastIndex = request.Entry.Index
+		if put.Request().Entry.Index > 0 {
+			if put.Request().Entry.Index > m.lastIndex {
+				m.lastIndex = put.Request().Entry.Index
 			}
-			index = request.Entry.Index
+			index = put.Request().Entry.Index
 		} else {
 			m.lastIndex++
 			index = m.lastIndex
@@ -170,7 +162,7 @@ func (m *indexedMapService) Put(put PutProposal) error {
 			IndexedMapEntry: &IndexedMapEntry{
 				IndexedMapEntryPosition: IndexedMapEntryPosition{
 					Index: index,
-					Key:   request.Entry.Key,
+					Key:   put.Request().Entry.Key,
 				},
 				IndexedMapEntryValue: IndexedMapEntryValue{
 					ObjectMeta: metaapi.ObjectMeta{
@@ -178,12 +170,12 @@ func (m *indexedMapService) Put(put PutProposal) error {
 							Num: metaapi.RevisionNum(put.ID()),
 						},
 					},
-					Value: request.Entry.Value.Value,
+					Value: put.Request().Entry.Value.Value,
 				},
 			},
 		}
-		if request.Entry.TTL != nil {
-			expire := m.Scheduler().Time().Add(*request.Entry.TTL)
+		if put.Request().Entry.TTL != nil {
+			expire := m.Scheduler().Time().Add(*put.Request().Entry.TTL)
 			newEntry.Expire = &expire
 		}
 		m.entries[newEntry.Key] = newEntry
@@ -195,8 +187,8 @@ func (m *indexedMapService) Put(put PutProposal) error {
 		}
 
 		// If the last entry is set, link it to the new entry
-		if request.Entry.Index > 0 {
-			if m.lastIndex == request.Entry.Index {
+		if put.Request().Entry.Index > 0 {
+			if m.lastIndex == put.Request().Entry.Index {
 				if m.lastEntry != nil {
 					m.lastEntry.Next = newEntry
 					newEntry.Prev = m.lastEntry
@@ -214,7 +206,7 @@ func (m *indexedMapService) Put(put PutProposal) error {
 		m.lastEntry = newEntry
 
 		// Schedule the timeout for the value if necessary.
-		m.scheduleTTL(request.Entry.Key, newEntry.IndexedMapEntry.Expire)
+		m.scheduleTTL(put.Request().Entry.Key, newEntry.IndexedMapEntry.Expire)
 
 		m.notify(&indexedmapapi.EventsResponse{
 			Event: indexedmapapi.Event{
@@ -223,16 +215,16 @@ func (m *indexedMapService) Put(put PutProposal) error {
 			},
 		})
 
-		return put.Reply(&indexedmapapi.PutResponse{
+		return &indexedmapapi.PutResponse{
 			Entry: m.newEntry(newEntry.IndexedMapEntry),
-		})
+		}, nil
 	}
 
 	// If the value is equal to the current value, return a no-op.
-	if bytes.Equal(oldEntry.Value, request.Entry.Value.Value) {
-		return put.Reply(&indexedmapapi.PutResponse{
+	if bytes.Equal(oldEntry.Value, put.Request().Entry.Value.Value) {
+		return &indexedmapapi.PutResponse{
 			Entry: m.newEntry(oldEntry.IndexedMapEntry),
-		})
+		}, nil
 	}
 
 	// Create a new entry value and set it in the map.
@@ -248,14 +240,14 @@ func (m *indexedMapService) Put(put PutProposal) error {
 						Num: metaapi.RevisionNum(put.ID()),
 					},
 				},
-				Value: request.Entry.Value.Value,
+				Value: put.Request().Entry.Value.Value,
 			},
 		},
 		Prev: oldEntry.Prev,
 		Next: oldEntry.Next,
 	}
-	if request.Entry.TTL != nil {
-		expire := m.Scheduler().Time().Add(*request.Entry.TTL)
+	if put.Request().Entry.TTL != nil {
+		expire := m.Scheduler().Time().Add(*put.Request().Entry.TTL)
 		newEntry.Expire = &expire
 	}
 	m.entries[newEntry.Key] = newEntry
@@ -283,67 +275,57 @@ func (m *indexedMapService) Put(put PutProposal) error {
 		},
 	})
 
-	return put.Reply(&indexedmapapi.PutResponse{
+	return &indexedmapapi.PutResponse{
 		Entry: m.newEntry(newEntry.IndexedMapEntry),
-	})
+	}, nil
 }
 
-func (m *indexedMapService) Get(get GetQuery) error {
-	request, err := get.Request()
-	if err != nil {
-		return err
-	}
-
+func (m *indexedMapService) Get(get GetQuery) (*indexedmapapi.GetResponse, error) {
 	var entry *LinkedMapEntryValue
 	var ok bool
-	if request.Position.Index > 0 {
-		entry, ok = m.indexes[request.Position.Index]
+	if get.Request().Position.Index > 0 {
+		entry, ok = m.indexes[get.Request().Position.Index]
 		if entry == nil {
-			return errors.NewNotFound("no entry found at index %d", request.Position.Index)
+			return nil, errors.NewNotFound("no entry found at index %d", get.Request().Position.Index)
 		}
 	} else {
-		entry, ok = m.entries[request.Position.Key]
+		entry, ok = m.entries[get.Request().Position.Key]
 		if entry == nil {
-			return errors.NewNotFound("no entry found at key %s", request.Position.Key)
+			return nil, errors.NewNotFound("no entry found at key %s", get.Request().Position.Key)
 		}
 	}
 
 	if !ok {
-		return errors.NewNotFound("entry not found")
+		return nil, errors.NewNotFound("entry not found")
 	}
-	return get.Reply(&indexedmapapi.GetResponse{
+	return &indexedmapapi.GetResponse{
 		Entry: m.newEntry(entry.IndexedMapEntry),
-	})
+	}, nil
 }
 
-func (m *indexedMapService) FirstEntry(firstEntry FirstEntryQuery) error {
+func (m *indexedMapService) FirstEntry(FirstEntryQuery) (*indexedmapapi.FirstEntryResponse, error) {
 	if m.firstEntry == nil {
-		return errors.NewNotFound("map is empty")
+		return nil, errors.NewNotFound("map is empty")
 	}
-	return firstEntry.Reply(&indexedmapapi.FirstEntryResponse{
+	return &indexedmapapi.FirstEntryResponse{
 		Entry: m.newEntry(m.firstEntry.IndexedMapEntry),
-	})
+	}, nil
 }
 
-func (m *indexedMapService) LastEntry(lastEntry LastEntryQuery) error {
+func (m *indexedMapService) LastEntry(LastEntryQuery) (*indexedmapapi.LastEntryResponse, error) {
 	if m.lastEntry == nil {
-		return errors.NewNotFound("map is empty")
+		return nil, errors.NewNotFound("map is empty")
 	}
-	return lastEntry.Reply(&indexedmapapi.LastEntryResponse{
+	return &indexedmapapi.LastEntryResponse{
 		Entry: m.newEntry(m.lastEntry.IndexedMapEntry),
-	})
+	}, nil
 }
 
-func (m *indexedMapService) PrevEntry(prevEntry PrevEntryQuery) error {
-	request, err := prevEntry.Request()
-	if err != nil {
-		return err
-	}
-
-	entry, ok := m.indexes[request.Index]
+func (m *indexedMapService) PrevEntry(prevEntry PrevEntryQuery) (*indexedmapapi.PrevEntryResponse, error) {
+	entry, ok := m.indexes[prevEntry.Request().Index]
 	if !ok {
 		for _, e := range m.indexes {
-			if entry == nil || (e.Index < request.Index && e.Index > entry.Index) {
+			if entry == nil || (e.Index < prevEntry.Request().Index && e.Index > entry.Index) {
 				entry = e
 			}
 		}
@@ -352,23 +334,18 @@ func (m *indexedMapService) PrevEntry(prevEntry PrevEntryQuery) error {
 	}
 
 	if entry == nil {
-		return errors.NewNotFound("no entry found prior to index %d", request.Index)
+		return nil, errors.NewNotFound("no entry found prior to index %d", prevEntry.Request().Index)
 	}
-	return prevEntry.Reply(&indexedmapapi.PrevEntryResponse{
+	return &indexedmapapi.PrevEntryResponse{
 		Entry: m.newEntry(entry.IndexedMapEntry),
-	})
+	}, nil
 }
 
-func (m *indexedMapService) NextEntry(nextEntry NextEntryQuery) error {
-	request, err := nextEntry.Request()
-	if err != nil {
-		return err
-	}
-
-	entry, ok := m.indexes[request.Index]
+func (m *indexedMapService) NextEntry(nextEntry NextEntryQuery) (*indexedmapapi.NextEntryResponse, error) {
+	entry, ok := m.indexes[nextEntry.Request().Index]
 	if !ok {
 		for _, e := range m.indexes {
-			if entry == nil || (e.Index > request.Index && e.Index < entry.Index) {
+			if entry == nil || (e.Index > nextEntry.Request().Index && e.Index < entry.Index) {
 				entry = e
 			}
 		}
@@ -377,34 +354,29 @@ func (m *indexedMapService) NextEntry(nextEntry NextEntryQuery) error {
 	}
 
 	if entry == nil {
-		return errors.NewNotFound("no entry found after index %d", request.Index)
+		return nil, errors.NewNotFound("no entry found after index %d", nextEntry.Request().Index)
 	}
-	return nextEntry.Reply(&indexedmapapi.NextEntryResponse{
+	return &indexedmapapi.NextEntryResponse{
 		Entry: m.newEntry(entry.IndexedMapEntry),
-	})
+	}, nil
 }
 
-func (m *indexedMapService) Remove(remove RemoveProposal) error {
-	request, err := remove.Request()
-	if err != nil {
-		return err
-	}
-
+func (m *indexedMapService) Remove(remove RemoveProposal) (*indexedmapapi.RemoveResponse, error) {
 	var entry *LinkedMapEntryValue
-	if request.Entry.Index > 0 {
-		entry = m.indexes[request.Entry.Index]
+	if remove.Request().Entry.Index > 0 {
+		entry = m.indexes[remove.Request().Entry.Index]
 		if entry == nil {
-			return errors.NewNotFound("no entry found at index %d", request.Entry.Index)
+			return nil, errors.NewNotFound("no entry found at index %d", remove.Request().Entry.Index)
 		}
 	} else {
-		entry = m.entries[request.Entry.Key]
+		entry = m.entries[remove.Request().Entry.Key]
 		if entry == nil {
-			return errors.NewNotFound("no entry found at key %s", request.Entry.Key)
+			return nil, errors.NewNotFound("no entry found at key %s", remove.Request().Entry.Key)
 		}
 	}
 
-	if err := checkPreconditions(entry.IndexedMapEntry, request.Preconditions); err != nil {
-		return err
+	if err := checkPreconditions(entry.IndexedMapEntry, remove.Request().Preconditions); err != nil {
+		return nil, err
 	}
 
 	// Delete the entry from the map.
@@ -412,7 +384,7 @@ func (m *indexedMapService) Remove(remove RemoveProposal) error {
 	delete(m.indexes, entry.Index)
 
 	// Cancel any TTLs.
-	m.cancelTTL(request.Entry.Key)
+	m.cancelTTL(remove.Request().Entry.Key)
 
 	// Update links for previous and next entries
 	if entry.Prev != nil {
@@ -433,32 +405,30 @@ func (m *indexedMapService) Remove(remove RemoveProposal) error {
 		},
 	})
 
-	return remove.Reply(&indexedmapapi.RemoveResponse{
+	return &indexedmapapi.RemoveResponse{
 		Entry: m.newEntry(entry.IndexedMapEntry),
-	})
+	}, nil
 }
 
-func (m *indexedMapService) Clear(clear ClearProposal) error {
+func (m *indexedMapService) Clear(ClearProposal) (*indexedmapapi.ClearResponse, error) {
 	m.entries = make(map[string]*LinkedMapEntryValue)
 	m.indexes = make(map[uint64]*LinkedMapEntryValue)
 	m.firstEntry = nil
 	m.lastEntry = nil
-	return clear.Reply(&indexedmapapi.ClearResponse{})
+	return &indexedmapapi.ClearResponse{}, nil
 }
 
-func (m *indexedMapService) Events(events EventsProposal) error {
-	request, err := events.Request()
-	if err != nil {
-		return err
-	}
-
+func (m *indexedMapService) Events(events EventsProposal) {
 	listener := &IndexedMapStateListener{
 		ProposalID: events.ID(),
-		Key:        request.Pos.Key,
-		Index:      request.Pos.Index,
+		Key:        events.Request().Pos.Key,
+		Index:      events.Request().Pos.Index,
 	}
 	m.listeners[events.ID()] = listener
-	if request.Replay {
+
+	events.Notify(&indexedmapapi.EventsResponse{})
+
+	if events.Request().Replay {
 		entry := m.firstEntry
 		for entry != nil {
 			if (listener.Key == "" && listener.Index == 0) ||
@@ -468,32 +438,24 @@ func (m *indexedMapService) Events(events EventsProposal) error {
 					Type:  indexedmapapi.Event_REPLAY,
 					Entry: *m.newEntry(entry.IndexedMapEntry),
 				}
-				err := events.Notify(&indexedmapapi.EventsResponse{
+				events.Notify(&indexedmapapi.EventsResponse{
 					Event: event,
 				})
-				if err != nil {
-					return err
-				}
 			}
 			entry = entry.Next
 		}
 	}
-	return nil
 }
 
-func (m *indexedMapService) Entries(entries EntriesQuery) error {
+func (m *indexedMapService) Entries(entries EntriesQuery) {
 	defer entries.Close()
 	entry := m.firstEntry
 	for entry != nil {
-		err := entries.Notify(&indexedmapapi.EntriesResponse{
+		entries.Notify(&indexedmapapi.EntriesResponse{
 			Entry: *m.newEntry(entry.IndexedMapEntry),
 		})
-		if err != nil {
-			return err
-		}
 		entry = entry.Next
 	}
-	return nil
 }
 
 func (m *indexedMapService) scheduleTTL(key string, expire *time.Time) {

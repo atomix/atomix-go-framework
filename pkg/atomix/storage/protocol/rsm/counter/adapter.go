@@ -5,6 +5,7 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
+	"github.com/gogo/protobuf/proto"
 	"io"
 )
 
@@ -42,57 +43,121 @@ type ServiceAdaptor struct {
 	rsm Service
 }
 
-func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) error {
+func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 	switch command.OperationID() {
 	case 1:
-		p := newSetProposal(command)
-		log.Debugf("Proposing SetProposal %s", p)
-		err := s.rsm.Set(p)
+		p, err := newSetProposal(command)
 		if err != nil {
-			log.Warn(err)
-			return err
+			err = errors.NewInternal(err.Error())
+			log.Error(err)
+			command.Output(nil, err)
+			return
 		}
-		return nil
+
+		log.Debugf("Proposal SetProposal %s", p)
+		response, err := s.rsm.Set(p)
+		if err != nil {
+			log.Warnf("Proposal SetProposal %s failed: %v", p, err)
+			command.Output(nil, err)
+		} else {
+			output, err := proto.Marshal(response)
+			if err != nil {
+				err = errors.NewInternal(err.Error())
+				log.Errorf("Proposal SetProposal %s failed: %v", p, err)
+				command.Output(nil, err)
+			} else {
+				log.Errorf("Proposal SetProposal %s complete: %+v", p, response)
+				command.Output(output, nil)
+			}
+		}
 	case 3:
-		p := newIncrementProposal(command)
-		log.Debugf("Proposing IncrementProposal %s", p)
-		err := s.rsm.Increment(p)
+		p, err := newIncrementProposal(command)
 		if err != nil {
-			log.Warn(err)
-			return err
+			err = errors.NewInternal(err.Error())
+			log.Error(err)
+			command.Output(nil, err)
+			return
 		}
-		return nil
+
+		log.Debugf("Proposal IncrementProposal %s", p)
+		response, err := s.rsm.Increment(p)
+		if err != nil {
+			log.Warnf("Proposal IncrementProposal %s failed: %v", p, err)
+			command.Output(nil, err)
+		} else {
+			output, err := proto.Marshal(response)
+			if err != nil {
+				err = errors.NewInternal(err.Error())
+				log.Errorf("Proposal IncrementProposal %s failed: %v", p, err)
+				command.Output(nil, err)
+			} else {
+				log.Errorf("Proposal IncrementProposal %s complete: %+v", p, response)
+				command.Output(output, nil)
+			}
+		}
 	case 4:
-		p := newDecrementProposal(command)
-		log.Debugf("Proposing DecrementProposal %s", p)
-		err := s.rsm.Decrement(p)
+		p, err := newDecrementProposal(command)
 		if err != nil {
-			log.Warn(err)
-			return err
+			err = errors.NewInternal(err.Error())
+			log.Error(err)
+			command.Output(nil, err)
+			return
 		}
-		return nil
+
+		log.Debugf("Proposal DecrementProposal %s", p)
+		response, err := s.rsm.Decrement(p)
+		if err != nil {
+			log.Warnf("Proposal DecrementProposal %s failed: %v", p, err)
+			command.Output(nil, err)
+		} else {
+			output, err := proto.Marshal(response)
+			if err != nil {
+				err = errors.NewInternal(err.Error())
+				log.Errorf("Proposal DecrementProposal %s failed: %v", p, err)
+				command.Output(nil, err)
+			} else {
+				log.Errorf("Proposal DecrementProposal %s complete: %+v", p, response)
+				command.Output(output, nil)
+			}
+		}
 	default:
 		err := errors.NewNotSupported("unknown operation %d", command.OperationID())
 		log.Warn(err)
-		return err
+		command.Output(nil, err)
 	}
 }
 
-func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) error {
+func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 	switch query.OperationID() {
 	case 2:
-		q := newGetQuery(query)
-		log.Debugf("Querying GetQuery %s", q)
-		err := s.rsm.Get(q)
+		q, err := newGetQuery(query)
 		if err != nil {
-			log.Warn(err)
-			return err
+			err = errors.NewInternal(err.Error())
+			log.Error(err)
+			query.Output(nil, err)
+			return
 		}
-		return nil
+
+		log.Debugf("Querying GetQuery %s", q)
+		response, err := s.rsm.Get(q)
+		if err != nil {
+			log.Warnf("Querying GetQuery %s failed: %v", q, err)
+			query.Output(nil, err)
+		} else {
+			output, err := proto.Marshal(response)
+			if err != nil {
+				err = errors.NewInternal(err.Error())
+				log.Errorf("Querying GetQuery %s failed: %v", q, err)
+				query.Output(nil, err)
+			} else {
+				log.Errorf("Querying GetQuery %s complete: %+v", q, response)
+				query.Output(output, nil)
+			}
+		}
 	default:
 		err := errors.NewNotSupported("unknown operation %d", query.OperationID())
 		log.Warn(err)
-		return err
+		query.Output(nil, err)
 	}
 }
 func (s *ServiceAdaptor) Backup(writer io.Writer) error {

@@ -5,6 +5,7 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
+	"github.com/gogo/protobuf/proto"
 	"io"
 )
 
@@ -45,84 +46,168 @@ type ServiceAdaptor struct {
 	rsm Service
 }
 
-func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) error {
+func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 	switch command.OperationID() {
 	case 3:
-		p := newAddProposal(command)
-		log.Debugf("Proposing AddProposal %s", p)
-		err := s.rsm.Add(p)
+		p, err := newAddProposal(command)
 		if err != nil {
-			log.Warn(err)
-			return err
+			err = errors.NewInternal(err.Error())
+			log.Error(err)
+			command.Output(nil, err)
+			return
 		}
-		return nil
+
+		log.Debugf("Proposal AddProposal %s", p)
+		response, err := s.rsm.Add(p)
+		if err != nil {
+			log.Warnf("Proposal AddProposal %s failed: %v", p, err)
+			command.Output(nil, err)
+		} else {
+			output, err := proto.Marshal(response)
+			if err != nil {
+				err = errors.NewInternal(err.Error())
+				log.Errorf("Proposal AddProposal %s failed: %v", p, err)
+				command.Output(nil, err)
+			} else {
+				log.Errorf("Proposal AddProposal %s complete: %+v", p, response)
+				command.Output(output, nil)
+			}
+		}
 	case 4:
-		p := newRemoveProposal(command)
-		log.Debugf("Proposing RemoveProposal %s", p)
-		err := s.rsm.Remove(p)
+		p, err := newRemoveProposal(command)
 		if err != nil {
-			log.Warn(err)
-			return err
+			err = errors.NewInternal(err.Error())
+			log.Error(err)
+			command.Output(nil, err)
+			return
 		}
-		return nil
+
+		log.Debugf("Proposal RemoveProposal %s", p)
+		response, err := s.rsm.Remove(p)
+		if err != nil {
+			log.Warnf("Proposal RemoveProposal %s failed: %v", p, err)
+			command.Output(nil, err)
+		} else {
+			output, err := proto.Marshal(response)
+			if err != nil {
+				err = errors.NewInternal(err.Error())
+				log.Errorf("Proposal RemoveProposal %s failed: %v", p, err)
+				command.Output(nil, err)
+			} else {
+				log.Errorf("Proposal RemoveProposal %s complete: %+v", p, response)
+				command.Output(output, nil)
+			}
+		}
 	case 5:
-		p := newClearProposal(command)
-		log.Debugf("Proposing ClearProposal %s", p)
-		err := s.rsm.Clear(p)
+		p, err := newClearProposal(command)
 		if err != nil {
-			log.Warn(err)
-			return err
+			err = errors.NewInternal(err.Error())
+			log.Error(err)
+			command.Output(nil, err)
+			return
 		}
-		return nil
+
+		log.Debugf("Proposal ClearProposal %s", p)
+		response, err := s.rsm.Clear(p)
+		if err != nil {
+			log.Warnf("Proposal ClearProposal %s failed: %v", p, err)
+			command.Output(nil, err)
+		} else {
+			output, err := proto.Marshal(response)
+			if err != nil {
+				err = errors.NewInternal(err.Error())
+				log.Errorf("Proposal ClearProposal %s failed: %v", p, err)
+				command.Output(nil, err)
+			} else {
+				log.Errorf("Proposal ClearProposal %s complete: %+v", p, response)
+				command.Output(output, nil)
+			}
+		}
 	case 6:
-		p := newEventsProposal(command)
-		log.Debugf("Proposing EventsProposal %s", p)
-		err := s.rsm.Events(p)
+		p, err := newEventsProposal(command)
 		if err != nil {
-			log.Warn(err)
-			return err
+			err = errors.NewInternal(err.Error())
+			log.Error(err)
+			command.Output(nil, err)
+			return
 		}
-		return nil
+
+		log.Debugf("Proposal EventsProposal %s", p)
+		s.rsm.Events(p)
 	default:
 		err := errors.NewNotSupported("unknown operation %d", command.OperationID())
 		log.Warn(err)
-		return err
+		command.Output(nil, err)
 	}
 }
 
-func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) error {
+func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 	switch query.OperationID() {
 	case 1:
-		q := newSizeQuery(query)
+		q, err := newSizeQuery(query)
+		if err != nil {
+			err = errors.NewInternal(err.Error())
+			log.Error(err)
+			query.Output(nil, err)
+			return
+		}
+
 		log.Debugf("Querying SizeQuery %s", q)
-		err := s.rsm.Size(q)
+		response, err := s.rsm.Size(q)
 		if err != nil {
-			log.Warn(err)
-			return err
+			log.Warnf("Querying SizeQuery %s failed: %v", q, err)
+			query.Output(nil, err)
+		} else {
+			output, err := proto.Marshal(response)
+			if err != nil {
+				err = errors.NewInternal(err.Error())
+				log.Errorf("Querying SizeQuery %s failed: %v", q, err)
+				query.Output(nil, err)
+			} else {
+				log.Errorf("Querying SizeQuery %s complete: %+v", q, response)
+				query.Output(output, nil)
+			}
 		}
-		return nil
 	case 2:
-		q := newContainsQuery(query)
+		q, err := newContainsQuery(query)
+		if err != nil {
+			err = errors.NewInternal(err.Error())
+			log.Error(err)
+			query.Output(nil, err)
+			return
+		}
+
 		log.Debugf("Querying ContainsQuery %s", q)
-		err := s.rsm.Contains(q)
+		response, err := s.rsm.Contains(q)
 		if err != nil {
-			log.Warn(err)
-			return err
+			log.Warnf("Querying ContainsQuery %s failed: %v", q, err)
+			query.Output(nil, err)
+		} else {
+			output, err := proto.Marshal(response)
+			if err != nil {
+				err = errors.NewInternal(err.Error())
+				log.Errorf("Querying ContainsQuery %s failed: %v", q, err)
+				query.Output(nil, err)
+			} else {
+				log.Errorf("Querying ContainsQuery %s complete: %+v", q, response)
+				query.Output(output, nil)
+			}
 		}
-		return nil
 	case 7:
-		q := newElementsQuery(query)
-		log.Debugf("Querying ElementsQuery %s", q)
-		err := s.rsm.Elements(q)
+		q, err := newElementsQuery(query)
 		if err != nil {
-			log.Warn(err)
-			return err
+			err = errors.NewInternal(err.Error())
+			log.Error(err)
+			query.Output(nil, err)
+			return
 		}
-		return nil
+
+		log.Debugf("Querying ElementsQuery %s", q)
+		s.rsm.Elements(q)
 	default:
 		err := errors.NewNotSupported("unknown operation %d", query.OperationID())
 		log.Warn(err)
-		return err
+		query.Output(nil, err)
 	}
 }
 func (s *ServiceAdaptor) Backup(writer io.Writer) error {

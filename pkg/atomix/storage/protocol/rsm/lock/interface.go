@@ -16,11 +16,11 @@ type Service interface {
 	Backup(SnapshotWriter) error
 	Restore(SnapshotReader) error
 	// Lock attempts to acquire the lock
-	Lock(LockProposal) error
+	Lock(LockProposal)
 	// Unlock releases the lock
-	Unlock(UnlockProposal) error
+	Unlock(UnlockProposal) (*lock.UnlockResponse, error)
 	// GetLock gets the lock state
-	GetLock(GetLockQuery) error
+	GetLock(GetLockQuery) (*lock.GetLockResponse, error)
 }
 
 type ServiceContext interface {
@@ -244,10 +244,19 @@ var _ Proposals = &serviceProposals{}
 
 type ProposalID uint64
 
+type ProposalState int
+
+const (
+	ProposalComplete ProposalState = iota
+	ProposalOpen
+)
+
 type Proposal interface {
 	fmt.Stringer
 	ID() ProposalID
 	Session() Session
+	State() ProposalState
+	Watch(func(ProposalState)) Watcher
 }
 
 func newProposal(command rsm.Command) Proposal {
@@ -266,6 +275,16 @@ func (p *serviceProposal) ID() ProposalID {
 
 func (p *serviceProposal) Session() Session {
 	return newSession(p.command.Session())
+}
+
+func (p *serviceProposal) State() ProposalState {
+	return ProposalState(p.command.State())
+}
+
+func (p *serviceProposal) Watch(f func(ProposalState)) Watcher {
+	return newWatcher(p.command.Watch(func(state rsm.CommandState) {
+		f(ProposalState(state))
+	}))
 }
 
 func (p *serviceProposal) String() string {
@@ -319,14 +338,24 @@ func (p *lockProposals) Get(id ProposalID) (LockProposal, bool) {
 	if !ok {
 		return nil, false
 	}
-	return newLockProposal(command), true
+	proposal, err := newLockProposal(command)
+	if err != nil {
+		log.Error(err)
+		return nil, false
+	}
+	return proposal, true
 }
 
 func (p *lockProposals) List() []LockProposal {
 	commands := p.commands.List(rsm.OperationID(1))
 	proposals := make([]LockProposal, len(commands))
 	for i, command := range commands {
-		proposals[i] = newLockProposal(command)
+		proposal, err := newLockProposal(command)
+		if err != nil {
+			log.Error(err)
+		} else {
+			proposals[i] = proposal
+		}
 	}
 	return proposals
 }
@@ -335,57 +364,58 @@ var _ LockProposals = &lockProposals{}
 
 type LockProposal interface {
 	Proposal
-	Request() (*lock.LockRequest, error)
-	Reply(*lock.LockResponse) error
-	Fail(error) error
+	Request() *lock.LockRequest
+	Reply(*lock.LockResponse)
+	Fail(error)
 }
 
-func newLockProposal(command rsm.Command) LockProposal {
+func newLockProposal(command rsm.Command) (LockProposal, error) {
+	request := &lock.LockRequest{}
+	if err := proto.Unmarshal(command.Input(), request); err != nil {
+		return nil, err
+	}
 	return &lockProposal{
 		Proposal: newProposal(command),
 		command:  command,
-	}
+		request:  request,
+	}, nil
 }
 
 type lockProposal struct {
 	Proposal
 	command  rsm.Command
+	request  *lock.LockRequest
 	complete bool
 }
 
-func (p *lockProposal) Request() (*lock.LockRequest, error) {
-	request := &lock.LockRequest{}
-	if err := proto.Unmarshal(p.command.Input(), request); err != nil {
-		return nil, err
-	}
-	log.Debugf("Received LockProposal %s: %s", p, request)
-	return request, nil
+func (p *lockProposal) Request() *lock.LockRequest {
+	return p.request
 }
-
-func (p *lockProposal) Reply(response *lock.LockResponse) error {
+func (p *lockProposal) Reply(response *lock.LockResponse) {
 	if p.complete {
-		return errors.NewConflict("proposal is already complete")
+		return
 	}
 	log.Debugf("Sending LockProposal %s: %s", p, response)
 	output, err := proto.Marshal(response)
 	if err != nil {
-		return err
+		err = errors.NewInternal(err.Error())
+		log.Errorf("Sending LockProposal %s response failed: %v", p, err)
+		p.command.Output(nil, err)
+	} else {
+		p.command.Output(output, nil)
 	}
-	p.command.Output(output, nil)
 	p.command.Close()
 	p.complete = true
-	return nil
 }
 
-func (p *lockProposal) Fail(err error) error {
+func (p *lockProposal) Fail(err error) {
 	if p.complete {
-		return errors.NewConflict("proposal is already complete")
+		return
 	}
 	log.Debugf("Failing LockProposal %s: %s", p, err)
 	p.command.Output(nil, err)
 	p.command.Close()
 	p.complete = true
-	return nil
 }
 
 func (p *lockProposal) String() string {
@@ -414,14 +444,24 @@ func (p *unlockProposals) Get(id ProposalID) (UnlockProposal, bool) {
 	if !ok {
 		return nil, false
 	}
-	return newUnlockProposal(command), true
+	proposal, err := newUnlockProposal(command)
+	if err != nil {
+		log.Error(err)
+		return nil, false
+	}
+	return proposal, true
 }
 
 func (p *unlockProposals) List() []UnlockProposal {
 	commands := p.commands.List(rsm.OperationID(2))
 	proposals := make([]UnlockProposal, len(commands))
 	for i, command := range commands {
-		proposals[i] = newUnlockProposal(command)
+		proposal, err := newUnlockProposal(command)
+		if err != nil {
+			log.Error(err)
+		} else {
+			proposals[i] = proposal
+		}
 	}
 	return proposals
 }
@@ -430,57 +470,29 @@ var _ UnlockProposals = &unlockProposals{}
 
 type UnlockProposal interface {
 	Proposal
-	Request() (*lock.UnlockRequest, error)
-	Reply(*lock.UnlockResponse) error
-	Fail(error) error
+	Request() *lock.UnlockRequest
 }
 
-func newUnlockProposal(command rsm.Command) UnlockProposal {
+func newUnlockProposal(command rsm.Command) (UnlockProposal, error) {
+	request := &lock.UnlockRequest{}
+	if err := proto.Unmarshal(command.Input(), request); err != nil {
+		return nil, err
+	}
 	return &unlockProposal{
 		Proposal: newProposal(command),
 		command:  command,
-	}
+		request:  request,
+	}, nil
 }
 
 type unlockProposal struct {
 	Proposal
-	command  rsm.Command
-	complete bool
+	command rsm.Command
+	request *lock.UnlockRequest
 }
 
-func (p *unlockProposal) Request() (*lock.UnlockRequest, error) {
-	request := &lock.UnlockRequest{}
-	if err := proto.Unmarshal(p.command.Input(), request); err != nil {
-		return nil, err
-	}
-	log.Debugf("Received UnlockProposal %s: %s", p, request)
-	return request, nil
-}
-
-func (p *unlockProposal) Reply(response *lock.UnlockResponse) error {
-	if p.complete {
-		return errors.NewConflict("proposal is already complete")
-	}
-	log.Debugf("Sending UnlockProposal %s: %s", p, response)
-	output, err := proto.Marshal(response)
-	if err != nil {
-		return err
-	}
-	p.command.Output(output, nil)
-	p.command.Close()
-	p.complete = true
-	return nil
-}
-
-func (p *unlockProposal) Fail(err error) error {
-	if p.complete {
-		return errors.NewConflict("proposal is already complete")
-	}
-	log.Debugf("Failing UnlockProposal %s: %s", p, err)
-	p.command.Output(nil, err)
-	p.command.Close()
-	p.complete = true
-	return nil
+func (p *unlockProposal) Request() *lock.UnlockRequest {
+	return p.request
 }
 
 func (p *unlockProposal) String() string {
@@ -491,40 +503,29 @@ var _ UnlockProposal = &unlockProposal{}
 
 type GetLockQuery interface {
 	Query
-	Request() (*lock.GetLockRequest, error)
-	Reply(*lock.GetLockResponse) error
+	Request() *lock.GetLockRequest
 }
 
-func newGetLockQuery(query rsm.Query) GetLockQuery {
-	return &getLockQuery{
-		Query: newQuery(query),
-		query: query,
+func newGetLockQuery(query rsm.Query) (GetLockQuery, error) {
+	request := &lock.GetLockRequest{}
+	if err := proto.Unmarshal(query.Input(), request); err != nil {
+		return nil, err
 	}
+	return &getLockQuery{
+		Query:   newQuery(query),
+		query:   query,
+		request: request,
+	}, nil
 }
 
 type getLockQuery struct {
 	Query
-	query rsm.Query
+	query   rsm.Query
+	request *lock.GetLockRequest
 }
 
-func (p *getLockQuery) Request() (*lock.GetLockRequest, error) {
-	request := &lock.GetLockRequest{}
-	if err := proto.Unmarshal(p.query.Input(), request); err != nil {
-		return nil, err
-	}
-	log.Debugf("Received GetLockQuery %s: %s", p, request)
-	return request, nil
-}
-
-func (p *getLockQuery) Reply(response *lock.GetLockResponse) error {
-	log.Debugf("Sending GetLockQuery %s: %s", p, response)
-	output, err := proto.Marshal(response)
-	if err != nil {
-		return err
-	}
-	p.query.Output(output, nil)
-	p.query.Close()
-	return nil
+func (p *getLockQuery) Request() *lock.GetLockRequest {
+	return p.request
 }
 
 func (p *getLockQuery) String() string {

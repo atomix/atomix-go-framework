@@ -44,20 +44,17 @@ type mapService struct {
 	timers    map[string]rsm.Timer
 }
 
-func (m *mapService) notify(event *mapapi.EventsResponse) error {
+func (m *mapService) notify(event *mapapi.EventsResponse) {
 	for proposalID, listener := range m.listeners {
 		if listener.Key == "" || listener.Key == event.Event.Entry.Key.Key {
 			proposal, ok := m.Proposals().Events().Get(proposalID)
 			if ok {
-				if err := proposal.Notify(event); err != nil {
-					return err
-				}
+				proposal.Notify(event)
 			} else {
 				delete(m.listeners, proposalID)
 			}
 		}
 	}
-	return nil
 }
 
 func (m *mapService) Backup(writer SnapshotWriter) error {
@@ -94,41 +91,36 @@ func (m *mapService) Restore(reader SnapshotReader) error {
 	return nil
 }
 
-func (m *mapService) Size(size SizeQuery) error {
-	return size.Reply(&mapapi.SizeResponse{
+func (m *mapService) Size(SizeQuery) (*mapapi.SizeResponse, error) {
+	return &mapapi.SizeResponse{
 		Size_: uint32(len(m.entries)),
-	})
+	}, nil
 }
 
-func (m *mapService) Put(put PutProposal) error {
-	request, err := put.Request()
-	if err != nil {
-		return err
-	}
-
-	oldEntry := m.entries[request.Entry.Key.Key]
-	if err := checkPreconditions(oldEntry, request.Preconditions); err != nil {
-		return err
+func (m *mapService) Put(put PutProposal) (*mapapi.PutResponse, error) {
+	oldEntry := m.entries[put.Request().Entry.Key.Key]
+	if err := checkPreconditions(oldEntry, put.Request().Preconditions); err != nil {
+		return nil, err
 	}
 
 	// If the value is equal to the current value, return a no-op.
-	if oldEntry != nil && bytes.Equal(oldEntry.Value.Value, request.Entry.Value.Value) {
-		return put.Reply(&mapapi.PutResponse{
+	if oldEntry != nil && bytes.Equal(oldEntry.Value.Value, put.Request().Entry.Value.Value) {
+		return &mapapi.PutResponse{
 			Entry: *m.newEntry(oldEntry),
-		})
+		}, nil
 	}
 
 	// Create a new entry and increment the revision number
-	newEntry := m.newEntryState(&request.Entry)
+	newEntry := m.newEntryState(&put.Request().Entry)
 	newEntry.Key.ObjectMeta.Revision = &metaapi.Revision{
 		Num: metaapi.RevisionNum(put.ID()),
 	}
 
 	// Create a new entry value and set it in the map.
-	m.entries[request.Entry.Key.Key] = newEntry
+	m.entries[put.Request().Entry.Key.Key] = newEntry
 
 	// Schedule the timeout for the value if necessary.
-	m.scheduleTTL(request.Entry.Key.Key, newEntry)
+	m.scheduleTTL(put.Request().Entry.Key.Key, newEntry)
 
 	// Publish an event to listener streams.
 	var eventType mapapi.Event_Type
@@ -144,42 +136,32 @@ func (m *mapService) Put(put PutProposal) error {
 		},
 	})
 
-	return put.Reply(&mapapi.PutResponse{
+	return &mapapi.PutResponse{
 		Entry: *m.newEntry(newEntry),
-	})
+	}, nil
 }
 
-func (m *mapService) Get(get GetQuery) error {
-	request, err := get.Request()
-	if err != nil {
-		return err
-	}
-
-	entry, ok := m.entries[request.Key]
+func (m *mapService) Get(get GetQuery) (*mapapi.GetResponse, error) {
+	entry, ok := m.entries[get.Request().Key]
 	if !ok {
-		return errors.NewNotFound("key %s not found", request.Key)
+		return nil, errors.NewNotFound("key %s not found", get.Request().Key)
 	}
-	return get.Reply(&mapapi.GetResponse{
+	return &mapapi.GetResponse{
 		Entry: *m.newEntry(entry),
-	})
+	}, nil
 }
 
-func (m *mapService) Remove(remove RemoveProposal) error {
-	request, err := remove.Request()
-	if err != nil {
-		return err
-	}
-
-	entry, ok := m.entries[request.Key.Key]
+func (m *mapService) Remove(remove RemoveProposal) (*mapapi.RemoveResponse, error) {
+	entry, ok := m.entries[remove.Request().Key.Key]
 	if !ok {
-		return errors.NewNotFound("key '%s' not found", request.Key.Key)
+		return nil, errors.NewNotFound("key '%s' not found", remove.Request().Key.Key)
 	}
 
-	if err := checkPreconditions(entry, request.Preconditions); err != nil {
-		return err
+	if err := checkPreconditions(entry, remove.Request().Preconditions); err != nil {
+		return nil, err
 	}
 
-	delete(m.entries, request.Key.Key)
+	delete(m.entries, remove.Request().Key.Key)
 
 	// Schedule the timeout for the value if necessary.
 	m.cancelTTL(entry.Key.Key)
@@ -192,12 +174,12 @@ func (m *mapService) Remove(remove RemoveProposal) error {
 		},
 	})
 
-	return remove.Reply(&mapapi.RemoveResponse{
+	return &mapapi.RemoveResponse{
 		Entry: *m.newEntry(entry),
-	})
+	}, nil
 }
 
-func (m *mapService) Clear(clear ClearProposal) error {
+func (m *mapService) Clear(ClearProposal) (*mapapi.ClearResponse, error) {
 	for key, entry := range m.entries {
 		m.notify(&mapapi.EventsResponse{
 			Event: mapapi.Event{
@@ -208,49 +190,39 @@ func (m *mapService) Clear(clear ClearProposal) error {
 		m.cancelTTL(key)
 		delete(m.entries, key)
 	}
-	return clear.Reply(&mapapi.ClearResponse{})
+	return &mapapi.ClearResponse{}, nil
 }
 
-func (m *mapService) Events(events EventsProposal) error {
-	request, err := events.Request()
-	if err != nil {
-		return err
-	}
-
+func (m *mapService) Events(events EventsProposal) {
 	m.listeners[events.ID()] = &MapStateListener{
 		ProposalID: events.ID(),
-		Key:        request.Key,
+		Key:        events.Request().Key,
 	}
-	if request.Replay {
+
+	events.Notify(&mapapi.EventsResponse{})
+
+	if events.Request().Replay {
 		for _, entry := range m.entries {
-			if request.Key == "" || request.Key == entry.Key.Key {
+			if events.Request().Key == "" || events.Request().Key == entry.Key.Key {
 				event := mapapi.Event{
 					Type:  mapapi.Event_REPLAY,
 					Entry: *m.newEntry(entry),
 				}
-				err := events.Notify(&mapapi.EventsResponse{
+				events.Notify(&mapapi.EventsResponse{
 					Event: event,
 				})
-				if err != nil {
-					return err
-				}
 			}
 		}
 	}
-	return nil
 }
 
-func (m *mapService) Entries(entries EntriesQuery) error {
+func (m *mapService) Entries(entries EntriesQuery) {
 	defer entries.Close()
 	for _, entry := range m.entries {
-		err := entries.Notify(&mapapi.EntriesResponse{
+		entries.Notify(&mapapi.EntriesResponse{
 			Entry: *m.newEntry(entry),
 		})
-		if err != nil {
-			return err
-		}
 	}
-	return nil
 }
 
 func (m *mapService) scheduleTTL(key string, entry *MapStateEntry) {

@@ -62,106 +62,78 @@ func (s *setService) Restore(reader SnapshotReader) error {
 	return nil
 }
 
-func (s *setService) notify(event setapi.Event) error {
+func (s *setService) notify(event setapi.Event) {
 	output := &setapi.EventsResponse{
 		Event: event,
 	}
 	for _, events := range s.Proposals().Events().List() {
-		if err := events.Notify(output); err != nil {
-			return err
-		}
+		events.Notify(output)
 	}
-	return nil
 }
 
-func (s *setService) Size(size SizeQuery) error {
-	return size.Reply(&setapi.SizeResponse{
+func (s *setService) Size(size SizeQuery) (*setapi.SizeResponse, error) {
+	return &setapi.SizeResponse{
 		Size_: uint32(len(s.values)),
-	})
+	}, nil
 }
 
-func (s *setService) Contains(contains ContainsQuery) error {
-	request, err := contains.Request()
-	if err != nil {
-		return err
-	}
-
-	_, ok := s.values[request.Element.Value]
-	return contains.Reply(&setapi.ContainsResponse{
+func (s *setService) Contains(contains ContainsQuery) (*setapi.ContainsResponse, error) {
+	_, ok := s.values[contains.Request().Element.Value]
+	return &setapi.ContainsResponse{
 		Contains: ok,
-	})
+	}, nil
 }
 
-func (s *setService) Add(add AddProposal) error {
-	request, err := add.Request()
-	if err != nil {
-		return err
+func (s *setService) Add(add AddProposal) (*setapi.AddResponse, error) {
+	if _, ok := s.values[add.Request().Element.Value]; ok {
+		return nil, errors.NewAlreadyExists("value already exists")
 	}
 
-	if _, ok := s.values[request.Element.Value]; ok {
-		return errors.NewAlreadyExists("value already exists")
-	}
-
-	s.values[request.Element.Value] = meta.FromProto(request.Element.ObjectMeta)
-	err = s.notify(setapi.Event{
+	s.values[add.Request().Element.Value] = meta.FromProto(add.Request().Element.ObjectMeta)
+	s.notify(setapi.Event{
 		Type:    setapi.Event_ADD,
-		Element: request.Element,
+		Element: add.Request().Element,
 	})
-	if err != nil {
-		return err
-	}
-	return add.Reply(&setapi.AddResponse{
-		Element: request.Element,
-	})
+	return &setapi.AddResponse{
+		Element: add.Request().Element,
+	}, nil
 }
 
-func (s *setService) Remove(remove RemoveProposal) error {
-	request, err := remove.Request()
-	if err != nil {
-		return err
-	}
-
-	object, ok := s.values[request.Element.Value]
+func (s *setService) Remove(remove RemoveProposal) (*setapi.RemoveResponse, error) {
+	object, ok := s.values[remove.Request().Element.Value]
 	if !ok {
-		return errors.NewNotFound("value not found")
+		return nil, errors.NewNotFound("value not found")
 	}
 
-	if !object.Equal(meta.FromProto(request.Element.ObjectMeta)) {
-		return errors.NewConflict("metadata mismatch")
+	if !object.Equal(meta.FromProto(remove.Request().Element.ObjectMeta)) {
+		return nil, errors.NewConflict("metadata mismatch")
 	}
 
-	delete(s.values, request.Element.Value)
+	delete(s.values, remove.Request().Element.Value)
 
 	element := setapi.Element{
 		ObjectMeta: object.Proto(),
-		Value:      request.Element.Value,
+		Value:      remove.Request().Element.Value,
 	}
-	err = s.notify(setapi.Event{
+	s.notify(setapi.Event{
 		Type:    setapi.Event_REMOVE,
 		Element: element,
 	})
-	if err != nil {
-		return err
-	}
-	return remove.Reply(&setapi.RemoveResponse{
+	return &setapi.RemoveResponse{
 		Element: element,
-	})
+	}, nil
 }
 
-func (s *setService) Clear(clear ClearProposal) error {
+func (s *setService) Clear(ClearProposal) (*setapi.ClearResponse, error) {
 	s.values = make(map[string]meta.ObjectMeta)
-	return clear.Reply(&setapi.ClearResponse{})
+	return &setapi.ClearResponse{}, nil
 }
 
-func (s *setService) Events(events EventsProposal) error {
-	request, err := events.Request()
-	if err != nil {
-		return err
-	}
-
-	if request.Replay {
+func (s *setService) Events(events EventsProposal) {
+	events.Notify(&setapi.EventsResponse{})
+	if events.Request().Replay {
 		for value, metadata := range s.values {
-			err := events.Notify(&setapi.EventsResponse{
+			events.Notify(&setapi.EventsResponse{
 				Event: setapi.Event{
 					Type: setapi.Event_REPLAY,
 					Element: setapi.Element{
@@ -170,26 +142,18 @@ func (s *setService) Events(events EventsProposal) error {
 					},
 				},
 			})
-			if err != nil {
-				return err
-			}
 		}
 	}
-	return nil
 }
 
-func (s *setService) Elements(elements ElementsQuery) error {
+func (s *setService) Elements(elements ElementsQuery) {
 	defer elements.Close()
 	for value, object := range s.values {
-		err := elements.Notify(&setapi.ElementsResponse{
+		elements.Notify(&setapi.ElementsResponse{
 			Element: setapi.Element{
 				ObjectMeta: object.Proto(),
 				Value:      value,
 			},
 		})
-		if err != nil {
-			return err
-		}
 	}
-	return nil
 }

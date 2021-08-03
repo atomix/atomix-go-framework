@@ -50,46 +50,34 @@ func (c *counterService) Restore(reader SnapshotReader) error {
 	return nil
 }
 
-func (c *counterService) Set(set SetProposal) error {
-	request, err := set.Request()
-	if err != nil {
-		return err
+func (c *counterService) Set(set SetProposal) (*counter.SetResponse, error) {
+	if err := checkPreconditions(c.value, set.Request().Preconditions); err != nil {
+		return nil, err
 	}
-	if err := checkPreconditions(c.value, request.Preconditions); err != nil {
-		return err
-	}
-	c.value = request.Value
-	return set.Reply(&counter.SetResponse{
+	c.value = set.Request().Value
+	return &counter.SetResponse{
 		Value: c.value,
-	})
+	}, nil
 }
 
-func (c *counterService) Get(get GetQuery) error {
-	return get.Reply(&counter.GetResponse{
+func (c *counterService) Get(GetQuery) (*counter.GetResponse, error) {
+	return &counter.GetResponse{
 		Value: c.value,
-	})
+	}, nil
 }
 
-func (c *counterService) Increment(increment IncrementProposal) error {
-	request, err := increment.Request()
-	if err != nil {
-		return err
-	}
-	c.value += request.Delta
-	return increment.Reply(&counter.IncrementResponse{
+func (c *counterService) Increment(increment IncrementProposal) (*counter.IncrementResponse, error) {
+	c.value += increment.Request().Delta
+	return &counter.IncrementResponse{
 		Value: c.value,
-	})
+	}, nil
 }
 
-func (c *counterService) Decrement(decrement DecrementProposal) error {
-	request, err := decrement.Request()
-	if err != nil {
-		return err
-	}
-	c.value -= request.Delta
-	return decrement.Reply(&counter.DecrementResponse{
+func (c *counterService) Decrement(decrement DecrementProposal) (*counter.DecrementResponse, error) {
+	c.value -= decrement.Request().Delta
+	return &counter.DecrementResponse{
 		Value: c.value,
-	})
+	}, nil
 }
 
 func checkPreconditions(value int64, preconditions []counter.Precondition) error {

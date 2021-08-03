@@ -4,7 +4,6 @@ package counter
 import (
 	"fmt"
 	counter "github.com/atomix/atomix-api/go/atomix/primitive/counter"
-	errors "github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	rsm "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
 	util "github.com/atomix/atomix-go-framework/pkg/atomix/util"
 	proto "github.com/golang/protobuf/proto"
@@ -16,13 +15,13 @@ type Service interface {
 	Backup(SnapshotWriter) error
 	Restore(SnapshotReader) error
 	// Set sets the counter value
-	Set(SetProposal) error
+	Set(SetProposal) (*counter.SetResponse, error)
 	// Get gets the current counter value
-	Get(GetQuery) error
+	Get(GetQuery) (*counter.GetResponse, error)
 	// Increment increments the counter value
-	Increment(IncrementProposal) error
+	Increment(IncrementProposal) (*counter.IncrementResponse, error)
 	// Decrement decrements the counter value
-	Decrement(DecrementProposal) error
+	Decrement(DecrementProposal) (*counter.DecrementResponse, error)
 }
 
 type ServiceContext interface {
@@ -252,10 +251,19 @@ var _ Proposals = &serviceProposals{}
 
 type ProposalID uint64
 
+type ProposalState int
+
+const (
+	ProposalComplete ProposalState = iota
+	ProposalOpen
+)
+
 type Proposal interface {
 	fmt.Stringer
 	ID() ProposalID
 	Session() Session
+	State() ProposalState
+	Watch(func(ProposalState)) Watcher
 }
 
 func newProposal(command rsm.Command) Proposal {
@@ -274,6 +282,16 @@ func (p *serviceProposal) ID() ProposalID {
 
 func (p *serviceProposal) Session() Session {
 	return newSession(p.command.Session())
+}
+
+func (p *serviceProposal) State() ProposalState {
+	return ProposalState(p.command.State())
+}
+
+func (p *serviceProposal) Watch(f func(ProposalState)) Watcher {
+	return newWatcher(p.command.Watch(func(state rsm.CommandState) {
+		f(ProposalState(state))
+	}))
 }
 
 func (p *serviceProposal) String() string {
@@ -327,14 +345,24 @@ func (p *setProposals) Get(id ProposalID) (SetProposal, bool) {
 	if !ok {
 		return nil, false
 	}
-	return newSetProposal(command), true
+	proposal, err := newSetProposal(command)
+	if err != nil {
+		log.Error(err)
+		return nil, false
+	}
+	return proposal, true
 }
 
 func (p *setProposals) List() []SetProposal {
 	commands := p.commands.List(rsm.OperationID(1))
 	proposals := make([]SetProposal, len(commands))
 	for i, command := range commands {
-		proposals[i] = newSetProposal(command)
+		proposal, err := newSetProposal(command)
+		if err != nil {
+			log.Error(err)
+		} else {
+			proposals[i] = proposal
+		}
 	}
 	return proposals
 }
@@ -343,57 +371,29 @@ var _ SetProposals = &setProposals{}
 
 type SetProposal interface {
 	Proposal
-	Request() (*counter.SetRequest, error)
-	Reply(*counter.SetResponse) error
-	Fail(error) error
+	Request() *counter.SetRequest
 }
 
-func newSetProposal(command rsm.Command) SetProposal {
+func newSetProposal(command rsm.Command) (SetProposal, error) {
+	request := &counter.SetRequest{}
+	if err := proto.Unmarshal(command.Input(), request); err != nil {
+		return nil, err
+	}
 	return &setProposal{
 		Proposal: newProposal(command),
 		command:  command,
-	}
+		request:  request,
+	}, nil
 }
 
 type setProposal struct {
 	Proposal
-	command  rsm.Command
-	complete bool
+	command rsm.Command
+	request *counter.SetRequest
 }
 
-func (p *setProposal) Request() (*counter.SetRequest, error) {
-	request := &counter.SetRequest{}
-	if err := proto.Unmarshal(p.command.Input(), request); err != nil {
-		return nil, err
-	}
-	log.Debugf("Received SetProposal %s: %s", p, request)
-	return request, nil
-}
-
-func (p *setProposal) Reply(response *counter.SetResponse) error {
-	if p.complete {
-		return errors.NewConflict("proposal is already complete")
-	}
-	log.Debugf("Sending SetProposal %s: %s", p, response)
-	output, err := proto.Marshal(response)
-	if err != nil {
-		return err
-	}
-	p.command.Output(output, nil)
-	p.command.Close()
-	p.complete = true
-	return nil
-}
-
-func (p *setProposal) Fail(err error) error {
-	if p.complete {
-		return errors.NewConflict("proposal is already complete")
-	}
-	log.Debugf("Failing SetProposal %s: %s", p, err)
-	p.command.Output(nil, err)
-	p.command.Close()
-	p.complete = true
-	return nil
+func (p *setProposal) Request() *counter.SetRequest {
+	return p.request
 }
 
 func (p *setProposal) String() string {
@@ -404,40 +404,29 @@ var _ SetProposal = &setProposal{}
 
 type GetQuery interface {
 	Query
-	Request() (*counter.GetRequest, error)
-	Reply(*counter.GetResponse) error
+	Request() *counter.GetRequest
 }
 
-func newGetQuery(query rsm.Query) GetQuery {
-	return &getQuery{
-		Query: newQuery(query),
-		query: query,
+func newGetQuery(query rsm.Query) (GetQuery, error) {
+	request := &counter.GetRequest{}
+	if err := proto.Unmarshal(query.Input(), request); err != nil {
+		return nil, err
 	}
+	return &getQuery{
+		Query:   newQuery(query),
+		query:   query,
+		request: request,
+	}, nil
 }
 
 type getQuery struct {
 	Query
-	query rsm.Query
+	query   rsm.Query
+	request *counter.GetRequest
 }
 
-func (p *getQuery) Request() (*counter.GetRequest, error) {
-	request := &counter.GetRequest{}
-	if err := proto.Unmarshal(p.query.Input(), request); err != nil {
-		return nil, err
-	}
-	log.Debugf("Received GetQuery %s: %s", p, request)
-	return request, nil
-}
-
-func (p *getQuery) Reply(response *counter.GetResponse) error {
-	log.Debugf("Sending GetQuery %s: %s", p, response)
-	output, err := proto.Marshal(response)
-	if err != nil {
-		return err
-	}
-	p.query.Output(output, nil)
-	p.query.Close()
-	return nil
+func (p *getQuery) Request() *counter.GetRequest {
+	return p.request
 }
 
 func (p *getQuery) String() string {
@@ -466,14 +455,24 @@ func (p *incrementProposals) Get(id ProposalID) (IncrementProposal, bool) {
 	if !ok {
 		return nil, false
 	}
-	return newIncrementProposal(command), true
+	proposal, err := newIncrementProposal(command)
+	if err != nil {
+		log.Error(err)
+		return nil, false
+	}
+	return proposal, true
 }
 
 func (p *incrementProposals) List() []IncrementProposal {
 	commands := p.commands.List(rsm.OperationID(3))
 	proposals := make([]IncrementProposal, len(commands))
 	for i, command := range commands {
-		proposals[i] = newIncrementProposal(command)
+		proposal, err := newIncrementProposal(command)
+		if err != nil {
+			log.Error(err)
+		} else {
+			proposals[i] = proposal
+		}
 	}
 	return proposals
 }
@@ -482,57 +481,29 @@ var _ IncrementProposals = &incrementProposals{}
 
 type IncrementProposal interface {
 	Proposal
-	Request() (*counter.IncrementRequest, error)
-	Reply(*counter.IncrementResponse) error
-	Fail(error) error
+	Request() *counter.IncrementRequest
 }
 
-func newIncrementProposal(command rsm.Command) IncrementProposal {
+func newIncrementProposal(command rsm.Command) (IncrementProposal, error) {
+	request := &counter.IncrementRequest{}
+	if err := proto.Unmarshal(command.Input(), request); err != nil {
+		return nil, err
+	}
 	return &incrementProposal{
 		Proposal: newProposal(command),
 		command:  command,
-	}
+		request:  request,
+	}, nil
 }
 
 type incrementProposal struct {
 	Proposal
-	command  rsm.Command
-	complete bool
+	command rsm.Command
+	request *counter.IncrementRequest
 }
 
-func (p *incrementProposal) Request() (*counter.IncrementRequest, error) {
-	request := &counter.IncrementRequest{}
-	if err := proto.Unmarshal(p.command.Input(), request); err != nil {
-		return nil, err
-	}
-	log.Debugf("Received IncrementProposal %s: %s", p, request)
-	return request, nil
-}
-
-func (p *incrementProposal) Reply(response *counter.IncrementResponse) error {
-	if p.complete {
-		return errors.NewConflict("proposal is already complete")
-	}
-	log.Debugf("Sending IncrementProposal %s: %s", p, response)
-	output, err := proto.Marshal(response)
-	if err != nil {
-		return err
-	}
-	p.command.Output(output, nil)
-	p.command.Close()
-	p.complete = true
-	return nil
-}
-
-func (p *incrementProposal) Fail(err error) error {
-	if p.complete {
-		return errors.NewConflict("proposal is already complete")
-	}
-	log.Debugf("Failing IncrementProposal %s: %s", p, err)
-	p.command.Output(nil, err)
-	p.command.Close()
-	p.complete = true
-	return nil
+func (p *incrementProposal) Request() *counter.IncrementRequest {
+	return p.request
 }
 
 func (p *incrementProposal) String() string {
@@ -561,14 +532,24 @@ func (p *decrementProposals) Get(id ProposalID) (DecrementProposal, bool) {
 	if !ok {
 		return nil, false
 	}
-	return newDecrementProposal(command), true
+	proposal, err := newDecrementProposal(command)
+	if err != nil {
+		log.Error(err)
+		return nil, false
+	}
+	return proposal, true
 }
 
 func (p *decrementProposals) List() []DecrementProposal {
 	commands := p.commands.List(rsm.OperationID(4))
 	proposals := make([]DecrementProposal, len(commands))
 	for i, command := range commands {
-		proposals[i] = newDecrementProposal(command)
+		proposal, err := newDecrementProposal(command)
+		if err != nil {
+			log.Error(err)
+		} else {
+			proposals[i] = proposal
+		}
 	}
 	return proposals
 }
@@ -577,57 +558,29 @@ var _ DecrementProposals = &decrementProposals{}
 
 type DecrementProposal interface {
 	Proposal
-	Request() (*counter.DecrementRequest, error)
-	Reply(*counter.DecrementResponse) error
-	Fail(error) error
+	Request() *counter.DecrementRequest
 }
 
-func newDecrementProposal(command rsm.Command) DecrementProposal {
+func newDecrementProposal(command rsm.Command) (DecrementProposal, error) {
+	request := &counter.DecrementRequest{}
+	if err := proto.Unmarshal(command.Input(), request); err != nil {
+		return nil, err
+	}
 	return &decrementProposal{
 		Proposal: newProposal(command),
 		command:  command,
-	}
+		request:  request,
+	}, nil
 }
 
 type decrementProposal struct {
 	Proposal
-	command  rsm.Command
-	complete bool
+	command rsm.Command
+	request *counter.DecrementRequest
 }
 
-func (p *decrementProposal) Request() (*counter.DecrementRequest, error) {
-	request := &counter.DecrementRequest{}
-	if err := proto.Unmarshal(p.command.Input(), request); err != nil {
-		return nil, err
-	}
-	log.Debugf("Received DecrementProposal %s: %s", p, request)
-	return request, nil
-}
-
-func (p *decrementProposal) Reply(response *counter.DecrementResponse) error {
-	if p.complete {
-		return errors.NewConflict("proposal is already complete")
-	}
-	log.Debugf("Sending DecrementProposal %s: %s", p, response)
-	output, err := proto.Marshal(response)
-	if err != nil {
-		return err
-	}
-	p.command.Output(output, nil)
-	p.command.Close()
-	p.complete = true
-	return nil
-}
-
-func (p *decrementProposal) Fail(err error) error {
-	if p.complete {
-		return errors.NewConflict("proposal is already complete")
-	}
-	log.Debugf("Failing DecrementProposal %s: %s", p, err)
-	p.command.Output(nil, err)
-	p.command.Close()
-	p.complete = true
-	return nil
+func (p *decrementProposal) Request() *counter.DecrementRequest {
+	return p.request
 }
 
 func (p *decrementProposal) String() string {
