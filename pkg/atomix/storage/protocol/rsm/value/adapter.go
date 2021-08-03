@@ -65,7 +65,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 				log.Errorf("Proposal SetProposal %s failed: %v", p, err)
 				command.Output(nil, err)
 			} else {
-				log.Errorf("Proposal SetProposal %s complete: %+v", p, response)
+				log.Debugf("Proposal SetProposal %s complete: %+v", p, response)
 				command.Output(output, nil)
 			}
 		}
@@ -110,7 +110,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 				log.Errorf("Querying GetQuery %s failed: %v", q, err)
 				query.Output(nil, err)
 			} else {
-				log.Errorf("Querying GetQuery %s complete: %+v", q, response)
+				log.Debugf("Querying GetQuery %s complete: %+v", q, response)
 				query.Output(output, nil)
 			}
 		}

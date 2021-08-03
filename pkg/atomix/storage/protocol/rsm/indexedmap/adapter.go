@@ -73,7 +73,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 				log.Errorf("Proposal PutProposal %s failed: %v", p, err)
 				command.Output(nil, err)
 			} else {
-				log.Errorf("Proposal PutProposal %s complete: %+v", p, response)
+				log.Debugf("Proposal PutProposal %s complete: %+v", p, response)
 				command.Output(output, nil)
 			}
 		}
@@ -98,7 +98,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 				log.Errorf("Proposal RemoveProposal %s failed: %v", p, err)
 				command.Output(nil, err)
 			} else {
-				log.Errorf("Proposal RemoveProposal %s complete: %+v", p, response)
+				log.Debugf("Proposal RemoveProposal %s complete: %+v", p, response)
 				command.Output(output, nil)
 			}
 		}
@@ -123,7 +123,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 				log.Errorf("Proposal ClearProposal %s failed: %v", p, err)
 				command.Output(nil, err)
 			} else {
-				log.Errorf("Proposal ClearProposal %s complete: %+v", p, response)
+				log.Debugf("Proposal ClearProposal %s complete: %+v", p, response)
 				command.Output(output, nil)
 			}
 		}
@@ -168,7 +168,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 				log.Errorf("Querying SizeQuery %s failed: %v", q, err)
 				query.Output(nil, err)
 			} else {
-				log.Errorf("Querying SizeQuery %s complete: %+v", q, response)
+				log.Debugf("Querying SizeQuery %s complete: %+v", q, response)
 				query.Output(output, nil)
 			}
 		}
@@ -193,7 +193,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 				log.Errorf("Querying GetQuery %s failed: %v", q, err)
 				query.Output(nil, err)
 			} else {
-				log.Errorf("Querying GetQuery %s complete: %+v", q, response)
+				log.Debugf("Querying GetQuery %s complete: %+v", q, response)
 				query.Output(output, nil)
 			}
 		}
@@ -218,7 +218,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 				log.Errorf("Querying FirstEntryQuery %s failed: %v", q, err)
 				query.Output(nil, err)
 			} else {
-				log.Errorf("Querying FirstEntryQuery %s complete: %+v", q, response)
+				log.Debugf("Querying FirstEntryQuery %s complete: %+v", q, response)
 				query.Output(output, nil)
 			}
 		}
@@ -243,7 +243,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 				log.Errorf("Querying LastEntryQuery %s failed: %v", q, err)
 				query.Output(nil, err)
 			} else {
-				log.Errorf("Querying LastEntryQuery %s complete: %+v", q, response)
+				log.Debugf("Querying LastEntryQuery %s complete: %+v", q, response)
 				query.Output(output, nil)
 			}
 		}
@@ -268,7 +268,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 				log.Errorf("Querying PrevEntryQuery %s failed: %v", q, err)
 				query.Output(nil, err)
 			} else {
-				log.Errorf("Querying PrevEntryQuery %s complete: %+v", q, response)
+				log.Debugf("Querying PrevEntryQuery %s complete: %+v", q, response)
 				query.Output(output, nil)
 			}
 		}
@@ -293,7 +293,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 				log.Errorf("Querying NextEntryQuery %s failed: %v", q, err)
 				query.Output(nil, err)
 			} else {
-				log.Errorf("Querying NextEntryQuery %s complete: %+v", q, response)
+				log.Debugf("Querying NextEntryQuery %s complete: %+v", q, response)
 				query.Output(output, nil)
 			}
 		}

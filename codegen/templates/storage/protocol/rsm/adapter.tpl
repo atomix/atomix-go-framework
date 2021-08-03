@@ -88,7 +88,7 @@ func (s *{{ $serviceImpl }}) ExecuteCommand(command rsm.Command) {
                 log.Errorf("Proposal {{ $proposalInt }} %s failed: %v", p, err)
                 command.Output(nil, err)
             } else {
-                log.Errorf("Proposal {{ $proposalInt }} %s complete: %+v", p, response)
+                log.Debugf("Proposal {{ $proposalInt }} %s complete: %+v", p, response)
                 command.Output(output, nil)
             }
         }
@@ -132,7 +132,7 @@ func (s *{{ $serviceImpl }}) ExecuteQuery(query rsm.Query) {
                 log.Errorf("Querying {{ $queryInt }} %s failed: %v", q, err)
                 query.Output(nil, err)
             } else {
-                log.Errorf("Querying {{ $queryInt }} %s complete: %+v", q, response)
+                log.Debugf("Querying {{ $queryInt }} %s complete: %+v", q, response)
                 query.Output(output, nil)
             }
         }

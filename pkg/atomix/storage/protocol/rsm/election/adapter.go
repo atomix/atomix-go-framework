@@ -69,7 +69,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 				log.Errorf("Proposal EnterProposal %s failed: %v", p, err)
 				command.Output(nil, err)
 			} else {
-				log.Errorf("Proposal EnterProposal %s complete: %+v", p, response)
+				log.Debugf("Proposal EnterProposal %s complete: %+v", p, response)
 				command.Output(output, nil)
 			}
 		}
@@ -94,7 +94,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 				log.Errorf("Proposal WithdrawProposal %s failed: %v", p, err)
 				command.Output(nil, err)
 			} else {
-				log.Errorf("Proposal WithdrawProposal %s complete: %+v", p, response)
+				log.Debugf("Proposal WithdrawProposal %s complete: %+v", p, response)
 				command.Output(output, nil)
 			}
 		}
@@ -119,7 +119,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 				log.Errorf("Proposal AnointProposal %s failed: %v", p, err)
 				command.Output(nil, err)
 			} else {
-				log.Errorf("Proposal AnointProposal %s complete: %+v", p, response)
+				log.Debugf("Proposal AnointProposal %s complete: %+v", p, response)
 				command.Output(output, nil)
 			}
 		}
@@ -144,7 +144,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 				log.Errorf("Proposal PromoteProposal %s failed: %v", p, err)
 				command.Output(nil, err)
 			} else {
-				log.Errorf("Proposal PromoteProposal %s complete: %+v", p, response)
+				log.Debugf("Proposal PromoteProposal %s complete: %+v", p, response)
 				command.Output(output, nil)
 			}
 		}
@@ -169,7 +169,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 				log.Errorf("Proposal EvictProposal %s failed: %v", p, err)
 				command.Output(nil, err)
 			} else {
-				log.Errorf("Proposal EvictProposal %s complete: %+v", p, response)
+				log.Debugf("Proposal EvictProposal %s complete: %+v", p, response)
 				command.Output(output, nil)
 			}
 		}
@@ -214,7 +214,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 				log.Errorf("Querying GetTermQuery %s failed: %v", q, err)
 				query.Output(nil, err)
 			} else {
-				log.Errorf("Querying GetTermQuery %s complete: %+v", q, response)
+				log.Debugf("Querying GetTermQuery %s complete: %+v", q, response)
 				query.Output(output, nil)
 			}
 		}

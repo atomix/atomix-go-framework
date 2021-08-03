@@ -76,7 +76,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 				log.Errorf("Proposal UnlockProposal %s failed: %v", p, err)
 				command.Output(nil, err)
 			} else {
-				log.Errorf("Proposal UnlockProposal %s complete: %+v", p, response)
+				log.Debugf("Proposal UnlockProposal %s complete: %+v", p, response)
 				command.Output(output, nil)
 			}
 		}
@@ -110,7 +110,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 				log.Errorf("Querying GetLockQuery %s failed: %v", q, err)
 				query.Output(nil, err)
 			} else {
-				log.Errorf("Querying GetLockQuery %s complete: %+v", q, response)
+				log.Debugf("Querying GetLockQuery %s complete: %+v", q, response)
 				query.Output(output, nil)
 			}
 		}
