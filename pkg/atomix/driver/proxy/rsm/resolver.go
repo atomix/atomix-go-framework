@@ -55,7 +55,7 @@ func (b *ResolverBuilder) Build(target resolver.Target, cc resolver.ClientConn, 
 	}
 	dialOpts = append(dialOpts, grpc.WithUnaryInterceptor(retry.RetryingUnaryClientInterceptor(retry.WithRetryOn(codes.Unavailable, codes.Unknown))))
 	dialOpts = append(dialOpts, grpc.WithStreamInterceptor(retry.RetryingStreamClientInterceptor(retry.WithRetryOn(codes.Unavailable, codes.Unknown))))
-	dialOpts = append(dialOpts, grpc.WithContextDialer(b.partition.Cluster().Network().Connect))
+	dialOpts = append(dialOpts, grpc.WithContextDialer(opts.Dialer))
 
 	resolverConn, err := grpc.Dial(target.Endpoint, dialOpts...)
 	if err != nil {
@@ -97,6 +97,11 @@ func (r *Resolver) start() error {
 	if err != nil {
 		return err
 	}
+	response, err := stream.Recv()
+	if err != nil {
+		return err
+	}
+	r.updateState(response)
 	go func() {
 		for {
 			response, err := stream.Recv()
@@ -110,9 +115,12 @@ func (r *Resolver) start() error {
 }
 
 func (r *Resolver) updateState(response *rsm.PartitionConfigResponse) {
+	log.Debugf("Updating connections for partition config %+v", response)
+
 	var addrs []resolver.Address
 	addrs = append(addrs, resolver.Address{
 		Addr: response.Leader,
+		Type: resolver.Backend,
 		Attributes: attributes.New(
 			"is_leader",
 			true,
@@ -122,6 +130,7 @@ func (r *Resolver) updateState(response *rsm.PartitionConfigResponse) {
 	for _, server := range response.Followers {
 		addrs = append(addrs, resolver.Address{
 			Addr: server,
+			Type: resolver.Backend,
 			Attributes: attributes.New(
 				"is_leader",
 				false,

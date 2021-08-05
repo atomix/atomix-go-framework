@@ -42,6 +42,7 @@ func (p *PickerBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
 	if leader == nil && len(followers) > 0 {
 		leader = followers[rand.Intn(len(followers))]
 	}
+	log.Debugf("Built new picker. Leader: %s, Followers: %s", leader, followers)
 	return &Picker{
 		leader:    leader,
 		followers: followers,
@@ -58,12 +59,12 @@ type Picker struct {
 
 func (p *Picker) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
 	var result balancer.PickResult
-	if info.FullMethodName == "Command" ||
-		info.FullMethodName == "CommandStream" ||
+	if info.FullMethodName == "/atomix.service.PartitionService/Command" ||
+		info.FullMethodName == "/atomix.service.PartitionService/CommandStream" ||
 		len(p.followers) == 0 {
 		result.SubConn = p.leader
-	} else if info.FullMethodName == "Query" ||
-		info.FullMethodName == "QueryStream" {
+	} else if info.FullMethodName == "/atomix.service.PartitionService/Query" ||
+		info.FullMethodName == "/atomix.service.PartitionService/QueryStream" {
 		result.SubConn = p.nextFollower()
 	}
 	if result.SubConn == nil {
