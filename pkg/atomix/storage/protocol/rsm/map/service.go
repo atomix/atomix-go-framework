@@ -291,11 +291,11 @@ func checkPreconditions(entry *MapStateEntry, preconditions []mapapi.Preconditio
 		case *mapapi.Precondition_Metadata:
 			if p.Metadata.Type == metaapi.ObjectMeta_TOMBSTONE {
 				if entry != nil {
-					return errors.NewConflict("metadata precondition failed")
+					return errors.NewAlreadyExists("metadata precondition failed")
 				}
 			} else {
 				if entry == nil {
-					return errors.NewConflict("metadata precondition failed")
+					return errors.NewNotFound("metadata precondition failed")
 				}
 				if !meta.Equal(entry.Key.ObjectMeta, *p.Metadata) {
 					return errors.NewConflict("metadata precondition failed")
