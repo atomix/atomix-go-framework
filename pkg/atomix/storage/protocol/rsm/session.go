@@ -345,7 +345,7 @@ func (c *primitiveServiceSessionCommand) snapshot() (*SessionCommandSnapshot, er
 	responses := make([]ServiceCommandResponse, 0, c.responses.Len())
 	elem := c.responses.Front()
 	for elem != nil {
-		responses = append(responses, elem.Value.(ServiceCommandResponse))
+		responses = append(responses, *elem.Value.(*ServiceCommandResponse))
 		elem = elem.Next()
 	}
 	var state SessionCommandState
@@ -374,7 +374,8 @@ func (c *primitiveServiceSessionCommand) restore(snapshot *SessionCommandSnapsho
 	c.request = snapshot.Request
 	c.responses = list.New()
 	for _, response := range snapshot.PendingResponses {
-		c.responses.PushBack(response)
+		r := response
+		c.responses.PushBack(&r)
 	}
 	c.stream = streams.NewNilStream()
 	return nil

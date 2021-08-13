@@ -132,6 +132,7 @@ type primitiveServiceManager struct {
 }
 
 func (m *primitiveServiceManager) snapshot() (*StateMachineSnapshot, error) {
+	log.Debugf("Backing up state to snapshot at index %d", m.index)
 	sessions := make([]*SessionSnapshot, 0, len(m.sessions))
 	for _, session := range m.sessions {
 		sessionSnapshot, err := session.snapshot()
@@ -158,6 +159,7 @@ func (m *primitiveServiceManager) snapshot() (*StateMachineSnapshot, error) {
 }
 
 func (m *primitiveServiceManager) restore(snapshot *StateMachineSnapshot) error {
+	log.Debugf("Restoring state from snapshot at index %d", snapshot.Index)
 	m.index = snapshot.Index
 	m.timestamp = snapshot.Timestamp
 
@@ -302,12 +304,14 @@ func (m *primitiveServiceManager) serviceCommand(request *ServiceCommandRequest,
 		return
 	}
 
+	commandID := CommandID(m.index)
 	command := newServiceSessionCommand(serviceSession)
-	if err := command.open(CommandID(m.index), request, stream); err != nil {
+	if err := command.open(commandID, request, stream); err != nil {
 		stream.Error(err)
 		stream.Close()
 		return
 	}
+	log.Debugf("Executing session %d command %d", serviceSession.ID(), commandID)
 	service.service.ExecuteCommand(command)
 }
 
@@ -322,8 +326,10 @@ func (m *primitiveServiceManager) createService(request *CreateServiceRequest, s
 	}
 
 	if service == nil {
+		log.Infof("Creating service %v", request.ServiceInfo)
 		service = newService(m)
 		if err := service.open(ServiceID(m.index), request.ServiceInfo); err != nil {
+			log.Warnf("Creating service %v failed: %s", request.ServiceInfo, err)
 			stream.Error(err)
 			return
 		}
@@ -332,8 +338,10 @@ func (m *primitiveServiceManager) createService(request *CreateServiceRequest, s
 
 	_, ok := session.getService(service.serviceID)
 	if !ok {
+		log.Debugf("Opening service %v session %d", request.ServiceInfo, session.sessionID)
 		serviceSession := newServiceSession(service)
 		if err := serviceSession.open(session.sessionID); err != nil {
+			log.Warnf("Opening service %v session %d failed: %s", request.ServiceInfo, session.sessionID, err)
 			stream.Error(err)
 			return
 		}
@@ -358,7 +366,9 @@ func (m *primitiveServiceManager) closeService(request *CloseServiceRequest, ses
 		return
 	}
 
+	log.Debugf("Closing service %d session %d", service.serviceID, session.sessionID)
 	if err := serviceSession.close(); err != nil {
+		log.Warnf("Closing service %d session %d failed: %s", service.serviceID, session.sessionID, err)
 		stream.Error(err)
 		return
 	}
@@ -378,7 +388,9 @@ func (m *primitiveServiceManager) keepAlive(request *KeepAliveRequest, stream st
 		log.Warn("Failed to decode request filter", err)
 	}
 
+	log.Debugf("Handling keep-alive for session %d", session.sessionID)
 	if err := session.keepAlive(request.LastRequestID, requestFilter); err != nil {
+		log.Warnf("Handling keep-alive for session %d failed: %s", session.sessionID, err)
 		stream.Error(err)
 		return
 	}
@@ -389,7 +401,9 @@ func (m *primitiveServiceManager) openSession(request *OpenSessionRequest, strea
 	defer stream.Close()
 	sessionID := SessionID(m.index)
 	session := newSession(m)
+	log.Debugf("Opening session %d", sessionID)
 	if err := session.open(sessionID, request.Timeout); err != nil {
+		log.Warnf("Opening session %d failed: %s", sessionID, err)
 		stream.Error(err)
 		return
 	}
@@ -407,7 +421,9 @@ func (m *primitiveServiceManager) closeSession(request *CloseSessionRequest, str
 		return
 	}
 	delete(m.sessions, request.SessionID)
+	log.Debugf("Closing session %d", session.sessionID)
 	if err := session.close(); err != nil {
+		log.Warnf("Closing session %d failed: %s", session.sessionID, err)
 		stream.Error(err)
 		return
 	}
@@ -474,5 +490,6 @@ func (m *primitiveServiceManager) serviceQuery(request *ServiceQueryRequest, ses
 		stream.Close()
 		return
 	}
+	log.Debugf("Executing session %d query", serviceSession.ID())
 	service.service.ExecuteQuery(query)
 }
