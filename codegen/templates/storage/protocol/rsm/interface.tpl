@@ -577,7 +577,6 @@ func (p *{{ $proposalImpl }}) Notify(response *{{ template "type" .Response.Type
         p.command.Close()
         p.closed = true
     } else {
-        log.Debugf("Notifying {{ $proposalInt }} %s: %s", p, response)
         p.command.Output(output, nil)
     }
 }
@@ -670,7 +669,6 @@ func (p *{{ $queryImpl }}) Notify(response *{{ template "type" .Response.Type }}
         p.query.Close()
         p.closed = true
     } else {
-        log.Debugf("Notifying {{ $queryInt }} %s: %s", p, response)
         p.query.Output(output, nil)
     }
 }

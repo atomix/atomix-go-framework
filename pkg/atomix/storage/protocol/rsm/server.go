@@ -102,6 +102,7 @@ func (s *Server) Query(ctx context.Context, request *PartitionQueryRequest) (*Pa
 
 		response := &PartitionQueryResponse{}
 		if err := proto.Unmarshal(result.Value.([]byte), &response.Response); err != nil {
+			log.Warnf("PartitionCommandResponse %+v failed: %v", request, err)
 			return nil, err
 		}
 		log.Debugf("Sending PartitionQueryResponse %+v", response)
@@ -158,11 +159,13 @@ func (s *Server) QueryStream(request *PartitionQueryRequest, srv PartitionServic
 
 			response := &PartitionQueryResponse{}
 			if err := proto.Unmarshal(result.Value.([]byte), &response.Response); err != nil {
+				log.Warnf("PartitionCommandResponse %+v failed: %v", request, err)
 				return err
 			}
 
 			log.Debugf("Sending PartitionQueryResponse %+v", response)
 			if err := srv.Send(response); err != nil {
+				log.Warnf("PartitionCommandResponse %+v failed: %v", request, err)
 				return err
 			}
 		case err := <-errCh:
@@ -220,6 +223,7 @@ func (s *Server) Command(ctx context.Context, request *PartitionCommandRequest) 
 
 		response := &PartitionCommandResponse{}
 		if err := proto.Unmarshal(result.Value.([]byte), &response.Response); err != nil {
+			log.Warnf("PartitionCommandResponse %+v failed: %v", request, err)
 			return nil, err
 		}
 		log.Debugf("Sending PartitionCommandResponse %+v", response)
@@ -278,10 +282,12 @@ func (s *Server) CommandStream(request *PartitionCommandRequest, srv PartitionSe
 
 			response := &PartitionCommandResponse{}
 			if err := proto.Unmarshal(result.Value.([]byte), &response.Response); err != nil {
+				log.Warnf("PartitionCommandResponse %+v failed: %v", request, err)
 				return err
 			}
 			log.Debugf("Sending PartitionCommandResponse %+v", response)
 			if err := srv.Send(response); err != nil {
+				log.Warnf("PartitionCommandResponse %+v failed: %v", request, err)
 				return err
 			}
 		case err := <-errCh:

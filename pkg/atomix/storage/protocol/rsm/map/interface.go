@@ -723,7 +723,6 @@ func (p *eventsProposal) Notify(response *_map.EventsResponse) {
 		p.command.Close()
 		p.closed = true
 	} else {
-		log.Debugf("Notifying EventsProposal %s: %s", p, response)
 		p.command.Output(output, nil)
 	}
 }
@@ -782,7 +781,6 @@ func (p *entriesQuery) Notify(response *_map.EntriesResponse) {
 		p.query.Close()
 		p.closed = true
 	} else {
-		log.Debugf("Notifying EntriesQuery %s: %s", p, response)
 		p.query.Output(output, nil)
 	}
 }

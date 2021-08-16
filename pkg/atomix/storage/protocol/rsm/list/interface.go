@@ -893,7 +893,6 @@ func (p *eventsProposal) Notify(response *list.EventsResponse) {
 		p.command.Close()
 		p.closed = true
 	} else {
-		log.Debugf("Notifying EventsProposal %s: %s", p, response)
 		p.command.Output(output, nil)
 	}
 }
@@ -952,7 +951,6 @@ func (p *elementsQuery) Notify(response *list.ElementsResponse) {
 		p.query.Close()
 		p.closed = true
 	} else {
-		log.Debugf("Notifying ElementsQuery %s: %s", p, response)
 		p.query.Output(output, nil)
 	}
 }

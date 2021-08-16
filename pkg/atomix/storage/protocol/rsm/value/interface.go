@@ -515,7 +515,6 @@ func (p *eventsProposal) Notify(response *value.EventsResponse) {
 		p.command.Close()
 		p.closed = true
 	} else {
-		log.Debugf("Notifying EventsProposal %s: %s", p, response)
 		p.command.Output(output, nil)
 	}
 }
