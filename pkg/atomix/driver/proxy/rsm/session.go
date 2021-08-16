@@ -213,7 +213,7 @@ func (s *Session) doCommandStream(ctx context.Context, serviceID rsm.ServiceID, 
 			s.lastIndex.Update(response.Response.Index)
 
 			responseID := response.Response.GetSessionCommand().GetServiceCommand().ResponseID
-			if responseID > lastResponseID {
+			if responseID == lastResponseID+1 {
 				result := response.Response.GetSessionCommand().GetServiceCommand().Operation
 				if result.Status.Code != rsm.ResponseCode_OK {
 					stream.Error(rsm.GetErrorFromStatus(result.Status))
@@ -380,12 +380,14 @@ func (s *Session) open(ctx context.Context) error {
 
 				switch requestEvent.eventType {
 				case sessionRequestEventStart:
-					requests[requestEvent.requestID] = &sessionStream{}
+					requests[requestEvent.requestID] = &sessionStream{
+						nextResponseID: 1,
+					}
 				case sessionRequestEventReceive:
 					request, ok := requests[requestEvent.requestID]
 					if ok {
-						if requestEvent.responseID > request.responseID {
-							request.responseID = requestEvent.responseID
+						if requestEvent.responseID > request.nextResponseID {
+							request.nextResponseID = requestEvent.responseID + 1
 						}
 					}
 				case sessionRequestEventEnd:
@@ -398,12 +400,14 @@ func (s *Session) open(ctx context.Context) error {
 					for queuedRequest != nil {
 						switch requestEvent.eventType {
 						case sessionRequestEventStart:
-							requests[requestEvent.requestID] = &sessionStream{}
+							requests[requestEvent.requestID] = &sessionStream{
+								nextResponseID: 1,
+							}
 						case sessionRequestEventReceive:
 							request, ok := requests[requestEvent.requestID]
 							if ok {
-								if requestEvent.responseID > request.responseID {
-									request.responseID = requestEvent.responseID
+								if requestEvent.responseID > request.nextResponseID {
+									request.nextResponseID = requestEvent.responseID + 1
 								}
 							}
 						case sessionRequestEventEnd:
@@ -414,12 +418,12 @@ func (s *Session) open(ctx context.Context) error {
 					delete(queue, requestEvent.requestID)
 				}
 			case <-ticker.C:
-				requestFilter := bloom.NewWithEstimates(uint(len(requests)), 0.1)
+				requestFilter := bloom.NewWithEstimates(uint(len(requests)*2), 0.1)
 				for requestID, stream := range requests {
 					requestBytes := make([]byte, 8)
 					binary.BigEndian.PutUint64(requestBytes, uint64(requestID))
 					responseBytes := make([]byte, 8)
-					binary.BigEndian.PutUint64(responseBytes, uint64(stream.responseID))
+					binary.BigEndian.PutUint64(responseBytes, uint64(stream.nextResponseID))
 					allBytes := append(requestBytes, responseBytes...)
 					requestFilter.Add(requestBytes)
 					requestFilter.Add(allBytes)
@@ -525,5 +529,5 @@ type sessionRequestEvent struct {
 }
 
 type sessionStream struct {
-	responseID rsm.ResponseID
+	nextResponseID rsm.ResponseID
 }

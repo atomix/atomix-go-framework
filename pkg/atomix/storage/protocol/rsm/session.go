@@ -160,6 +160,7 @@ type primitiveServiceSession struct {
 	service  *primitiveService
 	session  *primitiveSession
 	commands *primitiveSessionCommands
+	requests map[RequestID]*primitiveServiceSessionCommand
 	state    SessionState
 	watchers map[string]func(SessionState)
 }
@@ -184,12 +185,25 @@ func (s *primitiveServiceSession) Commands() Commands {
 	return s.commands
 }
 
+func (s *primitiveServiceSession) command(requestID RequestID) *primitiveServiceSessionCommand {
+	command, ok := s.requests[requestID]
+	if ok {
+		return command
+	}
+	return newServiceSessionCommand(s)
+}
+
+func (s *primitiveServiceSession) query() *primitiveServiceSessionQuery {
+	return newServiceSessionQuery(s)
+}
+
 func (s *primitiveServiceSession) open(sessionID SessionID) error {
 	session, ok := s.service.manager.sessions[sessionID]
 	if !ok {
 		return errors.NewInvalid("unknown session %d", sessionID)
 	}
 	s.session = session
+	s.requests = make(map[RequestID]*primitiveServiceSessionCommand)
 	s.commands = newSessionCommands()
 	s.session.services[s.service.serviceID] = s
 	s.service.sessions.add(s)
@@ -199,7 +213,7 @@ func (s *primitiveServiceSession) open(sessionID SessionID) error {
 
 func (s *primitiveServiceSession) snapshot() (*ServiceSessionSnapshot, error) {
 	commands := make([]*SessionCommandSnapshot, 0, len(s.commands.commands))
-	for _, command := range s.commands.commands {
+	for _, command := range s.requests {
 		commandSnapshot, err := command.snapshot()
 		if err != nil {
 			return nil, err
@@ -218,6 +232,7 @@ func (s *primitiveServiceSession) restore(snapshot *ServiceSessionSnapshot) erro
 		return errors.NewInvalid("unknown session %d", snapshot.SessionID)
 	}
 	s.session = session
+	s.requests = make(map[RequestID]*primitiveServiceSessionCommand)
 	s.commands = newSessionCommands()
 	for _, commandSnapshot := range snapshot.Commands {
 		command := newServiceSessionCommand(s)
@@ -330,15 +345,31 @@ func (c *primitiveServiceSessionCommand) Input() []byte {
 	return c.request.Operation.Value
 }
 
-func (c *primitiveServiceSessionCommand) open(id CommandID, request *ServiceCommandRequest, stream streams.WriteStream) error {
-	c.commandID = id
-	c.request = request
-	c.responses = list.New()
-	c.state = CommandOpen
-	c.stream = stream
-	c.session.commands.add(c)
-	c.session.service.commands.add(c)
-	return nil
+func (c *primitiveServiceSessionCommand) execute(request *ServiceCommandRequest, stream streams.WriteStream) {
+	switch c.state {
+	case CommandPending:
+		c.commandID = CommandID(c.session.service.Index())
+		c.request = request
+		c.responses = list.New()
+		c.stream = stream
+		c.session.requests[request.RequestID] = c
+		c.session.commands.add(c)
+		c.session.service.commands.add(c)
+		c.state = CommandRunning
+		log.Debugf("Executing command %d: %+v", c.commandID, request)
+		c.session.service.service.ExecuteCommand(c)
+	case CommandRunning | CommandComplete:
+		c.stream = stream
+		if c.responses.Len() > 0 {
+			log.Debugf("Replaying %d responses for command %d: %+v", c.responses.Len(), c.commandID, request)
+			elem := c.responses.Front()
+			for elem != nil {
+				response := elem.Value.(*ServiceCommandResponse)
+				stream.Value(response)
+				elem = elem.Next()
+			}
+		}
+	}
 }
 
 func (c *primitiveServiceSessionCommand) snapshot() (*SessionCommandSnapshot, error) {
@@ -350,7 +381,7 @@ func (c *primitiveServiceSessionCommand) snapshot() (*SessionCommandSnapshot, er
 	}
 	var state SessionCommandState
 	switch c.state {
-	case CommandOpen:
+	case CommandRunning:
 		state = SessionCommandState_COMMAND_OPEN
 	case CommandComplete:
 		state = SessionCommandState_COMMAND_COMPLETE
@@ -367,7 +398,7 @@ func (c *primitiveServiceSessionCommand) restore(snapshot *SessionCommandSnapsho
 	c.commandID = snapshot.CommandID
 	switch snapshot.State {
 	case SessionCommandState_COMMAND_OPEN:
-		c.state = CommandOpen
+		c.state = CommandRunning
 	case SessionCommandState_COMMAND_COMPLETE:
 		c.state = CommandComplete
 	}
@@ -378,21 +409,56 @@ func (c *primitiveServiceSessionCommand) restore(snapshot *SessionCommandSnapsho
 		c.responses.PushBack(&r)
 	}
 	c.stream = streams.NewNilStream()
+	c.session.requests[c.request.RequestID] = c
+	c.session.commands.add(c)
+	c.session.service.commands.add(c)
 	return nil
 }
 
-func (c *primitiveServiceSessionCommand) keepAlive(lastRequestID RequestID, requestFilter *bloom.BloomFilter) error {
-	if c.request.RequestID <= lastRequestID {
+func (c *primitiveServiceSessionCommand) keepAlive(lastRequestID RequestID, filter *bloom.BloomFilter) error {
+	if lastRequestID < c.request.RequestID {
+		return nil
+	}
+
+	// If the request ID is not in the keep-alive filter, the client canceled the request.
+	// Close the canceled request and remove it from the session.
+	requestBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(requestBytes, uint64(c.request.RequestID))
+	if c.state == CommandRunning && !filter.Test(requestBytes) {
+		c.Close()
+		delete(c.session.requests, c.request.RequestID)
+		return nil
+	}
+
+	// The keep-alive filter indicates the next response ID the client is waiting for.
+	// Remove pending responses up to the first response ID matching the keep-alive filter.
+	elem := c.responses.Front()
+	for elem != nil {
+		response := elem.Value.(*ServiceCommandResponse)
 		bytes := make([]byte, 8)
-		binary.BigEndian.PutUint64(bytes, uint64(c.request.RequestID))
-		if !requestFilter.Test(bytes) {
-			c.Close()
+		binary.BigEndian.PutUint64(bytes, uint64(response.ResponseID))
+		responseBytes := append(requestBytes, bytes...)
+		if !filter.Test(responseBytes) {
+			c.responses.Remove(elem)
+		} else {
+			break
 		}
+		elem = elem.Next()
+	}
+
+	// If the command is complete and the client has acknowledged receipt of all responses,
+	// remove the command from the session.
+	if c.state == CommandComplete && c.responses.Len() == 0 {
+		delete(c.session.requests, c.request.RequestID)
 	}
 	return nil
 }
 
 func (c *primitiveServiceSessionCommand) Output(bytes []byte, err error) {
+	if c.state == CommandComplete {
+		return
+	}
+
 	c.responseID++
 	response := &ServiceCommandResponse{
 		ResponseID: c.responseID,
@@ -435,24 +501,25 @@ type primitiveServiceSessionQuery struct {
 	responseID ResponseID
 }
 
-func (c *primitiveServiceSessionQuery) OperationID() OperationID {
-	return c.request.Operation.OperationID
+func (q *primitiveServiceSessionQuery) OperationID() OperationID {
+	return q.request.Operation.OperationID
 }
 
-func (c *primitiveServiceSessionQuery) Input() []byte {
-	return c.request.Operation.Value
+func (q *primitiveServiceSessionQuery) Input() []byte {
+	return q.request.Operation.Value
 }
 
-func (c *primitiveServiceSessionQuery) open(request *ServiceQueryRequest, stream streams.WriteStream) error {
-	c.request = request
-	c.stream = stream
-	return nil
+func (q *primitiveServiceSessionQuery) execute(request *ServiceQueryRequest, stream streams.WriteStream) {
+	q.request = request
+	q.stream = stream
+	log.Debugf("Executing query at index %d: %+v", q.session.service.Index(), request)
+	q.session.service.service.ExecuteQuery(q)
 }
 
-func (c *primitiveServiceSessionQuery) Output(bytes []byte, err error) {
-	c.responseID++
+func (q *primitiveServiceSessionQuery) Output(bytes []byte, err error) {
+	q.responseID++
 	response := &ServiceQueryResponse{
-		ResponseID: c.responseID,
+		ResponseID: q.responseID,
 		Operation: &OperationResponse{
 			Status: ResponseStatus{
 				Code:    getCode(err),
@@ -461,11 +528,11 @@ func (c *primitiveServiceSessionQuery) Output(bytes []byte, err error) {
 			Value: bytes,
 		},
 	}
-	c.stream.Value(response)
+	q.stream.Value(response)
 }
 
-func (c *primitiveServiceSessionQuery) Close() {
-	c.stream.Close()
+func (q *primitiveServiceSessionQuery) Close() {
+	q.stream.Close()
 }
 
 var _ Query = (*primitiveServiceSessionQuery)(nil)

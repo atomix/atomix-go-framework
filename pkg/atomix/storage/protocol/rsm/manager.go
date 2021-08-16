@@ -290,29 +290,13 @@ func (m *primitiveServiceManager) sessionCommand(request *SessionCommandRequest,
 }
 
 func (m *primitiveServiceManager) serviceCommand(request *ServiceCommandRequest, session *primitiveSession, stream streams.WriteStream) {
-	service, ok := m.services[request.ServiceID]
-	if !ok {
-		stream.Error(errors.NewNotFound("service not found"))
-		stream.Close()
-		return
-	}
-
-	serviceSession, ok := session.getService(request.ServiceID)
+	service, ok := session.getService(request.ServiceID)
 	if !ok {
 		stream.Error(errors.NewNotFound("session not found"))
 		stream.Close()
 		return
 	}
-
-	commandID := CommandID(m.index)
-	command := newServiceSessionCommand(serviceSession)
-	if err := command.open(commandID, request, stream); err != nil {
-		stream.Error(err)
-		stream.Close()
-		return
-	}
-	log.Debugf("Executing session %d command %d", serviceSession.ID(), commandID)
-	service.service.ExecuteCommand(command)
+	service.command(request.RequestID).execute(request, stream)
 }
 
 func (m *primitiveServiceManager) createService(request *CreateServiceRequest, session *primitiveSession, stream streams.WriteStream) {
@@ -470,26 +454,11 @@ func (m *primitiveServiceManager) sessionQuery(request *SessionQueryRequest, str
 }
 
 func (m *primitiveServiceManager) serviceQuery(request *ServiceQueryRequest, session *primitiveSession, stream streams.WriteStream) {
-	service, ok := m.services[request.ServiceID]
-	if !ok {
-		stream.Error(errors.NewNotFound("service not found"))
-		stream.Close()
-		return
-	}
-
-	serviceSession, ok := session.getService(request.ServiceID)
+	service, ok := session.getService(request.ServiceID)
 	if !ok {
 		stream.Error(errors.NewNotFound("session not found"))
 		stream.Close()
 		return
 	}
-
-	query := newServiceSessionQuery(serviceSession)
-	if err := query.open(request, stream); err != nil {
-		stream.Error(err)
-		stream.Close()
-		return
-	}
-	log.Debugf("Executing session %d query", serviceSession.ID())
-	service.service.ExecuteQuery(query)
+	service.query().execute(request, stream)
 }

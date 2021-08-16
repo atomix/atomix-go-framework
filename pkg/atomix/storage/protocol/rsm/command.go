@@ -69,8 +69,9 @@ var _ Commands = (*primitiveCommands)(nil)
 type CommandState int
 
 const (
-	CommandComplete CommandState = iota
-	CommandOpen
+	CommandPending CommandState = iota
+	CommandRunning
+	CommandComplete
 )
 
 // Command is a command operation
