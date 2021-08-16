@@ -358,8 +358,7 @@ func (c *primitiveServiceSessionCommand) execute(request *ServiceCommandRequest,
 		c.state = CommandRunning
 		log.Debugf("Executing command %d: %+v", c.commandID, request)
 		c.session.service.service.ExecuteCommand(c)
-	case CommandRunning | CommandComplete:
-		c.stream = stream
+	case CommandRunning:
 		if c.responses.Len() > 0 {
 			log.Debugf("Replaying %d responses for command %d: %+v", c.responses.Len(), c.commandID, request)
 			elem := c.responses.Front()
@@ -369,6 +368,18 @@ func (c *primitiveServiceSessionCommand) execute(request *ServiceCommandRequest,
 				elem = elem.Next()
 			}
 		}
+		c.stream = stream
+	case CommandComplete:
+		if c.responses.Len() > 0 {
+			log.Debugf("Replaying %d responses for command %d: %+v", c.responses.Len(), c.commandID, request)
+			elem := c.responses.Front()
+			for elem != nil {
+				response := elem.Value.(*ServiceCommandResponse)
+				stream.Value(response)
+				elem = elem.Next()
+			}
+		}
+		stream.Close()
 	}
 }
 
