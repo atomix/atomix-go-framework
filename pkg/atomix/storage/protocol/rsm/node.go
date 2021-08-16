@@ -55,18 +55,19 @@ func (n *Node) Start() error {
 	if !ok {
 		return errors.NewUnavailable("not a member of the cluster")
 	}
-	err := member.Serve(
+
+	err := n.protocol.Start(n.Cluster, n.registry)
+	if err != nil {
+		return err
+	}
+
+	err = member.Serve(
 		cluster.WithService(func(server *grpc.Server) {
 			RegisterPartitionServiceServer(server, &Server{Protocol: n.protocol})
 		}),
 		cluster.WithService(func(server *grpc.Server) {
 			protocolapi.RegisterProtocolConfigServiceServer(server, protocol.NewServer(n.Cluster))
 		}))
-	if err != nil {
-		return err
-	}
-
-	err = n.protocol.Start(n.Cluster, n.registry)
 	if err != nil {
 		return err
 	}
