@@ -411,7 +411,7 @@ func (c *primitiveServiceSessionCommand) execute(request *ServiceCommandRequest,
 }
 
 func (c *primitiveServiceSessionCommand) snapshot() (*SessionCommandSnapshot, error) {
-	log.Debugf("Snapshot command %d (service=%d, session=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
+	log.Debugf("Snapshot command %d (session=%d, service=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
 	responses := make([]ServiceCommandResponse, 0, c.responses.Len())
 	elem := c.responses.Front()
 	for elem != nil {
@@ -434,7 +434,7 @@ func (c *primitiveServiceSessionCommand) snapshot() (*SessionCommandSnapshot, er
 }
 
 func (c *primitiveServiceSessionCommand) restore(snapshot *SessionCommandSnapshot) error {
-	log.Debugf("Restore command %d (service=%d, session=%d, request=%d)", snapshot.CommandID, c.session.session.sessionID, c.session.service.serviceID, snapshot.Request.RequestID)
+	log.Debugf("Restore command %d (session=%d, service=%d, request=%d)", snapshot.CommandID, c.session.session.sessionID, c.session.service.serviceID, snapshot.Request.RequestID)
 	c.commandID = snapshot.CommandID
 	switch snapshot.State {
 	case SessionCommandState_COMMAND_OPEN:
@@ -467,10 +467,10 @@ func (c *primitiveServiceSessionCommand) keepAlive(lastRequestID RequestID, filt
 	if !filter.Test(requestBytes) {
 		switch c.state {
 		case CommandRunning:
-			log.Debugf("Cancel command %d (service=%d, session=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
+			log.Debugf("Cancel command %d (session=%d, service=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
 			c.Close()
 		case CommandComplete:
-			log.Debugf("Acknowledge command %d (service=%d, session=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
+			log.Debugf("Acknowledge command %d (session=%d, service=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
 		}
 		delete(c.session.requests, c.request.RequestID)
 		return nil
@@ -488,7 +488,7 @@ func (c *primitiveServiceSessionCommand) keepAlive(lastRequestID RequestID, filt
 		if !filter.Test(responseBytes) {
 			c.responses.Remove(elem)
 		} else {
-			log.Debugf("Keep-alive command %d (service=%d, session=%d, request=%d, response=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID, response.ResponseID)
+			log.Debugf("Keep-alive command %d (session=%d, service=%d, request=%d, response=%d)", c.commandID, c.session.service.serviceID, c.session.session.sessionID, c.request.RequestID, response.ResponseID)
 			break
 		}
 		elem = next
@@ -500,7 +500,7 @@ func (c *primitiveServiceSessionCommand) keepAlive(lastRequestID RequestID, filt
 		if c.state == CommandComplete {
 			delete(c.session.requests, c.request.RequestID)
 		} else {
-			log.Debugf("Keep-alive command %d (service=%d, session=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
+			log.Debugf("Keep-alive command %d (session=%d, service=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
 		}
 	}
 	return nil
@@ -527,7 +527,7 @@ func (c *primitiveServiceSessionCommand) Output(bytes []byte, err error) {
 }
 
 func (c *primitiveServiceSessionCommand) Close() {
-	log.Debugf("Close command %d (service=%d, session=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
+	log.Debugf("Close command %d (session=%d, service=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
 	c.session.service.commands.remove(c)
 	c.session.commands.remove(c)
 	c.state = CommandComplete
