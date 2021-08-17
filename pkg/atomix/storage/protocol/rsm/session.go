@@ -148,6 +148,7 @@ func (s *primitiveSession) keepAlive(lastRequestID RequestID, requestFilter *blo
 			return err
 		}
 	}
+	s.lastUpdated = s.manager.timestamp
 	return nil
 }
 

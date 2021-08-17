@@ -361,6 +361,15 @@ func (m *primitiveServiceManager) keepAlive(request *KeepAliveRequest, stream st
 		return
 	}
 	stream.Value(&KeepAliveResponse{})
+
+	for _, session := range m.sessions {
+		if m.timestamp.After(session.lastUpdated.Add(session.timeout)) {
+			log.Infof("Session %d expired after %s", session.sessionID, m.timestamp.Sub(session.lastUpdated))
+			if err := session.close(); err != nil {
+				log.Error(err)
+			}
+		}
+	}
 }
 
 func (m *primitiveServiceManager) openSession(request *OpenSessionRequest, stream streams.WriteStream) {
