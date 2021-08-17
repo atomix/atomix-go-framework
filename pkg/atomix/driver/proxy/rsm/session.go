@@ -15,7 +15,6 @@
 package rsm
 
 import (
-	"container/list"
 	"context"
 	"encoding/binary"
 	"encoding/json"
@@ -360,65 +359,30 @@ func (s *Session) open(ctx context.Context) error {
 	go func() {
 		ticker := time.NewTicker(s.Timeout / 4)
 		var requestID rsm.RequestID
-		queue := make(map[rsm.RequestID]*list.List)
 		requests := make(map[rsm.RequestID]*sessionStream)
 		for {
 			select {
 			case requestEvent := <-s.requestCh:
-				nextRequestID := requestID + 1
-				if requestEvent.requestID == nextRequestID {
-					requestID = requestEvent.requestID
-				} else if requestEvent.requestID > nextRequestID {
-					queuedRequests, ok := queue[requestEvent.requestID]
-					if !ok {
-						queuedRequests = list.New()
-						queue[requestEvent.requestID] = queuedRequests
-					}
-					queuedRequests.PushBack(requestEvent)
-					continue
-				}
-
 				switch requestEvent.eventType {
 				case sessionRequestEventStart:
-					requests[requestEvent.requestID] = &sessionStream{
-						nextResponseID: 1,
+					for requestID < requestEvent.requestID {
+						requestID++
+						requests[requestID] = &sessionStream{
+							nextResponseID: 1,
+						}
 					}
 				case sessionRequestEventReceive:
 					request, ok := requests[requestEvent.requestID]
 					if ok {
-						if requestEvent.responseID > request.nextResponseID {
+						if requestEvent.responseID == request.nextResponseID {
 							request.nextResponseID = requestEvent.responseID + 1
 						}
 					}
 				case sessionRequestEventEnd:
 					delete(requests, requestEvent.requestID)
 				}
-
-				queuedRequests, ok := queue[requestEvent.requestID]
-				if ok {
-					queuedRequest := queuedRequests.Front()
-					for queuedRequest != nil {
-						switch requestEvent.eventType {
-						case sessionRequestEventStart:
-							requests[requestEvent.requestID] = &sessionStream{
-								nextResponseID: 1,
-							}
-						case sessionRequestEventReceive:
-							request, ok := requests[requestEvent.requestID]
-							if ok {
-								if requestEvent.responseID > request.nextResponseID {
-									request.nextResponseID = requestEvent.responseID + 1
-								}
-							}
-						case sessionRequestEventEnd:
-							delete(requests, requestEvent.requestID)
-						}
-						queuedRequest = queuedRequest.Next()
-					}
-					delete(queue, requestEvent.requestID)
-				}
 			case <-ticker.C:
-				requestFilter := bloom.NewWithEstimates(uint(len(requests)*2), 0.1)
+				requestFilter := bloom.NewWithEstimates(uint(len(requests)*2), 0.05)
 				for requestID, stream := range requests {
 					requestBytes := make([]byte, 8)
 					binary.BigEndian.PutUint64(requestBytes, uint64(requestID))
