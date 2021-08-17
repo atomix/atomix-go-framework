@@ -115,13 +115,16 @@ func (s *primitiveSession) getService(serviceID ServiceID) (*primitiveServiceSes
 }
 
 func (s *primitiveSession) open(sessionID SessionID, timeout time.Duration) error {
+	log.Debugf("Open session %d", sessionID)
 	s.sessionID = sessionID
 	s.timeout = timeout
 	s.lastUpdated = s.manager.timestamp
+	s.manager.sessions[s.sessionID] = s
 	return nil
 }
 
 func (s *primitiveSession) snapshot() (*SessionSnapshot, error) {
+	log.Debugf("Snapshot session %d", s.sessionID)
 	return &SessionSnapshot{
 		SessionID:   s.sessionID,
 		Timeout:     s.timeout,
@@ -130,13 +133,16 @@ func (s *primitiveSession) snapshot() (*SessionSnapshot, error) {
 }
 
 func (s *primitiveSession) restore(snapshot *SessionSnapshot) error {
+	log.Debugf("Restore session %d", snapshot.SessionID)
 	s.sessionID = snapshot.SessionID
 	s.timeout = snapshot.Timeout
 	s.lastUpdated = snapshot.LastUpdated
+	s.manager.sessions[s.sessionID] = s
 	return nil
 }
 
 func (s *primitiveSession) keepAlive(lastRequestID RequestID, requestFilter *bloom.BloomFilter) error {
+	log.Debugf("Keep-alive session %d", s.sessionID)
 	for _, serviceSession := range s.services {
 		if err := serviceSession.keepAlive(lastRequestID, requestFilter); err != nil {
 			return err
@@ -146,6 +152,13 @@ func (s *primitiveSession) keepAlive(lastRequestID RequestID, requestFilter *blo
 }
 
 func (s *primitiveSession) close() error {
+	log.Debugf("Close session %d", s.sessionID)
+	for _, service := range s.services {
+		if err := service.close(); err != nil {
+			return err
+		}
+	}
+	delete(s.manager.sessions, s.sessionID)
 	return nil
 }
 
@@ -198,13 +211,15 @@ func (s *primitiveServiceSession) query() *primitiveServiceSessionQuery {
 }
 
 func (s *primitiveServiceSession) open(sessionID SessionID) error {
+	log.Debugf("Open session %d service %d", sessionID, s.service.serviceID)
 	session, ok := s.service.manager.sessions[sessionID]
 	if !ok {
+		log.Warnf("Open session %d service %d failed: unknown session", sessionID, s.service.serviceID)
 		return errors.NewInvalid("unknown session %d", sessionID)
 	}
 	s.session = session
-	s.requests = make(map[RequestID]*primitiveServiceSessionCommand)
 	s.commands = newSessionCommands()
+	s.requests = make(map[RequestID]*primitiveServiceSessionCommand)
 	s.session.services[s.service.serviceID] = s
 	s.service.sessions.add(s)
 	s.state = SessionOpen
@@ -212,10 +227,12 @@ func (s *primitiveServiceSession) open(sessionID SessionID) error {
 }
 
 func (s *primitiveServiceSession) snapshot() (*ServiceSessionSnapshot, error) {
+	log.Debugf("Snapshot session %d service %d", s.session.sessionID, s.service.serviceID)
 	commands := make([]*SessionCommandSnapshot, 0, len(s.commands.commands))
 	for _, command := range s.requests {
 		commandSnapshot, err := command.snapshot()
 		if err != nil {
+			log.Error(err)
 			return nil, err
 		}
 		commands = append(commands, commandSnapshot)
@@ -227,8 +244,10 @@ func (s *primitiveServiceSession) snapshot() (*ServiceSessionSnapshot, error) {
 }
 
 func (s *primitiveServiceSession) restore(snapshot *ServiceSessionSnapshot) error {
+	log.Debugf("Restore session %d service %d", snapshot.SessionID, s.service.serviceID)
 	session, ok := s.service.manager.sessions[snapshot.SessionID]
 	if !ok {
+		log.Warnf("Restore session %d service %d failed: unknown session", snapshot.SessionID, s.service.serviceID)
 		return errors.NewInvalid("unknown session %d", snapshot.SessionID)
 	}
 	s.session = session
@@ -237,6 +256,7 @@ func (s *primitiveServiceSession) restore(snapshot *ServiceSessionSnapshot) erro
 	for _, commandSnapshot := range snapshot.Commands {
 		command := newServiceSessionCommand(s)
 		if err := command.restore(commandSnapshot); err != nil {
+			log.Error(err)
 			return err
 		}
 	}
@@ -247,6 +267,7 @@ func (s *primitiveServiceSession) restore(snapshot *ServiceSessionSnapshot) erro
 }
 
 func (s *primitiveServiceSession) keepAlive(lastRequestID RequestID, requestFilter *bloom.BloomFilter) error {
+	log.Debugf("Keep-alive session %d service %d", s.session.sessionID, s.service.serviceID)
 	for _, command := range s.commands.commands {
 		if err := command.keepAlive(lastRequestID, requestFilter); err != nil {
 			return err
@@ -256,7 +277,12 @@ func (s *primitiveServiceSession) keepAlive(lastRequestID RequestID, requestFilt
 }
 
 func (s *primitiveServiceSession) close() error {
+	log.Debugf("Close session %d service %d", s.session.sessionID, s.service.serviceID)
+	for _, command := range s.commands.commands {
+		command.Close()
+	}
 	s.service.sessions.remove(s)
+	delete(s.session.services, s.service.serviceID)
 	s.state = SessionClosed
 	for _, watcher := range s.watchers {
 		watcher(SessionClosed)
@@ -384,6 +410,7 @@ func (c *primitiveServiceSessionCommand) execute(request *ServiceCommandRequest,
 }
 
 func (c *primitiveServiceSessionCommand) snapshot() (*SessionCommandSnapshot, error) {
+	log.Debugf("Snapshot command %d (service=%d, session=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
 	responses := make([]ServiceCommandResponse, 0, c.responses.Len())
 	elem := c.responses.Front()
 	for elem != nil {
@@ -406,6 +433,7 @@ func (c *primitiveServiceSessionCommand) snapshot() (*SessionCommandSnapshot, er
 }
 
 func (c *primitiveServiceSessionCommand) restore(snapshot *SessionCommandSnapshot) error {
+	log.Debugf("Restore command %d (service=%d, session=%d, request=%d)", snapshot.CommandID, c.session.session.sessionID, c.session.service.serviceID, snapshot.Request.RequestID)
 	c.commandID = snapshot.CommandID
 	switch snapshot.State {
 	case SessionCommandState_COMMAND_OPEN:
@@ -435,8 +463,14 @@ func (c *primitiveServiceSessionCommand) keepAlive(lastRequestID RequestID, filt
 	// Close the canceled request and remove it from the session.
 	requestBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(requestBytes, uint64(c.request.RequestID))
-	if c.state == CommandRunning && !filter.Test(requestBytes) {
-		c.Close()
+	if !filter.Test(requestBytes) {
+		switch c.state {
+		case CommandRunning:
+			log.Debugf("Cancel command %d (service=%d, session=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
+			c.Close()
+		case CommandComplete:
+			log.Debugf("Acknowledge command %d (service=%d, session=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
+		}
 		delete(c.session.requests, c.request.RequestID)
 		return nil
 	}
@@ -445,6 +479,7 @@ func (c *primitiveServiceSessionCommand) keepAlive(lastRequestID RequestID, filt
 	// Remove pending responses up to the first response ID matching the keep-alive filter.
 	elem := c.responses.Front()
 	for elem != nil {
+		next := elem.Next()
 		response := elem.Value.(*ServiceCommandResponse)
 		bytes := make([]byte, 8)
 		binary.BigEndian.PutUint64(bytes, uint64(response.ResponseID))
@@ -452,15 +487,20 @@ func (c *primitiveServiceSessionCommand) keepAlive(lastRequestID RequestID, filt
 		if !filter.Test(responseBytes) {
 			c.responses.Remove(elem)
 		} else {
+			log.Debugf("Keep-alive command %d (service=%d, session=%d, request=%d, response=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID, response.ResponseID)
 			break
 		}
-		elem = elem.Next()
+		elem = next
 	}
 
-	// If the command is complete and the client has acknowledged receipt of all responses,
-	// remove the command from the session.
-	if c.state == CommandComplete && c.responses.Len() == 0 {
-		delete(c.session.requests, c.request.RequestID)
+	if c.responses.Len() == 0 {
+		// If the command is complete and the client has acknowledged receipt of all responses,
+		// remove the command from the session.
+		if c.state == CommandComplete {
+			delete(c.session.requests, c.request.RequestID)
+		} else {
+			log.Debugf("Keep-alive command %d (service=%d, session=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
+		}
 	}
 	return nil
 }
@@ -486,6 +526,7 @@ func (c *primitiveServiceSessionCommand) Output(bytes []byte, err error) {
 }
 
 func (c *primitiveServiceSessionCommand) Close() {
+	log.Debugf("Close command %d (service=%d, session=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
 	c.session.service.commands.remove(c)
 	c.session.commands.remove(c)
 	c.state = CommandComplete

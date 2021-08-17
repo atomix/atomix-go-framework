@@ -77,6 +77,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 				command.Output(output, nil)
 			}
 		}
+		command.Close()
 	case 8:
 		p, err := newRemoveProposal(command)
 		if err != nil {
@@ -102,6 +103,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 				command.Output(output, nil)
 			}
 		}
+		command.Close()
 	case 9:
 		p, err := newClearProposal(command)
 		if err != nil {
@@ -127,6 +129,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 				command.Output(output, nil)
 			}
 		}
+		command.Close()
 	case 10:
 		p, err := newEventsProposal(command)
 		if err != nil {
@@ -172,6 +175,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 				query.Output(output, nil)
 			}
 		}
+		query.Close()
 	case 3:
 		q, err := newGetQuery(query)
 		if err != nil {
@@ -197,6 +201,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 				query.Output(output, nil)
 			}
 		}
+		query.Close()
 	case 4:
 		q, err := newFirstEntryQuery(query)
 		if err != nil {
@@ -222,6 +227,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 				query.Output(output, nil)
 			}
 		}
+		query.Close()
 	case 5:
 		q, err := newLastEntryQuery(query)
 		if err != nil {
@@ -247,6 +253,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 				query.Output(output, nil)
 			}
 		}
+		query.Close()
 	case 6:
 		q, err := newPrevEntryQuery(query)
 		if err != nil {
@@ -272,6 +279,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 				query.Output(output, nil)
 			}
 		}
+		query.Close()
 	case 7:
 		q, err := newNextEntryQuery(query)
 		if err != nil {
@@ -297,6 +305,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 				query.Output(output, nil)
 			}
 		}
+		query.Close()
 	case 11:
 		q, err := newEntriesQuery(query)
 		if err != nil {

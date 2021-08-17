@@ -92,6 +92,7 @@ func (s *{{ $serviceImpl }}) ExecuteCommand(command rsm.Command) {
                 command.Output(output, nil)
             }
         }
+        command.Close()
         {{- else }}
         s.rsm.{{ .Name }}(p)
         {{- end }}
@@ -136,6 +137,7 @@ func (s *{{ $serviceImpl }}) ExecuteQuery(query rsm.Query) {
                 query.Output(output, nil)
             }
         }
+        query.Close()
         {{- else if .Response.IsStream }}
         s.rsm.{{ .Name }}(q)
         {{- end }}

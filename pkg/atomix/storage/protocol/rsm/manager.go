@@ -162,23 +162,21 @@ func (m *primitiveServiceManager) restore(snapshot *StateMachineSnapshot) error 
 	log.Debugf("Restoring state from snapshot at index %d", snapshot.Index)
 	m.index = snapshot.Index
 	m.timestamp = snapshot.Timestamp
-
 	m.sessions = make(map[SessionID]*primitiveSession)
+	m.services = make(map[ServiceID]*primitiveService)
+
 	for _, sessionSnapshot := range snapshot.Sessions {
 		session := newSession(m)
 		if err := session.restore(sessionSnapshot); err != nil {
 			return err
 		}
-		m.sessions[session.sessionID] = session
 	}
 
-	m.services = make(map[ServiceID]*primitiveService)
 	for _, serviceSnapshot := range snapshot.Services {
 		service := newService(m)
 		if err := service.restore(serviceSnapshot); err != nil {
 			return err
 		}
-		m.services[service.serviceID] = service
 	}
 	return nil
 }
@@ -310,22 +308,17 @@ func (m *primitiveServiceManager) createService(request *CreateServiceRequest, s
 	}
 
 	if service == nil {
-		log.Infof("Creating service %v", request.ServiceInfo)
 		service = newService(m)
 		if err := service.open(ServiceID(m.index), request.ServiceInfo); err != nil {
-			log.Warnf("Creating service %v failed: %s", request.ServiceInfo, err)
 			stream.Error(err)
 			return
 		}
-		m.services[service.ID()] = service
 	}
 
 	_, ok := session.getService(service.serviceID)
 	if !ok {
-		log.Debugf("Opening service %v session %d", request.ServiceInfo, session.sessionID)
 		serviceSession := newServiceSession(service)
 		if err := serviceSession.open(session.sessionID); err != nil {
-			log.Warnf("Opening service %v session %d failed: %s", request.ServiceInfo, session.sessionID, err)
 			stream.Error(err)
 			return
 		}
@@ -338,21 +331,12 @@ func (m *primitiveServiceManager) createService(request *CreateServiceRequest, s
 
 func (m *primitiveServiceManager) closeService(request *CloseServiceRequest, session *primitiveSession, stream streams.WriteStream) {
 	defer stream.Close()
-	service, ok := m.services[request.ServiceID]
-	if !ok {
-		stream.Error(errors.NewNotFound("service not found"))
-		return
-	}
-
-	serviceSession, ok := session.getService(service.serviceID)
+	service, ok := session.getService(request.ServiceID)
 	if !ok {
 		stream.Error(errors.NewNotFound("session not found"))
 		return
 	}
-
-	log.Debugf("Closing service %d session %d", service.serviceID, session.sessionID)
-	if err := serviceSession.close(); err != nil {
-		log.Warnf("Closing service %d session %d failed: %s", service.serviceID, session.sessionID, err)
+	if err := service.close(); err != nil {
 		stream.Error(err)
 		return
 	}
@@ -372,9 +356,7 @@ func (m *primitiveServiceManager) keepAlive(request *KeepAliveRequest, stream st
 		log.Warn("Failed to decode request filter", err)
 	}
 
-	log.Debugf("Handling keep-alive for session %d", session.sessionID)
 	if err := session.keepAlive(request.LastRequestID, requestFilter); err != nil {
-		log.Warnf("Handling keep-alive for session %d failed: %s", session.sessionID, err)
 		stream.Error(err)
 		return
 	}
@@ -383,17 +365,13 @@ func (m *primitiveServiceManager) keepAlive(request *KeepAliveRequest, stream st
 
 func (m *primitiveServiceManager) openSession(request *OpenSessionRequest, stream streams.WriteStream) {
 	defer stream.Close()
-	sessionID := SessionID(m.index)
 	session := newSession(m)
-	log.Debugf("Opening session %d", sessionID)
-	if err := session.open(sessionID, request.Timeout); err != nil {
-		log.Warnf("Opening session %d failed: %s", sessionID, err)
+	if err := session.open(SessionID(m.index), request.Timeout); err != nil {
 		stream.Error(err)
 		return
 	}
-	m.sessions[sessionID] = session
 	stream.Value(&OpenSessionResponse{
-		SessionID: sessionID,
+		SessionID: session.sessionID,
 	})
 }
 
@@ -404,10 +382,7 @@ func (m *primitiveServiceManager) closeSession(request *CloseSessionRequest, str
 		stream.Error(errors.NewNotFound("session not found"))
 		return
 	}
-	delete(m.sessions, request.SessionID)
-	log.Debugf("Closing session %d", session.sessionID)
 	if err := session.close(); err != nil {
-		log.Warnf("Closing session %d failed: %s", session.sessionID, err)
 		stream.Error(err)
 		return
 	}

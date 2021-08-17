@@ -69,6 +69,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 				command.Output(output, nil)
 			}
 		}
+		command.Close()
 	case 3:
 		p, err := newEventsProposal(command)
 		if err != nil {
@@ -114,6 +115,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 				query.Output(output, nil)
 			}
 		}
+		query.Close()
 	default:
 		err := errors.NewNotSupported("unknown operation %d", query.OperationID())
 		log.Warn(err)

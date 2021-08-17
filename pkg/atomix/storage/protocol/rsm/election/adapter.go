@@ -73,6 +73,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 				command.Output(output, nil)
 			}
 		}
+		command.Close()
 	case 2:
 		p, err := newWithdrawProposal(command)
 		if err != nil {
@@ -98,6 +99,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 				command.Output(output, nil)
 			}
 		}
+		command.Close()
 	case 3:
 		p, err := newAnointProposal(command)
 		if err != nil {
@@ -123,6 +125,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 				command.Output(output, nil)
 			}
 		}
+		command.Close()
 	case 4:
 		p, err := newPromoteProposal(command)
 		if err != nil {
@@ -148,6 +151,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 				command.Output(output, nil)
 			}
 		}
+		command.Close()
 	case 5:
 		p, err := newEvictProposal(command)
 		if err != nil {
@@ -173,6 +177,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 				command.Output(output, nil)
 			}
 		}
+		command.Close()
 	case 7:
 		p, err := newEventsProposal(command)
 		if err != nil {
@@ -218,6 +223,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 				query.Output(output, nil)
 			}
 		}
+		query.Close()
 	default:
 		err := errors.NewNotSupported("unknown operation %d", query.OperationID())
 		log.Warn(err)

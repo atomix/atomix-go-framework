@@ -273,6 +273,7 @@ func (s *retryingClientStream) SendMsg(m interface{}) error {
 			log.Warnf("SendMsg %s: error", m, err)
 			return backoff.Permanent(err)
 		}
+		log.Debugf("SendMsg %s", m)
 		if err := s.getStream().SendMsg(m); err != nil {
 			if err == io.EOF {
 				s.mu.RLock()
@@ -321,6 +322,7 @@ func (s *retryingClientStream) RecvMsg(m interface{}) error {
 				log.Warn("RecvMsg: error", err)
 				return backoff.Permanent(err)
 			}
+			log.Debugf("RecvMsg %s", m)
 			return nil
 		}, backoff.WithContext(backoff.NewExponentialBackOff(), s.ctx))
 	}
@@ -348,6 +350,7 @@ func (s *retryingClientStream) retryStream() error {
 		s.mu.RUnlock()
 		msgs := s.buffer.list()
 		for _, m := range msgs {
+			log.Debugf("SendMsg %s", m)
 			if err := stream.SendMsg(m); err != nil {
 				if isRetryable(s.ctx, s.opts, err) {
 					log.Debug("Received stream error", err)

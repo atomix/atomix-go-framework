@@ -127,6 +127,7 @@ func (s *primitiveService) Commands() Commands {
 }
 
 func (s *primitiveService) open(serviceID ServiceID, info ServiceInfo) error {
+	log.Debugf("Open service %d (%s:%s/%s)", serviceID, info.Type, info.Namespace, info.Name)
 	s.serviceID = serviceID
 	serviceType := s.manager.registry.GetService(info.Type)
 	if serviceType == nil {
@@ -136,10 +137,12 @@ func (s *primitiveService) open(serviceID ServiceID, info ServiceInfo) error {
 	s.commands = newCommands()
 	s.sessions = newServiceSessions()
 	s.service = serviceType(s)
+	s.manager.services[s.serviceID] = s
 	return nil
 }
 
 func (s *primitiveService) snapshot() (*ServiceSnapshot, error) {
+	log.Debugf("Snapshot service %d", s.serviceID)
 	sessions := make([]*ServiceSessionSnapshot, 0, len(s.sessions.sessions))
 	for _, session := range s.sessions.sessions {
 		sessionSnapshot, err := session.snapshot()
@@ -151,6 +154,7 @@ func (s *primitiveService) snapshot() (*ServiceSnapshot, error) {
 
 	var b bytes.Buffer
 	if err := s.service.Backup(&b); err != nil {
+		log.Error(err)
 		return nil, err
 	}
 	data := b.Bytes()
@@ -164,6 +168,7 @@ func (s *primitiveService) snapshot() (*ServiceSnapshot, error) {
 }
 
 func (s *primitiveService) restore(snapshot *ServiceSnapshot) error {
+	log.Debugf("Restore service %d", snapshot.ServiceID)
 	s.serviceID = snapshot.ServiceID
 	s.info = snapshot.ServiceInfo
 	serviceType := s.manager.registry.GetService(snapshot.Type)
@@ -179,5 +184,11 @@ func (s *primitiveService) restore(snapshot *ServiceSnapshot) error {
 			return err
 		}
 	}
-	return s.service.Restore(bytes.NewReader(snapshot.Data))
+	err := s.service.Restore(bytes.NewReader(snapshot.Data))
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	s.manager.services[s.serviceID] = s
+	return nil
 }
