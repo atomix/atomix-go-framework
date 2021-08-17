@@ -123,7 +123,6 @@ func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueServic
 	}
 
 	ch := make(chan streams.Result)
-	stream := streams.NewChannelStream(ch)
 	clusterKey := request.Headers.ClusterKey
 	if clusterKey == "" {
 		clusterKey = request.Headers.PrimitiveID.String()
@@ -139,7 +138,7 @@ func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueServic
 	if err != nil {
 		return err
 	}
-	err = service.DoCommandStream(srv.Context(), eventsOp, input, stream)
+	err = service.DoCommandStream(srv.Context(), eventsOp, input, streams.NewChannelStream(ch))
 	if err != nil {
 		log.Warnf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)

@@ -404,7 +404,6 @@ func (s *ProxyServer) Events(request *indexedmap.EventsRequest, srv indexedmap.I
 	}
 
 	ch := make(chan streams.Result)
-	stream := streams.NewChannelStream(ch)
 	clusterKey := request.Headers.ClusterKey
 	if clusterKey == "" {
 		clusterKey = request.Headers.PrimitiveID.String()
@@ -420,7 +419,7 @@ func (s *ProxyServer) Events(request *indexedmap.EventsRequest, srv indexedmap.I
 	if err != nil {
 		return err
 	}
-	err = service.DoCommandStream(srv.Context(), eventsOp, input, stream)
+	err = service.DoCommandStream(srv.Context(), eventsOp, input, streams.NewChannelStream(ch))
 	if err != nil {
 		log.Warnf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
@@ -461,7 +460,6 @@ func (s *ProxyServer) Entries(request *indexedmap.EntriesRequest, srv indexedmap
 	}
 
 	ch := make(chan streams.Result)
-	stream := streams.NewChannelStream(ch)
 	clusterKey := request.Headers.ClusterKey
 	if clusterKey == "" {
 		clusterKey = request.Headers.PrimitiveID.String()
@@ -477,7 +475,7 @@ func (s *ProxyServer) Entries(request *indexedmap.EntriesRequest, srv indexedmap
 	if err != nil {
 		return err
 	}
-	err = service.DoQueryStream(srv.Context(), entriesOp, input, stream, s.readSync)
+	err = service.DoQueryStream(srv.Context(), entriesOp, input, streams.NewChannelStream(ch), s.readSync)
 	if err != nil {
 		log.Warnf("Request EntriesRequest failed: %v", err)
 		return errors.Proto(err)

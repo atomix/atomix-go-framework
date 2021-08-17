@@ -324,7 +324,6 @@ func (s *ProxyServer) Events(request *list.EventsRequest, srv list.ListService_E
 	}
 
 	ch := make(chan streams.Result)
-	stream := streams.NewChannelStream(ch)
 	clusterKey := request.Headers.ClusterKey
 	if clusterKey == "" {
 		clusterKey = request.Headers.PrimitiveID.String()
@@ -340,7 +339,7 @@ func (s *ProxyServer) Events(request *list.EventsRequest, srv list.ListService_E
 	if err != nil {
 		return err
 	}
-	err = service.DoCommandStream(srv.Context(), eventsOp, input, stream)
+	err = service.DoCommandStream(srv.Context(), eventsOp, input, streams.NewChannelStream(ch))
 	if err != nil {
 		log.Warnf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
@@ -381,7 +380,6 @@ func (s *ProxyServer) Elements(request *list.ElementsRequest, srv list.ListServi
 	}
 
 	ch := make(chan streams.Result)
-	stream := streams.NewChannelStream(ch)
 	clusterKey := request.Headers.ClusterKey
 	if clusterKey == "" {
 		clusterKey = request.Headers.PrimitiveID.String()
@@ -397,7 +395,7 @@ func (s *ProxyServer) Elements(request *list.ElementsRequest, srv list.ListServi
 	if err != nil {
 		return err
 	}
-	err = service.DoQueryStream(srv.Context(), elementsOp, input, stream, s.readSync)
+	err = service.DoQueryStream(srv.Context(), elementsOp, input, streams.NewChannelStream(ch), s.readSync)
 	if err != nil {
 		log.Warnf("Request ElementsRequest failed: %v", err)
 		return errors.Proto(err)

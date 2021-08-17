@@ -12,6 +12,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
+	sync "sync"
 )
 
 const Type = "Set"
@@ -235,24 +236,43 @@ func (s *ProxyServer) Events(request *set.EventsRequest, srv set.SetService_Even
 	}
 
 	ch := make(chan streams.Result)
-	stream := streams.NewChannelStream(ch)
 	serviceInfo := storage.ServiceInfo{
 		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
 	partitions := s.Partitions()
+	wg := &sync.WaitGroup{}
 	err = async.IterAsync(len(partitions), func(i int) error {
 		service, err := partitions[i].GetService(srv.Context(), serviceInfo)
 		if err != nil {
 			return err
 		}
-		return service.DoCommandStream(srv.Context(), eventsOp, input, stream)
+
+		partitionCh := make(chan streams.Result)
+		partitionStream := streams.NewChannelStream(partitionCh)
+		err = service.DoCommandStream(srv.Context(), eventsOp, input, partitionStream)
+		if err != nil {
+			return err
+		}
+		wg.Add(1)
+		go func() {
+			for result := range partitionCh {
+				ch <- result
+			}
+			wg.Done()
+		}()
+		return nil
 	})
 	if err != nil {
 		log.Warnf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
+
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
 
 	for result := range ch {
 		if result.Failed() {
@@ -289,24 +309,43 @@ func (s *ProxyServer) Elements(request *set.ElementsRequest, srv set.SetService_
 	}
 
 	ch := make(chan streams.Result)
-	stream := streams.NewChannelStream(ch)
 	serviceInfo := storage.ServiceInfo{
 		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
 	partitions := s.Partitions()
+	wg := &sync.WaitGroup{}
 	err = async.IterAsync(len(partitions), func(i int) error {
 		service, err := partitions[i].GetService(srv.Context(), serviceInfo)
 		if err != nil {
 			return err
 		}
-		return service.DoQueryStream(srv.Context(), elementsOp, input, stream, s.readSync)
+
+		partitionCh := make(chan streams.Result)
+		partitionStream := streams.NewChannelStream(partitionCh)
+		err = service.DoQueryStream(srv.Context(), elementsOp, input, partitionStream, s.readSync)
+		if err != nil {
+			return err
+		}
+		wg.Add(1)
+		go func() {
+			for result := range partitionCh {
+				ch <- result
+			}
+			wg.Done()
+		}()
+		return nil
 	})
 	if err != nil {
 		log.Warnf("Request ElementsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
+
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
 
 	for result := range ch {
 		if result.Failed() {

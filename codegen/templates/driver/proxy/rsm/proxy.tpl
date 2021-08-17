@@ -90,6 +90,9 @@ import (
 	{{- if or .Type.IsAsync .Response.IsStream }}
 	{{ import "streams" "github.com/atomix/atomix-go-framework/pkg/atomix/stream" }}
 	{{- end }}
+	{{- if and .Scope.IsGlobal .Response.IsStream }}
+	{{ import "sync" }}
+	{{- end }}
 	{{- end }}
 )
 
@@ -402,7 +405,6 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	}
 
     ch := make(chan streams.Result)
-	stream := streams.NewChannelStream(ch)
 	{{- if .Scope.IsPartition }}
 	{{- if .Request.PartitionKey }}
 	partitionKey := {{ template "val" .Request.PartitionKey }}request{{ template "field" .Request.PartitionKey }}
@@ -435,10 +437,14 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
         return err
     }
     {{- if .Type.IsCommand }}
-	err = service.DoCommandStream(srv.Context(), {{ $name }}, input, stream)
+	err = service.DoCommandStream(srv.Context(), {{ $name }}, input, streams.NewChannelStream(ch))
     {{- else }}
-	err = service.DoQueryStream(srv.Context(), {{ $name }}, input, stream, s.readSync)
+	err = service.DoQueryStream(srv.Context(), {{ $name }}, input, streams.NewChannelStream(ch), s.readSync)
     {{- end }}
+	if err != nil {
+        log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
+	    return errors.Proto(err)
+	}
 	{{- else if .Scope.IsGlobal }}
 	serviceInfo := storage.ServiceInfo{
 		Type:      storage.ServiceType(Type),
@@ -446,22 +452,42 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
 	partitions := s.Partitions()
+	wg := &sync.WaitGroup{}
 	err = async.IterAsync(len(partitions), func(i int) error {
-        service, err := partitions[i].GetService(srv.Context(), serviceInfo)
-        if err != nil {
-            return err
-        }
+		service, err := partitions[i].GetService(srv.Context(), serviceInfo)
+		if err != nil {
+			return err
+		}
+
+		partitionCh := make(chan streams.Result)
+		partitionStream := streams.NewChannelStream(partitionCh)
         {{- if .Type.IsCommand }}
-		return service.DoCommandStream(srv.Context(), {{ $name }}, input, stream)
+		err = service.DoCommandStream(srv.Context(), {{ $name }}, input, partitionStream)
         {{- else }}
-		return service.DoQueryStream(srv.Context(), {{ $name }}, input, stream, s.readSync)
+		err = service.DoQueryStream(srv.Context(), {{ $name }}, input, partitionStream, s.readSync)
         {{- end }}
+		if err != nil {
+			return err
+		}
+		wg.Add(1)
+		go func() {
+			for result := range partitionCh {
+				ch <- result
+			}
+			wg.Done()
+		}()
+		return nil
 	})
-	{{- end }}
 	if err != nil {
         log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return errors.Proto(err)
 	}
+
+	go func() {
+	    wg.Wait()
+	    close(ch)
+	}()
+	{{- end }}
 
     for result := range ch {
 		if result.Failed() {
