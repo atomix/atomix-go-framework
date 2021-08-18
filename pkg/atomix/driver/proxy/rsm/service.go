@@ -104,5 +104,8 @@ func (s *Service) close(ctx context.Context) error {
 		return errors.From(err)
 	}
 	s.lastIndex.Update(response.Response.Index)
+	s.servicesMu.Lock()
+	delete(s.services, s.serviceInfo)
+	s.servicesMu.Unlock()
 	return nil
 }
