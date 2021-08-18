@@ -42,6 +42,13 @@ func WithMaxInterval(d time.Duration) CallOption {
 	})
 }
 
+// WithJitter sets the retry interval jitter
+func WithJitter(j float64) CallOption {
+	return newCallOption(func(opts *callOptions) {
+		opts.jitter = &j
+	})
+}
+
 // WithRetryOn sets the codes on which to retry a request
 func WithRetryOn(codes ...codes.Code) CallOption {
 	return newCallOption(func(opts *callOptions) {
@@ -65,6 +72,7 @@ type callOptions struct {
 	perCallTimeout  *time.Duration
 	initialInterval *time.Duration
 	maxInterval     *time.Duration
+	jitter          *float64
 	codes           []codes.Code
 }
 

@@ -24,6 +24,7 @@ import (
 	"google.golang.org/grpc/status"
 	"io"
 	"sync"
+	"time"
 )
 
 var log = logging.GetLogger("atomix", "grpc", "retry")
@@ -60,7 +61,7 @@ func RetryingUnaryClientInterceptor(callOpts ...CallOption) func(ctx context.Con
 				return backoff.Permanent(err)
 			}
 			return nil
-		}, backoff.WithContext(b, ctx))
+		}, backoff.WithContext(newBackoff(callOpts), ctx))
 	}
 }
 
@@ -291,7 +292,7 @@ func (s *retryingClientStream) SendMsg(m interface{}) error {
 			return backoff.Permanent(err)
 		}
 		return nil
-	}, backoff.WithContext(backoff.NewExponentialBackOff(), s.ctx))
+	}, backoff.WithContext(backoff.NewConstantBackOff(time.Second), s.ctx))
 	if err == nil {
 		s.buffer.append(m)
 		return nil
@@ -324,20 +325,13 @@ func (s *retryingClientStream) RecvMsg(m interface{}) error {
 			}
 			log.Debugf("RecvMsg %s", m)
 			return nil
-		}, backoff.WithContext(backoff.NewExponentialBackOff(), s.ctx))
+		}, backoff.WithContext(backoff.NewConstantBackOff(time.Second), s.ctx))
 	}
 	log.Debugf("RecvMsg %s", m)
 	return nil
 }
 
 func (s *retryingClientStream) retryStream() error {
-	b := backoff.NewExponentialBackOff()
-	if s.opts.initialInterval != nil {
-		b.InitialInterval = *s.opts.initialInterval
-	}
-	if s.opts.maxInterval != nil {
-		b.MaxInterval = *s.opts.maxInterval
-	}
 	return backoff.Retry(func() error {
 		stream, err := s.newStream(s.ctx)
 		if err != nil {
@@ -374,7 +368,27 @@ func (s *retryingClientStream) retryStream() error {
 
 		s.setStream(stream)
 		return nil
-	}, backoff.WithContext(b, s.ctx))
+	}, backoff.WithContext(newBackoff(s.opts), s.ctx))
+}
+
+func newBackoff(opts *callOptions) backoff.BackOff {
+	b := backoff.NewExponentialBackOff()
+	if opts.initialInterval != nil {
+		b.InitialInterval = *opts.initialInterval
+	} else {
+		b.InitialInterval = 10 * time.Millisecond
+	}
+	if opts.maxInterval != nil {
+		b.MaxInterval = *opts.maxInterval
+	} else {
+		b.MaxInterval = 5 * time.Second
+	}
+	if opts.jitter != nil {
+		b.RandomizationFactor = *opts.jitter
+	} else {
+		b.RandomizationFactor = 0.5
+	}
+	return b
 }
 
 func isRetryable(ctx context.Context, opts *callOptions, err error) bool {
