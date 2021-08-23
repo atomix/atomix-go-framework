@@ -3,6 +3,7 @@ package indexedmap
 
 import (
 	"context"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
 	indexedmap "github.com/atomix/atomix-api/go/atomix/primitive/indexedmap"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
@@ -11,11 +12,12 @@ import (
 
 var log = logging.GetLogger("atomix", "indexedmap")
 
+const Type = "IndexedMap"
+
 // NewProxyServer creates a new ProxyServer
-func NewProxyServer(registry *ProxyRegistry, env env.DriverEnv) indexedmap.IndexedMapServiceServer {
+func NewProxyServer(registry *ProxyRegistry) indexedmap.IndexedMapServiceServer {
 	return &ProxyServer{
 		registry: registry,
-		env:      env,
 	}
 }
 
@@ -25,10 +27,19 @@ type ProxyServer struct {
 }
 
 func (s *ProxyServer) Size(ctx context.Context, request *indexedmap.SizeRequest) (*indexedmap.SizeResponse, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("SizeRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {
@@ -40,10 +51,19 @@ func (s *ProxyServer) Size(ctx context.Context, request *indexedmap.SizeRequest)
 }
 
 func (s *ProxyServer) Put(ctx context.Context, request *indexedmap.PutRequest) (*indexedmap.PutResponse, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("PutRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {
@@ -55,10 +75,19 @@ func (s *ProxyServer) Put(ctx context.Context, request *indexedmap.PutRequest) (
 }
 
 func (s *ProxyServer) Get(ctx context.Context, request *indexedmap.GetRequest) (*indexedmap.GetResponse, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("GetRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {
@@ -70,10 +99,19 @@ func (s *ProxyServer) Get(ctx context.Context, request *indexedmap.GetRequest) (
 }
 
 func (s *ProxyServer) FirstEntry(ctx context.Context, request *indexedmap.FirstEntryRequest) (*indexedmap.FirstEntryResponse, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("FirstEntryRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {
@@ -85,10 +123,19 @@ func (s *ProxyServer) FirstEntry(ctx context.Context, request *indexedmap.FirstE
 }
 
 func (s *ProxyServer) LastEntry(ctx context.Context, request *indexedmap.LastEntryRequest) (*indexedmap.LastEntryResponse, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("LastEntryRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {
@@ -100,10 +147,19 @@ func (s *ProxyServer) LastEntry(ctx context.Context, request *indexedmap.LastEnt
 }
 
 func (s *ProxyServer) PrevEntry(ctx context.Context, request *indexedmap.PrevEntryRequest) (*indexedmap.PrevEntryResponse, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("PrevEntryRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {
@@ -115,10 +171,19 @@ func (s *ProxyServer) PrevEntry(ctx context.Context, request *indexedmap.PrevEnt
 }
 
 func (s *ProxyServer) NextEntry(ctx context.Context, request *indexedmap.NextEntryRequest) (*indexedmap.NextEntryResponse, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("NextEntryRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {
@@ -130,10 +195,19 @@ func (s *ProxyServer) NextEntry(ctx context.Context, request *indexedmap.NextEnt
 }
 
 func (s *ProxyServer) Remove(ctx context.Context, request *indexedmap.RemoveRequest) (*indexedmap.RemoveResponse, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("RemoveRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {
@@ -145,10 +219,19 @@ func (s *ProxyServer) Remove(ctx context.Context, request *indexedmap.RemoveRequ
 }
 
 func (s *ProxyServer) Clear(ctx context.Context, request *indexedmap.ClearRequest) (*indexedmap.ClearResponse, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("ClearRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {
@@ -160,10 +243,19 @@ func (s *ProxyServer) Clear(ctx context.Context, request *indexedmap.ClearReques
 }
 
 func (s *ProxyServer) Events(request *indexedmap.EventsRequest, srv indexedmap.IndexedMapService_EventsServer) error {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("EventsRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {
@@ -175,10 +267,19 @@ func (s *ProxyServer) Events(request *indexedmap.EventsRequest, srv indexedmap.I
 }
 
 func (s *ProxyServer) Entries(request *indexedmap.EntriesRequest, srv indexedmap.IndexedMapService_EntriesServer) error {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("EntriesRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {

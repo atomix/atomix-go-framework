@@ -25,9 +25,18 @@ type ProxyServer struct {
 
 func (s *ProxyServer) Set(ctx context.Context, request *value.SetRequest) (*value.SetResponse, error) {
 	s.log.Debugf("Received SetRequest %+v", request)
-	clusterKey := request.Headers.ClusterKey
-	if clusterKey == "" {
-		clusterKey = request.Headers.PrimitiveID.String()
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
+	}
+
+	clusterKey, ok := gossip.GetClusterKey(md)
+	if !ok {
+		primitiveName, ok := gossip.GetPrimitiveName(md)
+		if !ok {
+			return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+		}
+		clusterKey = fmt.Sprintf("%s.%s", s.Namespace, primitiveName)
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
@@ -37,22 +46,30 @@ func (s *ProxyServer) Set(ctx context.Context, request *value.SetRequest) (*valu
 	}
 
 	client := value.NewValueServiceClient(conn)
-	ctx = partition.AddRequestHeaders(ctx, &request.Headers)
+	ctx = partition.AddRequestHeaders(ctx)
 	response, err := client.Set(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	partition.AddResponseHeaders(&response.Headers)
 	s.log.Debugf("Sending SetResponse %+v", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Get(ctx context.Context, request *value.GetRequest) (*value.GetResponse, error) {
 	s.log.Debugf("Received GetRequest %+v", request)
-	clusterKey := request.Headers.ClusterKey
-	if clusterKey == "" {
-		clusterKey = request.Headers.PrimitiveID.String()
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
+	}
+
+	clusterKey, ok := gossip.GetClusterKey(md)
+	if !ok {
+		primitiveName, ok := gossip.GetPrimitiveName(md)
+		if !ok {
+			return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+		}
+		clusterKey = fmt.Sprintf("%s.%s", s.Namespace, primitiveName)
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
@@ -62,22 +79,30 @@ func (s *ProxyServer) Get(ctx context.Context, request *value.GetRequest) (*valu
 	}
 
 	client := value.NewValueServiceClient(conn)
-	ctx = partition.AddRequestHeaders(ctx, &request.Headers)
+	ctx = partition.AddRequestHeaders(ctx)
 	response, err := client.Get(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	partition.AddResponseHeaders(&response.Headers)
 	s.log.Debugf("Sending GetResponse %+v", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueService_EventsServer) error {
 	s.log.Debugf("Received EventsRequest %+v", request)
-	clusterKey := request.Headers.ClusterKey
-	if clusterKey == "" {
-		clusterKey = request.Headers.PrimitiveID.String()
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
+	}
+
+	clusterKey, ok := gossip.GetClusterKey(md)
+	if !ok {
+		primitiveName, ok := gossip.GetPrimitiveName(md)
+		if !ok {
+			return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+		}
+		clusterKey = fmt.Sprintf("%s.%s", s.Namespace, primitiveName)
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
@@ -88,7 +113,7 @@ func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueServic
 	}
 
 	client := value.NewValueServiceClient(conn)
-	ctx := partition.AddRequestHeaders(srv.Context(), &request.Headers)
+	ctx := partition.AddRequestHeaders(srv.Context())
 	stream, err := client.Events(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request EventsRequest failed: %v", err)
@@ -104,7 +129,6 @@ func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueServic
 			s.log.Errorf("Request EventsRequest failed: %v", err)
 			return errors.Proto(err)
 		}
-		partition.AddResponseHeaders(&response.Headers)
 		s.log.Debugf("Sending EventsResponse %+v", response)
 		if err := srv.Send(response); err != nil {
 			s.log.Errorf("Response EventsResponse failed: %v", err)

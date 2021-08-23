@@ -141,18 +141,10 @@ func (m *Module) executeService(service pgs.Service, packages map[string]pgs.Pac
 			IsAsync:   async,
 		}
 
-		requestHeaders, err := m.ctx.GetHeadersFieldMeta(method.Input())
-		if err != nil {
-			panic(err)
-		} else if requestHeaders == nil {
-			panic("no request headers found on method input " + method.Input().FullyQualifiedName())
-		}
-
 		requestMeta := meta.RequestMeta{
 			MessageMeta: meta.MessageMeta{
 				Type: m.ctx.GetMessageTypeMeta(method.Input()),
 			},
-			Headers:  *requestHeaders,
 			IsUnary:  !method.ClientStreaming(),
 			IsStream: method.ClientStreaming(),
 		}
@@ -236,19 +228,11 @@ func (m *Module) executeService(service pgs.Service, packages map[string]pgs.Pac
 			}
 		}
 
-		responseHeaders, err := m.ctx.GetHeadersFieldMeta(method.Output())
-		if err != nil {
-			panic(err)
-		} else if responseHeaders == nil {
-			panic("no request headers found on method input " + method.Output().FullyQualifiedName())
-		}
-
 		// Generate output metadata from the output type.
 		responseMeta := meta.ResponseMeta{
 			MessageMeta: meta.MessageMeta{
 				Type: m.ctx.GetMessageTypeMeta(method.Output()),
 			},
-			Headers:  *responseHeaders,
 			IsUnary:  !method.ServerStreaming(),
 			IsStream: method.ServerStreaming(),
 		}

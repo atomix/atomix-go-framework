@@ -76,6 +76,7 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/golang/protobuf/proto"
+	"google.golang.org/grpc/metadata"
 	{{- $package := .Package }}
 	{{- range .Imports }}
 	{{ .Alias }} {{ .Path | quote }}
@@ -147,18 +148,30 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	{{- else if .Request.PartitionRange }}
 	partitionRange := {{ template "val" .Request.PartitionRange }}request{{ template "field" .Request.PartitionRange }}
 	{{- else }}
-	clusterKey := request.Headers.ClusterKey
-	if clusterKey == "" {
-	    clusterKey = request{{ template "field" .Request.Headers }}.PrimitiveID.String()
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
+
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+
+	clusterKey, ok := rsm.GetClusterKey(md)
+	if !ok {
+		clusterKey = fmt.Sprintf("%s.%s", s.Namespace, primitiveName)
+	}
+
     partition := s.PartitionBy([]byte(clusterKey))
 	{{- end }}
 
 	serviceInfo := storage.ServiceInfo{
 		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
-		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
+		Name:      primitiveName,
 	}
+	ctx = metadata.NewOutgoingContext(ctx, metadata.MD{})
 	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
         log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
@@ -187,10 +200,20 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
     {{- $aggregates = true }}
     {{- end }}
 
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
+	}
+
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+
 	serviceInfo := storage.ServiceInfo{
 		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
-		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
+		Name:      primitiveName,
 	}
 	{{- if .Response.Aggregates }}
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
@@ -205,6 +228,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
         {{- end }}
 	})
 	{{- else }}
+	ctx = metadata.NewOutgoingContext(ctx, metadata.MD{})
 	err = async.IterAsync(len(partitions), func(i int) error {
         service, err := partitions[i].GetService(ctx, serviceInfo)
         if err != nil {
@@ -278,18 +302,30 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	{{- else if .Request.PartitionRange }}
 	partitionRange := {{ template "val" .Request.PartitionRange }}request{{ template "field" .Request.PartitionRange }}
 	{{- else }}
-	clusterKey := request.Headers.ClusterKey
-	if clusterKey == "" {
-	    clusterKey = request{{ template "field" .Request.Headers }}.PrimitiveID.String()
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
+
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+
+	clusterKey, ok := rsm.GetClusterKey(md)
+	if !ok {
+		clusterKey = fmt.Sprintf("%s.%s", s.Namespace, primitiveName)
+	}
+
     partition := s.PartitionBy([]byte(clusterKey))
 	{{- end }}
 
 	serviceInfo := storage.ServiceInfo{
 		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
-		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
+		Name:      primitiveName,
 	}
+	ctx = metadata.NewOutgoingContext(ctx, metadata.MD{})
 	service, err := partition.GetService(ctx, serviceInfo)
     if err != nil {
         return nil, err
@@ -324,23 +360,34 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
         return nil, errors.Proto(err)
     }
 	{{- else if .Scope.IsGlobal }}
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
+	}
+
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+
 	serviceInfo := storage.ServiceInfo{
 		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
-		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
+		Name:      primitiveName,
 	}
 	partitions := s.Partitions()
+	ctx = metadata.NewOutgoingContext(ctx, metadata.MD{})
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
-        service, err := partitions[i].GetService(srv.Context(), serviceInfo)
+        service, err := partitions[i].GetService(ctx, serviceInfo)
         if err != nil {
             return nil, err
         }
         ch := make(chan streams.Result)
         stream := streams.NewChannelStream(ch)
         {{- if .Type.IsCommand }}
-		err = service.DoCommandStream(srv.Context(), {{ $name }}, input, stream)
+		err = service.DoCommandStream(ctx, {{ $name }}, input, stream)
         {{- else }}
-		err = service.DoQueryStream(srv.Context(), {{ $name }}, input, stream, s.readSync)
+		err = service.DoQueryStream(ctx, {{ $name }}, input, stream, s.readSync)
         {{- end }}
 		if err != nil {
 		    return nil, err
@@ -420,41 +467,64 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	{{- else if .Request.PartitionRange }}
 	partitionRange := {{ template "val" .Request.PartitionRange }}request{{ template "field" .Request.PartitionRange }}
 	{{- else }}
-	clusterKey := request.Headers.ClusterKey
-	if clusterKey == "" {
-	    clusterKey = request{{ template "field" .Request.Headers }}.PrimitiveID.String()
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
+
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+
+	clusterKey, ok := rsm.GetClusterKey(md)
+	if !ok {
+		clusterKey = fmt.Sprintf("%s.%s", s.Namespace, primitiveName)
+	}
+
     partition := s.PartitionBy([]byte(clusterKey))
 	{{- end }}
 
 	serviceInfo := storage.ServiceInfo{
 		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
-		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
+		Name:      primitiveName,
 	}
-    service, err := partition.GetService(srv.Context(), serviceInfo)
+	ctx := metadata.NewOutgoingContext(ctx, metadata.MD{})
+    service, err := partition.GetService(ctx, serviceInfo)
     if err != nil {
         return err
     }
     {{- if .Type.IsCommand }}
-	err = service.DoCommandStream(srv.Context(), {{ $name }}, input, streams.NewChannelStream(ch))
+	err = service.DoCommandStream(ctx, {{ $name }}, input, streams.NewChannelStream(ch))
     {{- else }}
-	err = service.DoQueryStream(srv.Context(), {{ $name }}, input, streams.NewChannelStream(ch), s.readSync)
+	err = service.DoQueryStream(ctx, {{ $name }}, input, streams.NewChannelStream(ch), s.readSync)
     {{- end }}
 	if err != nil {
         log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return errors.Proto(err)
 	}
 	{{- else if .Scope.IsGlobal }}
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
+	}
+
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+
 	serviceInfo := storage.ServiceInfo{
 		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
-		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
+		Name:      primitiveName,
 	}
 	partitions := s.Partitions()
+	ctx := metadata.NewOutgoingContext(ctx, metadata.MD{})
 	wg := &sync.WaitGroup{}
 	err = async.IterAsync(len(partitions), func(i int) error {
-		service, err := partitions[i].GetService(srv.Context(), serviceInfo)
+		service, err := partitions[i].GetService(ctx, serviceInfo)
 		if err != nil {
 			return err
 		}
@@ -462,9 +532,9 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 		partitionCh := make(chan streams.Result)
 		partitionStream := streams.NewChannelStream(partitionCh)
         {{- if .Type.IsCommand }}
-		err = service.DoCommandStream(srv.Context(), {{ $name }}, input, partitionStream)
+		err = service.DoCommandStream(ctx, {{ $name }}, input, partitionStream)
         {{- else }}
-		err = service.DoQueryStream(srv.Context(), {{ $name }}, input, partitionStream, s.readSync)
+		err = service.DoQueryStream(ctx, {{ $name }}, input, partitionStream, s.readSync)
         {{- end }}
 		if err != nil {
 			return err

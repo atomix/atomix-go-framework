@@ -44,9 +44,11 @@ package {{ .Package.Name }}
 
 import (
 	"context"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
+	"google.golang.org/grpc/metadata"
 	{{- $package := .Package }}
 	{{- range .Imports }}
 	{{ .Alias }} {{ .Path | quote }}
@@ -55,11 +57,13 @@ import (
 
 var log = logging.GetLogger("atomix", {{ .Primitive.Name | lower | quote }})
 
+{{- $type := printf "%sType" .Generator.Prefix }}
+const {{ $type }} = {{ .Primitive.Name | quote }}
+
 // New{{ $server }} creates a new {{ $server }}
-func New{{ $server }}(registry *{{ $registry }}, env env.DriverEnv) {{ $service }} {
+func New{{ $server }}(registry *{{ $registry }}) {{ $service }} {
 	return &{{ $server }}{
 		registry: registry,
-		env:      env,
 	}
 }
 
@@ -73,10 +77,19 @@ type {{ $server }} struct {
 {{- $method := . }}
 {{ if and .Request.IsUnary .Response.IsUnary }}
 func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "type" .Request.Type }}) (*{{ template "type" .Response.Type }}, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request{{ template "field" .Request.Headers }}.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+	    Type: {{ $type }},
+	    Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 	    log.Warnf("{{ .Request.Type.Name }} %+v failed: %v", request, err)
 	    if errors.IsNotFound(err) {
@@ -88,10 +101,19 @@ func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "t
 }
 {{ else if .Response.IsStream }}
 func (s *{{ $server }}) {{ .Name }}(request *{{ template "type" .Request.Type }}, srv {{ template "type" $primitive.Type }}_{{ .Name }}Server) error {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request{{ template "field" .Request.Headers }}.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+	    Type: {{ $type }},
+	    Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 	    log.Warnf("{{ .Request.Type.Name }} %+v failed: %v", request, err)
 	    if errors.IsNotFound(err) {

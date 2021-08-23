@@ -3,6 +3,7 @@ package election
 
 import (
 	"context"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
 	election "github.com/atomix/atomix-api/go/atomix/primitive/election"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
@@ -11,11 +12,12 @@ import (
 
 var log = logging.GetLogger("atomix", "election")
 
+const Type = "Election"
+
 // NewProxyServer creates a new ProxyServer
-func NewProxyServer(registry *ProxyRegistry, env env.DriverEnv) election.LeaderElectionServiceServer {
+func NewProxyServer(registry *ProxyRegistry) election.LeaderElectionServiceServer {
 	return &ProxyServer{
 		registry: registry,
-		env:      env,
 	}
 }
 
@@ -25,10 +27,19 @@ type ProxyServer struct {
 }
 
 func (s *ProxyServer) Enter(ctx context.Context, request *election.EnterRequest) (*election.EnterResponse, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("EnterRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {
@@ -40,10 +51,19 @@ func (s *ProxyServer) Enter(ctx context.Context, request *election.EnterRequest)
 }
 
 func (s *ProxyServer) Withdraw(ctx context.Context, request *election.WithdrawRequest) (*election.WithdrawResponse, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("WithdrawRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {
@@ -55,10 +75,19 @@ func (s *ProxyServer) Withdraw(ctx context.Context, request *election.WithdrawRe
 }
 
 func (s *ProxyServer) Anoint(ctx context.Context, request *election.AnointRequest) (*election.AnointResponse, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("AnointRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {
@@ -70,10 +99,19 @@ func (s *ProxyServer) Anoint(ctx context.Context, request *election.AnointReques
 }
 
 func (s *ProxyServer) Promote(ctx context.Context, request *election.PromoteRequest) (*election.PromoteResponse, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("PromoteRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {
@@ -85,10 +123,19 @@ func (s *ProxyServer) Promote(ctx context.Context, request *election.PromoteRequ
 }
 
 func (s *ProxyServer) Evict(ctx context.Context, request *election.EvictRequest) (*election.EvictResponse, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("EvictRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {
@@ -100,10 +147,19 @@ func (s *ProxyServer) Evict(ctx context.Context, request *election.EvictRequest)
 }
 
 func (s *ProxyServer) GetTerm(ctx context.Context, request *election.GetTermRequest) (*election.GetTermResponse, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("GetTermRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {
@@ -115,10 +171,19 @@ func (s *ProxyServer) GetTerm(ctx context.Context, request *election.GetTermRequ
 }
 
 func (s *ProxyServer) Events(request *election.EventsRequest, srv election.LeaderElectionService_EventsServer) error {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("EventsRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {

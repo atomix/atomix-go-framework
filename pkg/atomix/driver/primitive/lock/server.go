@@ -3,6 +3,7 @@ package lock
 
 import (
 	"context"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
 	lock "github.com/atomix/atomix-api/go/atomix/primitive/lock"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
@@ -11,11 +12,12 @@ import (
 
 var log = logging.GetLogger("atomix", "lock")
 
+const Type = "Lock"
+
 // NewProxyServer creates a new ProxyServer
-func NewProxyServer(registry *ProxyRegistry, env env.DriverEnv) lock.LockServiceServer {
+func NewProxyServer(registry *ProxyRegistry) lock.LockServiceServer {
 	return &ProxyServer{
 		registry: registry,
-		env:      env,
 	}
 }
 
@@ -25,10 +27,19 @@ type ProxyServer struct {
 }
 
 func (s *ProxyServer) Lock(ctx context.Context, request *lock.LockRequest) (*lock.LockResponse, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("LockRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {
@@ -40,10 +51,19 @@ func (s *ProxyServer) Lock(ctx context.Context, request *lock.LockRequest) (*loc
 }
 
 func (s *ProxyServer) Unlock(ctx context.Context, request *lock.UnlockRequest) (*lock.UnlockResponse, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("UnlockRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {
@@ -55,10 +75,19 @@ func (s *ProxyServer) Unlock(ctx context.Context, request *lock.UnlockRequest) (
 }
 
 func (s *ProxyServer) GetLock(ctx context.Context, request *lock.GetLockRequest) (*lock.GetLockResponse, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("GetLockRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {

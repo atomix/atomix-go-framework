@@ -43,17 +43,29 @@ func (s *ProxyServer) Lock(ctx context.Context, request *lock.LockRequest) (*loc
 		log.Errorf("Request LockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	clusterKey := request.Headers.ClusterKey
-	if clusterKey == "" {
-		clusterKey = request.Headers.PrimitiveID.String()
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
+
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+
+	clusterKey, ok := rsm.GetClusterKey(md)
+	if !ok {
+		clusterKey = fmt.Sprintf("%s.%s", s.Namespace, primitiveName)
+	}
+
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
 		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Name:      primitiveName,
 	}
+	ctx = metadata.NewOutgoingContext(ctx, metadata.MD{})
 	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		return nil, err
@@ -94,17 +106,29 @@ func (s *ProxyServer) Unlock(ctx context.Context, request *lock.UnlockRequest) (
 		log.Errorf("Request UnlockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	clusterKey := request.Headers.ClusterKey
-	if clusterKey == "" {
-		clusterKey = request.Headers.PrimitiveID.String()
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
+
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+
+	clusterKey, ok := rsm.GetClusterKey(md)
+	if !ok {
+		clusterKey = fmt.Sprintf("%s.%s", s.Namespace, primitiveName)
+	}
+
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
 		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Name:      primitiveName,
 	}
+	ctx = metadata.NewOutgoingContext(ctx, metadata.MD{})
 	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request UnlockRequest failed: %v", err)
@@ -133,17 +157,29 @@ func (s *ProxyServer) GetLock(ctx context.Context, request *lock.GetLockRequest)
 		log.Errorf("Request GetLockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	clusterKey := request.Headers.ClusterKey
-	if clusterKey == "" {
-		clusterKey = request.Headers.PrimitiveID.String()
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
+
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+
+	clusterKey, ok := rsm.GetClusterKey(md)
+	if !ok {
+		clusterKey = fmt.Sprintf("%s.%s", s.Namespace, primitiveName)
+	}
+
 	partition := s.PartitionBy([]byte(clusterKey))
 
 	serviceInfo := storage.ServiceInfo{
 		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Name:      primitiveName,
 	}
+	ctx = metadata.NewOutgoingContext(ctx, metadata.MD{})
 	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request GetLockRequest failed: %v", err)

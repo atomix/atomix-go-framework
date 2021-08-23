@@ -24,9 +24,18 @@ type ProxyServer struct {
 
 func (s *ProxyServer) Set(ctx context.Context, request *counter.SetRequest) (*counter.SetResponse, error) {
 	s.log.Debugf("Received SetRequest %+v", request)
-	clusterKey := request.Headers.ClusterKey
-	if clusterKey == "" {
-		clusterKey = request.Headers.PrimitiveID.String()
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
+	}
+
+	clusterKey, ok := gossip.GetClusterKey(md)
+	if !ok {
+		primitiveName, ok := gossip.GetPrimitiveName(md)
+		if !ok {
+			return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+		}
+		clusterKey = fmt.Sprintf("%s.%s", s.Namespace, primitiveName)
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
@@ -36,22 +45,30 @@ func (s *ProxyServer) Set(ctx context.Context, request *counter.SetRequest) (*co
 	}
 
 	client := counter.NewCounterServiceClient(conn)
-	ctx = partition.AddRequestHeaders(ctx, &request.Headers)
+	ctx = partition.AddRequestHeaders(ctx)
 	response, err := client.Set(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	partition.AddResponseHeaders(&response.Headers)
 	s.log.Debugf("Sending SetResponse %+v", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Get(ctx context.Context, request *counter.GetRequest) (*counter.GetResponse, error) {
 	s.log.Debugf("Received GetRequest %+v", request)
-	clusterKey := request.Headers.ClusterKey
-	if clusterKey == "" {
-		clusterKey = request.Headers.PrimitiveID.String()
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
+	}
+
+	clusterKey, ok := gossip.GetClusterKey(md)
+	if !ok {
+		primitiveName, ok := gossip.GetPrimitiveName(md)
+		if !ok {
+			return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+		}
+		clusterKey = fmt.Sprintf("%s.%s", s.Namespace, primitiveName)
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
@@ -61,22 +78,30 @@ func (s *ProxyServer) Get(ctx context.Context, request *counter.GetRequest) (*co
 	}
 
 	client := counter.NewCounterServiceClient(conn)
-	ctx = partition.AddRequestHeaders(ctx, &request.Headers)
+	ctx = partition.AddRequestHeaders(ctx)
 	response, err := client.Get(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	partition.AddResponseHeaders(&response.Headers)
 	s.log.Debugf("Sending GetResponse %+v", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Increment(ctx context.Context, request *counter.IncrementRequest) (*counter.IncrementResponse, error) {
 	s.log.Debugf("Received IncrementRequest %+v", request)
-	clusterKey := request.Headers.ClusterKey
-	if clusterKey == "" {
-		clusterKey = request.Headers.PrimitiveID.String()
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
+	}
+
+	clusterKey, ok := gossip.GetClusterKey(md)
+	if !ok {
+		primitiveName, ok := gossip.GetPrimitiveName(md)
+		if !ok {
+			return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+		}
+		clusterKey = fmt.Sprintf("%s.%s", s.Namespace, primitiveName)
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
@@ -86,22 +111,30 @@ func (s *ProxyServer) Increment(ctx context.Context, request *counter.IncrementR
 	}
 
 	client := counter.NewCounterServiceClient(conn)
-	ctx = partition.AddRequestHeaders(ctx, &request.Headers)
+	ctx = partition.AddRequestHeaders(ctx)
 	response, err := client.Increment(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request IncrementRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	partition.AddResponseHeaders(&response.Headers)
 	s.log.Debugf("Sending IncrementResponse %+v", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Decrement(ctx context.Context, request *counter.DecrementRequest) (*counter.DecrementResponse, error) {
 	s.log.Debugf("Received DecrementRequest %+v", request)
-	clusterKey := request.Headers.ClusterKey
-	if clusterKey == "" {
-		clusterKey = request.Headers.PrimitiveID.String()
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
+	}
+
+	clusterKey, ok := gossip.GetClusterKey(md)
+	if !ok {
+		primitiveName, ok := gossip.GetPrimitiveName(md)
+		if !ok {
+			return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+		}
+		clusterKey = fmt.Sprintf("%s.%s", s.Namespace, primitiveName)
 	}
 	partition := s.PartitionBy([]byte(clusterKey))
 
@@ -111,13 +144,12 @@ func (s *ProxyServer) Decrement(ctx context.Context, request *counter.DecrementR
 	}
 
 	client := counter.NewCounterServiceClient(conn)
-	ctx = partition.AddRequestHeaders(ctx, &request.Headers)
+	ctx = partition.AddRequestHeaders(ctx)
 	response, err := client.Decrement(ctx, request)
 	if err != nil {
 		s.log.Errorf("Request DecrementRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	partition.AddResponseHeaders(&response.Headers)
 	s.log.Debugf("Sending DecrementResponse %+v", response)
 	return response, nil
 }

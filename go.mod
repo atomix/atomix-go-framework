@@ -18,3 +18,5 @@ require (
 	google.golang.org/grpc v1.33.2
 	gopkg.in/yaml.v2 v2.2.4
 )
+
+replace github.com/atomix/atomix-api/go => ../atomix-api/go

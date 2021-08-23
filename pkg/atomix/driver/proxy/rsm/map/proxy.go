@@ -52,10 +52,20 @@ func (s *ProxyServer) Size(ctx context.Context, request *_map.SizeRequest) (*_ma
 	}
 	partitions := s.Partitions()
 
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
+	}
+
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+
 	serviceInfo := storage.ServiceInfo{
 		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Name:      primitiveName,
 	}
 	outputs, err := async.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
 		service, err := partitions[i].GetService(ctx, serviceInfo)
@@ -100,8 +110,9 @@ func (s *ProxyServer) Put(ctx context.Context, request *_map.PutRequest) (*_map.
 	serviceInfo := storage.ServiceInfo{
 		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Name:      primitiveName,
 	}
+	ctx = metadata.NewOutgoingContext(ctx, metadata.MD{})
 	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request PutRequest failed: %v", err)
@@ -136,8 +147,9 @@ func (s *ProxyServer) Get(ctx context.Context, request *_map.GetRequest) (*_map.
 	serviceInfo := storage.ServiceInfo{
 		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Name:      primitiveName,
 	}
+	ctx = metadata.NewOutgoingContext(ctx, metadata.MD{})
 	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request GetRequest failed: %v", err)
@@ -172,8 +184,9 @@ func (s *ProxyServer) Remove(ctx context.Context, request *_map.RemoveRequest) (
 	serviceInfo := storage.ServiceInfo{
 		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Name:      primitiveName,
 	}
+	ctx = metadata.NewOutgoingContext(ctx, metadata.MD{})
 	service, err := partition.GetService(ctx, serviceInfo)
 	if err != nil {
 		log.Errorf("Request RemoveRequest failed: %v", err)
@@ -204,11 +217,22 @@ func (s *ProxyServer) Clear(ctx context.Context, request *_map.ClearRequest) (*_
 	}
 	partitions := s.Partitions()
 
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
+	}
+
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+
 	serviceInfo := storage.ServiceInfo{
 		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Name:      primitiveName,
 	}
+	ctx = metadata.NewOutgoingContext(ctx, metadata.MD{})
 	err = async.IterAsync(len(partitions), func(i int) error {
 		service, err := partitions[i].GetService(ctx, serviceInfo)
 		if err != nil {
@@ -236,22 +260,33 @@ func (s *ProxyServer) Events(request *_map.EventsRequest, srv _map.MapService_Ev
 	}
 
 	ch := make(chan streams.Result)
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
+	}
+
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+
 	serviceInfo := storage.ServiceInfo{
 		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Name:      primitiveName,
 	}
 	partitions := s.Partitions()
+	ctx := metadata.NewOutgoingContext(ctx, metadata.MD{})
 	wg := &sync.WaitGroup{}
 	err = async.IterAsync(len(partitions), func(i int) error {
-		service, err := partitions[i].GetService(srv.Context(), serviceInfo)
+		service, err := partitions[i].GetService(ctx, serviceInfo)
 		if err != nil {
 			return err
 		}
 
 		partitionCh := make(chan streams.Result)
 		partitionStream := streams.NewChannelStream(partitionCh)
-		err = service.DoCommandStream(srv.Context(), eventsOp, input, partitionStream)
+		err = service.DoCommandStream(ctx, eventsOp, input, partitionStream)
 		if err != nil {
 			return err
 		}
@@ -309,22 +344,33 @@ func (s *ProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_
 	}
 
 	ch := make(chan streams.Result)
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
+	}
+
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+
 	serviceInfo := storage.ServiceInfo{
 		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
-		Name:      request.Headers.PrimitiveID.Name,
+		Name:      primitiveName,
 	}
 	partitions := s.Partitions()
+	ctx := metadata.NewOutgoingContext(ctx, metadata.MD{})
 	wg := &sync.WaitGroup{}
 	err = async.IterAsync(len(partitions), func(i int) error {
-		service, err := partitions[i].GetService(srv.Context(), serviceInfo)
+		service, err := partitions[i].GetService(ctx, serviceInfo)
 		if err != nil {
 			return err
 		}
 
 		partitionCh := make(chan streams.Result)
 		partitionStream := streams.NewChannelStream(partitionCh)
-		err = service.DoQueryStream(srv.Context(), entriesOp, input, partitionStream, s.readSync)
+		err = service.DoQueryStream(ctx, entriesOp, input, partitionStream, s.readSync)
 		if err != nil {
 			return err
 		}

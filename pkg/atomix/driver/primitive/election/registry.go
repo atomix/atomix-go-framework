@@ -2,7 +2,7 @@
 package election
 
 import (
-	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
 	election "github.com/atomix/atomix-api/go/atomix/primitive/election"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"sync"
@@ -16,11 +16,11 @@ func NewProxyRegistry() *ProxyRegistry {
 }
 
 type ProxyRegistry struct {
-	proxies map[primitiveapi.PrimitiveId]election.LeaderElectionServiceServer
+	proxies map[driverapi.ProxyId]election.LeaderElectionServiceServer
 	mu      sync.RWMutex
 }
 
-func (r *ProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server election.LeaderElectionServiceServer) error {
+func (r *ProxyRegistry) AddProxy(id driverapi.ProxyId, server election.LeaderElectionServiceServer) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.proxies[id]; ok {
@@ -31,7 +31,7 @@ func (r *ProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server election.Le
 	return nil
 }
 
-func (r *ProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error {
+func (r *ProxyRegistry) RemoveProxy(id driverapi.ProxyId) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.proxies[id]; !ok {
@@ -42,7 +42,7 @@ func (r *ProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error {
 	return nil
 }
 
-func (r *ProxyRegistry) GetProxy(id primitiveapi.PrimitiveId) (election.LeaderElectionServiceServer, error) {
+func (r *ProxyRegistry) GetProxy(id driverapi.ProxyId) (election.LeaderElectionServiceServer, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	proxy, ok := r.proxies[id]

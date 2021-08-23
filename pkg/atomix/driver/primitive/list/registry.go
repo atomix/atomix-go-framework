@@ -2,7 +2,7 @@
 package list
 
 import (
-	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
 	list "github.com/atomix/atomix-api/go/atomix/primitive/list"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"sync"
@@ -16,11 +16,11 @@ func NewProxyRegistry() *ProxyRegistry {
 }
 
 type ProxyRegistry struct {
-	proxies map[primitiveapi.PrimitiveId]list.ListServiceServer
+	proxies map[driverapi.ProxyId]list.ListServiceServer
 	mu      sync.RWMutex
 }
 
-func (r *ProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server list.ListServiceServer) error {
+func (r *ProxyRegistry) AddProxy(id driverapi.ProxyId, server list.ListServiceServer) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.proxies[id]; ok {
@@ -31,7 +31,7 @@ func (r *ProxyRegistry) AddProxy(id primitiveapi.PrimitiveId, server list.ListSe
 	return nil
 }
 
-func (r *ProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error {
+func (r *ProxyRegistry) RemoveProxy(id driverapi.ProxyId) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.proxies[id]; !ok {
@@ -42,7 +42,7 @@ func (r *ProxyRegistry) RemoveProxy(id primitiveapi.PrimitiveId) error {
 	return nil
 }
 
-func (r *ProxyRegistry) GetProxy(id primitiveapi.PrimitiveId) (list.ListServiceServer, error) {
+func (r *ProxyRegistry) GetProxy(id driverapi.ProxyId) (list.ListServiceServer, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	proxy, ok := r.proxies[id]

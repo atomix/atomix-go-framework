@@ -5,7 +5,7 @@ package {{ .Package.Name }}
 {{- $registry := printf "%sProxyRegistry" .Generator.Prefix }}
 
 import (
-	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"sync"
 	{{- $package := .Package }}
@@ -22,11 +22,11 @@ func New{{ $registry }}() *{{ $registry }} {
 }
 
 type {{ $registry }} struct {
-	proxies map[primitiveapi.PrimitiveId]{{ $service }}
+	proxies map[driverapi.ProxyId]{{ $service }}
 	mu      sync.RWMutex
 }
 
-func (r *{{ $registry }}) AddProxy(id primitiveapi.PrimitiveId, server {{ $service }}) error {
+func (r *{{ $registry }}) AddProxy(id driverapi.ProxyId, server {{ $service }}) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.proxies[id]; ok {
@@ -37,7 +37,7 @@ func (r *{{ $registry }}) AddProxy(id primitiveapi.PrimitiveId, server {{ $servi
 	return nil
 }
 
-func (r *{{ $registry }}) RemoveProxy(id primitiveapi.PrimitiveId) error {
+func (r *{{ $registry }}) RemoveProxy(id driverapi.ProxyId) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.proxies[id]; !ok {
@@ -48,7 +48,7 @@ func (r *{{ $registry }}) RemoveProxy(id primitiveapi.PrimitiveId) error {
 	return nil
 }
 
-func (r *{{ $registry }}) GetProxy(id primitiveapi.PrimitiveId) ({{ $service }}, error) {
+func (r *{{ $registry }}) GetProxy(id driverapi.ProxyId) ({{ $service }}, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	proxy, ok := r.proxies[id]

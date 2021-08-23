@@ -9,6 +9,7 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/gossip"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"google.golang.org/grpc/metadata"
 	{{- $package := .Package }}
 	{{- range .Imports }}
 	{{ .Alias }} {{ .Path | quote }}
@@ -115,9 +116,18 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	{{- else if .Request.PartitionRange }}
 	partitionRange := {{ template "val" .Request.PartitionRange }}request{{ template "field" .Request.PartitionRange }}
 	{{- else }}
-	clusterKey := request.Headers.ClusterKey
-	if clusterKey == "" {
-	    clusterKey = request{{ template "field" .Request.Headers }}.PrimitiveID.String()
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
+	}
+
+	clusterKey, ok := gossip.GetClusterKey(md)
+	if !ok {
+        primitiveName, ok := gossip.GetPrimitiveName(md)
+        if !ok {
+            return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+        }
+		clusterKey = fmt.Sprintf("%s.%s", s.Namespace, primitiveName)
 	}
     partition := s.PartitionBy([]byte(clusterKey))
 	{{- end }}
@@ -128,13 +138,12 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	}
 
 	client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-	ctx = partition.AddRequestHeaders(ctx, {{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
+	ctx = partition.AddRequestHeaders(ctx)
 	response, err := client.{{ .Name }}(ctx, request)
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
-	partition.AddResponseHeaders({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
 	{{- else if .Scope.IsGlobal }}
 	partitions := s.Partitions()
     {{- if .Response.Aggregates }}
@@ -147,12 +156,11 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
             return nil, err
         }
         client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-    	ctx := partition.AddRequestHeaders(ctx, {{ template "ref" .Request.Headers }}prequest{{ template "field" .Request.Headers }})
+    	ctx := partition.AddRequestHeaders(ctx)
 		presponse, err := client.{{ .Name }}(ctx, prequest)
 		if err != nil {
 		    return nil, err
 		}
-    	partition.AddResponseHeaders({{ template "ref" .Response.Headers }}presponse{{ template "field" .Response.Headers }})
     	return presponse, nil
 	})
     {{- else }}
@@ -165,7 +173,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
             return err
         }
         client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-    	ctx := partition.AddRequestHeaders(ctx, {{ template "ref" .Request.Headers }}prequest{{ template "field" .Request.Headers }})
+    	ctx := partition.AddRequestHeaders(ctx)
 		_, err = client.{{ .Name }}(ctx, prequest)
 		return err
 	})
@@ -176,7 +184,6 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	}
 
 	response := &{{ template "type" .Response.Type }}{}
-    s.AddResponseHeaders({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
     {{- range .Response.Aggregates }}
     {{- if .IsChooseFirst }}
     response{{ template "field" . }} = responses[0].(*{{ template "type" $method.Response.Type }}){{ template "field" . }}
@@ -212,9 +219,18 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	{{- else if .Request.PartitionRange }}
 	partitionRange := {{ template "val" .Request.PartitionRange }}request{{ template "field" .Request.PartitionRange }}
 	{{- else }}
-	clusterKey := request.Headers.ClusterKey
-	if clusterKey == "" {
-	    clusterKey = request{{ template "field" .Request.Headers }}.PrimitiveID.String()
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
+	}
+
+	clusterKey, ok := gossip.GetClusterKey(md)
+	if !ok {
+        primitiveName, ok := gossip.GetPrimitiveName(md)
+        if !ok {
+            return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+        }
+		clusterKey = fmt.Sprintf("%s.%s", s.Namespace, primitiveName)
 	}
     partition := s.PartitionBy([]byte(clusterKey))
 	{{- end }}
@@ -226,7 +242,7 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	}
 
 	client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-	ctx := partition.AddRequestHeaders(srv.Context(), {{ template "ref" .Request.Headers }}request{{ template "field" .Request.Headers }})
+	ctx := partition.AddRequestHeaders(srv.Context())
 	stream, err := client.{{ .Name }}(ctx, request)
 	if err != nil {
         s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
@@ -242,7 +258,6 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
             s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
 			return errors.Proto(err)
 		}
-    	partition.AddResponseHeaders({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
 		s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
 		if err := srv.Send(response); err != nil {
             s.log.Errorf("Response {{ .Response.Type.Name }} failed: %v", err)
@@ -264,7 +279,7 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
             return err
         }
         client := {{ $primitive.Type.Package.Alias }}.New{{ $primitive.Type.Name }}Client(conn)
-	    ctx := partition.AddRequestHeaders(srv.Context(), {{ template "ref" .Request.Headers }}prequest{{ template "field" .Request.Headers }})
+	    ctx := partition.AddRequestHeaders(srv.Context())
         stream, err := client.{{ .Name }}(ctx, prequest)
         if err != nil {
             s.log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
@@ -280,7 +295,6 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
                 } else if err != nil {
                     errCh <- err
                 } else {
-                    partition.AddResponseHeaders({{ template "ref" .Response.Headers }}presponse{{ template "field" .Response.Headers }})
                     responseCh <- presponse
                 }
             }
@@ -302,7 +316,6 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
         select {
         case response, ok := <-responseCh:
             if ok {
-    	        s.AddResponseHeaders({{ template "ref" .Response.Headers }}response{{ template "field" .Response.Headers }})
                 s.log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
                 err := srv.Send(response)
                 if err != nil {

@@ -3,19 +3,23 @@ package counter
 
 import (
 	"context"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
 	counter "github.com/atomix/atomix-api/go/atomix/primitive/counter"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"google.golang.org/grpc/metadata"
 )
 
 var log = logging.GetLogger("atomix", "counter")
 
+const Type = "Counter"
+
 // NewProxyServer creates a new ProxyServer
-func NewProxyServer(registry *ProxyRegistry, env env.DriverEnv) counter.CounterServiceServer {
+func NewProxyServer(registry *ProxyRegistry) counter.CounterServiceServer {
 	return &ProxyServer{
 		registry: registry,
-		env:      env,
 	}
 }
 
@@ -25,10 +29,19 @@ type ProxyServer struct {
 }
 
 func (s *ProxyServer) Set(ctx context.Context, request *counter.SetRequest) (*counter.SetResponse, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("SetRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {
@@ -40,10 +53,19 @@ func (s *ProxyServer) Set(ctx context.Context, request *counter.SetRequest) (*co
 }
 
 func (s *ProxyServer) Get(ctx context.Context, request *counter.GetRequest) (*counter.GetResponse, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("GetRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {
@@ -55,10 +77,19 @@ func (s *ProxyServer) Get(ctx context.Context, request *counter.GetRequest) (*co
 }
 
 func (s *ProxyServer) Increment(ctx context.Context, request *counter.IncrementRequest) (*counter.IncrementResponse, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("IncrementRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {
@@ -70,10 +101,19 @@ func (s *ProxyServer) Increment(ctx context.Context, request *counter.IncrementR
 }
 
 func (s *ProxyServer) Decrement(ctx context.Context, request *counter.DecrementRequest) (*counter.DecrementResponse, error) {
-	if request.Headers.PrimitiveID.Namespace == "" {
-		request.Headers.PrimitiveID.Namespace = s.env.Namespace
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive headers"))
 	}
-	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
+	primitiveName, ok := rsm.GetPrimitiveName(md)
+	if !ok {
+		return nil, errors.Proto(errors.NewInvalid("missing primitive header"))
+	}
+	proxyID := driverapi.ProxyId{
+		Type: Type,
+		Name: primitiveName,
+	}
+	proxy, err := s.registry.GetProxy(proxyID)
 	if err != nil {
 		log.Warnf("DecrementRequest %+v failed: %v", request, err)
 		if errors.IsNotFound(err) {

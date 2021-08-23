@@ -149,7 +149,6 @@ type MessageMeta struct {
 // RequestMeta is the type metadata for a message
 type RequestMeta struct {
 	MessageMeta
-	Headers        FieldRefMeta
 	PartitionKey   *FieldRefMeta
 	PartitionRange *FieldRefMeta
 	IsUnary        bool
@@ -159,7 +158,6 @@ type RequestMeta struct {
 // ResponseMeta is the type metadata for a message
 type ResponseMeta struct {
 	MessageMeta
-	Headers    FieldRefMeta
 	Aggregates []AggregatorMeta
 	IsUnary    bool
 	IsStream   bool
