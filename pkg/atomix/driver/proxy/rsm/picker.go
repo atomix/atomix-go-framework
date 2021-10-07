@@ -59,12 +59,9 @@ type Picker struct {
 
 func (p *Picker) Pick(info balancer.PickInfo) (balancer.PickResult, error) {
 	var result balancer.PickResult
-	if info.FullMethodName == "/atomix.service.PartitionService/Command" ||
-		info.FullMethodName == "/atomix.service.PartitionService/CommandStream" ||
-		len(p.followers) == 0 {
+	if p.leader != nil {
 		result.SubConn = p.leader
-	} else if info.FullMethodName == "/atomix.service.PartitionService/Query" ||
-		info.FullMethodName == "/atomix.service.PartitionService/QueryStream" {
+	} else if len(p.followers) > 0 {
 		result.SubConn = p.nextFollower()
 	}
 	if result.SubConn == nil {
