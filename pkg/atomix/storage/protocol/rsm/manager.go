@@ -15,6 +15,7 @@
 package rsm
 
 import (
+	"container/list"
 	"encoding/json"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
@@ -22,6 +23,7 @@ import (
 	"github.com/bits-and-blooms/bloom/v3"
 	"github.com/gogo/protobuf/proto"
 	"io"
+	"sync"
 	"time"
 )
 
@@ -117,6 +119,7 @@ func newServiceManager(registry *Registry) *primitiveServiceManager {
 	return &primitiveServiceManager{
 		sessions:  make(map[SessionID]*primitiveSession),
 		services:  make(map[ServiceID]*primitiveService),
+		queries:   make(map[Index]*list.List),
 		registry:  registry,
 		scheduler: newScheduler(),
 	}
@@ -125,6 +128,8 @@ func newServiceManager(registry *Registry) *primitiveServiceManager {
 type primitiveServiceManager struct {
 	sessions  map[SessionID]*primitiveSession
 	services  map[ServiceID]*primitiveService
+	queries   map[Index]*list.List
+	queriesMu sync.RWMutex
 	registry  *Registry
 	scheduler *serviceScheduler
 	index     Index
@@ -164,6 +169,7 @@ func (m *primitiveServiceManager) restore(snapshot *StateMachineSnapshot) error 
 	m.timestamp = snapshot.Timestamp
 	m.sessions = make(map[SessionID]*primitiveSession)
 	m.services = make(map[ServiceID]*primitiveService)
+	m.queries = make(map[Index]*list.List)
 
 	for _, sessionSnapshot := range snapshot.Sessions {
 		session := newSession(m)
@@ -240,6 +246,21 @@ func (m *primitiveServiceManager) command(request *CommandRequest, stream stream
 	}
 
 	m.scheduler.runImmediateTasks()
+
+	m.queriesMu.RLock()
+	queries, ok := m.queries[m.index]
+	m.queriesMu.RUnlock()
+	if ok {
+		m.queriesMu.Lock()
+		elem := queries.Front()
+		for elem != nil {
+			query := elem.Value.(primitiveServiceQuery)
+			m.indexQuery(query.request, query.stream)
+			elem = elem.Next()
+		}
+		delete(m.queries, m.index)
+		m.queriesMu.Unlock()
+	}
 }
 
 func (m *primitiveServiceManager) sessionCommand(request *SessionCommandRequest, stream streams.WriteStream) {
@@ -399,6 +420,24 @@ func (m *primitiveServiceManager) closeSession(request *CloseSessionRequest, str
 }
 
 func (m *primitiveServiceManager) query(request *QueryRequest, stream streams.WriteStream) {
+	if request.LastIndex > m.index {
+		m.queriesMu.Lock()
+		queries, ok := m.queries[request.LastIndex]
+		if !ok {
+			queries = list.New()
+			m.queries[request.LastIndex] = queries
+		}
+		queries.PushBack(primitiveServiceQuery{
+			request: request,
+			stream:  stream,
+		})
+		m.queriesMu.Unlock()
+	} else {
+		m.indexQuery(request, stream)
+	}
+}
+
+func (m *primitiveServiceManager) indexQuery(request *QueryRequest, stream streams.WriteStream) {
 	switch r := request.Request.(type) {
 	case *QueryRequest_SessionQuery:
 		m.sessionQuery(r.SessionQuery, streams.NewEncodingStream(stream, func(value interface{}, err error) (interface{}, error) {
@@ -445,4 +484,9 @@ func (m *primitiveServiceManager) serviceQuery(request *ServiceQueryRequest, ses
 		return
 	}
 	service.query().execute(request, stream)
+}
+
+type primitiveServiceQuery struct {
+	request *QueryRequest
+	stream  streams.WriteStream
 }
