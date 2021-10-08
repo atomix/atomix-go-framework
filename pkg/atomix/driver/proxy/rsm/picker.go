@@ -15,7 +15,6 @@
 package rsm
 
 import (
-	"math/rand"
 	"sync/atomic"
 
 	"google.golang.org/grpc/balancer"
@@ -38,9 +37,6 @@ func (p *PickerBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
 			continue
 		}
 		followers = append(followers, sc)
-	}
-	if leader == nil && len(followers) > 0 {
-		leader = followers[rand.Intn(len(followers))]
 	}
 	log.Debugf("Built new picker. Leader: %s, Followers: %s", leader, followers)
 	return &Picker{
