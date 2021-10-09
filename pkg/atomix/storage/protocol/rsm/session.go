@@ -467,10 +467,10 @@ func (c *primitiveServiceSessionCommand) keepAlive(lastRequestID RequestID, filt
 	if !filter.Test(requestBytes) {
 		switch c.state {
 		case CommandRunning:
-			//log.Debugf("Cancel command %d (session=%d, service=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
+			log.Debugf("Cancel command %d (session=%d, service=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
 			c.Close()
 		case CommandComplete:
-			//log.Debugf("Acknowledge command %d (session=%d, service=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
+			log.Debugf("Acknowledge command %d (session=%d, service=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
 		}
 		delete(c.session.requests, c.request.RequestID)
 		return nil
@@ -488,7 +488,7 @@ func (c *primitiveServiceSessionCommand) keepAlive(lastRequestID RequestID, filt
 		if !filter.Test(responseBytes) {
 			c.responses.Remove(elem)
 		} else {
-			//log.Debugf("Keep-alive command %d (session=%d, service=%d, request=%d, response=%d)", c.commandID, c.session.service.serviceID, c.session.session.sessionID, c.request.RequestID, response.ResponseID)
+			log.Debugf("Keep-alive command %d (session=%d, service=%d, request=%d, response=%d)", c.commandID, c.session.service.serviceID, c.session.session.sessionID, c.request.RequestID, response.ResponseID)
 			break
 		}
 		elem = next
@@ -498,10 +498,10 @@ func (c *primitiveServiceSessionCommand) keepAlive(lastRequestID RequestID, filt
 		// If the command is complete and the client has acknowledged receipt of all responses,
 		// remove the command from the session.
 		if c.state == CommandComplete {
-			//log.Debugf("Acknowledge command %d (session=%d, service=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
+			log.Debugf("Acknowledge command %d (session=%d, service=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
 			delete(c.session.requests, c.request.RequestID)
 		} else {
-			//log.Debugf("Keep-alive command %d (session=%d, service=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
+			log.Debugf("Keep-alive command %d (session=%d, service=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
 		}
 	}
 	return nil
@@ -528,7 +528,7 @@ func (c *primitiveServiceSessionCommand) Output(bytes []byte, err error) {
 }
 
 func (c *primitiveServiceSessionCommand) Close() {
-	//log.Debugf("Close command %d (session=%d, service=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
+	log.Debugf("Close command %d (session=%d, service=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
 	c.session.service.commands.remove(c)
 	c.session.commands.remove(c)
 	c.state = CommandComplete

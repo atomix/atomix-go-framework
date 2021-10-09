@@ -128,8 +128,17 @@ func (s *Server) QueryStream(request *PartitionQueryRequest, srv PartitionServic
 
 	resultCh := make(chan streams.Result)
 	errCh := make(chan error)
-	stream := streams.NewChannelStream(resultCh)
-	defer stream.Drain()
+	stream := streams.NewBufferedStream()
+	go func() {
+		defer close(resultCh)
+		for {
+			result, ok := stream.Receive()
+			if !ok {
+				return
+			}
+			resultCh <- result
+		}
+	}()
 	go func() {
 		if request.Sync {
 			err := partition.SyncQuery(srv.Context(), bytes, stream)
@@ -258,8 +267,17 @@ func (s *Server) CommandStream(request *PartitionCommandRequest, srv PartitionSe
 
 	resultCh := make(chan streams.Result)
 	errCh := make(chan error)
-	stream := streams.NewChannelStream(resultCh)
-	defer stream.Drain()
+	stream := streams.NewBufferedStream()
+	go func() {
+		defer close(resultCh)
+		for {
+			result, ok := stream.Receive()
+			if !ok {
+				return
+			}
+			resultCh <- result
+		}
+	}()
 	go func() {
 		err := partition.SyncCommand(srv.Context(), bytes, stream)
 		if err != nil {
