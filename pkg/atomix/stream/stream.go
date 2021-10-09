@@ -199,59 +199,30 @@ func (s *bufferedStream) Close() {
 
 // NewChannelStream returns a new channel-based stream
 func NewChannelStream(ch chan Result) Stream {
-	stream := &channelStream{
-		inCh:  make(chan Result),
-		outCh: ch,
+	return &channelStream{
+		ch: ch,
 	}
-	go stream.process()
-	return stream
 }
 
 // channelStream is a channel-based stream
 type channelStream struct {
-	inCh     chan Result
-	outCh    chan Result
-	canceled bool
-	mu       sync.RWMutex
-}
-
-func (s *channelStream) process() {
-	canceled := false
-	for result := range s.inCh {
-		if !canceled {
-			s.mu.RLock()
-			if s.canceled {
-				close(s.outCh)
-				canceled = true
-			}
-			s.mu.RUnlock()
-		}
-		if !canceled {
-			s.outCh <- result
-		}
-	}
-	if !canceled {
-		close(s.outCh)
-	}
+	ch chan Result
 }
 
 func (s *channelStream) Receive() (Result, bool) {
-	result, ok := <-s.outCh
+	result, ok := <-s.ch
 	return result, ok
 }
 
 func (s *channelStream) Drain() {
 	go func() {
-		for range s.outCh {
+		for range s.ch {
 		}
 	}()
-	s.mu.Lock()
-	s.canceled = true
-	s.mu.Unlock()
 }
 
 func (s *channelStream) Send(result Result) {
-	s.inCh <- result
+	s.ch <- result
 }
 
 func (s *channelStream) Result(value interface{}, err error) {
@@ -270,7 +241,7 @@ func (s *channelStream) Error(err error) {
 }
 
 func (s *channelStream) Close() {
-	close(s.inCh)
+	close(s.ch)
 }
 
 // NewNilStream returns a disconnected stream
