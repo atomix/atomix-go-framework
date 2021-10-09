@@ -16,6 +16,7 @@ package logging
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 )
@@ -24,12 +25,17 @@ var root *zapLogger
 
 const nameSep = "/"
 
+const atomixDebugEnv = "ATOMIX_DEBUG"
+
 func init() {
 	config := Config{}
 	if err := load(&config); err != nil {
 		panic(err)
 	} else if err := configure(config); err != nil {
 		panic(err)
+	}
+	if os.Getenv(atomixDebugEnv) != "" {
+		SetLevel(DebugLevel)
 	}
 }
 
