@@ -322,8 +322,6 @@ func (s *ProxyServer) Events(request *list.EventsRequest, srv list.ListService_E
 		log.Errorf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
-
-	ch := make(chan streams.Result)
 	clusterKey := request.Headers.ClusterKey
 	if clusterKey == "" {
 		clusterKey = request.Headers.PrimitiveID.String()
@@ -339,11 +337,25 @@ func (s *ProxyServer) Events(request *list.EventsRequest, srv list.ListService_E
 	if err != nil {
 		return err
 	}
-	err = service.DoCommandStream(srv.Context(), eventsOp, input, streams.NewChannelStream(ch))
+
+	stream := streams.NewBufferedStream()
+	err = service.DoCommandStream(srv.Context(), eventsOp, input, stream)
 	if err != nil {
 		log.Warnf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
+
+	ch := make(chan streams.Result)
+	go func() {
+		defer close(ch)
+		for {
+			result, ok := stream.Receive()
+			if !ok {
+				return
+			}
+			ch <- result
+		}
+	}()
 
 	for result := range ch {
 		if result.Failed() {
@@ -378,8 +390,6 @@ func (s *ProxyServer) Elements(request *list.ElementsRequest, srv list.ListServi
 		log.Errorf("Request ElementsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
-
-	ch := make(chan streams.Result)
 	clusterKey := request.Headers.ClusterKey
 	if clusterKey == "" {
 		clusterKey = request.Headers.PrimitiveID.String()
@@ -395,11 +405,25 @@ func (s *ProxyServer) Elements(request *list.ElementsRequest, srv list.ListServi
 	if err != nil {
 		return err
 	}
-	err = service.DoQueryStream(srv.Context(), elementsOp, input, streams.NewChannelStream(ch), s.readSync)
+
+	stream := streams.NewBufferedStream()
+	err = service.DoQueryStream(srv.Context(), elementsOp, input, stream, s.readSync)
 	if err != nil {
 		log.Warnf("Request ElementsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
+
+	ch := make(chan streams.Result)
+	go func() {
+		defer close(ch)
+		for {
+			result, ok := stream.Receive()
+			if !ok {
+				return
+			}
+			ch <- result
+		}
+	}()
 
 	for result := range ch {
 		if result.Failed() {

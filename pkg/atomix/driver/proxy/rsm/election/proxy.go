@@ -281,8 +281,6 @@ func (s *ProxyServer) Events(request *election.EventsRequest, srv election.Leade
 		log.Errorf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
-
-	ch := make(chan streams.Result)
 	clusterKey := request.Headers.ClusterKey
 	if clusterKey == "" {
 		clusterKey = request.Headers.PrimitiveID.String()
@@ -298,11 +296,25 @@ func (s *ProxyServer) Events(request *election.EventsRequest, srv election.Leade
 	if err != nil {
 		return err
 	}
-	err = service.DoCommandStream(srv.Context(), eventsOp, input, streams.NewChannelStream(ch))
+
+	stream := streams.NewBufferedStream()
+	err = service.DoCommandStream(srv.Context(), eventsOp, input, stream)
 	if err != nil {
 		log.Warnf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
+
+	ch := make(chan streams.Result)
+	go func() {
+		defer close(ch)
+		for {
+			result, ok := stream.Receive()
+			if !ok {
+				return
+			}
+			ch <- result
+		}
+	}()
 
 	for result := range ch {
 		if result.Failed() {

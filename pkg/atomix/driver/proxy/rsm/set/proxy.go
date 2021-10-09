@@ -234,13 +234,12 @@ func (s *ProxyServer) Events(request *set.EventsRequest, srv set.SetService_Even
 		log.Errorf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
-
-	ch := make(chan streams.Result)
 	serviceInfo := storage.ServiceInfo{
 		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
+	ch := make(chan streams.Result)
 	partitions := s.Partitions()
 	wg := &sync.WaitGroup{}
 	err = async.IterAsync(len(partitions), func(i int) error {
@@ -249,18 +248,21 @@ func (s *ProxyServer) Events(request *set.EventsRequest, srv set.SetService_Even
 			return err
 		}
 
-		partitionCh := make(chan streams.Result)
-		partitionStream := streams.NewChannelStream(partitionCh)
-		err = service.DoCommandStream(srv.Context(), eventsOp, input, partitionStream)
+		stream := streams.NewBufferedStream()
+		err = service.DoCommandStream(srv.Context(), eventsOp, input, stream)
 		if err != nil {
 			return err
 		}
 		wg.Add(1)
 		go func() {
-			for result := range partitionCh {
+			defer wg.Done()
+			for {
+				result, ok := stream.Receive()
+				if !ok {
+					return
+				}
 				ch <- result
 			}
-			wg.Done()
 		}()
 		return nil
 	})
@@ -307,13 +309,12 @@ func (s *ProxyServer) Elements(request *set.ElementsRequest, srv set.SetService_
 		log.Errorf("Request ElementsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
-
-	ch := make(chan streams.Result)
 	serviceInfo := storage.ServiceInfo{
 		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request.Headers.PrimitiveID.Name,
 	}
+	ch := make(chan streams.Result)
 	partitions := s.Partitions()
 	wg := &sync.WaitGroup{}
 	err = async.IterAsync(len(partitions), func(i int) error {
@@ -322,18 +323,21 @@ func (s *ProxyServer) Elements(request *set.ElementsRequest, srv set.SetService_
 			return err
 		}
 
-		partitionCh := make(chan streams.Result)
-		partitionStream := streams.NewChannelStream(partitionCh)
-		err = service.DoQueryStream(srv.Context(), elementsOp, input, partitionStream, s.readSync)
+		stream := streams.NewBufferedStream()
+		err = service.DoQueryStream(srv.Context(), elementsOp, input, stream, s.readSync)
 		if err != nil {
 			return err
 		}
 		wg.Add(1)
 		go func() {
-			for result := range partitionCh {
+			defer wg.Done()
+			for {
+				result, ok := stream.Receive()
+				if !ok {
+					return
+				}
 				ch <- result
 			}
-			wg.Done()
 		}()
 		return nil
 	})

@@ -402,8 +402,6 @@ func (s *ProxyServer) Events(request *indexedmap.EventsRequest, srv indexedmap.I
 		log.Errorf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
-
-	ch := make(chan streams.Result)
 	clusterKey := request.Headers.ClusterKey
 	if clusterKey == "" {
 		clusterKey = request.Headers.PrimitiveID.String()
@@ -419,11 +417,25 @@ func (s *ProxyServer) Events(request *indexedmap.EventsRequest, srv indexedmap.I
 	if err != nil {
 		return err
 	}
-	err = service.DoCommandStream(srv.Context(), eventsOp, input, streams.NewChannelStream(ch))
+
+	stream := streams.NewBufferedStream()
+	err = service.DoCommandStream(srv.Context(), eventsOp, input, stream)
 	if err != nil {
 		log.Warnf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
+
+	ch := make(chan streams.Result)
+	go func() {
+		defer close(ch)
+		for {
+			result, ok := stream.Receive()
+			if !ok {
+				return
+			}
+			ch <- result
+		}
+	}()
 
 	for result := range ch {
 		if result.Failed() {
@@ -458,8 +470,6 @@ func (s *ProxyServer) Entries(request *indexedmap.EntriesRequest, srv indexedmap
 		log.Errorf("Request EntriesRequest failed: %v", err)
 		return errors.Proto(err)
 	}
-
-	ch := make(chan streams.Result)
 	clusterKey := request.Headers.ClusterKey
 	if clusterKey == "" {
 		clusterKey = request.Headers.PrimitiveID.String()
@@ -475,11 +485,25 @@ func (s *ProxyServer) Entries(request *indexedmap.EntriesRequest, srv indexedmap
 	if err != nil {
 		return err
 	}
-	err = service.DoQueryStream(srv.Context(), entriesOp, input, streams.NewChannelStream(ch), s.readSync)
+
+	stream := streams.NewBufferedStream()
+	err = service.DoQueryStream(srv.Context(), entriesOp, input, stream, s.readSync)
 	if err != nil {
 		log.Warnf("Request EntriesRequest failed: %v", err)
 		return errors.Proto(err)
 	}
+
+	ch := make(chan streams.Result)
+	go func() {
+		defer close(ch)
+		for {
+			result, ok := stream.Receive()
+			if !ok {
+				return
+			}
+			ch <- result
+		}
+	}()
 
 	for result := range ch {
 		if result.Failed() {

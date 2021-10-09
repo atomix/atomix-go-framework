@@ -404,7 +404,6 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
         return errors.Proto(err)
 	}
 
-    ch := make(chan streams.Result)
 	{{- if .Scope.IsPartition }}
 	{{- if .Request.PartitionKey }}
 	partitionKey := {{ template "val" .Request.PartitionKey }}request{{ template "field" .Request.PartitionKey }}
@@ -436,21 +435,36 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
     if err != nil {
         return err
     }
+
+	stream := streams.NewBufferedStream()
     {{- if .Type.IsCommand }}
-	err = service.DoCommandStream(srv.Context(), {{ $name }}, input, streams.NewChannelStream(ch))
+	err = service.DoCommandStream(srv.Context(), {{ $name }}, input, stream)
     {{- else }}
-	err = service.DoQueryStream(srv.Context(), {{ $name }}, input, streams.NewChannelStream(ch), s.readSync)
+	err = service.DoQueryStream(srv.Context(), {{ $name }}, input, stream, s.readSync)
     {{- end }}
 	if err != nil {
         log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return errors.Proto(err)
 	}
+
+    ch := make(chan streams.Result)
+	go func() {
+        defer close(ch)
+		for {
+			result, ok := stream.Receive()
+			if !ok {
+    			return
+			}
+			ch <- result
+		}
+	}()
 	{{- else if .Scope.IsGlobal }}
 	serviceInfo := storage.ServiceInfo{
 		Type:      storage.ServiceType(Type),
 		Namespace: s.Namespace,
 		Name:      request{{ template "field" .Request.Headers }}.PrimitiveID.Name,
 	}
+    ch := make(chan streams.Result)
 	partitions := s.Partitions()
 	wg := &sync.WaitGroup{}
 	err = async.IterAsync(len(partitions), func(i int) error {
@@ -459,22 +473,25 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 			return err
 		}
 
-		partitionCh := make(chan streams.Result)
-		partitionStream := streams.NewChannelStream(partitionCh)
+	    stream := streams.NewBufferedStream()
         {{- if .Type.IsCommand }}
-		err = service.DoCommandStream(srv.Context(), {{ $name }}, input, partitionStream)
+		err = service.DoCommandStream(srv.Context(), {{ $name }}, input, stream)
         {{- else }}
-		err = service.DoQueryStream(srv.Context(), {{ $name }}, input, partitionStream, s.readSync)
+		err = service.DoQueryStream(srv.Context(), {{ $name }}, input, stream, s.readSync)
         {{- end }}
 		if err != nil {
 			return err
 		}
 		wg.Add(1)
 		go func() {
-			for result := range partitionCh {
-				ch <- result
-			}
-			wg.Done()
+		    defer wg.Done()
+            for {
+                result, ok := stream.Receive()
+                if !ok {
+                    return
+                }
+                ch <- result
+            }
 		}()
 		return nil
 	})
