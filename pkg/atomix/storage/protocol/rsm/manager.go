@@ -93,8 +93,16 @@ func (s *primitiveServiceStateMachine) Command(bytes []byte, stream streams.Writ
 			if err != nil {
 				return nil, err
 			}
-			return proto.Marshal(value.(*CommandResponse))
+			response := value.(*CommandResponse)
+			log.Debugf("Completing CommandResponse %+v", response)
+			bytes, err := proto.Marshal(response)
+			if err != nil {
+				log.Debugf("CommandRequest failed: %v", err)
+				return nil, err
+			}
+			return bytes, nil
 		})
+		log.Debugf("Applying CommandRequest %+v", request)
 		s.manager.command(request, stream)
 	}
 }
@@ -109,8 +117,16 @@ func (s *primitiveServiceStateMachine) Query(bytes []byte, stream streams.WriteS
 			if err != nil {
 				return nil, err
 			}
-			return proto.Marshal(value.(*QueryResponse))
+			response := value.(*QueryResponse)
+			log.Debugf("Completing QueryResponse %+v", response)
+			bytes, err := proto.Marshal(response)
+			if err != nil {
+				log.Debugf("QueryRequest failed: %v", err)
+				return nil, err
+			}
+			return bytes, nil
 		})
+		log.Debugf("Applying QueryRequest %+v", request)
 		s.manager.query(request, stream)
 	}
 }
@@ -255,6 +271,7 @@ func (m *primitiveServiceManager) command(request *CommandRequest, stream stream
 		elem := queries.Front()
 		for elem != nil {
 			query := elem.Value.(primitiveServiceQuery)
+			log.Debugf("Dequeued QueryRequest at index %d: %+v", m.index, query.request)
 			m.indexQuery(query.request, query.stream)
 			elem = elem.Next()
 		}
@@ -421,6 +438,7 @@ func (m *primitiveServiceManager) closeSession(request *CloseSessionRequest, str
 
 func (m *primitiveServiceManager) query(request *QueryRequest, stream streams.WriteStream) {
 	if request.LastIndex > m.index {
+		log.Debugf("Enqueued QueryRequest at index %d: %+v", m.index, request)
 		m.queriesMu.Lock()
 		queries, ok := m.queries[request.LastIndex]
 		if !ok {
