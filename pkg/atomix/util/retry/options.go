@@ -42,13 +42,6 @@ func WithMaxInterval(d time.Duration) CallOption {
 	})
 }
 
-// WithJitter sets the retry interval jitter
-func WithJitter(j float64) CallOption {
-	return newCallOption(func(opts *callOptions) {
-		opts.jitter = &j
-	})
-}
-
 // WithRetryOn sets the codes on which to retry a request
 func WithRetryOn(codes ...codes.Code) CallOption {
 	return newCallOption(func(opts *callOptions) {
@@ -72,18 +65,17 @@ type callOptions struct {
 	perCallTimeout  *time.Duration
 	initialInterval *time.Duration
 	maxInterval     *time.Duration
-	jitter          *float64
 	codes           []codes.Code
 }
 
-func perCallContext(ctx context.Context, opts *callOptions) context.Context {
+func newCallContext(ctx context.Context, opts *callOptions) context.Context {
 	if opts.perCallTimeout != nil {
-		ctx, _ = context.WithTimeout(ctx, *opts.perCallTimeout)
+		ctx, _ = context.WithTimeout(ctx, *opts.perCallTimeout) //nolint:govet
 	}
 	return ctx
 }
 
-func reuseOrNewWithCallOptions(opts *callOptions, options []CallOption) *callOptions {
+func newCallOptions(opts *callOptions, options []CallOption) *callOptions {
 	if len(options) == 0 {
 		return opts
 	}
