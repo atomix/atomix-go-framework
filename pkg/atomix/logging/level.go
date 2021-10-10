@@ -18,10 +18,11 @@ import (
 	zp "go.uber.org/zap"
 	zc "go.uber.org/zap/zapcore"
 	"strings"
+	"sync/atomic"
 )
 
 // Level :
-type Level int
+type Level int32
 
 const (
 	// DebugLevel logs a message at debug level
@@ -86,4 +87,23 @@ func levelStringToLevel(l string) Level {
 		return DPanicLevel
 	}
 	return ErrorLevel
+}
+
+func newAtomicLevel(level Level) *atomicLevel {
+	return &atomicLevel{
+		level: int32(level),
+	}
+}
+
+type atomicLevel struct {
+	level int32
+}
+
+func (l *atomicLevel) Store(level Level) {
+	atomic.StoreInt32(&l.level, int32(level))
+}
+
+func (l *atomicLevel) Load() Level {
+	atomic.LoadInt32(&l.level)
+	return Level(l.level)
 }
