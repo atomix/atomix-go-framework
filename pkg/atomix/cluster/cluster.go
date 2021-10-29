@@ -18,6 +18,7 @@ import (
 	"context"
 	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
 	"io"
+	"sort"
 	"sync"
 )
 
@@ -200,6 +201,14 @@ func (c *cluster) Update(config protocolapi.ProtocolConfig) error {
 		}
 		partitions = append(partitions, partition)
 	}
+
+	sort.Slice(replicas, func(i, j int) bool {
+		return replicas[i].ID < replicas[j].ID
+	})
+
+	sort.Slice(partitions, func(i, j int) bool {
+		return partitions[i].ID() < partitions[j].ID()
+	})
 
 	c.replicas = replicas
 	c.partitions = partitions
