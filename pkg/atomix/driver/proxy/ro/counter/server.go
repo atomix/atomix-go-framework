@@ -17,7 +17,7 @@ package counter
 import (
 	"context"
 	counterapi "github.com/atomix/atomix-api/go/atomix/primitive/counter"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
 )
 
 // NewProxyServer creates a new read-only counter server

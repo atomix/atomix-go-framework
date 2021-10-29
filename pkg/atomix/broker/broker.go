@@ -16,9 +16,9 @@ package broker
 
 import (
 	brokerapi "github.com/atomix/atomix-api/go/atomix/management/broker"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/server"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/cluster"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/server"
 	"google.golang.org/grpc"
 )
 

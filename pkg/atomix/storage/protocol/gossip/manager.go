@@ -16,9 +16,9 @@ package gossip
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/util"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/cluster"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/util"
 	"google.golang.org/grpc/metadata"
 	"strconv"
 )

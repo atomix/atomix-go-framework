@@ -18,8 +18,8 @@ import (
 	"container/list"
 	lockapi "github.com/atomix/atomix-api/go/atomix/primitive/lock"
 	metaapi "github.com/atomix/atomix-api/go/atomix/primitive/meta"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/storage/protocol/rsm"
 )
 
 func init() {

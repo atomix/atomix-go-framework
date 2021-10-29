@@ -17,8 +17,8 @@ package gossip
 import (
 	"context"
 	"github.com/atomix/atomix-api/go/atomix/primitive/meta"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/cluster"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
 	"sync"
 )
 

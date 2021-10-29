@@ -17,9 +17,9 @@ package rsm
 import (
 	"context"
 	"fmt"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/util/retry"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/cluster"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/storage/protocol/rsm"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/util/retry"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/attributes"
 	"google.golang.org/grpc/codes"

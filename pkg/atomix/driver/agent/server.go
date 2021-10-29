@@ -17,7 +17,7 @@ package agent
 import (
 	"context"
 	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
 )
 
 func newServer(agent *Agent) *Server {

@@ -16,7 +16,7 @@ package gossip
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/time"
 )
 
 // ServiceType is a gossip service type name

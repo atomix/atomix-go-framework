@@ -16,10 +16,10 @@ package rsm
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/util"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/util/async"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/cluster"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/driver/env"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/util"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/util/async"
 )
 
 // NewClient creates a new proxy client

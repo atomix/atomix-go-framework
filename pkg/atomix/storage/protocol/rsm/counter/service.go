@@ -16,7 +16,7 @@ package counter
 
 import (
 	"github.com/atomix/atomix-api/go/atomix/primitive/counter"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
 )
 
 func init() {

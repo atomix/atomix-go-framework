@@ -17,10 +17,10 @@ package _map //nolint:golint
 import (
 	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
 	mapapi "github.com/atomix/atomix-api/go/atomix/primitive/map"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive"
-	mapdriver "github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive/map"
-	mapro "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/ro/map"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/driver/primitive"
+	mapdriver "github.com/atomix/atomix-go-sdk/pkg/atomix/driver/primitive/map"
+	mapro "github.com/atomix/atomix-go-sdk/pkg/atomix/driver/proxy/ro/map"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/driver/proxy/rsm"
 	"github.com/gogo/protobuf/jsonpb"
 	"google.golang.org/grpc"
 )

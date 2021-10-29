@@ -17,7 +17,7 @@ package election
 import (
 	electionapi "github.com/atomix/atomix-api/go/atomix/primitive/election"
 	"github.com/atomix/atomix-api/go/atomix/primitive/meta"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
 )
 
 func init() {

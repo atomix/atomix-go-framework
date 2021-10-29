@@ -16,7 +16,7 @@ package rsm
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/stream"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/stream"
 )
 
 // PartitionID is a partition identifier

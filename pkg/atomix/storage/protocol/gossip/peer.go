@@ -16,10 +16,10 @@ package gossip
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/cluster"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/meta"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/time"
 	"google.golang.org/grpc"
 	"io"
 )

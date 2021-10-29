@@ -17,10 +17,10 @@ package indexedmap
 import (
 	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
 	indexedmapapi "github.com/atomix/atomix-api/go/atomix/primitive/indexedmap"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive"
-	indexedmapdriver "github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive/indexedmap"
-	indexedmapro "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/ro/indexedmap"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/driver/primitive"
+	indexedmapdriver "github.com/atomix/atomix-go-sdk/pkg/atomix/driver/primitive/indexedmap"
+	indexedmapro "github.com/atomix/atomix-go-sdk/pkg/atomix/driver/proxy/ro/indexedmap"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/driver/proxy/rsm"
 	"github.com/gogo/protobuf/jsonpb"
 	"google.golang.org/grpc"
 )

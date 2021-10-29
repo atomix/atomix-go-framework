@@ -16,7 +16,7 @@ package codegen
 
 import (
 	"fmt"
-	"github.com/atomix/atomix-go-framework/codegen/meta"
+	"github.com/atomix/atomix-go-sdk/codegen/meta"
 	"github.com/iancoleman/strcase"
 	"path"
 	"path/filepath"

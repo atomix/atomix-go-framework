@@ -15,7 +15,7 @@
 package main
 
 import (
-	"github.com/atomix/atomix-go-framework/codegen"
+	"github.com/atomix/atomix-go-sdk/codegen"
 	"github.com/lyft/protoc-gen-star"
 	pgsgo "github.com/lyft/protoc-gen-star/lang/go"
 )

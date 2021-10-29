@@ -17,9 +17,9 @@ package gossip
 import (
 	"context"
 	metaapi "github.com/atomix/atomix-api/go/atomix/primitive/meta"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/meta"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/time"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"io"

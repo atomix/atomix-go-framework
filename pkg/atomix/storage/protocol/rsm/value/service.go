@@ -17,8 +17,8 @@ package value
 import (
 	metaapi "github.com/atomix/atomix-api/go/atomix/primitive/meta"
 	valueapi "github.com/atomix/atomix-api/go/atomix/primitive/value"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/meta"
 )
 
 func init() {

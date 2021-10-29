@@ -18,7 +18,7 @@ import (
 	"fmt"
 	operationext "github.com/atomix/atomix-api/go/atomix/primitive/extensions/operation"
 	partitionext "github.com/atomix/atomix-api/go/atomix/primitive/extensions/partition"
-	"github.com/atomix/atomix-go-framework/codegen/meta"
+	"github.com/atomix/atomix-go-sdk/codegen/meta"
 	"github.com/lyft/protoc-gen-star"
 	"github.com/lyft/protoc-gen-star/lang/go"
 )

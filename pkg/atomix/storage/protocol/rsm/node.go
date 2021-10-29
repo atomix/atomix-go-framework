@@ -16,11 +16,11 @@ package rsm
 
 import (
 	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/util"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/cluster"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/storage/protocol"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/util"
 	"google.golang.org/grpc"
 )
 

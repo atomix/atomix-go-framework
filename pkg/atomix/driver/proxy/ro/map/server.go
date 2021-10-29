@@ -17,7 +17,7 @@ package _map
 import (
 	"context"
 	mapapi "github.com/atomix/atomix-api/go/atomix/primitive/map"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
 )
 
 // NewProxyServer creates a new read-only map server

@@ -16,9 +16,9 @@ package rsm
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
-	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/storage/protocol/rsm"
+	streams "github.com/atomix/atomix-go-sdk/pkg/atomix/stream"
 )
 
 // newService creates a new Service for the given partition

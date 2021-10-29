@@ -17,7 +17,7 @@ package gossip
 import (
 	"context"
 	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/logging"
 	"google.golang.org/grpc"
 )
 

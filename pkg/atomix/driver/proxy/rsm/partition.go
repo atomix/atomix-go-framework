@@ -17,7 +17,7 @@ package rsm
 import (
 	"context"
 	"fmt"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/cluster"
 )
 
 // NewPartition creates a new proxy partition

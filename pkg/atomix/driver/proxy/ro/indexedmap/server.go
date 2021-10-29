@@ -17,7 +17,7 @@ package indexedmap
 import (
 	"context"
 	indexedmapapi "github.com/atomix/atomix-api/go/atomix/primitive/indexedmap"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
 )
 
 // NewProxyServer creates a new read-only indexedmap server

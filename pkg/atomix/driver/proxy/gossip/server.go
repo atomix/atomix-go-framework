@@ -17,8 +17,8 @@ package gossip
 import (
 	"github.com/atomix/atomix-api/go/atomix/primitive"
 	"github.com/atomix/atomix-api/go/atomix/primitive/meta"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/util"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/time"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/util"
 )
 
 func NewServer(client *Client, config GossipConfig) *Server {

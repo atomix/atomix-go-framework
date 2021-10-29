@@ -17,7 +17,7 @@ package value
 import (
 	"context"
 	valueapi "github.com/atomix/atomix-api/go/atomix/primitive/value"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
 )
 
 // NewProxyServer creates a new read-only value server

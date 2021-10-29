@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
 	"google.golang.org/grpc"
 	"sync"
 )

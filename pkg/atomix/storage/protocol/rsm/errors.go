@@ -15,7 +15,7 @@
 package rsm
 
 import (
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
 )
 
 // GetErrorFromStatus creates a typed error from a response status

@@ -17,10 +17,10 @@ package election
 import (
 	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
 	electionapi "github.com/atomix/atomix-api/go/atomix/primitive/election"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive"
-	electiondriver "github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive/election"
-	electionro "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/ro/election"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/driver/primitive"
+	electiondriver "github.com/atomix/atomix-go-sdk/pkg/atomix/driver/primitive/election"
+	electionro "github.com/atomix/atomix-go-sdk/pkg/atomix/driver/proxy/ro/election"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/driver/proxy/rsm"
 	"github.com/gogo/protobuf/jsonpb"
 	"google.golang.org/grpc"
 )

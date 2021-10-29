@@ -18,9 +18,9 @@ import (
 	"context"
 	mapapi "github.com/atomix/atomix-api/go/atomix/primitive/map"
 	metaapi "github.com/atomix/atomix-api/go/atomix/primitive/meta"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/time"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/meta"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/time"
 	"sync"
 )
 

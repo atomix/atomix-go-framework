@@ -16,8 +16,8 @@ package set
 
 import (
 	setapi "github.com/atomix/atomix-api/go/atomix/primitive/set"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/meta"
 )
 
 func init() {

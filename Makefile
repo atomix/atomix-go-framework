@@ -13,7 +13,7 @@ build:
 
 test: # @HELP run the unit tests and source code validation
 test: build license_check linters
-	go test github.com/atomix/atomix-go-framework/pkg/...
+	go test github.com/atomix/atomix-go-sdk/pkg/...
 
 protoc-gen-atomix: # @HELP build the source code
 protoc-gen-atomix:
@@ -26,8 +26,8 @@ codegen: protoc-gen-atomix
 primitives: codegen # @HELP compile the protobuf files (using protoc-go Docker)
 	docker run -it \
 		-v $(PARENT_DIR)/atomix-api:/go/src/github.com/atomix/atomix-api \
-		-v `pwd`:/go/src/github.com/atomix/atomix-go-framework \
-		-w /go/src/github.com/atomix/atomix-go-framework \
+		-v `pwd`:/go/src/github.com/atomix/atomix-go-sdk \
+		-w /go/src/github.com/atomix/atomix-go-sdk \
 		--entrypoint build/bin/generate-primitives.sh \
 		atomix/go-codegen:latest
 
@@ -44,7 +44,7 @@ license_check: # @HELP examine and ensure license headers exist
 protos:
 	docker run -it \
 		-v $(PARENT_DIR)/atomix-api:/go/src/github.com/atomix/atomix-api \
-	 	-v `pwd`:/go/src/github.com/atomix/atomix-go-framework \
-		-w /go/src/github.com/atomix/atomix-go-framework \
+	 	-v `pwd`:/go/src/github.com/atomix/atomix-go-sdk \
+		-w /go/src/github.com/atomix/atomix-go-sdk \
 		--entrypoint build/bin/compile_protos.sh \
 		onosproject/protoc-go:stable

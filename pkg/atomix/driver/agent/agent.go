@@ -16,8 +16,8 @@ package agent
 
 import (
 	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/driver/proxy"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/logging"
 	"google.golang.org/grpc"
 )
 

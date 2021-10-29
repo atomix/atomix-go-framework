@@ -17,10 +17,10 @@ package list
 import (
 	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
 	listapi "github.com/atomix/atomix-api/go/atomix/primitive/list"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive"
-	listdriver "github.com/atomix/atomix-go-framework/pkg/atomix/driver/primitive/list"
-	listro "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/ro/list"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/driver/primitive"
+	listdriver "github.com/atomix/atomix-go-sdk/pkg/atomix/driver/primitive/list"
+	listro "github.com/atomix/atomix-go-sdk/pkg/atomix/driver/proxy/ro/list"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/driver/proxy/rsm"
 	"github.com/gogo/protobuf/jsonpb"
 	"google.golang.org/grpc"
 )

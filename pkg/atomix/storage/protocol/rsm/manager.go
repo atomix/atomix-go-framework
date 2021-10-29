@@ -17,9 +17,9 @@ package rsm
 import (
 	"container/list"
 	"encoding/json"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/util"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
+	streams "github.com/atomix/atomix-go-sdk/pkg/atomix/stream"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/util"
 	"github.com/bits-and-blooms/bloom/v3"
 	"github.com/gogo/protobuf/proto"
 	"io"

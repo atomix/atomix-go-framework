@@ -1,4 +1,4 @@
-module github.com/atomix/atomix-go-framework
+module github.com/atomix/atomix-go-sdk
 
 go 1.13
 

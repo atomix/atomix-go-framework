@@ -14,7 +14,7 @@
 
 package driver
 
-import "github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
+import "github.com/atomix/atomix-go-sdk/pkg/atomix/driver/env"
 
 type driverOptions struct {
 	env.DriverEnv

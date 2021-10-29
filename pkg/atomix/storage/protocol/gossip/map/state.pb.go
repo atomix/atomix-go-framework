@@ -6,7 +6,7 @@ package _map
 import (
 	fmt "fmt"
 	meta "github.com/atomix/atomix-api/go/atomix/primitive/meta"
-	_ "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/gossip/primitive"
+	_ "github.com/atomix/atomix-go-sdk/pkg/atomix/storage/protocol/gossip/primitive"
 	_ "github.com/gogo/protobuf/gogoproto"
 	proto "github.com/gogo/protobuf/proto"
 	_ "github.com/gogo/protobuf/types"

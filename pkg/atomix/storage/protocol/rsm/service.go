@@ -16,7 +16,7 @@ package rsm
 
 import (
 	"bytes"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
 	"io"
 	"time"
 )

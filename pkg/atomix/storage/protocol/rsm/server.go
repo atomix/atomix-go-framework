@@ -16,8 +16,8 @@ package rsm
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	streams "github.com/atomix/atomix-go-framework/pkg/atomix/stream"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
+	streams "github.com/atomix/atomix-go-sdk/pkg/atomix/stream"
 	"github.com/gogo/protobuf/proto"
 	"time"
 )
