@@ -12,35 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package broker
+package main
 
-const (
-	defaultPort = 5678
+import (
+	"fmt"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/broker"
+	"github.com/atomix/atomix-go-sdk/pkg/atomix/logging"
+	"github.com/spf13/cobra"
+	"os"
 )
 
-type brokerOptions struct {
-	namespace string
-	name      string
-	node      string
-	port      int
-}
+func main() {
+	logging.SetLevel(logging.InfoLevel)
 
-func applyOptions(opts ...Option) brokerOptions {
-	options := brokerOptions{
-		port: defaultPort,
+	cmd := &cobra.Command{
+		Use: "atomix-broker",
 	}
-	for _, opt := range opts {
-		opt(&options)
+
+	if err := cmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
-	return options
-}
 
-// Option is a broker option
-type Option func(opts *brokerOptions)
+	// Create a new broker node
+	broker := broker.NewBroker(broker.WithPort(5678))
 
-// WithPort sets the broker port
-func WithPort(port int) Option {
-	return func(opts *brokerOptions) {
-		opts.port = port
+	// Start the node
+	if err := broker.Start(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 }

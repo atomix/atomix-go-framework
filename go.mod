@@ -12,6 +12,7 @@ require (
 	github.com/iancoleman/strcase v0.1.2
 	github.com/lyft/protoc-gen-star v0.5.2
 	github.com/mitchellh/go-homedir v1.1.0
+	github.com/spf13/cobra v0.0.5
 	github.com/spf13/viper v1.7.1
 	github.com/stretchr/testify v1.6.1
 	go.uber.org/zap v1.16.0
