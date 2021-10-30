@@ -16,10 +16,6 @@ package meta
 
 import (
 	"fmt"
-	"github.com/atomix/atomix-api/go/atomix/primitive/extensions/operation"
-	"github.com/atomix/atomix-api/go/atomix/primitive/extensions/partition"
-	"github.com/atomix/atomix-go-sdk/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-sdk/pkg/atomix/storage/protocol/gossip/primitive"
 	"github.com/golang/protobuf/proto"
 	"github.com/lyft/protoc-gen-star"
 	"github.com/lyft/protoc-gen-star/lang/go"
@@ -49,7 +45,7 @@ func (c *Context) GetFilePath(entity pgs.Entity, file string) string {
 	return filepath.Join(path, file)
 }
 
-// GetFilePath returns the output path for the given entity
+// GetTemplatePath returns the output path for the given entity
 func (c *Context) GetTemplatePath(file string) string {
 	return file
 }
@@ -78,58 +74,7 @@ func (c *Context) GetPackageMeta(entity pgs.Entity) PackageMeta {
 	}
 }
 
-func (c *Context) GetStateMeta(packages map[string]pgs.Package) (*StateMeta, error) {
-	stateType := c.ctx.Params().Str("state")
-	if stateType != "" {
-		msgType, ok := c.findMessage(stateType, packages)
-		if !ok {
-			return nil, errors.NewNotFound("could not find state message '%s'", stateType)
-		}
-		stateTypeMeta := c.GetMessageTypeMeta(msgType)
-		keyField, err := c.GetStateKeyFieldMeta(msgType)
-		if err != nil {
-			return nil, err
-		}
-		digestField, err := c.GetStateDigestFieldMeta(msgType)
-		if err != nil {
-			return nil, err
-		}
-		return &StateMeta{
-			IsDiscrete:   true,
-			IsContinuous: false,
-			Type:         stateTypeMeta,
-			Key:          keyField,
-			Digest:       digestField,
-		}, nil
-	}
-
-	entryType := c.ctx.Params().Str("entry")
-	if entryType != "" {
-		msgType, ok := c.findMessage(entryType, packages)
-		if !ok {
-			return nil, errors.NewNotFound("could not find entry message '%s'", entryType)
-		}
-		entryTypeMeta := c.GetMessageTypeMeta(msgType)
-		keyField, err := c.GetStateKeyFieldMeta(msgType)
-		if err != nil {
-			return nil, err
-		}
-		digestField, err := c.GetStateDigestFieldMeta(msgType)
-		if err != nil {
-			return nil, err
-		}
-		return &StateMeta{
-			IsDiscrete:   false,
-			IsContinuous: true,
-			Type:         entryTypeMeta,
-			Key:          keyField,
-			Digest:       digestField,
-		}, nil
-	}
-	return nil, nil
-}
-
-func (c *Context) findMessage(typeName string, packages map[string]pgs.Package) (pgs.Message, bool) {
+func (c *Context) FindMessageByName(typeName string, packages map[string]pgs.Package) (pgs.Message, bool) {
 	for _, pkg := range packages {
 		for _, file := range pkg.Files() {
 			for _, msg := range file.Messages() {
@@ -174,8 +119,8 @@ func (c *Context) ParseTypeString(t string) (TypeMeta, error) {
 	}, nil
 }
 
-// FindMessage finds a message from its type metadata
-func (c *Context) FindMessage(entity pgs.Entity, typeMeta TypeMeta) (pgs.Message, bool) {
+// FindMessageByType finds a message from its type metadata
+func (c *Context) FindMessageByType(entity pgs.Entity, typeMeta TypeMeta) (pgs.Message, bool) {
 	for _, message := range entity.File().Messages() {
 		messageTypeMeta := c.GetMessageTypeMeta(message)
 		if messageTypeMeta.Package.Path == typeMeta.Package.Path && messageTypeMeta.Name == typeMeta.Name {
@@ -505,90 +450,7 @@ func (c *Context) GetEnumValueTypeMeta(enumValue pgs.EnumValue) TypeMeta {
 	}
 }
 
-// GetHeadersFieldMeta extracts the metadata for the headers field in the given message
-func (c *Context) GetHeadersFieldMeta(message pgs.Message) (*FieldRefMeta, error) {
-	return c.findAnnotatedField(message, operation.E_Headers)
-}
-
-// GetStateKeyFieldMeta extracts the metadata for the state key field in the given message
-func (c *Context) GetStateKeyFieldMeta(message pgs.Message) (*FieldRefMeta, error) {
-	return c.findAnnotatedField(message, primitive.E_Key)
-}
-
-// GetStateDigestFieldMeta extracts the metadata for the state digest field in the given message
-func (c *Context) GetStateDigestFieldMeta(message pgs.Message) (*FieldRefMeta, error) {
-	return c.findAnnotatedField(message, primitive.E_Digest)
-}
-
-// GetPartitionKeyField extracts the metadata for the partitionkey field in the given message
-func (c *Context) GetPartitionKeyFieldMeta(message pgs.Message) (*FieldRefMeta, error) {
-	return c.findAnnotatedField(message, partition.E_Key)
-}
-
-// GetPartitionRangeField extracts the metadata for the partitionrange field in the given message
-func (c *Context) GetPartitionRangeFieldMeta(message pgs.Message) (*FieldRefMeta, error) {
-	return c.findAnnotatedField(message, partition.E_Range)
-}
-
-// GetAggregateFields extracts the metadata for aggregated fields in the given message
-func (c *Context) GetAggregateFields(message pgs.Message) ([]AggregatorMeta, error) {
-	return c.findAggregateFields(message)
-}
-
-func (c *Context) findAggregateFields(message pgs.Message) ([]AggregatorMeta, error) {
-	fields := make([]AggregatorMeta, 0)
-	for _, field := range message.Fields() {
-		var aggregate operation.AggregateStrategy
-		ok, err := field.Extension(operation.E_Aggregate, &aggregate)
-		if err != nil {
-			return nil, err
-		} else if ok {
-			fields = append(fields, AggregatorMeta{
-				FieldRefMeta: FieldRefMeta{
-					Field: FieldMeta{
-						Type: c.GetFieldTypeMeta(field),
-						Path: []PathMeta{
-							{
-								Name: c.GetFieldName(field),
-								Type: c.GetFieldTypeMeta(field),
-							},
-						},
-					},
-				},
-				IsChooseFirst: aggregate == operation.AggregateStrategy_CHOOSE_FIRST,
-				IsAppend:      aggregate == operation.AggregateStrategy_APPEND,
-				IsSum:         aggregate == operation.AggregateStrategy_SUM,
-			})
-		} else if field.Type().IsEmbed() {
-			children, err := c.findAggregateFields(field.Type().Embed())
-			if err != nil {
-				return nil, err
-			} else {
-				for _, child := range children {
-					fields = append(fields, AggregatorMeta{
-						FieldRefMeta: FieldRefMeta{
-							Field: FieldMeta{
-								Type: child.Field.Type,
-								Path: append([]PathMeta{
-									{
-										Name: c.GetFieldName(field),
-										Type: c.GetFieldTypeMeta(field),
-									},
-								}, child.Field.Path...),
-							},
-						},
-						IsChooseFirst: child.IsChooseFirst,
-						IsAppend:      child.IsAppend,
-						IsSum:         child.IsSum,
-					})
-				}
-			}
-		}
-	}
-	return fields, nil
-}
-
-func (c *Context) findAnnotatedField(message pgs.Message, extension *proto.ExtensionDesc) (*FieldRefMeta, error) {
+func (c *Context) FindAnnotatedField(message pgs.Message, extension *proto.ExtensionDesc) (*FieldRefMeta, error) {
 	for _, field := range message.Fields() {
 		var isAnnotatedField bool
 		ok, err := field.Extension(extension, &isAnnotatedField)
@@ -607,7 +469,7 @@ func (c *Context) findAnnotatedField(message pgs.Message, extension *proto.Exten
 				},
 			}, nil
 		} else if field.Type().IsEmbed() {
-			child, err := c.findAnnotatedField(field.Type().Embed(), extension)
+			child, err := c.FindAnnotatedField(field.Type().Embed(), extension)
 			if err != nil {
 				return nil, err
 			} else if child != nil {

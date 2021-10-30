@@ -20,7 +20,6 @@ type CodegenMeta struct {
 	Location  LocationMeta
 	Package   PackageMeta
 	Imports   []PackageMeta
-	Primitive PrimitiveMeta
 }
 
 // GeneratorMeta is the metadata for the code generator
@@ -40,6 +39,13 @@ type PackageMeta struct {
 	Path   string
 	Alias  string
 	Import bool
+}
+
+// ServiceMeta is the metadata for a service
+type ServiceMeta struct {
+	Type    ServiceTypeMeta
+	Comment string
+	Methods []MethodMeta
 }
 
 // TypeMeta is the metadata for a store type
@@ -68,29 +74,6 @@ type TypeMeta struct {
 	Values      []TypeMeta
 }
 
-// PrimitiveMeta is the metadata for a primitive
-type PrimitiveMeta struct {
-	ServiceMeta
-	Name  string
-	State *StateMeta
-}
-
-// ServiceMeta is the metadata for a service
-type ServiceMeta struct {
-	Type    ServiceTypeMeta
-	Comment string
-	Methods []MethodMeta
-}
-
-// StateMeta is metadata for a service state
-type StateMeta struct {
-	IsDiscrete   bool
-	IsContinuous bool
-	Type         TypeMeta
-	Key          *FieldRefMeta
-	Digest       *FieldRefMeta
-}
-
 // ServiceTypeMeta is metadata for a service type
 type ServiceTypeMeta struct {
 	Name    string
@@ -116,29 +99,10 @@ type PathMeta struct {
 
 // MethodMeta is the metadata for a primitive method
 type MethodMeta struct {
-	ID          uint32
-	Name        string
-	Type        MethodTypeMeta
-	Comment     string
-	Scope       MethodScopeMeta
-	Partitioner MethodPartitionerMeta
-	Request     RequestMeta
-	Response    ResponseMeta
-}
-
-// MethodScopeMeta is the metadata for a method scope
-type MethodScopeMeta struct {
-	IsPartition bool
-	IsGlobal    bool
-}
-
-// MethodPartitionerMeta is the metadata for partitioning requests
-type MethodPartitionerMeta struct {
-	IsName       bool
-	IsHash       bool
-	IsRange      bool
-	IsRandom     bool
-	IsRoundRobin bool
+	Name     string
+	Comment  string
+	Request  RequestMeta
+	Response ResponseMeta
 }
 
 // MessageMeta is the metadata for a message
@@ -149,34 +113,13 @@ type MessageMeta struct {
 // RequestMeta is the type metadata for a message
 type RequestMeta struct {
 	MessageMeta
-	Headers        FieldRefMeta
-	PartitionKey   *FieldRefMeta
-	PartitionRange *FieldRefMeta
-	IsUnary        bool
-	IsStream       bool
+	IsUnary  bool
+	IsStream bool
 }
 
 // ResponseMeta is the type metadata for a message
 type ResponseMeta struct {
 	MessageMeta
-	Headers    FieldRefMeta
-	Aggregates []AggregatorMeta
-	IsUnary    bool
-	IsStream   bool
-}
-
-// AggregatorMeta is the metadata for response aggregation
-type AggregatorMeta struct {
-	FieldRefMeta
-	IsChooseFirst bool
-	IsAppend      bool
-	IsSum         bool
-}
-
-// MethodTypeMeta is the metadata for a store method type
-type MethodTypeMeta struct {
-	IsCommand bool
-	IsQuery   bool
-	IsSync    bool
-	IsAsync   bool
+	IsUnary  bool
+	IsStream bool
 }

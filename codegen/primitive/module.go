@@ -12,13 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package codegen
+package primitive
 
 import (
 	"fmt"
 	operationext "github.com/atomix/atomix-api/go/atomix/primitive/extensions/operation"
 	partitionext "github.com/atomix/atomix-api/go/atomix/primitive/extensions/partition"
+	"github.com/atomix/atomix-api/go/atomix/primitive/extensions/primitive"
 	"github.com/atomix/atomix-go-sdk/codegen/meta"
+	primitivemeta "github.com/atomix/atomix-go-sdk/codegen/primitive/meta"
+	"github.com/atomix/atomix-go-sdk/codegen/template"
 	"github.com/lyft/protoc-gen-star"
 	"github.com/lyft/protoc-gen-star/lang/go"
 )
@@ -26,11 +29,10 @@ import (
 const moduleName = "atomix"
 
 // NewModule creates a new proto module
-func NewModule(plugin string, protocol string, templates map[string]string) pgs.Module {
+func NewModule(plugin string, templates map[string]string) pgs.Module {
 	return &Module{
 		ModuleBase: &pgs.ModuleBase{},
 		plugin:     plugin,
-		protocol:   protocol,
 		templates:  templates,
 	}
 }
@@ -38,9 +40,8 @@ func NewModule(plugin string, protocol string, templates map[string]string) pgs.
 // Module is the code generation module
 type Module struct {
 	*pgs.ModuleBase
-	ctx       *meta.Context
+	ctx       *primitivemeta.Context
 	plugin    string
-	protocol  string
 	templates map[string]string
 }
 
@@ -52,20 +53,16 @@ func (m *Module) Name() string {
 // InitContext initializes the module context
 func (m *Module) InitContext(c pgs.BuildContext) {
 	m.ModuleBase.InitContext(c)
-	m.ctx = meta.NewContext(pgsgo.InitContext(c.Parameters()))
+	m.ctx = primitivemeta.NewContext(pgsgo.InitContext(c.Parameters()))
 }
 
 func (m *Module) isPluginEnabled() bool {
 	return m.Parameters().Str("plugin") == m.plugin
 }
 
-func (m *Module) isProtocolEnabled() bool {
-	return m.Parameters().Str("protocol") == m.protocol
-}
-
 // Execute executes the code generator
 func (m *Module) Execute(targets map[string]pgs.File, packages map[string]pgs.Package) []pgs.Artifact {
-	if !m.isPluginEnabled() || !m.isProtocolEnabled() {
+	if !m.isPluginEnabled() {
 		return m.Artifacts()
 	}
 	for _, target := range targets {
@@ -84,12 +81,21 @@ func (m *Module) executeTarget(target pgs.File, packages map[string]pgs.Package)
 // executeService generates a store from a Protobuf service
 //nolint:gocyclo
 func (m *Module) executeService(service pgs.Service, packages map[string]pgs.Package) {
-	primitiveType, err := meta.GetPrimitiveType(service)
+	serviceType, err := primitivemeta.GetServiceType(service)
 	if err != nil {
 		return
 	}
 
-	partition, err := meta.GetPartitioned(service)
+	if serviceType != primitive.ServiceType_PRIMITIVE {
+		return
+	}
+
+	primitiveType, err := primitivemeta.GetPrimitiveType(service)
+	if err != nil {
+		return
+	}
+
+	partition, err := primitivemeta.GetPartitioned(service)
 	if err != nil {
 		panic(err)
 	}
@@ -116,52 +122,46 @@ func (m *Module) executeService(service pgs.Service, packages map[string]pgs.Pac
 	}
 
 	// Iterate through the methods on the service and construct method metadata for the template.
-	methods := make([]meta.MethodMeta, 0)
+	methods := make([]primitivemeta.MethodMeta, 0)
 	for _, method := range service.Methods() {
-		operationID, err := meta.GetOperationID(method)
+		operationID, err := primitivemeta.GetOperationID(method)
 		if err != nil {
 			panic(err)
 		}
 
 		// Get the operation type for the method.
-		operationType, err := meta.GetOperationType(method)
+		operationType, err := primitivemeta.GetOperationType(method)
 		if err != nil {
 			panic(err)
 		}
 
-		async, err := meta.GetAsync(method)
+		async, err := primitivemeta.GetAsync(method)
 		if err != nil {
 			panic(err)
 		}
 
-		methodTypeMeta := meta.MethodTypeMeta{
+		methodTypeMeta := primitivemeta.MethodTypeMeta{
 			IsCommand: operationType == operationext.OperationType_COMMAND,
 			IsQuery:   operationType == operationext.OperationType_QUERY,
 			IsSync:    !async,
 			IsAsync:   async,
 		}
 
-		requestHeaders, err := m.ctx.GetHeadersFieldMeta(method.Input())
-		if err != nil {
-			panic(err)
-		} else if requestHeaders == nil {
-			panic("no request headers found on method input " + method.Input().FullyQualifiedName())
-		}
-
-		requestMeta := meta.RequestMeta{
-			MessageMeta: meta.MessageMeta{
-				Type: m.ctx.GetMessageTypeMeta(method.Input()),
+		requestMeta := primitivemeta.RequestMeta{
+			RequestMeta: meta.RequestMeta{
+				MessageMeta: meta.MessageMeta{
+					Type: m.ctx.GetMessageTypeMeta(method.Input()),
+				},
+				IsUnary:  !method.ClientStreaming(),
+				IsStream: method.ClientStreaming(),
 			},
-			Headers:  *requestHeaders,
-			IsUnary:  !method.ClientStreaming(),
-			IsStream: method.ClientStreaming(),
 		}
 		addImport(&requestMeta.Type)
 
-		var methodScopeMeta meta.MethodScopeMeta
-		var methodPartitionerMeta meta.MethodPartitionerMeta
+		var methodScopeMeta primitivemeta.MethodScopeMeta
+		var methodPartitionerMeta primitivemeta.MethodPartitionerMeta
 
-		partitionStrategy, err := meta.GetPartitionStrategy(method)
+		partitionStrategy, err := primitivemeta.GetPartitionStrategy(method)
 		if err != nil {
 			panic(err)
 		}
@@ -170,7 +170,7 @@ func (m *Module) executeService(service pgs.Service, packages map[string]pgs.Pac
 			if partitionStrategy != nil {
 				switch *partitionStrategy {
 				case partitionext.PartitionStrategy_NONE:
-					methodScopeMeta = meta.MethodScopeMeta{
+					methodScopeMeta = primitivemeta.MethodScopeMeta{
 						IsGlobal: true,
 					}
 				case partitionext.PartitionStrategy_HASH:
@@ -182,10 +182,10 @@ func (m *Module) executeService(service pgs.Service, packages map[string]pgs.Pac
 					} else {
 						requestMeta.PartitionKey = partitionKey
 					}
-					methodScopeMeta = meta.MethodScopeMeta{
+					methodScopeMeta = primitivemeta.MethodScopeMeta{
 						IsPartition: true,
 					}
-					methodPartitionerMeta = meta.MethodPartitionerMeta{
+					methodPartitionerMeta = primitivemeta.MethodPartitionerMeta{
 						IsHash: true,
 					}
 				case partitionext.PartitionStrategy_RANGE:
@@ -197,29 +197,29 @@ func (m *Module) executeService(service pgs.Service, packages map[string]pgs.Pac
 					} else {
 						requestMeta.PartitionRange = partitionRange
 					}
-					methodScopeMeta = meta.MethodScopeMeta{
+					methodScopeMeta = primitivemeta.MethodScopeMeta{
 						IsPartition: true,
 					}
-					methodPartitionerMeta = meta.MethodPartitionerMeta{
+					methodPartitionerMeta = primitivemeta.MethodPartitionerMeta{
 						IsRange: true,
 					}
 				case partitionext.PartitionStrategy_RANDOM:
-					methodScopeMeta = meta.MethodScopeMeta{
+					methodScopeMeta = primitivemeta.MethodScopeMeta{
 						IsPartition: true,
 					}
-					methodPartitionerMeta = meta.MethodPartitionerMeta{
+					methodPartitionerMeta = primitivemeta.MethodPartitionerMeta{
 						IsRandom: true,
 					}
 				case partitionext.PartitionStrategy_ROUND_ROBIN:
-					methodScopeMeta = meta.MethodScopeMeta{
+					methodScopeMeta = primitivemeta.MethodScopeMeta{
 						IsPartition: true,
 					}
-					methodPartitionerMeta = meta.MethodPartitionerMeta{
+					methodPartitionerMeta = primitivemeta.MethodPartitionerMeta{
 						IsRoundRobin: true,
 					}
 				}
 			} else {
-				methodScopeMeta = meta.MethodScopeMeta{
+				methodScopeMeta = primitivemeta.MethodScopeMeta{
 					IsGlobal: true,
 				}
 			}
@@ -228,29 +228,23 @@ func (m *Module) executeService(service pgs.Service, packages map[string]pgs.Pac
 				panic(fmt.Errorf("method '%s' is annotated with 'atomix.primitive.partitionby`, but service '%s' is not annotated with 'atomix.primitive.partition'", method.Name().String(), service.Name().String()))
 			}
 
-			methodScopeMeta = meta.MethodScopeMeta{
+			methodScopeMeta = primitivemeta.MethodScopeMeta{
 				IsPartition: true,
 			}
-			methodPartitionerMeta = meta.MethodPartitionerMeta{
+			methodPartitionerMeta = primitivemeta.MethodPartitionerMeta{
 				IsName: true,
 			}
 		}
 
-		responseHeaders, err := m.ctx.GetHeadersFieldMeta(method.Output())
-		if err != nil {
-			panic(err)
-		} else if responseHeaders == nil {
-			panic("no request headers found on method input " + method.Output().FullyQualifiedName())
-		}
-
 		// Generate output metadata from the output type.
-		responseMeta := meta.ResponseMeta{
-			MessageMeta: meta.MessageMeta{
-				Type: m.ctx.GetMessageTypeMeta(method.Output()),
+		responseMeta := primitivemeta.ResponseMeta{
+			ResponseMeta: meta.ResponseMeta{
+				MessageMeta: meta.MessageMeta{
+					Type: m.ctx.GetMessageTypeMeta(method.Output()),
+				},
+				IsUnary:  !method.ServerStreaming(),
+				IsStream: method.ServerStreaming(),
 			},
-			Headers:  *responseHeaders,
-			IsUnary:  !method.ServerStreaming(),
-			IsStream: method.ServerStreaming(),
 		}
 		addImport(&responseMeta.Type)
 
@@ -260,10 +254,12 @@ func (m *Module) executeService(service pgs.Service, packages map[string]pgs.Pac
 		}
 		responseMeta.Aggregates = aggregates
 
-		methodMeta := meta.MethodMeta{
+		methodMeta := primitivemeta.MethodMeta{
+			MethodMeta: meta.MethodMeta{
+				Name:    method.Name().UpperCamelCase().String(),
+				Comment: method.SourceCodeInfo().LeadingComments(),
+			},
 			ID:          operationID,
-			Name:        method.Name().UpperCamelCase().String(),
-			Comment:     method.SourceCodeInfo().LeadingComments(),
 			Type:        methodTypeMeta,
 			Scope:       methodScopeMeta,
 			Partitioner: methodPartitionerMeta,
@@ -280,38 +276,34 @@ func (m *Module) executeService(service pgs.Service, packages map[string]pgs.Pac
 		imports = append(imports, importPkg)
 	}
 
-	stateMeta, err := m.ctx.GetStateMeta(packages)
-	if err != nil {
-		panic(err)
-	} else if stateMeta != nil {
-		addImport(&stateMeta.Type)
-	}
-
-	primitiveMeta := meta.PrimitiveMeta{
+	primitiveMeta := primitivemeta.PrimitiveMeta{
 		Name: primitiveType,
-		ServiceMeta: meta.ServiceMeta{
-			Type: meta.ServiceTypeMeta{
-				Name:    pgsgo.PGGUpperCamelCase(service.Name()).String(),
-				Package: m.ctx.GetPackageMeta(service),
+		ServiceMeta: primitivemeta.ServiceMeta{
+			ServiceMeta: meta.ServiceMeta{
+				Type: meta.ServiceTypeMeta{
+					Name:    pgsgo.PGGUpperCamelCase(service.Name()).String(),
+					Package: m.ctx.GetPackageMeta(service),
+				},
+				Comment: service.SourceCodeInfo().LeadingComments(),
 			},
-			Comment: service.SourceCodeInfo().LeadingComments(),
 			Methods: methods,
 		},
-		State: stateMeta,
 	}
 
 	// Generate the store metadata.
-	meta := meta.CodegenMeta{
-		Generator: meta.GeneratorMeta{
-			Prefix: m.BuildContext.Parameters().Str("prefix"),
+	meta := primitivemeta.CodegenMeta{
+		CodegenMeta: meta.CodegenMeta{
+			Generator: meta.GeneratorMeta{
+				Prefix: m.BuildContext.Parameters().Str("prefix"),
+			},
+			Location: meta.LocationMeta{},
+			Package:  m.ctx.GetPackageMeta(service),
+			Imports:  imports,
 		},
-		Location:  meta.LocationMeta{},
-		Package:   m.ctx.GetPackageMeta(service),
-		Imports:   imports,
 		Primitive: primitiveMeta,
 	}
 
-	for file, template := range m.templates {
-		m.OverwriteGeneratorTemplateFile(m.ctx.GetFilePath(service, file), NewTemplate(m.ctx.GetTemplatePath(template), importsSet), meta)
+	for f, t := range m.templates {
+		m.OverwriteGeneratorTemplateFile(m.ctx.GetFilePath(service, f), template.NewTemplate(m.ctx.GetTemplatePath(t), importsSet), meta)
 	}
 }
