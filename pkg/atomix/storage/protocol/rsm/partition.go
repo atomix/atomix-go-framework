@@ -20,7 +20,7 @@ import (
 )
 
 // PartitionID is a partition identifier
-type PartitionID int
+type PartitionID uint32
 
 // PartitionConfig is the partition configuration
 type PartitionConfig struct {
