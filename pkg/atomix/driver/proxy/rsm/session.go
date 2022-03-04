@@ -468,7 +468,13 @@ func (s *Session) keepAliveSessions(ctx context.Context, requestID rsm.RequestID
 
 	response, err := s.client.Command(ctx, request)
 	if err != nil {
-		return errors.From(err)
+		err = errors.From(err)
+		if errors.IsFault(err) {
+			log.Error("Detected potential data loss: ", err)
+			log.Infof("Exiting process...")
+			os.Exit(errors.Code(err))
+		}
+		return errors.NewInternal(err.Error())
 	}
 	s.lastIndex.Update(response.Response.Index)
 	return nil
