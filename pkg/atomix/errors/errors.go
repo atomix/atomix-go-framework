@@ -49,6 +49,8 @@ const (
 	Timeout
 	// Internal indicates an unexpected internal error occurred
 	Internal
+	// Fault indicates a data fault occurred
+	Fault
 )
 
 // TypedError is an typed error
@@ -100,6 +102,10 @@ func From(err error) error {
 		return NewUnauthorized(status.Message())
 	case codes.PermissionDenied:
 		return NewForbidden(status.Message())
+	// TODO: According to the gRPC docs, the Conflict error type should use the Abort code
+	// This change has to be done on a major release.
+	// The use of FailedPrecondition is preserved here for backward compatibility.
+	// See https://grpc.github.io/grpc/core/md_doc_statuscodes.html
 	case codes.FailedPrecondition:
 		return NewConflict(status.Message())
 	case codes.InvalidArgument:
@@ -112,6 +118,8 @@ func From(err error) error {
 		return NewTimeout(status.Message())
 	case codes.Internal:
 		return NewInternal(status.Message())
+	case codes.DataLoss:
+		return NewFault(status.Message())
 	default:
 		return err
 	}
@@ -141,6 +149,10 @@ func Proto(err error) error {
 		return status.Error(codes.Unauthenticated, typed.Message)
 	case Forbidden:
 		return status.Error(codes.PermissionDenied, typed.Message)
+	// TODO: According to the gRPC docs, the Conflict error type should use the Abort code
+	// This change has to be done on a major release.
+	// The use of FailedPrecondition is preserved here for backward compatibility.
+	// See https://grpc.github.io/grpc/core/md_doc_statuscodes.html
 	case Conflict:
 		return status.Error(codes.FailedPrecondition, typed.Message)
 	case Invalid:
@@ -153,6 +165,8 @@ func Proto(err error) error {
 		return status.Error(codes.DeadlineExceeded, typed.Message)
 	case Internal:
 		return status.Error(codes.Internal, typed.Message)
+	case Fault:
+		return status.Error(codes.DataLoss, typed.Message)
 	default:
 		return status.Error(codes.Internal, err.Error())
 	}
@@ -229,6 +243,16 @@ func NewInternal(msg string, args ...interface{}) error {
 	return New(Internal, msg, args...)
 }
 
+// NewFault returns a new Fault error
+func NewFault(msg string, args ...interface{}) error {
+	return New(Fault, msg, args...)
+}
+
+// Code returns the error code
+func Code(err error) int {
+	return int(TypeOf(err))
+}
+
 // TypeOf returns the type of the given error
 func TypeOf(err error) Type {
 	if typed, ok := err.(*TypedError); ok {
@@ -303,4 +327,9 @@ func IsTimeout(err error) bool {
 // IsInternal checks whether the given error is an Internal error
 func IsInternal(err error) bool {
 	return IsType(err, Internal)
+}
+
+// IsFault checks whether the given error is a Fault error
+func IsFault(err error) bool {
+	return IsType(err, Fault)
 }

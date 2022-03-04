@@ -283,7 +283,7 @@ func (m *primitiveServiceManager) command(request *CommandRequest, stream stream
 func (m *primitiveServiceManager) sessionCommand(request *SessionCommandRequest, stream streams.WriteStream) {
 	session, ok := m.sessions[request.SessionID]
 	if !ok {
-		stream.Error(errors.NewNotFound("session not found"))
+		stream.Error(errors.NewFault("session not found"))
 		stream.Close()
 		return
 	}
@@ -328,7 +328,7 @@ func (m *primitiveServiceManager) sessionCommand(request *SessionCommandRequest,
 func (m *primitiveServiceManager) serviceCommand(request *ServiceCommandRequest, session *primitiveSession, stream streams.WriteStream) {
 	service, ok := session.getService(request.ServiceID)
 	if !ok {
-		stream.Error(errors.NewNotFound("session not found"))
+		stream.Error(errors.NewFault("session not found"))
 		stream.Close()
 		return
 	}
@@ -371,7 +371,7 @@ func (m *primitiveServiceManager) closeService(request *CloseServiceRequest, ses
 	defer stream.Close()
 	service, ok := session.getService(request.ServiceID)
 	if !ok {
-		stream.Error(errors.NewNotFound("session not found"))
+		stream.Error(errors.NewFault("session not found"))
 		return
 	}
 	if err := service.close(); err != nil {
@@ -385,7 +385,7 @@ func (m *primitiveServiceManager) keepAlive(request *KeepAliveRequest, stream st
 	defer stream.Close()
 	session, ok := m.sessions[request.SessionID]
 	if !ok {
-		stream.Error(errors.NewNotFound("session not found"))
+		stream.Error(errors.NewFault("session not found"))
 		return
 	}
 
@@ -435,7 +435,7 @@ func (m *primitiveServiceManager) closeSession(request *CloseSessionRequest, str
 	defer stream.Close()
 	session, ok := m.sessions[request.SessionID]
 	if !ok {
-		stream.Error(errors.NewNotFound("session not found"))
+		stream.Error(errors.NewFault("session not found"))
 		return
 	}
 	if err := session.close(); err != nil {
@@ -483,7 +483,7 @@ func (m *primitiveServiceManager) indexQuery(request *QueryRequest, stream strea
 func (m *primitiveServiceManager) sessionQuery(request *SessionQueryRequest, stream streams.WriteStream) {
 	session, ok := m.sessions[request.SessionID]
 	if !ok {
-		stream.Error(errors.NewNotFound("session not found"))
+		stream.Error(errors.NewFault("session not found"))
 		stream.Close()
 		return
 	}
@@ -506,7 +506,7 @@ func (m *primitiveServiceManager) sessionQuery(request *SessionQueryRequest, str
 func (m *primitiveServiceManager) serviceQuery(request *ServiceQueryRequest, session *primitiveSession, stream streams.WriteStream) {
 	service, ok := session.getService(request.ServiceID)
 	if !ok {
-		stream.Error(errors.NewNotFound("session not found"))
+		stream.Error(errors.NewFault("session not found"))
 		stream.Close()
 		return
 	}

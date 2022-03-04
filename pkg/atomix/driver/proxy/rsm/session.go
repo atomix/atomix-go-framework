@@ -27,6 +27,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"io"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -147,9 +148,14 @@ func (s *Session) doCommand(ctx context.Context, serviceID rsm.ServiceID, operat
 		requestID: requestID,
 	}
 
-	response, err := s.client.Command(ctx, request, retry.WithRetryOn(codes.Unavailable, codes.Unknown))
+	response, err := s.client.Command(ctx, request, retry.WithRetryOn(codes.Unavailable))
 	if err != nil {
-		return nil, errors.From(err)
+		err = errors.From(err)
+		if errors.IsFault(err) {
+			log.Error("Detected potential data loss. Exiting...", err)
+			os.Exit(errors.Code(err))
+		}
+		return nil, err
 	}
 
 	s.lastIndex.Update(response.Response.Index)
@@ -195,9 +201,14 @@ func (s *Session) doCommandStream(ctx context.Context, serviceID rsm.ServiceID, 
 		requestID: requestID,
 	}
 
-	responseStream, err := s.client.CommandStream(ctx, request, retry.WithRetryOn(codes.Unavailable, codes.Unknown))
+	responseStream, err := s.client.CommandStream(ctx, request, retry.WithRetryOn(codes.Unavailable))
 	if err != nil {
-		return errors.From(err)
+		err = errors.From(err)
+		if errors.IsFault(err) {
+			log.Error("Detected potential data loss. Exiting...", err)
+			os.Exit(errors.Code(err))
+		}
+		return err
 	}
 
 	go func() {
@@ -208,8 +219,14 @@ func (s *Session) doCommandStream(ctx context.Context, serviceID rsm.ServiceID, 
 			if err == io.EOF {
 				break
 			} else if err != nil {
-				stream.Error(errors.From(err))
-				break
+				err = errors.From(err)
+				if errors.IsFault(err) {
+					log.Error("Detected potential data loss. Exiting...", err)
+					os.Exit(errors.Code(err))
+				} else {
+					stream.Error(err)
+					break
+				}
 			}
 
 			s.lastIndex.Update(response.Response.Index)
@@ -258,9 +275,14 @@ func (s *Session) doQuery(ctx context.Context, serviceID rsm.ServiceID, operatio
 		},
 	}
 
-	response, err := s.client.Query(ctx, request, retry.WithRetryOn(codes.Unavailable, codes.Unknown))
+	response, err := s.client.Query(ctx, request, retry.WithRetryOn(codes.Unavailable))
 	if err != nil {
-		return nil, errors.From(err)
+		err = errors.From(err)
+		if errors.IsFault(err) {
+			log.Error("Detected potential data loss. Exiting...", err)
+			os.Exit(errors.Code(err))
+		}
+		return nil, err
 	}
 
 	result := response.Response.GetSessionQuery().GetServiceQuery().Operation
@@ -294,9 +316,14 @@ func (s *Session) doQueryStream(ctx context.Context, serviceID rsm.ServiceID, op
 		},
 	}
 
-	responseStream, err := s.client.QueryStream(ctx, request, retry.WithRetryOn(codes.Unavailable, codes.Unknown))
+	responseStream, err := s.client.QueryStream(ctx, request, retry.WithRetryOn(codes.Unavailable))
 	if err != nil {
-		return errors.From(err)
+		err = errors.From(err)
+		if errors.IsFault(err) {
+			log.Error("Detected potential data loss. Exiting...", err)
+			os.Exit(errors.Code(err))
+		}
+		return err
 	}
 
 	go func() {
@@ -306,8 +333,14 @@ func (s *Session) doQueryStream(ctx context.Context, serviceID rsm.ServiceID, op
 			if err == io.EOF {
 				break
 			} else if err != nil {
-				stream.Error(errors.From(err))
-				break
+				err = errors.From(err)
+				if errors.IsFault(err) {
+					log.Error("Detected potential data loss. Exiting...", err)
+					os.Exit(errors.Code(err))
+				} else {
+					stream.Error(err)
+					break
+				}
 			}
 
 			result := response.Response.GetSessionQuery().GetServiceQuery().Operation
@@ -327,8 +360,8 @@ func (s *Session) open(ctx context.Context) error {
 		cluster.WithDialOption(grpc.WithInsecure()),
 		cluster.WithDialOption(grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"rsm"}`)),
 		cluster.WithDialOption(grpc.WithResolvers(newResolver(s.partition))),
-		cluster.WithDialOption(grpc.WithUnaryInterceptor(retry.RetryingUnaryClientInterceptor(retry.WithRetryOn(codes.Unavailable, codes.Unknown)))),
-		cluster.WithDialOption(grpc.WithStreamInterceptor(retry.RetryingStreamClientInterceptor(retry.WithRetryOn(codes.Unavailable, codes.Unknown)))))
+		cluster.WithDialOption(grpc.WithUnaryInterceptor(retry.RetryingUnaryClientInterceptor(retry.WithRetryOn(codes.Unavailable)))),
+		cluster.WithDialOption(grpc.WithStreamInterceptor(retry.RetryingStreamClientInterceptor(retry.WithRetryOn(codes.Unavailable)))))
 	if err != nil {
 		return err
 	}
