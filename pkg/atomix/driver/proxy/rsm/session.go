@@ -34,6 +34,9 @@ import (
 
 const chanBufSize = 1000
 
+// The false positive rate for request/response filters
+const fpRate float64 = 0.05
+
 // SessionOption implements a session option
 type SessionOption interface {
 	prepare(options *sessionOptions)
@@ -382,25 +385,30 @@ func (s *Session) open(ctx context.Context) error {
 					delete(requests, requestEvent.requestID)
 				}
 			case <-ticker.C:
-				requestFilter := bloom.NewWithEstimates(uint(len(requests)*2), 0.05)
+				requestFilter := bloom.NewWithEstimates(uint(len(requests)), fpRate)
+				responseFilter := bloom.NewWithEstimates(uint(len(requests)), fpRate)
 				for requestID, stream := range requests {
 					requestBytes := make([]byte, 8)
 					binary.BigEndian.PutUint64(requestBytes, uint64(requestID))
+					requestFilter.Add(requestBytes)
 					responseBytes := make([]byte, 8)
 					binary.BigEndian.PutUint64(responseBytes, uint64(stream.nextResponseID))
-					allBytes := append(requestBytes, responseBytes...)
-					requestFilter.Add(requestBytes)
-					requestFilter.Add(allBytes)
+					responseFilter.Add(responseBytes)
 				}
-				go s.keepAliveSessions(context.Background(), requestID, requestFilter)
+				go s.keepAliveSessions(context.Background(), requestID, requestFilter, responseFilter)
 			}
 		}
 	}()
 	return nil
 }
 
-func (s *Session) keepAliveSessions(ctx context.Context, requestID rsm.RequestID, requestFilter *bloom.BloomFilter) error {
+func (s *Session) keepAliveSessions(ctx context.Context, requestID rsm.RequestID, requestFilter *bloom.BloomFilter, responseFilter *bloom.BloomFilter) error {
 	requestFilterBytes, err := json.Marshal(requestFilter)
+	if err != nil {
+		return err
+	}
+
+	responseFilterBytes, err := json.Marshal(responseFilter)
 	if err != nil {
 		return err
 	}
@@ -410,9 +418,10 @@ func (s *Session) keepAliveSessions(ctx context.Context, requestID rsm.RequestID
 		Request: rsm.CommandRequest{
 			Request: &rsm.CommandRequest_KeepAlive{
 				KeepAlive: &rsm.KeepAliveRequest{
-					SessionID:     s.sessionID,
-					LastRequestID: requestID,
-					RequestFilter: requestFilterBytes,
+					SessionID:      s.sessionID,
+					LastRequestID:  requestID,
+					RequestFilter:  requestFilterBytes,
+					ResponseFilter: responseFilterBytes,
 				},
 			},
 		},
