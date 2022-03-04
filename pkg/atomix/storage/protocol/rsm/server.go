@@ -67,8 +67,9 @@ func (s *Server) Query(ctx context.Context, request *PartitionQueryRequest) (*Pa
 
 	bytes, err := proto.Marshal(&request.Request)
 	if err != nil {
+		err = errors.NewInvalid("could not marshal request", err)
 		log.Debugf("PartitionQueryRequest %+v failed: %s", request, err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	resultCh := make(chan streams.Result, 1)
@@ -92,24 +93,25 @@ func (s *Server) Query(ctx context.Context, request *PartitionQueryRequest) (*Pa
 		if !ok {
 			err = errors.NewCanceled("stream closed")
 			log.Debugf("PartitionQueryRequest %+v failed: %s", request, err)
-			return nil, err
+			return nil, errors.Proto(err)
 		}
 
 		if result.Failed() {
 			log.Warnf("PartitionQueryRequest %+v failed: %v", request, result.Error)
-			return nil, result.Error
+			return nil, errors.Proto(result.Error)
 		}
 
 		response := &PartitionQueryResponse{}
 		if err := proto.Unmarshal(result.Value.([]byte), &response.Response); err != nil {
+			err = errors.NewInvalid("could not unmarshal response", err)
 			log.Warnf("PartitionCommandResponse %+v failed: %v", request, err)
-			return nil, err
+			return nil, errors.Proto(err)
 		}
 		log.Debugf("Sending PartitionQueryResponse %+v", response)
 		return response, nil
 	case err := <-errCh:
 		log.Debugf("PartitionQueryRequest %+v failed: %s", request, err)
-		return nil, err
+		return nil, errors.Proto(err)
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
@@ -122,8 +124,9 @@ func (s *Server) QueryStream(request *PartitionQueryRequest, srv PartitionServic
 
 	bytes, err := proto.Marshal(&request.Request)
 	if err != nil {
+		err = errors.NewInvalid("could not marshal request", err)
 		log.Debugf("PartitionQueryRequest %+v failed: %s", request, err)
-		return err
+		return errors.Proto(err)
 	}
 
 	resultCh := make(chan streams.Result)
@@ -163,13 +166,14 @@ func (s *Server) QueryStream(request *PartitionQueryRequest, srv PartitionServic
 
 			if result.Failed() {
 				log.Warnf("PartitionQueryRequest %+v failed: %v", request, result.Error)
-				return result.Error
+				return errors.Proto(result.Error)
 			}
 
 			response := &PartitionQueryResponse{}
 			if err := proto.Unmarshal(result.Value.([]byte), &response.Response); err != nil {
+				err = errors.NewInvalid("could not unmarshal response", err)
 				log.Warnf("PartitionCommandResponse %+v failed: %v", request, err)
-				return err
+				return errors.Proto(err)
 			}
 
 			log.Debugf("Sending PartitionQueryResponse %+v", response)
@@ -179,7 +183,7 @@ func (s *Server) QueryStream(request *PartitionQueryRequest, srv PartitionServic
 			}
 		case err := <-errCh:
 			log.Warnf("PartitionQueryRequest %+v failed: %v", request, err)
-			return err
+			return errors.Proto(err)
 		case <-srv.Context().Done():
 			err := srv.Context().Err()
 			log.Debugf("Finished PartitionQueryRequest %+v: %v", request, err)
@@ -194,7 +198,9 @@ func (s *Server) Command(ctx context.Context, request *PartitionCommandRequest) 
 	// If the client requires a leader and is not the leader, return an error
 	partition := s.Protocol.Partition(request.PartitionID)
 	if partition.MustLeader() && !partition.IsLeader() {
-		return nil, errors.Proto(errors.NewUnavailable("not the leader"))
+		err := errors.NewUnavailable("not the leader")
+		log.Debugf("PartitionCommandRequest %+v failed: %s", request, err)
+		return nil, errors.Proto(err)
 	}
 
 	if request.Request.Timestamp == nil {
@@ -204,8 +210,9 @@ func (s *Server) Command(ctx context.Context, request *PartitionCommandRequest) 
 
 	bytes, err := proto.Marshal(&request.Request)
 	if err != nil {
+		err = errors.NewInvalid("could not marshal request", err)
 		log.Debugf("PartitionCommandRequest %+v failed: %s", request, err)
-		return nil, err
+		return nil, errors.Proto(err)
 	}
 
 	resultCh := make(chan streams.Result, 1)
@@ -222,24 +229,25 @@ func (s *Server) Command(ctx context.Context, request *PartitionCommandRequest) 
 		if !ok {
 			err = errors.NewCanceled("stream closed")
 			log.Debugf("PartitionCommandRequest %+v failed: %s", request, err)
-			return nil, err
+			return nil, errors.Proto(err)
 		}
 
 		if result.Failed() {
 			log.Warnf("PartitionCommandRequest %+v failed: %v", request, result.Error)
-			return nil, result.Error
+			return nil, errors.Proto(result.Error)
 		}
 
 		response := &PartitionCommandResponse{}
 		if err := proto.Unmarshal(result.Value.([]byte), &response.Response); err != nil {
+			err = errors.NewInvalid("could not unmarshal response", err)
 			log.Warnf("PartitionCommandResponse %+v failed: %v", request, err)
-			return nil, err
+			return nil, errors.Proto(err)
 		}
 		log.Debugf("Sending PartitionCommandResponse %+v", response)
 		return response, nil
 	case err := <-errCh:
 		log.Debugf("PartitionCommandRequest %+v failed: %s", request, err)
-		return nil, err
+		return nil, errors.Proto(err)
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
@@ -251,7 +259,9 @@ func (s *Server) CommandStream(request *PartitionCommandRequest, srv PartitionSe
 	// If the client requires a leader and is not the leader, return an error
 	partition := s.Protocol.Partition(request.PartitionID)
 	if partition.MustLeader() && !partition.IsLeader() {
-		return errors.Proto(errors.NewUnavailable("not the leader"))
+		err := errors.NewUnavailable("not the leader")
+		log.Debugf("PartitionCommandRequest %+v failed: %s", request, err)
+		return errors.Proto(err)
 	}
 
 	if request.Request.Timestamp == nil {
@@ -261,8 +271,9 @@ func (s *Server) CommandStream(request *PartitionCommandRequest, srv PartitionSe
 
 	bytes, err := proto.Marshal(&request.Request)
 	if err != nil {
+		err = errors.NewInvalid("could not marshal request", err)
 		log.Debugf("PartitionCommandRequest %+v failed: %s", request, err)
-		return err
+		return errors.Proto(err)
 	}
 
 	resultCh := make(chan streams.Result)
@@ -295,13 +306,14 @@ func (s *Server) CommandStream(request *PartitionCommandRequest, srv PartitionSe
 
 			if result.Failed() {
 				log.Warnf("PartitionCommandRequest %+v failed: %v", request, result.Error)
-				return result.Error
+				return errors.Proto(result.Error)
 			}
 
 			response := &PartitionCommandResponse{}
 			if err := proto.Unmarshal(result.Value.([]byte), &response.Response); err != nil {
+				err = errors.NewInvalid("could not unmarshal response", err)
 				log.Warnf("PartitionCommandResponse %+v failed: %v", request, err)
-				return err
+				return errors.Proto(err)
 			}
 			log.Debugf("Sending PartitionCommandResponse %+v", response)
 			if err := srv.Send(response); err != nil {
@@ -310,7 +322,7 @@ func (s *Server) CommandStream(request *PartitionCommandRequest, srv PartitionSe
 			}
 		case err := <-errCh:
 			log.Warnf("PartitionCommandRequest %+v failed: %v", request, err)
-			return err
+			return errors.Proto(err)
 		case <-srv.Context().Done():
 			err := srv.Context().Err()
 			log.Debugf("Finished PartitionCommandRequest %+v: %v", request, err)
