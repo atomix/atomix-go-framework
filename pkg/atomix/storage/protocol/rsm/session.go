@@ -141,10 +141,10 @@ func (s *primitiveSession) restore(snapshot *SessionSnapshot) error {
 	return nil
 }
 
-func (s *primitiveSession) keepAlive(lastRequestID RequestID, requestFilter *bloom.BloomFilter) error {
+func (s *primitiveSession) keepAlive(lastRequestID RequestID, requestFilter *bloom.BloomFilter, responseFilter *bloom.BloomFilter) error {
 	log.Debugf("Keep-alive session %d", s.sessionID)
 	for _, serviceSession := range s.services {
-		if err := serviceSession.keepAlive(lastRequestID, requestFilter); err != nil {
+		if err := serviceSession.keepAlive(lastRequestID, requestFilter, responseFilter); err != nil {
 			return err
 		}
 	}
@@ -267,10 +267,10 @@ func (s *primitiveServiceSession) restore(snapshot *ServiceSessionSnapshot) erro
 	return nil
 }
 
-func (s *primitiveServiceSession) keepAlive(lastRequestID RequestID, requestFilter *bloom.BloomFilter) error {
+func (s *primitiveServiceSession) keepAlive(lastRequestID RequestID, requestFilter *bloom.BloomFilter, responseFilter *bloom.BloomFilter) error {
 	log.Debugf("Keep-alive session %d service %d", s.session.sessionID, s.service.serviceID)
 	for _, command := range s.commands.commands {
-		if err := command.keepAlive(lastRequestID, requestFilter); err != nil {
+		if err := command.keepAlive(lastRequestID, requestFilter, responseFilter); err != nil {
 			return err
 		}
 	}
@@ -455,7 +455,7 @@ func (c *primitiveServiceSessionCommand) restore(snapshot *SessionCommandSnapsho
 	return nil
 }
 
-func (c *primitiveServiceSessionCommand) keepAlive(lastRequestID RequestID, filter *bloom.BloomFilter) error {
+func (c *primitiveServiceSessionCommand) keepAlive(lastRequestID RequestID, requestFilter *bloom.BloomFilter, responseFilter *bloom.BloomFilter) error {
 	if lastRequestID < c.request.RequestID {
 		return nil
 	}
@@ -464,7 +464,7 @@ func (c *primitiveServiceSessionCommand) keepAlive(lastRequestID RequestID, filt
 	// Close the canceled request and remove it from the session.
 	requestBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(requestBytes, uint64(c.request.RequestID))
-	if !filter.Test(requestBytes) {
+	if !requestFilter.Test(requestBytes) {
 		switch c.state {
 		case CommandRunning:
 			log.Debugf("Cancel command %d (session=%d, service=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
@@ -482,10 +482,9 @@ func (c *primitiveServiceSessionCommand) keepAlive(lastRequestID RequestID, filt
 	for elem != nil {
 		next := elem.Next()
 		response := elem.Value.(*ServiceCommandResponse)
-		bytes := make([]byte, 8)
-		binary.BigEndian.PutUint64(bytes, uint64(response.ResponseID))
-		responseBytes := append(requestBytes, bytes...)
-		if !filter.Test(responseBytes) {
+		responseBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(responseBytes, uint64(response.ResponseID))
+		if !responseFilter.Test(responseBytes) {
 			c.responses.Remove(elem)
 		} else {
 			log.Debugf("Keep-alive command %d (session=%d, service=%d, request=%d, response=%d)", c.commandID, c.session.service.serviceID, c.session.session.sessionID, c.request.RequestID, response.ResponseID)

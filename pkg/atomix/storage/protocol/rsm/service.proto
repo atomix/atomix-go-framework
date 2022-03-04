@@ -115,6 +115,7 @@ message KeepAliveRequest {
     uint64 session_id = 1 [(gogoproto.customname) = "SessionID", (gogoproto.casttype) = "SessionID"];
     uint64 last_request_id = 2 [(gogoproto.customname) = "LastRequestID", (gogoproto.casttype) = "RequestID"];
     bytes request_filter = 3;
+    bytes response_filter = 4;
 }
 
 message KeepAliveResponse {
