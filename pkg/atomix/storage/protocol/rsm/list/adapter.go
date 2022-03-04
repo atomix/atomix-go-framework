@@ -62,7 +62,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 		log.Debugf("Proposal AppendProposal %s", p)
 		response, err := s.rsm.Append(p)
 		if err != nil {
-			log.Warnf("Proposal AppendProposal %s failed: %v", p, err)
+			log.Debugf("Proposal AppendProposal %s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -88,7 +88,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 		log.Debugf("Proposal InsertProposal %s", p)
 		response, err := s.rsm.Insert(p)
 		if err != nil {
-			log.Warnf("Proposal InsertProposal %s failed: %v", p, err)
+			log.Debugf("Proposal InsertProposal %s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -114,7 +114,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 		log.Debugf("Proposal SetProposal %s", p)
 		response, err := s.rsm.Set(p)
 		if err != nil {
-			log.Warnf("Proposal SetProposal %s failed: %v", p, err)
+			log.Debugf("Proposal SetProposal %s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -140,7 +140,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 		log.Debugf("Proposal RemoveProposal %s", p)
 		response, err := s.rsm.Remove(p)
 		if err != nil {
-			log.Warnf("Proposal RemoveProposal %s failed: %v", p, err)
+			log.Debugf("Proposal RemoveProposal %s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -166,7 +166,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 		log.Debugf("Proposal ClearProposal %s", p)
 		response, err := s.rsm.Clear(p)
 		if err != nil {
-			log.Warnf("Proposal ClearProposal %s failed: %v", p, err)
+			log.Debugf("Proposal ClearProposal %s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -193,7 +193,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 		s.rsm.Events(p)
 	default:
 		err := errors.NewNotSupported("unknown operation %d", command.OperationID())
-		log.Warn(err)
+		log.Debug(err)
 		command.Output(nil, err)
 	}
 }
@@ -212,7 +212,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 		log.Debugf("Querying SizeQuery %s", q)
 		response, err := s.rsm.Size(q)
 		if err != nil {
-			log.Warnf("Querying SizeQuery %s failed: %v", q, err)
+			log.Debugf("Querying SizeQuery %s failed: %v", q, err)
 			query.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -238,7 +238,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 		log.Debugf("Querying GetQuery %s", q)
 		response, err := s.rsm.Get(q)
 		if err != nil {
-			log.Warnf("Querying GetQuery %s failed: %v", q, err)
+			log.Debugf("Querying GetQuery %s failed: %v", q, err)
 			query.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -265,7 +265,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 		s.rsm.Elements(q)
 	default:
 		err := errors.NewNotSupported("unknown operation %d", query.OperationID())
-		log.Warn(err)
+		log.Debug(err)
 		query.Output(nil, err)
 	}
 }

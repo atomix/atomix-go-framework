@@ -67,7 +67,7 @@ func (s *ProxyServer) Size(ctx context.Context, request *list.SizeRequest) (*lis
 	}
 	output, err := service.DoQuery(ctx, sizeOp, input, s.readSync)
 	if err != nil {
-		log.Warnf("Request SizeRequest failed: %v", err)
+		log.Debugf("Request SizeRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -106,7 +106,7 @@ func (s *ProxyServer) Append(ctx context.Context, request *list.AppendRequest) (
 	}
 	output, err := service.DoCommand(ctx, appendOp, input)
 	if err != nil {
-		log.Warnf("Request AppendRequest failed: %v", err)
+		log.Debugf("Request AppendRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -145,7 +145,7 @@ func (s *ProxyServer) Insert(ctx context.Context, request *list.InsertRequest) (
 	}
 	output, err := service.DoCommand(ctx, insertOp, input)
 	if err != nil {
-		log.Warnf("Request InsertRequest failed: %v", err)
+		log.Debugf("Request InsertRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -184,7 +184,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *list.GetRequest) (*list.
 	}
 	output, err := service.DoQuery(ctx, getOp, input, s.readSync)
 	if err != nil {
-		log.Warnf("Request GetRequest failed: %v", err)
+		log.Debugf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -223,7 +223,7 @@ func (s *ProxyServer) Set(ctx context.Context, request *list.SetRequest) (*list.
 	}
 	output, err := service.DoCommand(ctx, setOp, input)
 	if err != nil {
-		log.Warnf("Request SetRequest failed: %v", err)
+		log.Debugf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -262,7 +262,7 @@ func (s *ProxyServer) Remove(ctx context.Context, request *list.RemoveRequest) (
 	}
 	output, err := service.DoCommand(ctx, removeOp, input)
 	if err != nil {
-		log.Warnf("Request RemoveRequest failed: %v", err)
+		log.Debugf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -301,7 +301,7 @@ func (s *ProxyServer) Clear(ctx context.Context, request *list.ClearRequest) (*l
 	}
 	output, err := service.DoCommand(ctx, clearOp, input)
 	if err != nil {
-		log.Warnf("Request ClearRequest failed: %v", err)
+		log.Debugf("Request ClearRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -341,7 +341,7 @@ func (s *ProxyServer) Events(request *list.EventsRequest, srv list.ListService_E
 	stream := streams.NewBufferedStream()
 	err = service.DoCommandStream(srv.Context(), eventsOp, input, stream)
 	if err != nil {
-		log.Warnf("Request EventsRequest failed: %v", err)
+		log.Debugf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
@@ -362,7 +362,7 @@ func (s *ProxyServer) Events(request *list.EventsRequest, srv list.ListService_E
 			if result.Error == context.Canceled {
 				break
 			}
-			log.Warnf("Request EventsRequest failed: %v", result.Error)
+			log.Debugf("Request EventsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 
@@ -409,7 +409,7 @@ func (s *ProxyServer) Elements(request *list.ElementsRequest, srv list.ListServi
 	stream := streams.NewBufferedStream()
 	err = service.DoQueryStream(srv.Context(), elementsOp, input, stream, s.readSync)
 	if err != nil {
-		log.Warnf("Request ElementsRequest failed: %v", err)
+		log.Debugf("Request ElementsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
@@ -430,7 +430,7 @@ func (s *ProxyServer) Elements(request *list.ElementsRequest, srv list.ListServi
 			if result.Error == context.Canceled {
 				break
 			}
-			log.Warnf("Request ElementsRequest failed: %v", result.Error)
+			log.Debugf("Request ElementsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 

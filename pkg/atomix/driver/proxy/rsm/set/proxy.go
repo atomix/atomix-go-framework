@@ -65,7 +65,7 @@ func (s *ProxyServer) Size(ctx context.Context, request *set.SizeRequest) (*set.
 		return service.DoQuery(ctx, sizeOp, input, s.readSync)
 	})
 	if err != nil {
-		log.Warnf("Request SizeRequest failed: %v", err)
+		log.Debugf("Request SizeRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 	responses := make([]set.SizeResponse, 0, len(outputs))
@@ -109,7 +109,7 @@ func (s *ProxyServer) Contains(ctx context.Context, request *set.ContainsRequest
 	}
 	output, err := service.DoQuery(ctx, containsOp, input, s.readSync)
 	if err != nil {
-		log.Warnf("Request ContainsRequest failed: %v", err)
+		log.Debugf("Request ContainsRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -145,7 +145,7 @@ func (s *ProxyServer) Add(ctx context.Context, request *set.AddRequest) (*set.Ad
 	}
 	output, err := service.DoCommand(ctx, addOp, input)
 	if err != nil {
-		log.Warnf("Request AddRequest failed: %v", err)
+		log.Debugf("Request AddRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -181,7 +181,7 @@ func (s *ProxyServer) Remove(ctx context.Context, request *set.RemoveRequest) (*
 	}
 	output, err := service.DoCommand(ctx, removeOp, input)
 	if err != nil {
-		log.Warnf("Request RemoveRequest failed: %v", err)
+		log.Debugf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -218,7 +218,7 @@ func (s *ProxyServer) Clear(ctx context.Context, request *set.ClearRequest) (*se
 		return err
 	})
 	if err != nil {
-		log.Warnf("Request ClearRequest failed: %v", err)
+		log.Debugf("Request ClearRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -267,7 +267,7 @@ func (s *ProxyServer) Events(request *set.EventsRequest, srv set.SetService_Even
 		return nil
 	})
 	if err != nil {
-		log.Warnf("Request EventsRequest failed: %v", err)
+		log.Debugf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
@@ -281,7 +281,7 @@ func (s *ProxyServer) Events(request *set.EventsRequest, srv set.SetService_Even
 			if result.Error == context.Canceled {
 				break
 			}
-			log.Warnf("Request EventsRequest failed: %v", result.Error)
+			log.Debugf("Request EventsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 
@@ -342,7 +342,7 @@ func (s *ProxyServer) Elements(request *set.ElementsRequest, srv set.SetService_
 		return nil
 	})
 	if err != nil {
-		log.Warnf("Request ElementsRequest failed: %v", err)
+		log.Debugf("Request ElementsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
@@ -356,7 +356,7 @@ func (s *ProxyServer) Elements(request *set.ElementsRequest, srv set.SetService_
 			if result.Error == context.Canceled {
 				break
 			}
-			log.Warnf("Request ElementsRequest failed: %v", result.Error)
+			log.Debugf("Request ElementsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 

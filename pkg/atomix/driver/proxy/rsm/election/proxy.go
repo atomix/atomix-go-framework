@@ -65,7 +65,7 @@ func (s *ProxyServer) Enter(ctx context.Context, request *election.EnterRequest)
 	}
 	output, err := service.DoCommand(ctx, enterOp, input)
 	if err != nil {
-		log.Warnf("Request EnterRequest failed: %v", err)
+		log.Debugf("Request EnterRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -104,7 +104,7 @@ func (s *ProxyServer) Withdraw(ctx context.Context, request *election.WithdrawRe
 	}
 	output, err := service.DoCommand(ctx, withdrawOp, input)
 	if err != nil {
-		log.Warnf("Request WithdrawRequest failed: %v", err)
+		log.Debugf("Request WithdrawRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -143,7 +143,7 @@ func (s *ProxyServer) Anoint(ctx context.Context, request *election.AnointReques
 	}
 	output, err := service.DoCommand(ctx, anointOp, input)
 	if err != nil {
-		log.Warnf("Request AnointRequest failed: %v", err)
+		log.Debugf("Request AnointRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -182,7 +182,7 @@ func (s *ProxyServer) Promote(ctx context.Context, request *election.PromoteRequ
 	}
 	output, err := service.DoCommand(ctx, promoteOp, input)
 	if err != nil {
-		log.Warnf("Request PromoteRequest failed: %v", err)
+		log.Debugf("Request PromoteRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -221,7 +221,7 @@ func (s *ProxyServer) Evict(ctx context.Context, request *election.EvictRequest)
 	}
 	output, err := service.DoCommand(ctx, evictOp, input)
 	if err != nil {
-		log.Warnf("Request EvictRequest failed: %v", err)
+		log.Debugf("Request EvictRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -260,7 +260,7 @@ func (s *ProxyServer) GetTerm(ctx context.Context, request *election.GetTermRequ
 	}
 	output, err := service.DoQuery(ctx, getTermOp, input, s.readSync)
 	if err != nil {
-		log.Warnf("Request GetTermRequest failed: %v", err)
+		log.Debugf("Request GetTermRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -300,7 +300,7 @@ func (s *ProxyServer) Events(request *election.EventsRequest, srv election.Leade
 	stream := streams.NewBufferedStream()
 	err = service.DoCommandStream(srv.Context(), eventsOp, input, stream)
 	if err != nil {
-		log.Warnf("Request EventsRequest failed: %v", err)
+		log.Debugf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
@@ -321,7 +321,7 @@ func (s *ProxyServer) Events(request *election.EventsRequest, srv election.Leade
 			if result.Error == context.Canceled {
 				break
 			}
-			log.Warnf("Request EventsRequest failed: %v", result.Error)
+			log.Debugf("Request EventsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 

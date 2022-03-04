@@ -61,7 +61,7 @@ func (s *ProxyServer) Set(ctx context.Context, request *value.SetRequest) (*valu
 	}
 	output, err := service.DoCommand(ctx, setOp, input)
 	if err != nil {
-		log.Warnf("Request SetRequest failed: %v", err)
+		log.Debugf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -100,7 +100,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *value.GetRequest) (*valu
 	}
 	output, err := service.DoQuery(ctx, getOp, input, s.readSync)
 	if err != nil {
-		log.Warnf("Request GetRequest failed: %v", err)
+		log.Debugf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -140,7 +140,7 @@ func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueServic
 	stream := streams.NewBufferedStream()
 	err = service.DoCommandStream(srv.Context(), eventsOp, input, stream)
 	if err != nil {
-		log.Warnf("Request EventsRequest failed: %v", err)
+		log.Debugf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
@@ -161,7 +161,7 @@ func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueServic
 			if result.Error == context.Canceled {
 				break
 			}
-			log.Warnf("Request EventsRequest failed: %v", result.Error)
+			log.Debugf("Request EventsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 

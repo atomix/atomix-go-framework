@@ -57,7 +57,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 		log.Debugf("Proposal SetProposal %s", p)
 		response, err := s.rsm.Set(p)
 		if err != nil {
-			log.Warnf("Proposal SetProposal %s failed: %v", p, err)
+			log.Debugf("Proposal SetProposal %s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -83,7 +83,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 		log.Debugf("Proposal IncrementProposal %s", p)
 		response, err := s.rsm.Increment(p)
 		if err != nil {
-			log.Warnf("Proposal IncrementProposal %s failed: %v", p, err)
+			log.Debugf("Proposal IncrementProposal %s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -109,7 +109,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 		log.Debugf("Proposal DecrementProposal %s", p)
 		response, err := s.rsm.Decrement(p)
 		if err != nil {
-			log.Warnf("Proposal DecrementProposal %s failed: %v", p, err)
+			log.Debugf("Proposal DecrementProposal %s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -125,7 +125,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 		command.Close()
 	default:
 		err := errors.NewNotSupported("unknown operation %d", command.OperationID())
-		log.Warn(err)
+		log.Debug(err)
 		command.Output(nil, err)
 	}
 }
@@ -144,7 +144,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 		log.Debugf("Querying GetQuery %s", q)
 		response, err := s.rsm.Get(q)
 		if err != nil {
-			log.Warnf("Querying GetQuery %s failed: %v", q, err)
+			log.Debugf("Querying GetQuery %s failed: %v", q, err)
 			query.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -160,7 +160,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 		query.Close()
 	default:
 		err := errors.NewNotSupported("unknown operation %d", query.OperationID())
-		log.Warn(err)
+		log.Debug(err)
 		query.Output(nil, err)
 	}
 }

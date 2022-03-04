@@ -64,7 +64,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 		log.Debugf("Proposal PutProposal %s", p)
 		response, err := s.rsm.Put(p)
 		if err != nil {
-			log.Warnf("Proposal PutProposal %s failed: %v", p, err)
+			log.Debugf("Proposal PutProposal %s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -90,7 +90,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 		log.Debugf("Proposal RemoveProposal %s", p)
 		response, err := s.rsm.Remove(p)
 		if err != nil {
-			log.Warnf("Proposal RemoveProposal %s failed: %v", p, err)
+			log.Debugf("Proposal RemoveProposal %s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -116,7 +116,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 		log.Debugf("Proposal ClearProposal %s", p)
 		response, err := s.rsm.Clear(p)
 		if err != nil {
-			log.Warnf("Proposal ClearProposal %s failed: %v", p, err)
+			log.Debugf("Proposal ClearProposal %s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -143,7 +143,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 		s.rsm.Events(p)
 	default:
 		err := errors.NewNotSupported("unknown operation %d", command.OperationID())
-		log.Warn(err)
+		log.Debug(err)
 		command.Output(nil, err)
 	}
 }
@@ -162,7 +162,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 		log.Debugf("Querying SizeQuery %s", q)
 		response, err := s.rsm.Size(q)
 		if err != nil {
-			log.Warnf("Querying SizeQuery %s failed: %v", q, err)
+			log.Debugf("Querying SizeQuery %s failed: %v", q, err)
 			query.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -188,7 +188,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 		log.Debugf("Querying GetQuery %s", q)
 		response, err := s.rsm.Get(q)
 		if err != nil {
-			log.Warnf("Querying GetQuery %s failed: %v", q, err)
+			log.Debugf("Querying GetQuery %s failed: %v", q, err)
 			query.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -214,7 +214,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 		log.Debugf("Querying FirstEntryQuery %s", q)
 		response, err := s.rsm.FirstEntry(q)
 		if err != nil {
-			log.Warnf("Querying FirstEntryQuery %s failed: %v", q, err)
+			log.Debugf("Querying FirstEntryQuery %s failed: %v", q, err)
 			query.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -240,7 +240,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 		log.Debugf("Querying LastEntryQuery %s", q)
 		response, err := s.rsm.LastEntry(q)
 		if err != nil {
-			log.Warnf("Querying LastEntryQuery %s failed: %v", q, err)
+			log.Debugf("Querying LastEntryQuery %s failed: %v", q, err)
 			query.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -266,7 +266,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 		log.Debugf("Querying PrevEntryQuery %s", q)
 		response, err := s.rsm.PrevEntry(q)
 		if err != nil {
-			log.Warnf("Querying PrevEntryQuery %s failed: %v", q, err)
+			log.Debugf("Querying PrevEntryQuery %s failed: %v", q, err)
 			query.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -292,7 +292,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 		log.Debugf("Querying NextEntryQuery %s", q)
 		response, err := s.rsm.NextEntry(q)
 		if err != nil {
-			log.Warnf("Querying NextEntryQuery %s failed: %v", q, err)
+			log.Debugf("Querying NextEntryQuery %s failed: %v", q, err)
 			query.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -319,7 +319,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 		s.rsm.Entries(q)
 	default:
 		err := errors.NewNotSupported("unknown operation %d", query.OperationID())
-		log.Warn(err)
+		log.Debug(err)
 		query.Output(nil, err)
 	}
 }

@@ -152,10 +152,11 @@ func (s *Session) doCommand(ctx context.Context, serviceID rsm.ServiceID, operat
 	if err != nil {
 		err = errors.From(err)
 		if errors.IsFault(err) {
-			log.Error("Detected potential data loss. Exiting...", err)
+			log.Error("Detected potential data loss: ", err)
+			log.Infof("Exiting process...")
 			os.Exit(errors.Code(err))
 		}
-		return nil, err
+		return nil, errors.NewInternal(err.Error())
 	}
 
 	s.lastIndex.Update(response.Response.Index)
@@ -205,10 +206,11 @@ func (s *Session) doCommandStream(ctx context.Context, serviceID rsm.ServiceID, 
 	if err != nil {
 		err = errors.From(err)
 		if errors.IsFault(err) {
-			log.Error("Detected potential data loss. Exiting...", err)
+			log.Error("Detected potential data loss: ", err)
+			log.Infof("Exiting process...")
 			os.Exit(errors.Code(err))
 		}
-		return err
+		return errors.NewInternal(err.Error())
 	}
 
 	go func() {
@@ -221,10 +223,11 @@ func (s *Session) doCommandStream(ctx context.Context, serviceID rsm.ServiceID, 
 			} else if err != nil {
 				err = errors.From(err)
 				if errors.IsFault(err) {
-					log.Error("Detected potential data loss. Exiting...", err)
+					log.Error("Detected potential data loss: ", err)
+					log.Infof("Exiting process...")
 					os.Exit(errors.Code(err))
 				} else {
-					stream.Error(err)
+					stream.Error(errors.NewInternal(err.Error()))
 					break
 				}
 			}
@@ -279,10 +282,11 @@ func (s *Session) doQuery(ctx context.Context, serviceID rsm.ServiceID, operatio
 	if err != nil {
 		err = errors.From(err)
 		if errors.IsFault(err) {
-			log.Error("Detected potential data loss. Exiting...", err)
+			log.Error("Detected potential data loss: ", err)
+			log.Infof("Exiting process...")
 			os.Exit(errors.Code(err))
 		}
-		return nil, err
+		return nil, errors.NewInternal(err.Error())
 	}
 
 	result := response.Response.GetSessionQuery().GetServiceQuery().Operation
@@ -320,10 +324,11 @@ func (s *Session) doQueryStream(ctx context.Context, serviceID rsm.ServiceID, op
 	if err != nil {
 		err = errors.From(err)
 		if errors.IsFault(err) {
-			log.Error("Detected potential data loss. Exiting...", err)
+			log.Error("Detected potential data loss: ", err)
+			log.Infof("Exiting process...")
 			os.Exit(errors.Code(err))
 		}
-		return err
+		return errors.NewInternal(err.Error())
 	}
 
 	go func() {
@@ -335,10 +340,11 @@ func (s *Session) doQueryStream(ctx context.Context, serviceID rsm.ServiceID, op
 			} else if err != nil {
 				err = errors.From(err)
 				if errors.IsFault(err) {
-					log.Error("Detected potential data loss. Exiting...", err)
+					log.Error("Detected potential data loss: ", err)
+					log.Infof("Exiting process...")
 					os.Exit(errors.Code(err))
 				} else {
-					stream.Error(err)
+					stream.Error(errors.NewInternal(err.Error()))
 					break
 				}
 			}

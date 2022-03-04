@@ -170,7 +170,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	output, err := service.DoQuery(ctx, {{ $name }}, input, s.readSync)
     {{- end }}
 	if err != nil {
-        log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
+        log.Debugf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
 
@@ -219,7 +219,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	})
 	{{- end }}
 	if err != nil {
-        log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
+        log.Debugf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
 
@@ -303,7 +303,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	err = service.DoQueryStream(ctx, {{ $name }}, input, stream, s.readSync)
 	{{- end }}
 	if err != nil {
-        log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
+        log.Debugf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return nil, errors.Proto(err)
 	}
 
@@ -313,7 +313,7 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
 	}
 
     if result.Failed() {
-        log.Warnf("Request {{ .Request.Type.Name }} failed: %v", result.Error)
+        log.Debugf("Request {{ .Request.Type.Name }} failed: %v", result.Error)
         return nil, errors.Proto(result.Error)
     }
 
@@ -443,7 +443,7 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 	err = service.DoQueryStream(srv.Context(), {{ $name }}, input, stream, s.readSync)
     {{- end }}
 	if err != nil {
-        log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
+        log.Debugf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return errors.Proto(err)
 	}
 
@@ -496,7 +496,7 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 		return nil
 	})
 	if err != nil {
-        log.Warnf("Request {{ .Request.Type.Name }} failed: %v", err)
+        log.Debugf("Request {{ .Request.Type.Name }} failed: %v", err)
 	    return errors.Proto(err)
 	}
 
@@ -511,7 +511,7 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
 		    if result.Error == context.Canceled {
 		        break
 			}
-			log.Warnf("Request {{ .Request.Type.Name }} failed: %v", result.Error)
+			log.Debugf("Request {{ .Request.Type.Name }} failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 

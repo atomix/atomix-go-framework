@@ -60,7 +60,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 		log.Debugf("Proposal AddProposal %s", p)
 		response, err := s.rsm.Add(p)
 		if err != nil {
-			log.Warnf("Proposal AddProposal %s failed: %v", p, err)
+			log.Debugf("Proposal AddProposal %s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -86,7 +86,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 		log.Debugf("Proposal RemoveProposal %s", p)
 		response, err := s.rsm.Remove(p)
 		if err != nil {
-			log.Warnf("Proposal RemoveProposal %s failed: %v", p, err)
+			log.Debugf("Proposal RemoveProposal %s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -112,7 +112,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 		log.Debugf("Proposal ClearProposal %s", p)
 		response, err := s.rsm.Clear(p)
 		if err != nil {
-			log.Warnf("Proposal ClearProposal %s failed: %v", p, err)
+			log.Debugf("Proposal ClearProposal %s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -139,7 +139,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 		s.rsm.Events(p)
 	default:
 		err := errors.NewNotSupported("unknown operation %d", command.OperationID())
-		log.Warn(err)
+		log.Debug(err)
 		command.Output(nil, err)
 	}
 }
@@ -158,7 +158,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 		log.Debugf("Querying SizeQuery %s", q)
 		response, err := s.rsm.Size(q)
 		if err != nil {
-			log.Warnf("Querying SizeQuery %s failed: %v", q, err)
+			log.Debugf("Querying SizeQuery %s failed: %v", q, err)
 			query.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -184,7 +184,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 		log.Debugf("Querying ContainsQuery %s", q)
 		response, err := s.rsm.Contains(q)
 		if err != nil {
-			log.Warnf("Querying ContainsQuery %s failed: %v", q, err)
+			log.Debugf("Querying ContainsQuery %s failed: %v", q, err)
 			query.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
@@ -211,7 +211,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 		s.rsm.Elements(q)
 	default:
 		err := errors.NewNotSupported("unknown operation %d", query.OperationID())
-		log.Warn(err)
+		log.Debug(err)
 		query.Output(nil, err)
 	}
 }

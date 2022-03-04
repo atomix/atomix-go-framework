@@ -61,7 +61,7 @@ func (s *ProxyServer) Set(ctx context.Context, request *counter.SetRequest) (*co
 	}
 	output, err := service.DoCommand(ctx, setOp, input)
 	if err != nil {
-		log.Warnf("Request SetRequest failed: %v", err)
+		log.Debugf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -100,7 +100,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *counter.GetRequest) (*co
 	}
 	output, err := service.DoQuery(ctx, getOp, input, s.readSync)
 	if err != nil {
-		log.Warnf("Request GetRequest failed: %v", err)
+		log.Debugf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -139,7 +139,7 @@ func (s *ProxyServer) Increment(ctx context.Context, request *counter.IncrementR
 	}
 	output, err := service.DoCommand(ctx, incrementOp, input)
 	if err != nil {
-		log.Warnf("Request IncrementRequest failed: %v", err)
+		log.Debugf("Request IncrementRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -178,7 +178,7 @@ func (s *ProxyServer) Decrement(ctx context.Context, request *counter.DecrementR
 	}
 	output, err := service.DoCommand(ctx, decrementOp, input)
 	if err != nil {
-		log.Warnf("Request DecrementRequest failed: %v", err)
+		log.Debugf("Request DecrementRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 

@@ -69,7 +69,7 @@ func (s *ProxyServer) Size(ctx context.Context, request *indexedmap.SizeRequest)
 	}
 	output, err := service.DoQuery(ctx, sizeOp, input, s.readSync)
 	if err != nil {
-		log.Warnf("Request SizeRequest failed: %v", err)
+		log.Debugf("Request SizeRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -108,7 +108,7 @@ func (s *ProxyServer) Put(ctx context.Context, request *indexedmap.PutRequest) (
 	}
 	output, err := service.DoCommand(ctx, putOp, input)
 	if err != nil {
-		log.Warnf("Request PutRequest failed: %v", err)
+		log.Debugf("Request PutRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -147,7 +147,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *indexedmap.GetRequest) (
 	}
 	output, err := service.DoQuery(ctx, getOp, input, s.readSync)
 	if err != nil {
-		log.Warnf("Request GetRequest failed: %v", err)
+		log.Debugf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -186,7 +186,7 @@ func (s *ProxyServer) FirstEntry(ctx context.Context, request *indexedmap.FirstE
 	}
 	output, err := service.DoQuery(ctx, firstEntryOp, input, s.readSync)
 	if err != nil {
-		log.Warnf("Request FirstEntryRequest failed: %v", err)
+		log.Debugf("Request FirstEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -225,7 +225,7 @@ func (s *ProxyServer) LastEntry(ctx context.Context, request *indexedmap.LastEnt
 	}
 	output, err := service.DoQuery(ctx, lastEntryOp, input, s.readSync)
 	if err != nil {
-		log.Warnf("Request LastEntryRequest failed: %v", err)
+		log.Debugf("Request LastEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -264,7 +264,7 @@ func (s *ProxyServer) PrevEntry(ctx context.Context, request *indexedmap.PrevEnt
 	}
 	output, err := service.DoQuery(ctx, prevEntryOp, input, s.readSync)
 	if err != nil {
-		log.Warnf("Request PrevEntryRequest failed: %v", err)
+		log.Debugf("Request PrevEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -303,7 +303,7 @@ func (s *ProxyServer) NextEntry(ctx context.Context, request *indexedmap.NextEnt
 	}
 	output, err := service.DoQuery(ctx, nextEntryOp, input, s.readSync)
 	if err != nil {
-		log.Warnf("Request NextEntryRequest failed: %v", err)
+		log.Debugf("Request NextEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -342,7 +342,7 @@ func (s *ProxyServer) Remove(ctx context.Context, request *indexedmap.RemoveRequ
 	}
 	output, err := service.DoCommand(ctx, removeOp, input)
 	if err != nil {
-		log.Warnf("Request RemoveRequest failed: %v", err)
+		log.Debugf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -381,7 +381,7 @@ func (s *ProxyServer) Clear(ctx context.Context, request *indexedmap.ClearReques
 	}
 	output, err := service.DoCommand(ctx, clearOp, input)
 	if err != nil {
-		log.Warnf("Request ClearRequest failed: %v", err)
+		log.Debugf("Request ClearRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
 
@@ -421,7 +421,7 @@ func (s *ProxyServer) Events(request *indexedmap.EventsRequest, srv indexedmap.I
 	stream := streams.NewBufferedStream()
 	err = service.DoCommandStream(srv.Context(), eventsOp, input, stream)
 	if err != nil {
-		log.Warnf("Request EventsRequest failed: %v", err)
+		log.Debugf("Request EventsRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
@@ -442,7 +442,7 @@ func (s *ProxyServer) Events(request *indexedmap.EventsRequest, srv indexedmap.I
 			if result.Error == context.Canceled {
 				break
 			}
-			log.Warnf("Request EventsRequest failed: %v", result.Error)
+			log.Debugf("Request EventsRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 
@@ -489,7 +489,7 @@ func (s *ProxyServer) Entries(request *indexedmap.EntriesRequest, srv indexedmap
 	stream := streams.NewBufferedStream()
 	err = service.DoQueryStream(srv.Context(), entriesOp, input, stream, s.readSync)
 	if err != nil {
-		log.Warnf("Request EntriesRequest failed: %v", err)
+		log.Debugf("Request EntriesRequest failed: %v", err)
 		return errors.Proto(err)
 	}
 
@@ -510,7 +510,7 @@ func (s *ProxyServer) Entries(request *indexedmap.EntriesRequest, srv indexedmap
 			if result.Error == context.Canceled {
 				break
 			}
-			log.Warnf("Request EntriesRequest failed: %v", result.Error)
+			log.Debugf("Request EntriesRequest failed: %v", result.Error)
 			return errors.Proto(result.Error)
 		}
 

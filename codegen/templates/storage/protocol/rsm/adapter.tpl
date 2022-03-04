@@ -79,7 +79,7 @@ func (s *{{ $serviceImpl }}) ExecuteCommand(command rsm.Command) {
         {{- if (and .Response.IsUnary .Type.IsSync ) }}
         response, err := s.rsm.{{ .Name }}(p)
         if err != nil {
-            log.Warnf("Proposal {{ $proposalInt }} %s failed: %v", p, err)
+            log.Debugf("Proposal {{ $proposalInt }} %s failed: %v", p, err)
             command.Output(nil, err)
         } else {
             output, err := proto.Marshal(response)
@@ -100,7 +100,7 @@ func (s *{{ $serviceImpl }}) ExecuteCommand(command rsm.Command) {
     {{- end }}
     default:
         err := errors.NewNotSupported("unknown operation %d", command.OperationID())
-        log.Warn(err)
+        log.Debug(err)
         command.Output(nil, err)
     }
 }
@@ -124,7 +124,7 @@ func (s *{{ $serviceImpl }}) ExecuteQuery(query rsm.Query) {
         {{- if .Response.IsUnary }}
         response, err := s.rsm.{{ .Name }}(q)
         if err != nil {
-            log.Warnf("Querying {{ $queryInt }} %s failed: %v", q, err)
+            log.Debugf("Querying {{ $queryInt }} %s failed: %v", q, err)
             query.Output(nil, err)
         } else {
             output, err := proto.Marshal(response)
@@ -145,7 +145,7 @@ func (s *{{ $serviceImpl }}) ExecuteQuery(query rsm.Query) {
     {{- end }}
     default:
         err := errors.NewNotSupported("unknown operation %d", query.OperationID())
-        log.Warn(err)
+        log.Debug(err)
         query.Output(nil, err)
     }
 }
