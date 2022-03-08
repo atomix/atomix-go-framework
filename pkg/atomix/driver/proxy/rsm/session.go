@@ -428,7 +428,7 @@ func (s *Session) open(ctx context.Context) error {
 					if ok {
 						if requestEvent.responseID > request.ackedResponseID {
 							request.ackedResponseID = requestEvent.responseID
-							log.Debugf("Acked request %d responses up to %d", requestEvent.responseID)
+							log.Debugf("Acked request %d responses up to %d", requestEvent.requestID, requestEvent.responseID)
 						}
 					}
 				}
