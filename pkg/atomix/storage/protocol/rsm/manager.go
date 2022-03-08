@@ -389,21 +389,14 @@ func (m *primitiveServiceManager) keepAlive(request *KeepAliveRequest, stream st
 		return
 	}
 
-	requestFilter := &bloom.BloomFilter{}
-	if err := json.Unmarshal(request.RequestFilter, requestFilter); err != nil {
+	openRequests := &bloom.BloomFilter{}
+	if err := json.Unmarshal(request.OpenRequests, openRequests); err != nil {
 		log.Warn("Failed to decode request filter", err)
 		stream.Error(errors.NewInvalid("invalid request filter", err))
 		return
 	}
 
-	responseFilter := &bloom.BloomFilter{}
-	if err := json.Unmarshal(request.ResponseFilter, responseFilter); err != nil {
-		log.Warn("Failed to decode response filter", err)
-		stream.Error(errors.NewInvalid("invalid response filter", err))
-		return
-	}
-
-	if err := session.keepAlive(request.LastRequestID, requestFilter, responseFilter); err != nil {
+	if err := session.keepAlive(request.LastRequestID, openRequests, request.CompleteResponses); err != nil {
 		stream.Error(err)
 		return
 	}
