@@ -213,13 +213,31 @@ func (s *Session) doCommandStream(ctx context.Context, serviceID rsm.ServiceID, 
 		return errors.NewInternal(err.Error())
 	}
 
+	s.requestCh <- sessionRequestEvent{
+		eventType: sessionStreamEventOpen,
+		requestID: requestID,
+	}
+
 	go func() {
+		defer func() {
+			s.requestCh <- sessionRequestEvent{
+				eventType: sessionRequestEventEnd,
+				requestID: requestID,
+			}
+		}()
 		defer stream.Close()
+		defer func() {
+			s.requestCh <- sessionRequestEvent{
+				eventType: sessionStreamEventClose,
+				requestID: requestID,
+			}
+		}()
+
 		var lastResponseID rsm.ResponseID
 		for {
 			response, err := responseStream.Recv()
 			if err == io.EOF {
-				break
+				return
 			} else if err != nil {
 				err = errors.From(err)
 				if errors.IsFault(err) {
@@ -228,7 +246,7 @@ func (s *Session) doCommandStream(ctx context.Context, serviceID rsm.ServiceID, 
 					os.Exit(errors.Code(err))
 				} else {
 					stream.Error(errors.NewInternal(err.Error()))
-					break
+					return
 				}
 			}
 
@@ -243,7 +261,7 @@ func (s *Session) doCommandStream(ctx context.Context, serviceID rsm.ServiceID, 
 					stream.Value(result.Value)
 				}
 				s.requestCh <- sessionRequestEvent{
-					eventType:  sessionRequestEventReceive,
+					eventType:  sessionStreamEventReceive,
 					requestID:  requestID,
 					responseID: responseID,
 				}
@@ -401,7 +419,8 @@ func (s *Session) open(ctx context.Context) error {
 	go func() {
 		ticker := time.NewTicker(s.Timeout / 4)
 		var requestID rsm.RequestID
-		requests := make(map[rsm.RequestID]*sessionStream)
+		requests := make(map[rsm.RequestID]bool)
+		responseStreams := make(map[rsm.RequestID]*sessionResponseStream)
 		for {
 			select {
 			case requestEvent := <-s.requestCh:
@@ -409,41 +428,64 @@ func (s *Session) open(ctx context.Context) error {
 				case sessionRequestEventStart:
 					for requestID < requestEvent.requestID {
 						requestID++
-						requests[requestID] = &sessionStream{}
-						log.Debugf("Opened response stream for request %d", requestID)
-					}
-				case sessionRequestEventReceive:
-					request, ok := requests[requestEvent.requestID]
-					if ok {
-						if requestEvent.responseID == request.currentResponseID+1 {
-							request.currentResponseID++
-							log.Debugf("Received request %d response %d", requestEvent.requestID, requestEvent.responseID)
-						}
+						requests[requestID] = true
+						log.Debugf("Started request %d", requestID)
 					}
 				case sessionRequestEventEnd:
-					delete(requests, requestEvent.requestID)
-					log.Debugf("Closed request %d response stream", requestEvent.requestID)
-				case sessionRequestEventAck:
-					request, ok := requests[requestEvent.requestID]
+					if requests[requestEvent.requestID] {
+						delete(requests, requestEvent.requestID)
+						log.Debugf("Finished request %d", requestEvent.requestID)
+					}
+				case sessionStreamEventOpen:
+					responseStreams[requestID] = &sessionResponseStream{}
+					log.Debugf("Opened request %d response stream", requestID)
+				case sessionStreamEventReceive:
+					responseStream, ok := responseStreams[requestEvent.requestID]
 					if ok {
-						if requestEvent.responseID > request.ackedResponseID {
-							request.ackedResponseID = requestEvent.responseID
-							log.Debugf("Acked request %d responses up to %d", requestEvent.requestID, requestEvent.responseID)
+						if requestEvent.responseID == responseStream.currentResponseID+1 {
+							responseStream.currentResponseID++
+							log.Debugf("Received request %d stream response %d", requestEvent.requestID, requestEvent.responseID)
+						}
+					}
+				case sessionStreamEventClose:
+					delete(responseStreams, requestEvent.requestID)
+					log.Debugf("Closed request %d response stream", requestEvent.requestID)
+				case sessionStreamEventAck:
+					responseStream, ok := responseStreams[requestEvent.requestID]
+					if ok {
+						if requestEvent.responseID > responseStream.ackedResponseID {
+							responseStream.ackedResponseID = requestEvent.responseID
+							log.Debugf("Acked request %d stream responses up to %d", requestEvent.requestID, requestEvent.responseID)
 						}
 					}
 				}
 			case <-ticker.C:
 				openRequests := bloom.NewWithEstimates(uint(len(requests)), fpRate)
 				completeResponses := make(map[rsm.RequestID]rsm.ResponseID)
-				for requestID, request := range requests {
+				for requestID := range requests {
 					requestBytes := make([]byte, 8)
 					binary.BigEndian.PutUint64(requestBytes, uint64(requestID))
 					openRequests.Add(requestBytes)
-					if request.currentResponseID > 1 && request.currentResponseID > request.ackedResponseID {
-						completeResponses[requestID] = request.currentResponseID
+				}
+				for requestID, responseStream := range responseStreams {
+					if responseStream.currentResponseID > 1 && responseStream.currentResponseID > responseStream.ackedResponseID {
+						completeResponses[requestID] = responseStream.currentResponseID
 					}
 				}
-				go s.keepAliveSessions(context.Background(), requestID, openRequests, completeResponses)
+				go func(lastRequestID rsm.RequestID) {
+					err := s.keepAliveSessions(context.Background(), lastRequestID, openRequests, completeResponses)
+					if err != nil {
+						log.Error(err)
+					} else {
+						for requestID, responseID := range completeResponses {
+							s.requestCh <- sessionRequestEvent{
+								eventType:  sessionStreamEventAck,
+								requestID:  requestID,
+								responseID: responseID,
+							}
+						}
+					}
+				}(requestID)
 			}
 		}
 	}()
@@ -481,14 +523,6 @@ func (s *Session) keepAliveSessions(ctx context.Context, lastRequestID rsm.Reque
 		return errors.NewInternal(err.Error())
 	}
 	s.lastIndex.Update(response.Response.Index)
-
-	for requestID, responseID := range completeResponses {
-		s.requestCh <- sessionRequestEvent{
-			eventType:  sessionRequestEventAck,
-			requestID:  requestID,
-			responseID: responseID,
-		}
-	}
 	return nil
 }
 
@@ -548,9 +582,11 @@ type sessionRequestEventType int
 
 const (
 	sessionRequestEventStart sessionRequestEventType = iota
-	sessionRequestEventReceive
 	sessionRequestEventEnd
-	sessionRequestEventAck
+	sessionStreamEventOpen
+	sessionStreamEventReceive
+	sessionStreamEventClose
+	sessionStreamEventAck
 )
 
 type sessionRequestEvent struct {
@@ -559,7 +595,7 @@ type sessionRequestEvent struct {
 	eventType  sessionRequestEventType
 }
 
-type sessionStream struct {
+type sessionResponseStream struct {
 	currentResponseID rsm.ResponseID
 	ackedResponseID   rsm.ResponseID
 }
