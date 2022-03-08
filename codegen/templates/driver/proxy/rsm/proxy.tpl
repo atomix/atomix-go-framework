@@ -125,7 +125,7 @@ type {{ $proxy }} struct {
 {{- $method := . }}
 {{ if and .Response.IsUnary .Type.IsSync }}
 func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "type" .Request.Type }}) (*{{ template "type" .Response.Type }}, error) {
-	log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
+	log.Debugf("Received {{ .Request.Type.Name }} %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
         log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
@@ -251,12 +251,12 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
     {{- end }}
 	{{- end }}
 	{{- end }}
-	log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
+	log.Debugf("Sending {{ .Response.Type.Name }} %.250s", response)
 	return response, nil
 }
 {{ else if .Type.IsAsync }}
 func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "type" .Request.Type }}) (*{{ template "type" .Response.Type }}, error) {
-	log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
+	log.Debugf("Received {{ .Request.Type.Name }} %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
         log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
@@ -392,12 +392,12 @@ func (s *{{ $proxy }}) {{ .Name }}(ctx context.Context, request *{{ template "ty
     {{- end }}
 	{{- end }}
 	{{- end }}
-	log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
+	log.Debugf("Sending {{ .Response.Type.Name }} %.250s", response)
 	return response, nil
 }
 {{ else if .Response.IsStream }}
 func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }}, srv {{ template "type" $primitive.Type }}_{{ .Name }}Server) error {
-    log.Debugf("Received {{ .Request.Type.Name }} %+v", request)
+    log.Debugf("Received {{ .Request.Type.Name }} %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
         log.Errorf("Request {{ .Request.Type.Name }} failed: %v", err)
@@ -522,13 +522,13 @@ func (s *{{ $proxy }}) {{ .Name }}(request *{{ template "type" .Request.Type }},
             return errors.Proto(err)
         }
 
-		log.Debugf("Sending {{ .Response.Type.Name }} %+v", response)
+		log.Debugf("Sending {{ .Response.Type.Name }} %.250s", response)
 		if err = srv.Send(response); err != nil {
             log.Warnf("Response {{ .Response.Type.Name }} failed: %v", err)
 			return err
 		}
 	}
-	log.Debugf("Finished {{ .Request.Type.Name }} %+v", request)
+	log.Debugf("Finished {{ .Request.Type.Name }} %.250s", request)
 	return nil
 }
 {{ end }}

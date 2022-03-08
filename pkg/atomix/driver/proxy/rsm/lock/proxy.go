@@ -37,7 +37,7 @@ type ProxyServer struct {
 }
 
 func (s *ProxyServer) Lock(ctx context.Context, request *lock.LockRequest) (*lock.LockResponse, error) {
-	log.Debugf("Received LockRequest %+v", request)
+	log.Debugf("Received LockRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request LockRequest failed: %v", err)
@@ -83,12 +83,12 @@ func (s *ProxyServer) Lock(ctx context.Context, request *lock.LockRequest) (*loc
 		log.Errorf("Request LockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending LockResponse %+v", response)
+	log.Debugf("Sending LockResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Unlock(ctx context.Context, request *lock.UnlockRequest) (*lock.UnlockResponse, error) {
-	log.Debugf("Received UnlockRequest %+v", request)
+	log.Debugf("Received UnlockRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request UnlockRequest failed: %v", err)
@@ -122,12 +122,12 @@ func (s *ProxyServer) Unlock(ctx context.Context, request *lock.UnlockRequest) (
 		log.Errorf("Request UnlockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending UnlockResponse %+v", response)
+	log.Debugf("Sending UnlockResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) GetLock(ctx context.Context, request *lock.GetLockRequest) (*lock.GetLockResponse, error) {
-	log.Debugf("Received GetLockRequest %+v", request)
+	log.Debugf("Received GetLockRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request GetLockRequest failed: %v", err)
@@ -161,6 +161,6 @@ func (s *ProxyServer) GetLock(ctx context.Context, request *lock.GetLockRequest)
 		log.Errorf("Request GetLockRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending GetLockResponse %+v", response)
+	log.Debugf("Sending GetLockResponse %.250s", response)
 	return response, nil
 }

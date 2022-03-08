@@ -43,7 +43,7 @@ type ProxyServer struct {
 }
 
 func (s *ProxyServer) Size(ctx context.Context, request *list.SizeRequest) (*list.SizeResponse, error) {
-	log.Debugf("Received SizeRequest %+v", request)
+	log.Debugf("Received SizeRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request SizeRequest failed: %v", err)
@@ -77,12 +77,12 @@ func (s *ProxyServer) Size(ctx context.Context, request *list.SizeRequest) (*lis
 		log.Errorf("Request SizeRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending SizeResponse %+v", response)
+	log.Debugf("Sending SizeResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Append(ctx context.Context, request *list.AppendRequest) (*list.AppendResponse, error) {
-	log.Debugf("Received AppendRequest %+v", request)
+	log.Debugf("Received AppendRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request AppendRequest failed: %v", err)
@@ -116,12 +116,12 @@ func (s *ProxyServer) Append(ctx context.Context, request *list.AppendRequest) (
 		log.Errorf("Request AppendRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending AppendResponse %+v", response)
+	log.Debugf("Sending AppendResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Insert(ctx context.Context, request *list.InsertRequest) (*list.InsertResponse, error) {
-	log.Debugf("Received InsertRequest %+v", request)
+	log.Debugf("Received InsertRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request InsertRequest failed: %v", err)
@@ -155,12 +155,12 @@ func (s *ProxyServer) Insert(ctx context.Context, request *list.InsertRequest) (
 		log.Errorf("Request InsertRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending InsertResponse %+v", response)
+	log.Debugf("Sending InsertResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Get(ctx context.Context, request *list.GetRequest) (*list.GetResponse, error) {
-	log.Debugf("Received GetRequest %+v", request)
+	log.Debugf("Received GetRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request GetRequest failed: %v", err)
@@ -194,12 +194,12 @@ func (s *ProxyServer) Get(ctx context.Context, request *list.GetRequest) (*list.
 		log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending GetResponse %+v", response)
+	log.Debugf("Sending GetResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Set(ctx context.Context, request *list.SetRequest) (*list.SetResponse, error) {
-	log.Debugf("Received SetRequest %+v", request)
+	log.Debugf("Received SetRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request SetRequest failed: %v", err)
@@ -233,12 +233,12 @@ func (s *ProxyServer) Set(ctx context.Context, request *list.SetRequest) (*list.
 		log.Errorf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending SetResponse %+v", response)
+	log.Debugf("Sending SetResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Remove(ctx context.Context, request *list.RemoveRequest) (*list.RemoveResponse, error) {
-	log.Debugf("Received RemoveRequest %+v", request)
+	log.Debugf("Received RemoveRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request RemoveRequest failed: %v", err)
@@ -272,12 +272,12 @@ func (s *ProxyServer) Remove(ctx context.Context, request *list.RemoveRequest) (
 		log.Errorf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending RemoveResponse %+v", response)
+	log.Debugf("Sending RemoveResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Clear(ctx context.Context, request *list.ClearRequest) (*list.ClearResponse, error) {
-	log.Debugf("Received ClearRequest %+v", request)
+	log.Debugf("Received ClearRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request ClearRequest failed: %v", err)
@@ -311,12 +311,12 @@ func (s *ProxyServer) Clear(ctx context.Context, request *list.ClearRequest) (*l
 		log.Errorf("Request ClearRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending ClearResponse %+v", response)
+	log.Debugf("Sending ClearResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Events(request *list.EventsRequest, srv list.ListService_EventsServer) error {
-	log.Debugf("Received EventsRequest %+v", request)
+	log.Debugf("Received EventsRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request EventsRequest failed: %v", err)
@@ -373,18 +373,18 @@ func (s *ProxyServer) Events(request *list.EventsRequest, srv list.ListService_E
 			return errors.Proto(err)
 		}
 
-		log.Debugf("Sending EventsResponse %+v", response)
+		log.Debugf("Sending EventsResponse %.250s", response)
 		if err = srv.Send(response); err != nil {
 			log.Warnf("Response EventsResponse failed: %v", err)
 			return err
 		}
 	}
-	log.Debugf("Finished EventsRequest %+v", request)
+	log.Debugf("Finished EventsRequest %.250s", request)
 	return nil
 }
 
 func (s *ProxyServer) Elements(request *list.ElementsRequest, srv list.ListService_ElementsServer) error {
-	log.Debugf("Received ElementsRequest %+v", request)
+	log.Debugf("Received ElementsRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request ElementsRequest failed: %v", err)
@@ -441,12 +441,12 @@ func (s *ProxyServer) Elements(request *list.ElementsRequest, srv list.ListServi
 			return errors.Proto(err)
 		}
 
-		log.Debugf("Sending ElementsResponse %+v", response)
+		log.Debugf("Sending ElementsResponse %.250s", response)
 		if err = srv.Send(response); err != nil {
 			log.Warnf("Response ElementsResponse failed: %v", err)
 			return err
 		}
 	}
-	log.Debugf("Finished ElementsRequest %+v", request)
+	log.Debugf("Finished ElementsRequest %.250s", request)
 	return nil
 }

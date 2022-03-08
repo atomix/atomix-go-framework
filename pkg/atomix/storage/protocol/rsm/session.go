@@ -387,11 +387,11 @@ func (c *primitiveServiceSessionCommand) execute(request *ServiceCommandRequest,
 		c.session.commands.add(c)
 		c.session.service.commands.add(c)
 		c.state = CommandRunning
-		log.Debugf("Executing command %d: %+v", c.commandID, request)
+		log.Debugf("Executing command %d: %.250s", c.commandID, request)
 		c.session.service.service.ExecuteCommand(c)
 	case CommandRunning:
 		if c.responses.Len() > 0 {
-			log.Debugf("Replaying %d responses for command %d: %+v", c.responses.Len(), c.commandID, request)
+			log.Debugf("Replaying %d responses for command %d: %.250s", c.responses.Len(), c.commandID, request)
 			elem := c.responses.Front()
 			for elem != nil {
 				response := elem.Value.(*ServiceCommandResponse)
@@ -402,7 +402,7 @@ func (c *primitiveServiceSessionCommand) execute(request *ServiceCommandRequest,
 		c.stream = stream
 	case CommandComplete:
 		if c.responses.Len() > 0 {
-			log.Debugf("Replaying %d responses for command %d: %+v", c.responses.Len(), c.commandID, request)
+			log.Debugf("Replaying %d responses for command %d: %.250s", c.responses.Len(), c.commandID, request)
 			elem := c.responses.Front()
 			for elem != nil {
 				response := elem.Value.(*ServiceCommandResponse)
@@ -566,7 +566,7 @@ func (q *primitiveServiceSessionQuery) Input() []byte {
 func (q *primitiveServiceSessionQuery) execute(request *ServiceQueryRequest, stream streams.WriteStream) {
 	q.request = request
 	q.stream = stream
-	log.Debugf("Executing query at index %d: %+v", q.session.service.Index(), request)
+	log.Debugf("Executing query at index %d: %.250s", q.session.service.Index(), request)
 	q.session.service.service.ExecuteQuery(q)
 }
 

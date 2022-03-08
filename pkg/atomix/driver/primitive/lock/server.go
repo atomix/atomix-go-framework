@@ -30,7 +30,7 @@ func (s *ProxyServer) Lock(ctx context.Context, request *lock.LockRequest) (*loc
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("LockRequest %+v failed: %v", request, err)
+		log.Warnf("LockRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -45,7 +45,7 @@ func (s *ProxyServer) Unlock(ctx context.Context, request *lock.UnlockRequest) (
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("UnlockRequest %+v failed: %v", request, err)
+		log.Warnf("UnlockRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -60,7 +60,7 @@ func (s *ProxyServer) GetLock(ctx context.Context, request *lock.GetLockRequest)
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("GetLockRequest %+v failed: %v", request, err)
+		log.Warnf("GetLockRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}

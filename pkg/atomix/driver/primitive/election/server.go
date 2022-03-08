@@ -30,7 +30,7 @@ func (s *ProxyServer) Enter(ctx context.Context, request *election.EnterRequest)
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("EnterRequest %+v failed: %v", request, err)
+		log.Warnf("EnterRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -45,7 +45,7 @@ func (s *ProxyServer) Withdraw(ctx context.Context, request *election.WithdrawRe
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("WithdrawRequest %+v failed: %v", request, err)
+		log.Warnf("WithdrawRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -60,7 +60,7 @@ func (s *ProxyServer) Anoint(ctx context.Context, request *election.AnointReques
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("AnointRequest %+v failed: %v", request, err)
+		log.Warnf("AnointRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -75,7 +75,7 @@ func (s *ProxyServer) Promote(ctx context.Context, request *election.PromoteRequ
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("PromoteRequest %+v failed: %v", request, err)
+		log.Warnf("PromoteRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -90,7 +90,7 @@ func (s *ProxyServer) Evict(ctx context.Context, request *election.EvictRequest)
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("EvictRequest %+v failed: %v", request, err)
+		log.Warnf("EvictRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -105,7 +105,7 @@ func (s *ProxyServer) GetTerm(ctx context.Context, request *election.GetTermRequ
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("GetTermRequest %+v failed: %v", request, err)
+		log.Warnf("GetTermRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -120,7 +120,7 @@ func (s *ProxyServer) Events(request *election.EventsRequest, srv election.Leade
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("EventsRequest %+v failed: %v", request, err)
+		log.Warnf("EventsRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return errors.NewUnavailable(err.Error())
 		}

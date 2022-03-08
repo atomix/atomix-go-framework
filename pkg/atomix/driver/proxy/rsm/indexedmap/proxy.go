@@ -45,7 +45,7 @@ type ProxyServer struct {
 }
 
 func (s *ProxyServer) Size(ctx context.Context, request *indexedmap.SizeRequest) (*indexedmap.SizeResponse, error) {
-	log.Debugf("Received SizeRequest %+v", request)
+	log.Debugf("Received SizeRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request SizeRequest failed: %v", err)
@@ -79,12 +79,12 @@ func (s *ProxyServer) Size(ctx context.Context, request *indexedmap.SizeRequest)
 		log.Errorf("Request SizeRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending SizeResponse %+v", response)
+	log.Debugf("Sending SizeResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Put(ctx context.Context, request *indexedmap.PutRequest) (*indexedmap.PutResponse, error) {
-	log.Debugf("Received PutRequest %+v", request)
+	log.Debugf("Received PutRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request PutRequest failed: %v", err)
@@ -118,12 +118,12 @@ func (s *ProxyServer) Put(ctx context.Context, request *indexedmap.PutRequest) (
 		log.Errorf("Request PutRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending PutResponse %+v", response)
+	log.Debugf("Sending PutResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Get(ctx context.Context, request *indexedmap.GetRequest) (*indexedmap.GetResponse, error) {
-	log.Debugf("Received GetRequest %+v", request)
+	log.Debugf("Received GetRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request GetRequest failed: %v", err)
@@ -157,12 +157,12 @@ func (s *ProxyServer) Get(ctx context.Context, request *indexedmap.GetRequest) (
 		log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending GetResponse %+v", response)
+	log.Debugf("Sending GetResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) FirstEntry(ctx context.Context, request *indexedmap.FirstEntryRequest) (*indexedmap.FirstEntryResponse, error) {
-	log.Debugf("Received FirstEntryRequest %+v", request)
+	log.Debugf("Received FirstEntryRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request FirstEntryRequest failed: %v", err)
@@ -196,12 +196,12 @@ func (s *ProxyServer) FirstEntry(ctx context.Context, request *indexedmap.FirstE
 		log.Errorf("Request FirstEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending FirstEntryResponse %+v", response)
+	log.Debugf("Sending FirstEntryResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) LastEntry(ctx context.Context, request *indexedmap.LastEntryRequest) (*indexedmap.LastEntryResponse, error) {
-	log.Debugf("Received LastEntryRequest %+v", request)
+	log.Debugf("Received LastEntryRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request LastEntryRequest failed: %v", err)
@@ -235,12 +235,12 @@ func (s *ProxyServer) LastEntry(ctx context.Context, request *indexedmap.LastEnt
 		log.Errorf("Request LastEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending LastEntryResponse %+v", response)
+	log.Debugf("Sending LastEntryResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) PrevEntry(ctx context.Context, request *indexedmap.PrevEntryRequest) (*indexedmap.PrevEntryResponse, error) {
-	log.Debugf("Received PrevEntryRequest %+v", request)
+	log.Debugf("Received PrevEntryRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request PrevEntryRequest failed: %v", err)
@@ -274,12 +274,12 @@ func (s *ProxyServer) PrevEntry(ctx context.Context, request *indexedmap.PrevEnt
 		log.Errorf("Request PrevEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending PrevEntryResponse %+v", response)
+	log.Debugf("Sending PrevEntryResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) NextEntry(ctx context.Context, request *indexedmap.NextEntryRequest) (*indexedmap.NextEntryResponse, error) {
-	log.Debugf("Received NextEntryRequest %+v", request)
+	log.Debugf("Received NextEntryRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request NextEntryRequest failed: %v", err)
@@ -313,12 +313,12 @@ func (s *ProxyServer) NextEntry(ctx context.Context, request *indexedmap.NextEnt
 		log.Errorf("Request NextEntryRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending NextEntryResponse %+v", response)
+	log.Debugf("Sending NextEntryResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Remove(ctx context.Context, request *indexedmap.RemoveRequest) (*indexedmap.RemoveResponse, error) {
-	log.Debugf("Received RemoveRequest %+v", request)
+	log.Debugf("Received RemoveRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request RemoveRequest failed: %v", err)
@@ -352,12 +352,12 @@ func (s *ProxyServer) Remove(ctx context.Context, request *indexedmap.RemoveRequ
 		log.Errorf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending RemoveResponse %+v", response)
+	log.Debugf("Sending RemoveResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Clear(ctx context.Context, request *indexedmap.ClearRequest) (*indexedmap.ClearResponse, error) {
-	log.Debugf("Received ClearRequest %+v", request)
+	log.Debugf("Received ClearRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request ClearRequest failed: %v", err)
@@ -391,12 +391,12 @@ func (s *ProxyServer) Clear(ctx context.Context, request *indexedmap.ClearReques
 		log.Errorf("Request ClearRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending ClearResponse %+v", response)
+	log.Debugf("Sending ClearResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Events(request *indexedmap.EventsRequest, srv indexedmap.IndexedMapService_EventsServer) error {
-	log.Debugf("Received EventsRequest %+v", request)
+	log.Debugf("Received EventsRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request EventsRequest failed: %v", err)
@@ -453,18 +453,18 @@ func (s *ProxyServer) Events(request *indexedmap.EventsRequest, srv indexedmap.I
 			return errors.Proto(err)
 		}
 
-		log.Debugf("Sending EventsResponse %+v", response)
+		log.Debugf("Sending EventsResponse %.250s", response)
 		if err = srv.Send(response); err != nil {
 			log.Warnf("Response EventsResponse failed: %v", err)
 			return err
 		}
 	}
-	log.Debugf("Finished EventsRequest %+v", request)
+	log.Debugf("Finished EventsRequest %.250s", request)
 	return nil
 }
 
 func (s *ProxyServer) Entries(request *indexedmap.EntriesRequest, srv indexedmap.IndexedMapService_EntriesServer) error {
-	log.Debugf("Received EntriesRequest %+v", request)
+	log.Debugf("Received EntriesRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request EntriesRequest failed: %v", err)
@@ -521,12 +521,12 @@ func (s *ProxyServer) Entries(request *indexedmap.EntriesRequest, srv indexedmap
 			return errors.Proto(err)
 		}
 
-		log.Debugf("Sending EntriesResponse %+v", response)
+		log.Debugf("Sending EntriesResponse %.250s", response)
 		if err = srv.Send(response); err != nil {
 			log.Warnf("Response EntriesResponse failed: %v", err)
 			return err
 		}
 	}
-	log.Debugf("Finished EntriesRequest %+v", request)
+	log.Debugf("Finished EntriesRequest %.250s", request)
 	return nil
 }

@@ -30,7 +30,7 @@ func (s *ProxyServer) Size(ctx context.Context, request *indexedmap.SizeRequest)
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("SizeRequest %+v failed: %v", request, err)
+		log.Warnf("SizeRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -45,7 +45,7 @@ func (s *ProxyServer) Put(ctx context.Context, request *indexedmap.PutRequest) (
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("PutRequest %+v failed: %v", request, err)
+		log.Warnf("PutRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -60,7 +60,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *indexedmap.GetRequest) (
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("GetRequest %+v failed: %v", request, err)
+		log.Warnf("GetRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -75,7 +75,7 @@ func (s *ProxyServer) FirstEntry(ctx context.Context, request *indexedmap.FirstE
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("FirstEntryRequest %+v failed: %v", request, err)
+		log.Warnf("FirstEntryRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -90,7 +90,7 @@ func (s *ProxyServer) LastEntry(ctx context.Context, request *indexedmap.LastEnt
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("LastEntryRequest %+v failed: %v", request, err)
+		log.Warnf("LastEntryRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -105,7 +105,7 @@ func (s *ProxyServer) PrevEntry(ctx context.Context, request *indexedmap.PrevEnt
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("PrevEntryRequest %+v failed: %v", request, err)
+		log.Warnf("PrevEntryRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -120,7 +120,7 @@ func (s *ProxyServer) NextEntry(ctx context.Context, request *indexedmap.NextEnt
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("NextEntryRequest %+v failed: %v", request, err)
+		log.Warnf("NextEntryRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -135,7 +135,7 @@ func (s *ProxyServer) Remove(ctx context.Context, request *indexedmap.RemoveRequ
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("RemoveRequest %+v failed: %v", request, err)
+		log.Warnf("RemoveRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -150,7 +150,7 @@ func (s *ProxyServer) Clear(ctx context.Context, request *indexedmap.ClearReques
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("ClearRequest %+v failed: %v", request, err)
+		log.Warnf("ClearRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -165,7 +165,7 @@ func (s *ProxyServer) Events(request *indexedmap.EventsRequest, srv indexedmap.I
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("EventsRequest %+v failed: %v", request, err)
+		log.Warnf("EventsRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return errors.NewUnavailable(err.Error())
 		}
@@ -180,7 +180,7 @@ func (s *ProxyServer) Entries(request *indexedmap.EntriesRequest, srv indexedmap
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("EntriesRequest %+v failed: %v", request, err)
+		log.Warnf("EntriesRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return errors.NewUnavailable(err.Error())
 		}

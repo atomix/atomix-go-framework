@@ -30,7 +30,7 @@ func (s *ProxyServer) Set(ctx context.Context, request *value.SetRequest) (*valu
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("SetRequest %+v failed: %v", request, err)
+		log.Warnf("SetRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -45,7 +45,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *value.GetRequest) (*valu
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("GetRequest %+v failed: %v", request, err)
+		log.Warnf("GetRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -60,7 +60,7 @@ func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueServic
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("EventsRequest %+v failed: %v", request, err)
+		log.Warnf("EventsRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return errors.NewUnavailable(err.Error())
 		}

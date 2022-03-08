@@ -44,7 +44,7 @@ type ProxyServer struct {
 }
 
 func (s *ProxyServer) Size(ctx context.Context, request *_map.SizeRequest) (*_map.SizeResponse, error) {
-	log.Debugf("Received SizeRequest %+v", request)
+	log.Debugf("Received SizeRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request SizeRequest failed: %v", err)
@@ -83,12 +83,12 @@ func (s *ProxyServer) Size(ctx context.Context, request *_map.SizeRequest) (*_ma
 	for _, r := range responses {
 		response.Size_ += r.Size_
 	}
-	log.Debugf("Sending SizeResponse %+v", response)
+	log.Debugf("Sending SizeResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Put(ctx context.Context, request *_map.PutRequest) (*_map.PutResponse, error) {
-	log.Debugf("Received PutRequest %+v", request)
+	log.Debugf("Received PutRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request PutRequest failed: %v", err)
@@ -119,12 +119,12 @@ func (s *ProxyServer) Put(ctx context.Context, request *_map.PutRequest) (*_map.
 		log.Errorf("Request PutRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending PutResponse %+v", response)
+	log.Debugf("Sending PutResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Get(ctx context.Context, request *_map.GetRequest) (*_map.GetResponse, error) {
-	log.Debugf("Received GetRequest %+v", request)
+	log.Debugf("Received GetRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request GetRequest failed: %v", err)
@@ -155,12 +155,12 @@ func (s *ProxyServer) Get(ctx context.Context, request *_map.GetRequest) (*_map.
 		log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending GetResponse %+v", response)
+	log.Debugf("Sending GetResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Remove(ctx context.Context, request *_map.RemoveRequest) (*_map.RemoveResponse, error) {
-	log.Debugf("Received RemoveRequest %+v", request)
+	log.Debugf("Received RemoveRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request RemoveRequest failed: %v", err)
@@ -191,12 +191,12 @@ func (s *ProxyServer) Remove(ctx context.Context, request *_map.RemoveRequest) (
 		log.Errorf("Request RemoveRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending RemoveResponse %+v", response)
+	log.Debugf("Sending RemoveResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Clear(ctx context.Context, request *_map.ClearRequest) (*_map.ClearResponse, error) {
-	log.Debugf("Received ClearRequest %+v", request)
+	log.Debugf("Received ClearRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request ClearRequest failed: %v", err)
@@ -223,12 +223,12 @@ func (s *ProxyServer) Clear(ctx context.Context, request *_map.ClearRequest) (*_
 	}
 
 	response := &_map.ClearResponse{}
-	log.Debugf("Sending ClearResponse %+v", response)
+	log.Debugf("Sending ClearResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Events(request *_map.EventsRequest, srv _map.MapService_EventsServer) error {
-	log.Debugf("Received EventsRequest %+v", request)
+	log.Debugf("Received EventsRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request EventsRequest failed: %v", err)
@@ -292,18 +292,18 @@ func (s *ProxyServer) Events(request *_map.EventsRequest, srv _map.MapService_Ev
 			return errors.Proto(err)
 		}
 
-		log.Debugf("Sending EventsResponse %+v", response)
+		log.Debugf("Sending EventsResponse %.250s", response)
 		if err = srv.Send(response); err != nil {
 			log.Warnf("Response EventsResponse failed: %v", err)
 			return err
 		}
 	}
-	log.Debugf("Finished EventsRequest %+v", request)
+	log.Debugf("Finished EventsRequest %.250s", request)
 	return nil
 }
 
 func (s *ProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_EntriesServer) error {
-	log.Debugf("Received EntriesRequest %+v", request)
+	log.Debugf("Received EntriesRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request EntriesRequest failed: %v", err)
@@ -367,12 +367,12 @@ func (s *ProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_
 			return errors.Proto(err)
 		}
 
-		log.Debugf("Sending EntriesResponse %+v", response)
+		log.Debugf("Sending EntriesResponse %.250s", response)
 		if err = srv.Send(response); err != nil {
 			log.Warnf("Response EntriesResponse failed: %v", err)
 			return err
 		}
 	}
-	log.Debugf("Finished EntriesRequest %+v", request)
+	log.Debugf("Finished EntriesRequest %.250s", request)
 	return nil
 }

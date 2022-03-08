@@ -37,7 +37,7 @@ type ProxyServer struct {
 }
 
 func (s *ProxyServer) Set(ctx context.Context, request *counter.SetRequest) (*counter.SetResponse, error) {
-	log.Debugf("Received SetRequest %+v", request)
+	log.Debugf("Received SetRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request SetRequest failed: %v", err)
@@ -71,12 +71,12 @@ func (s *ProxyServer) Set(ctx context.Context, request *counter.SetRequest) (*co
 		log.Errorf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending SetResponse %+v", response)
+	log.Debugf("Sending SetResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Get(ctx context.Context, request *counter.GetRequest) (*counter.GetResponse, error) {
-	log.Debugf("Received GetRequest %+v", request)
+	log.Debugf("Received GetRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request GetRequest failed: %v", err)
@@ -110,12 +110,12 @@ func (s *ProxyServer) Get(ctx context.Context, request *counter.GetRequest) (*co
 		log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending GetResponse %+v", response)
+	log.Debugf("Sending GetResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Increment(ctx context.Context, request *counter.IncrementRequest) (*counter.IncrementResponse, error) {
-	log.Debugf("Received IncrementRequest %+v", request)
+	log.Debugf("Received IncrementRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request IncrementRequest failed: %v", err)
@@ -149,12 +149,12 @@ func (s *ProxyServer) Increment(ctx context.Context, request *counter.IncrementR
 		log.Errorf("Request IncrementRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending IncrementResponse %+v", response)
+	log.Debugf("Sending IncrementResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Decrement(ctx context.Context, request *counter.DecrementRequest) (*counter.DecrementResponse, error) {
-	log.Debugf("Received DecrementRequest %+v", request)
+	log.Debugf("Received DecrementRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request DecrementRequest failed: %v", err)
@@ -188,6 +188,6 @@ func (s *ProxyServer) Decrement(ctx context.Context, request *counter.DecrementR
 		log.Errorf("Request DecrementRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending DecrementResponse %+v", response)
+	log.Debugf("Sending DecrementResponse %.250s", response)
 	return response, nil
 }

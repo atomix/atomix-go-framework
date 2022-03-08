@@ -30,7 +30,7 @@ func (s *ProxyServer) Set(ctx context.Context, request *counter.SetRequest) (*co
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("SetRequest %+v failed: %v", request, err)
+		log.Warnf("SetRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -45,7 +45,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *counter.GetRequest) (*co
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("GetRequest %+v failed: %v", request, err)
+		log.Warnf("GetRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -60,7 +60,7 @@ func (s *ProxyServer) Increment(ctx context.Context, request *counter.IncrementR
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("IncrementRequest %+v failed: %v", request, err)
+		log.Warnf("IncrementRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -75,7 +75,7 @@ func (s *ProxyServer) Decrement(ctx context.Context, request *counter.DecrementR
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("DecrementRequest %+v failed: %v", request, err)
+		log.Warnf("DecrementRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}

@@ -50,26 +50,26 @@ func RetryingUnaryClientInterceptor(callOpts ...CallOption) func(ctx context.Con
 			b.MaxInterval = *callOpts.maxInterval
 		}
 		return backoff.Retry(func() error {
-			log.Debugf("SendMsg %s", req)
+			log.Debugf("SendMsg %.250s", req)
 			callCtx := newCallContext(ctx, callOpts)
 			if err := invoker(callCtx, method, req, reply, cc, grpcOpts...); err != nil {
 				if isContextError(err) {
 					if ctx.Err() != nil {
-						log.Debugf("SendMsg %s: error", req, err)
+						log.Debugf("SendMsg %.250s: error", req, err)
 						return backoff.Permanent(err)
 					} else if callOpts.perCallTimeout != nil {
-						log.Debugf("SendMsg %s: error", req, err)
+						log.Debugf("SendMsg %.250s: error", req, err)
 						return err
 					}
 				}
 				if isRetryable(callOpts, err) {
-					log.Debugf("SendMsg %s: error", req, err)
+					log.Debugf("SendMsg %.250s: error", req, err)
 					return err
 				}
-				log.Warnf("SendMsg %s: error", req, err)
+				log.Warnf("SendMsg %.250s: error", req, err)
 				return backoff.Permanent(err)
 			}
-			log.Debugf("RecvMsg %s", reply)
+			log.Debugf("RecvMsg %.250s", reply)
 			return nil
 		}, b)
 	}
@@ -239,7 +239,7 @@ func (s *retryingClientStream) Trailer() metadata.MD {
 }
 
 func (s *retryingClientStream) SendMsg(m interface{}) error {
-	log.Debugf("SendMsg %s", m)
+	log.Debugf("SendMsg %.250s", m)
 	return s.retrySendMsg(m)
 }
 
@@ -247,7 +247,7 @@ func (s *retryingClientStream) retrySendMsg(m interface{}) error {
 	return backoff.RetryNotify(func() error {
 		return s.trySendMsg(m)
 	}, backoff.NewExponentialBackOff(), func(err error, duration time.Duration) {
-		log.Debugf("SendMsg %s: retry after %s", m, duration, err)
+		log.Debugf("SendMsg %.250s: retry after %.250s", m, duration, err)
 	})
 }
 
@@ -259,26 +259,26 @@ func (s *retryingClientStream) trySendMsg(m interface{}) error {
 	}
 	if isContextError(err) {
 		if s.ctx.Err() != nil {
-			log.Debugf("SendMsg %s: error", m, err)
+			log.Debugf("SendMsg %.250s: error", m, err)
 			return backoff.Permanent(err)
 		} else if s.opts.perCallTimeout != nil {
-			log.Debugf("SendMsg %s: error", m, err)
+			log.Debugf("SendMsg %.250s: error", m, err)
 			if err := s.tryStream(); err != nil {
-				log.Debug("SendMsg %s: error", m, err)
+				log.Debug("SendMsg %.250s: error", m, err)
 				return err
 			}
 			return s.trySendMsg(m)
 		}
 	}
 	if isRetryable(s.opts, err) {
-		log.Debugf("SendMsg %s: error", m, err)
+		log.Debugf("SendMsg %.250s: error", m, err)
 		if err := s.tryStream(); err != nil {
-			log.Debug("SendMsg %s: error", m, err)
+			log.Debug("SendMsg %.250s: error", m, err)
 			return err
 		}
 		return s.trySendMsg(m)
 	}
-	log.Warnf("SendMsg %s: error", m, err)
+	log.Warnf("SendMsg %.250s: error", m, err)
 	return backoff.Permanent(err)
 }
 
@@ -297,7 +297,7 @@ func (s *retryingClientStream) retryRecvMsg(m interface{}) error {
 func (s *retryingClientStream) tryRecvMsg(m interface{}) error {
 	err := s.getStream().RecvMsg(m)
 	if err == nil {
-		log.Debugf("RecvMsg %s", m)
+		log.Debugf("RecvMsg %.250s", m)
 		return nil
 	}
 	if err == io.EOF {
@@ -367,22 +367,22 @@ func (s *retryingClientStream) tryStream() error {
 
 	msgs := s.buffer.list()
 	for _, m := range msgs {
-		log.Debugf("SendMsg %s", m)
+		log.Debugf("SendMsg %.250s", m)
 		if err := stream.SendMsg(m); err != nil {
 			if isContextError(err) {
 				if s.ctx.Err() != nil {
-					log.Debugf("SendMsg %s: error", m, err)
+					log.Debugf("SendMsg %.250s: error", m, err)
 					return backoff.Permanent(err)
 				} else if s.opts.perCallTimeout != nil {
-					log.Debugf("SendMsg %s: error", m, err)
+					log.Debugf("SendMsg %.250s: error", m, err)
 					return err
 				}
 			}
 			if isRetryable(s.opts, err) {
-				log.Debugf("SendMsg %s: error", m, err)
+				log.Debugf("SendMsg %.250s: error", m, err)
 				return err
 			}
-			log.Warnf("SendMsg %s: error", m, err)
+			log.Warnf("SendMsg %.250s: error", m, err)
 			return backoff.Permanent(err)
 		}
 	}

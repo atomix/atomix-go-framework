@@ -37,7 +37,7 @@ type ProxyServer struct {
 }
 
 func (s *ProxyServer) Set(ctx context.Context, request *value.SetRequest) (*value.SetResponse, error) {
-	log.Debugf("Received SetRequest %+v", request)
+	log.Debugf("Received SetRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request SetRequest failed: %v", err)
@@ -71,12 +71,12 @@ func (s *ProxyServer) Set(ctx context.Context, request *value.SetRequest) (*valu
 		log.Errorf("Request SetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending SetResponse %+v", response)
+	log.Debugf("Sending SetResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Get(ctx context.Context, request *value.GetRequest) (*value.GetResponse, error) {
-	log.Debugf("Received GetRequest %+v", request)
+	log.Debugf("Received GetRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request GetRequest failed: %v", err)
@@ -110,12 +110,12 @@ func (s *ProxyServer) Get(ctx context.Context, request *value.GetRequest) (*valu
 		log.Errorf("Request GetRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending GetResponse %+v", response)
+	log.Debugf("Sending GetResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueService_EventsServer) error {
-	log.Debugf("Received EventsRequest %+v", request)
+	log.Debugf("Received EventsRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request EventsRequest failed: %v", err)
@@ -172,12 +172,12 @@ func (s *ProxyServer) Events(request *value.EventsRequest, srv value.ValueServic
 			return errors.Proto(err)
 		}
 
-		log.Debugf("Sending EventsResponse %+v", response)
+		log.Debugf("Sending EventsResponse %.250s", response)
 		if err = srv.Send(response); err != nil {
 			log.Warnf("Response EventsResponse failed: %v", err)
 			return err
 		}
 	}
-	log.Debugf("Finished EventsRequest %+v", request)
+	log.Debugf("Finished EventsRequest %.250s", request)
 	return nil
 }

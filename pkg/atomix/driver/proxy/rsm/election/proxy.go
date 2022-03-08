@@ -41,7 +41,7 @@ type ProxyServer struct {
 }
 
 func (s *ProxyServer) Enter(ctx context.Context, request *election.EnterRequest) (*election.EnterResponse, error) {
-	log.Debugf("Received EnterRequest %+v", request)
+	log.Debugf("Received EnterRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request EnterRequest failed: %v", err)
@@ -75,12 +75,12 @@ func (s *ProxyServer) Enter(ctx context.Context, request *election.EnterRequest)
 		log.Errorf("Request EnterRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending EnterResponse %+v", response)
+	log.Debugf("Sending EnterResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Withdraw(ctx context.Context, request *election.WithdrawRequest) (*election.WithdrawResponse, error) {
-	log.Debugf("Received WithdrawRequest %+v", request)
+	log.Debugf("Received WithdrawRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request WithdrawRequest failed: %v", err)
@@ -114,12 +114,12 @@ func (s *ProxyServer) Withdraw(ctx context.Context, request *election.WithdrawRe
 		log.Errorf("Request WithdrawRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending WithdrawResponse %+v", response)
+	log.Debugf("Sending WithdrawResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Anoint(ctx context.Context, request *election.AnointRequest) (*election.AnointResponse, error) {
-	log.Debugf("Received AnointRequest %+v", request)
+	log.Debugf("Received AnointRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request AnointRequest failed: %v", err)
@@ -153,12 +153,12 @@ func (s *ProxyServer) Anoint(ctx context.Context, request *election.AnointReques
 		log.Errorf("Request AnointRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending AnointResponse %+v", response)
+	log.Debugf("Sending AnointResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Promote(ctx context.Context, request *election.PromoteRequest) (*election.PromoteResponse, error) {
-	log.Debugf("Received PromoteRequest %+v", request)
+	log.Debugf("Received PromoteRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request PromoteRequest failed: %v", err)
@@ -192,12 +192,12 @@ func (s *ProxyServer) Promote(ctx context.Context, request *election.PromoteRequ
 		log.Errorf("Request PromoteRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending PromoteResponse %+v", response)
+	log.Debugf("Sending PromoteResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Evict(ctx context.Context, request *election.EvictRequest) (*election.EvictResponse, error) {
-	log.Debugf("Received EvictRequest %+v", request)
+	log.Debugf("Received EvictRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request EvictRequest failed: %v", err)
@@ -231,12 +231,12 @@ func (s *ProxyServer) Evict(ctx context.Context, request *election.EvictRequest)
 		log.Errorf("Request EvictRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending EvictResponse %+v", response)
+	log.Debugf("Sending EvictResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) GetTerm(ctx context.Context, request *election.GetTermRequest) (*election.GetTermResponse, error) {
-	log.Debugf("Received GetTermRequest %+v", request)
+	log.Debugf("Received GetTermRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request GetTermRequest failed: %v", err)
@@ -270,12 +270,12 @@ func (s *ProxyServer) GetTerm(ctx context.Context, request *election.GetTermRequ
 		log.Errorf("Request GetTermRequest failed: %v", err)
 		return nil, errors.Proto(err)
 	}
-	log.Debugf("Sending GetTermResponse %+v", response)
+	log.Debugf("Sending GetTermResponse %.250s", response)
 	return response, nil
 }
 
 func (s *ProxyServer) Events(request *election.EventsRequest, srv election.LeaderElectionService_EventsServer) error {
-	log.Debugf("Received EventsRequest %+v", request)
+	log.Debugf("Received EventsRequest %.250s", request)
 	input, err := proto.Marshal(request)
 	if err != nil {
 		log.Errorf("Request EventsRequest failed: %v", err)
@@ -332,12 +332,12 @@ func (s *ProxyServer) Events(request *election.EventsRequest, srv election.Leade
 			return errors.Proto(err)
 		}
 
-		log.Debugf("Sending EventsResponse %+v", response)
+		log.Debugf("Sending EventsResponse %.250s", response)
 		if err = srv.Send(response); err != nil {
 			log.Warnf("Response EventsResponse failed: %v", err)
 			return err
 		}
 	}
-	log.Debugf("Finished EventsRequest %+v", request)
+	log.Debugf("Finished EventsRequest %.250s", request)
 	return nil
 }

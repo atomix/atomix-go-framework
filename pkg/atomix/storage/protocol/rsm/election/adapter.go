@@ -57,19 +57,19 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 			return
 		}
 
-		log.Debugf("Proposal EnterProposal %s", p)
+		log.Debugf("Proposal EnterProposal %.250s", p)
 		response, err := s.rsm.Enter(p)
 		if err != nil {
-			log.Debugf("Proposal EnterProposal %s failed: %v", p, err)
+			log.Debugf("Proposal EnterProposal %.250s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
 			if err != nil {
 				err = errors.NewInternal(err.Error())
-				log.Errorf("Proposal EnterProposal %s failed: %v", p, err)
+				log.Errorf("Proposal EnterProposal %.250s failed: %v", p, err)
 				command.Output(nil, err)
 			} else {
-				log.Debugf("Proposal EnterProposal %s complete: %+v", p, response)
+				log.Debugf("Proposal EnterProposal %.250s complete: %.250s", p, response)
 				command.Output(output, nil)
 			}
 		}
@@ -83,19 +83,19 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 			return
 		}
 
-		log.Debugf("Proposal WithdrawProposal %s", p)
+		log.Debugf("Proposal WithdrawProposal %.250s", p)
 		response, err := s.rsm.Withdraw(p)
 		if err != nil {
-			log.Debugf("Proposal WithdrawProposal %s failed: %v", p, err)
+			log.Debugf("Proposal WithdrawProposal %.250s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
 			if err != nil {
 				err = errors.NewInternal(err.Error())
-				log.Errorf("Proposal WithdrawProposal %s failed: %v", p, err)
+				log.Errorf("Proposal WithdrawProposal %.250s failed: %v", p, err)
 				command.Output(nil, err)
 			} else {
-				log.Debugf("Proposal WithdrawProposal %s complete: %+v", p, response)
+				log.Debugf("Proposal WithdrawProposal %.250s complete: %.250s", p, response)
 				command.Output(output, nil)
 			}
 		}
@@ -109,19 +109,19 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 			return
 		}
 
-		log.Debugf("Proposal AnointProposal %s", p)
+		log.Debugf("Proposal AnointProposal %.250s", p)
 		response, err := s.rsm.Anoint(p)
 		if err != nil {
-			log.Debugf("Proposal AnointProposal %s failed: %v", p, err)
+			log.Debugf("Proposal AnointProposal %.250s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
 			if err != nil {
 				err = errors.NewInternal(err.Error())
-				log.Errorf("Proposal AnointProposal %s failed: %v", p, err)
+				log.Errorf("Proposal AnointProposal %.250s failed: %v", p, err)
 				command.Output(nil, err)
 			} else {
-				log.Debugf("Proposal AnointProposal %s complete: %+v", p, response)
+				log.Debugf("Proposal AnointProposal %.250s complete: %.250s", p, response)
 				command.Output(output, nil)
 			}
 		}
@@ -135,19 +135,19 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 			return
 		}
 
-		log.Debugf("Proposal PromoteProposal %s", p)
+		log.Debugf("Proposal PromoteProposal %.250s", p)
 		response, err := s.rsm.Promote(p)
 		if err != nil {
-			log.Debugf("Proposal PromoteProposal %s failed: %v", p, err)
+			log.Debugf("Proposal PromoteProposal %.250s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
 			if err != nil {
 				err = errors.NewInternal(err.Error())
-				log.Errorf("Proposal PromoteProposal %s failed: %v", p, err)
+				log.Errorf("Proposal PromoteProposal %.250s failed: %v", p, err)
 				command.Output(nil, err)
 			} else {
-				log.Debugf("Proposal PromoteProposal %s complete: %+v", p, response)
+				log.Debugf("Proposal PromoteProposal %.250s complete: %.250s", p, response)
 				command.Output(output, nil)
 			}
 		}
@@ -161,19 +161,19 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 			return
 		}
 
-		log.Debugf("Proposal EvictProposal %s", p)
+		log.Debugf("Proposal EvictProposal %.250s", p)
 		response, err := s.rsm.Evict(p)
 		if err != nil {
-			log.Debugf("Proposal EvictProposal %s failed: %v", p, err)
+			log.Debugf("Proposal EvictProposal %.250s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
 			if err != nil {
 				err = errors.NewInternal(err.Error())
-				log.Errorf("Proposal EvictProposal %s failed: %v", p, err)
+				log.Errorf("Proposal EvictProposal %.250s failed: %v", p, err)
 				command.Output(nil, err)
 			} else {
-				log.Debugf("Proposal EvictProposal %s complete: %+v", p, response)
+				log.Debugf("Proposal EvictProposal %.250s complete: %.250s", p, response)
 				command.Output(output, nil)
 			}
 		}
@@ -187,7 +187,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 			return
 		}
 
-		log.Debugf("Proposal EventsProposal %s", p)
+		log.Debugf("Proposal EventsProposal %.250s", p)
 		s.rsm.Events(p)
 	default:
 		err := errors.NewNotSupported("unknown operation %d", command.OperationID())
@@ -207,19 +207,19 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 			return
 		}
 
-		log.Debugf("Querying GetTermQuery %s", q)
+		log.Debugf("Querying GetTermQuery %.250s", q)
 		response, err := s.rsm.GetTerm(q)
 		if err != nil {
-			log.Debugf("Querying GetTermQuery %s failed: %v", q, err)
+			log.Debugf("Querying GetTermQuery %.250s failed: %v", q, err)
 			query.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
 			if err != nil {
 				err = errors.NewInternal(err.Error())
-				log.Errorf("Querying GetTermQuery %s failed: %v", q, err)
+				log.Errorf("Querying GetTermQuery %.250s failed: %v", q, err)
 				query.Output(nil, err)
 			} else {
-				log.Debugf("Querying GetTermQuery %s complete: %+v", q, response)
+				log.Debugf("Querying GetTermQuery %.250s complete: %+v", q, response)
 				query.Output(output, nil)
 			}
 		}

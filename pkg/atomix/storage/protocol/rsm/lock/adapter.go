@@ -53,7 +53,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 			return
 		}
 
-		log.Debugf("Proposal LockProposal %s", p)
+		log.Debugf("Proposal LockProposal %.250s", p)
 		s.rsm.Lock(p)
 	case 2:
 		p, err := newUnlockProposal(command)
@@ -64,19 +64,19 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 			return
 		}
 
-		log.Debugf("Proposal UnlockProposal %s", p)
+		log.Debugf("Proposal UnlockProposal %.250s", p)
 		response, err := s.rsm.Unlock(p)
 		if err != nil {
-			log.Debugf("Proposal UnlockProposal %s failed: %v", p, err)
+			log.Debugf("Proposal UnlockProposal %.250s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
 			if err != nil {
 				err = errors.NewInternal(err.Error())
-				log.Errorf("Proposal UnlockProposal %s failed: %v", p, err)
+				log.Errorf("Proposal UnlockProposal %.250s failed: %v", p, err)
 				command.Output(nil, err)
 			} else {
-				log.Debugf("Proposal UnlockProposal %s complete: %+v", p, response)
+				log.Debugf("Proposal UnlockProposal %.250s complete: %.250s", p, response)
 				command.Output(output, nil)
 			}
 		}
@@ -99,19 +99,19 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 			return
 		}
 
-		log.Debugf("Querying GetLockQuery %s", q)
+		log.Debugf("Querying GetLockQuery %.250s", q)
 		response, err := s.rsm.GetLock(q)
 		if err != nil {
-			log.Debugf("Querying GetLockQuery %s failed: %v", q, err)
+			log.Debugf("Querying GetLockQuery %.250s failed: %v", q, err)
 			query.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
 			if err != nil {
 				err = errors.NewInternal(err.Error())
-				log.Errorf("Querying GetLockQuery %s failed: %v", q, err)
+				log.Errorf("Querying GetLockQuery %.250s failed: %v", q, err)
 				query.Output(nil, err)
 			} else {
-				log.Debugf("Querying GetLockQuery %s complete: %+v", q, response)
+				log.Debugf("Querying GetLockQuery %.250s complete: %+v", q, response)
 				query.Output(output, nil)
 			}
 		}

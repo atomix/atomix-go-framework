@@ -57,19 +57,19 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 			return
 		}
 
-		log.Debugf("Proposal AddProposal %s", p)
+		log.Debugf("Proposal AddProposal %.250s", p)
 		response, err := s.rsm.Add(p)
 		if err != nil {
-			log.Debugf("Proposal AddProposal %s failed: %v", p, err)
+			log.Debugf("Proposal AddProposal %.250s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
 			if err != nil {
 				err = errors.NewInternal(err.Error())
-				log.Errorf("Proposal AddProposal %s failed: %v", p, err)
+				log.Errorf("Proposal AddProposal %.250s failed: %v", p, err)
 				command.Output(nil, err)
 			} else {
-				log.Debugf("Proposal AddProposal %s complete: %+v", p, response)
+				log.Debugf("Proposal AddProposal %.250s complete: %.250s", p, response)
 				command.Output(output, nil)
 			}
 		}
@@ -83,19 +83,19 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 			return
 		}
 
-		log.Debugf("Proposal RemoveProposal %s", p)
+		log.Debugf("Proposal RemoveProposal %.250s", p)
 		response, err := s.rsm.Remove(p)
 		if err != nil {
-			log.Debugf("Proposal RemoveProposal %s failed: %v", p, err)
+			log.Debugf("Proposal RemoveProposal %.250s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
 			if err != nil {
 				err = errors.NewInternal(err.Error())
-				log.Errorf("Proposal RemoveProposal %s failed: %v", p, err)
+				log.Errorf("Proposal RemoveProposal %.250s failed: %v", p, err)
 				command.Output(nil, err)
 			} else {
-				log.Debugf("Proposal RemoveProposal %s complete: %+v", p, response)
+				log.Debugf("Proposal RemoveProposal %.250s complete: %.250s", p, response)
 				command.Output(output, nil)
 			}
 		}
@@ -109,19 +109,19 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 			return
 		}
 
-		log.Debugf("Proposal ClearProposal %s", p)
+		log.Debugf("Proposal ClearProposal %.250s", p)
 		response, err := s.rsm.Clear(p)
 		if err != nil {
-			log.Debugf("Proposal ClearProposal %s failed: %v", p, err)
+			log.Debugf("Proposal ClearProposal %.250s failed: %v", p, err)
 			command.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
 			if err != nil {
 				err = errors.NewInternal(err.Error())
-				log.Errorf("Proposal ClearProposal %s failed: %v", p, err)
+				log.Errorf("Proposal ClearProposal %.250s failed: %v", p, err)
 				command.Output(nil, err)
 			} else {
-				log.Debugf("Proposal ClearProposal %s complete: %+v", p, response)
+				log.Debugf("Proposal ClearProposal %.250s complete: %.250s", p, response)
 				command.Output(output, nil)
 			}
 		}
@@ -135,7 +135,7 @@ func (s *ServiceAdaptor) ExecuteCommand(command rsm.Command) {
 			return
 		}
 
-		log.Debugf("Proposal EventsProposal %s", p)
+		log.Debugf("Proposal EventsProposal %.250s", p)
 		s.rsm.Events(p)
 	default:
 		err := errors.NewNotSupported("unknown operation %d", command.OperationID())
@@ -155,19 +155,19 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 			return
 		}
 
-		log.Debugf("Querying SizeQuery %s", q)
+		log.Debugf("Querying SizeQuery %.250s", q)
 		response, err := s.rsm.Size(q)
 		if err != nil {
-			log.Debugf("Querying SizeQuery %s failed: %v", q, err)
+			log.Debugf("Querying SizeQuery %.250s failed: %v", q, err)
 			query.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
 			if err != nil {
 				err = errors.NewInternal(err.Error())
-				log.Errorf("Querying SizeQuery %s failed: %v", q, err)
+				log.Errorf("Querying SizeQuery %.250s failed: %v", q, err)
 				query.Output(nil, err)
 			} else {
-				log.Debugf("Querying SizeQuery %s complete: %+v", q, response)
+				log.Debugf("Querying SizeQuery %.250s complete: %+v", q, response)
 				query.Output(output, nil)
 			}
 		}
@@ -181,19 +181,19 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 			return
 		}
 
-		log.Debugf("Querying ContainsQuery %s", q)
+		log.Debugf("Querying ContainsQuery %.250s", q)
 		response, err := s.rsm.Contains(q)
 		if err != nil {
-			log.Debugf("Querying ContainsQuery %s failed: %v", q, err)
+			log.Debugf("Querying ContainsQuery %.250s failed: %v", q, err)
 			query.Output(nil, err)
 		} else {
 			output, err := proto.Marshal(response)
 			if err != nil {
 				err = errors.NewInternal(err.Error())
-				log.Errorf("Querying ContainsQuery %s failed: %v", q, err)
+				log.Errorf("Querying ContainsQuery %.250s failed: %v", q, err)
 				query.Output(nil, err)
 			} else {
-				log.Debugf("Querying ContainsQuery %s complete: %+v", q, response)
+				log.Debugf("Querying ContainsQuery %.250s complete: %+v", q, response)
 				query.Output(output, nil)
 			}
 		}
@@ -207,7 +207,7 @@ func (s *ServiceAdaptor) ExecuteQuery(query rsm.Query) {
 			return
 		}
 
-		log.Debugf("Querying ElementsQuery %s", q)
+		log.Debugf("Querying ElementsQuery %.250s", q)
 		s.rsm.Elements(q)
 	default:
 		err := errors.NewNotSupported("unknown operation %d", query.OperationID())

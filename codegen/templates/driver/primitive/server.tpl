@@ -78,7 +78,7 @@ func (s *{{ $server }}) {{ .Name }}(ctx context.Context, request *{{ template "t
 	}
 	proxy, err := s.registry.GetProxy(request{{ template "field" .Request.Headers }}.PrimitiveID)
 	if err != nil {
-	    log.Warnf("{{ .Request.Type.Name }} %+v failed: %v", request, err)
+	    log.Warnf("{{ .Request.Type.Name }} %.250s failed: %v", request, err)
 	    if errors.IsNotFound(err) {
 	        return nil, errors.NewUnavailable(err.Error())
 	    }
@@ -93,7 +93,7 @@ func (s *{{ $server }}) {{ .Name }}(request *{{ template "type" .Request.Type }}
 	}
 	proxy, err := s.registry.GetProxy(request{{ template "field" .Request.Headers }}.PrimitiveID)
 	if err != nil {
-	    log.Warnf("{{ .Request.Type.Name }} %+v failed: %v", request, err)
+	    log.Warnf("{{ .Request.Type.Name }} %.250s failed: %v", request, err)
 	    if errors.IsNotFound(err) {
 	        return errors.NewUnavailable(err.Error())
 	    }

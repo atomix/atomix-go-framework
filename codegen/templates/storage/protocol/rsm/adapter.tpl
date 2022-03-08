@@ -75,20 +75,20 @@ func (s *{{ $serviceImpl }}) ExecuteCommand(command rsm.Command) {
             return
         }
 
-        log.Debugf("Proposal {{ $proposalInt }} %s", p)
+        log.Debugf("Proposal {{ $proposalInt }} %.250s", p)
         {{- if (and .Response.IsUnary .Type.IsSync ) }}
         response, err := s.rsm.{{ .Name }}(p)
         if err != nil {
-            log.Debugf("Proposal {{ $proposalInt }} %s failed: %v", p, err)
+            log.Debugf("Proposal {{ $proposalInt }} %.250s failed: %v", p, err)
             command.Output(nil, err)
         } else {
             output, err := proto.Marshal(response)
             if err != nil {
                 err = errors.NewInternal(err.Error())
-                log.Errorf("Proposal {{ $proposalInt }} %s failed: %v", p, err)
+                log.Errorf("Proposal {{ $proposalInt }} %.250s failed: %v", p, err)
                 command.Output(nil, err)
             } else {
-                log.Debugf("Proposal {{ $proposalInt }} %s complete: %+v", p, response)
+                log.Debugf("Proposal {{ $proposalInt }} %.250s complete: %.250s", p, response)
                 command.Output(output, nil)
             }
         }
@@ -120,20 +120,20 @@ func (s *{{ $serviceImpl }}) ExecuteQuery(query rsm.Query) {
             return
         }
 
-        log.Debugf("Querying {{ $queryInt }} %s", q)
+        log.Debugf("Querying {{ $queryInt }} %.250s", q)
         {{- if .Response.IsUnary }}
         response, err := s.rsm.{{ .Name }}(q)
         if err != nil {
-            log.Debugf("Querying {{ $queryInt }} %s failed: %v", q, err)
+            log.Debugf("Querying {{ $queryInt }} %.250s failed: %v", q, err)
             query.Output(nil, err)
         } else {
             output, err := proto.Marshal(response)
             if err != nil {
                 err = errors.NewInternal(err.Error())
-                log.Errorf("Querying {{ $queryInt }} %s failed: %v", q, err)
+                log.Errorf("Querying {{ $queryInt }} %.250s failed: %v", q, err)
                 query.Output(nil, err)
             } else {
-                log.Debugf("Querying {{ $queryInt }} %s complete: %+v", q, response)
+                log.Debugf("Querying {{ $queryInt }} %.250s complete: %+v", q, response)
                 query.Output(output, nil)
             }
         }

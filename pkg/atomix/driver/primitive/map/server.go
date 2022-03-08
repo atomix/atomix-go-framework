@@ -30,7 +30,7 @@ func (s *ProxyServer) Size(ctx context.Context, request *_map.SizeRequest) (*_ma
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("SizeRequest %+v failed: %v", request, err)
+		log.Warnf("SizeRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -45,7 +45,7 @@ func (s *ProxyServer) Put(ctx context.Context, request *_map.PutRequest) (*_map.
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("PutRequest %+v failed: %v", request, err)
+		log.Warnf("PutRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -60,7 +60,7 @@ func (s *ProxyServer) Get(ctx context.Context, request *_map.GetRequest) (*_map.
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("GetRequest %+v failed: %v", request, err)
+		log.Warnf("GetRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -75,7 +75,7 @@ func (s *ProxyServer) Remove(ctx context.Context, request *_map.RemoveRequest) (
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("RemoveRequest %+v failed: %v", request, err)
+		log.Warnf("RemoveRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -90,7 +90,7 @@ func (s *ProxyServer) Clear(ctx context.Context, request *_map.ClearRequest) (*_
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("ClearRequest %+v failed: %v", request, err)
+		log.Warnf("ClearRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return nil, errors.NewUnavailable(err.Error())
 		}
@@ -105,7 +105,7 @@ func (s *ProxyServer) Events(request *_map.EventsRequest, srv _map.MapService_Ev
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("EventsRequest %+v failed: %v", request, err)
+		log.Warnf("EventsRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return errors.NewUnavailable(err.Error())
 		}
@@ -120,7 +120,7 @@ func (s *ProxyServer) Entries(request *_map.EntriesRequest, srv _map.MapService_
 	}
 	proxy, err := s.registry.GetProxy(request.Headers.PrimitiveID)
 	if err != nil {
-		log.Warnf("EntriesRequest %+v failed: %v", request, err)
+		log.Warnf("EntriesRequest %.250s failed: %v", request, err)
 		if errors.IsNotFound(err) {
 			return errors.NewUnavailable(err.Error())
 		}
