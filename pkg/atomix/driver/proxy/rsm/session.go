@@ -439,7 +439,7 @@ func (s *Session) open(ctx context.Context) error {
 					requestBytes := make([]byte, 8)
 					binary.BigEndian.PutUint64(requestBytes, uint64(requestID))
 					openRequests.Add(requestBytes)
-					if request.currentResponseID > request.ackedResponseID {
+					if request.currentResponseID > 1 && request.currentResponseID > request.ackedResponseID {
 						completeResponses[requestID] = request.currentResponseID
 					}
 				}
