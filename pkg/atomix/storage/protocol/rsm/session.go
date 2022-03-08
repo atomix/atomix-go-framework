@@ -141,10 +141,10 @@ func (s *primitiveSession) restore(snapshot *SessionSnapshot) error {
 	return nil
 }
 
-func (s *primitiveSession) keepAlive(lastRequestID RequestID, requestFilter *bloom.BloomFilter, responseFilter *bloom.BloomFilter) error {
+func (s *primitiveSession) keepAlive(lastRequestID RequestID, openRequests *bloom.BloomFilter, completeResponses map[RequestID]ResponseID) error {
 	log.Debugf("Keep-alive session %d", s.sessionID)
 	for _, serviceSession := range s.services {
-		if err := serviceSession.keepAlive(lastRequestID, requestFilter, responseFilter); err != nil {
+		if err := serviceSession.keepAlive(lastRequestID, openRequests, completeResponses); err != nil {
 			return err
 		}
 	}
@@ -267,10 +267,14 @@ func (s *primitiveServiceSession) restore(snapshot *ServiceSessionSnapshot) erro
 	return nil
 }
 
-func (s *primitiveServiceSession) keepAlive(lastRequestID RequestID, requestFilter *bloom.BloomFilter, responseFilter *bloom.BloomFilter) error {
+func (s *primitiveServiceSession) keepAlive(lastRequestID RequestID, openRequests *bloom.BloomFilter, completeResponses map[RequestID]ResponseID) error {
 	log.Debugf("Keep-alive session %d service %d", s.session.sessionID, s.service.serviceID)
 	for _, command := range s.commands.commands {
-		if err := command.keepAlive(lastRequestID, requestFilter, responseFilter); err != nil {
+		var ackResponse *ResponseID
+		if responseID, ok := completeResponses[command.request.RequestID]; ok {
+			ackResponse = &responseID
+		}
+		if err := command.keepAlive(lastRequestID, openRequests, ackResponse); err != nil {
 			return err
 		}
 	}
@@ -455,7 +459,7 @@ func (c *primitiveServiceSessionCommand) restore(snapshot *SessionCommandSnapsho
 	return nil
 }
 
-func (c *primitiveServiceSessionCommand) keepAlive(lastRequestID RequestID, requestFilter *bloom.BloomFilter, responseFilter *bloom.BloomFilter) error {
+func (c *primitiveServiceSessionCommand) keepAlive(lastRequestID RequestID, openRequests *bloom.BloomFilter, ackResponse *ResponseID) error {
 	if lastRequestID < c.request.RequestID {
 		return nil
 	}
@@ -464,7 +468,7 @@ func (c *primitiveServiceSessionCommand) keepAlive(lastRequestID RequestID, requ
 	// Close the canceled request and remove it from the session.
 	requestBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(requestBytes, uint64(c.request.RequestID))
-	if !requestFilter.Test(requestBytes) {
+	if !openRequests.Test(requestBytes) {
 		switch c.state {
 		case CommandRunning:
 			log.Debugf("Cancel command %d (session=%d, service=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
@@ -478,29 +482,26 @@ func (c *primitiveServiceSessionCommand) keepAlive(lastRequestID RequestID, requ
 
 	// The keep-alive filter indicates the next response ID the client is waiting for.
 	// Remove pending responses up to the first response ID matching the keep-alive filter.
-	elem := c.responses.Front()
-	for elem != nil {
-		next := elem.Next()
-		response := elem.Value.(*ServiceCommandResponse)
-		responseBytes := make([]byte, 8)
-		binary.BigEndian.PutUint64(responseBytes, uint64(response.ResponseID))
-		if !responseFilter.Test(responseBytes) {
+	if ackResponse != nil {
+		ackResponseID := *ackResponse
+		elem := c.responses.Front()
+		for elem != nil && elem.Value.(*ServiceCommandResponse).ResponseID <= ackResponseID {
+			next := elem.Next()
 			c.responses.Remove(elem)
-		} else {
-			log.Debugf("Keep-alive command %d (session=%d, service=%d, request=%d, response=%d)", c.commandID, c.session.service.serviceID, c.session.session.sessionID, c.request.RequestID, response.ResponseID)
-			break
+			elem = next
 		}
-		elem = next
-	}
 
-	if c.responses.Len() == 0 {
-		// If the command is complete and the client has acknowledged receipt of all responses,
-		// remove the command from the session.
-		if c.state == CommandComplete {
-			log.Debugf("Acknowledge command %d (session=%d, service=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
-			delete(c.session.requests, c.request.RequestID)
+		if c.responses.Len() == 0 {
+			// If the command is complete and the client has acknowledged receipt of all responses,
+			// remove the command from the session.
+			if c.state == CommandComplete {
+				log.Debugf("Acknowledge command %d (session=%d, service=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
+				delete(c.session.requests, c.request.RequestID)
+			} else {
+				log.Debugf("Keep-alive command %d (session=%d, service=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
+			}
 		} else {
-			log.Debugf("Keep-alive command %d (session=%d, service=%d, request=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID)
+			log.Debugf("Keep-alive command %d (session=%d, service=%d, request=%d, response=%d)", c.commandID, c.session.session.sessionID, c.session.service.serviceID, c.request.RequestID, ackResponseID)
 		}
 	}
 	return nil

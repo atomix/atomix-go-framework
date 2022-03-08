@@ -409,45 +409,49 @@ func (s *Session) open(ctx context.Context) error {
 				case sessionRequestEventStart:
 					for requestID < requestEvent.requestID {
 						requestID++
-						requests[requestID] = &sessionStream{
-							nextResponseID: 1,
-						}
+						requests[requestID] = &sessionStream{}
+						log.Debugf("Opened response stream for request %d", requestID)
 					}
 				case sessionRequestEventReceive:
 					request, ok := requests[requestEvent.requestID]
 					if ok {
-						if requestEvent.responseID == request.nextResponseID {
-							request.nextResponseID = requestEvent.responseID + 1
+						if requestEvent.responseID == request.currentResponseID+1 {
+							request.currentResponseID++
+							log.Debugf("Received request %d response %d", requestEvent.requestID, requestEvent.responseID)
 						}
 					}
 				case sessionRequestEventEnd:
 					delete(requests, requestEvent.requestID)
+					log.Debugf("Closed request %d response stream", requestEvent.requestID)
+				case sessionRequestEventAck:
+					request, ok := requests[requestEvent.requestID]
+					if ok {
+						if requestEvent.responseID > request.ackedResponseID {
+							request.ackedResponseID = requestEvent.responseID
+							log.Debugf("Acked request %d responses up to %d", requestEvent.requestID, requestEvent.responseID)
+						}
+					}
 				}
 			case <-ticker.C:
-				requestFilter := bloom.NewWithEstimates(uint(len(requests)), fpRate)
-				responseFilter := bloom.NewWithEstimates(uint(len(requests)), fpRate)
-				for requestID, stream := range requests {
+				openRequests := bloom.NewWithEstimates(uint(len(requests)), fpRate)
+				completeResponses := make(map[rsm.RequestID]rsm.ResponseID)
+				for requestID, request := range requests {
 					requestBytes := make([]byte, 8)
 					binary.BigEndian.PutUint64(requestBytes, uint64(requestID))
-					requestFilter.Add(requestBytes)
-					responseBytes := make([]byte, 8)
-					binary.BigEndian.PutUint64(responseBytes, uint64(stream.nextResponseID))
-					responseFilter.Add(responseBytes)
+					openRequests.Add(requestBytes)
+					if request.currentResponseID > 1 && request.currentResponseID > request.ackedResponseID {
+						completeResponses[requestID] = request.currentResponseID
+					}
 				}
-				go s.keepAliveSessions(context.Background(), requestID, requestFilter, responseFilter)
+				go s.keepAliveSessions(context.Background(), requestID, openRequests, completeResponses)
 			}
 		}
 	}()
 	return nil
 }
 
-func (s *Session) keepAliveSessions(ctx context.Context, requestID rsm.RequestID, requestFilter *bloom.BloomFilter, responseFilter *bloom.BloomFilter) error {
-	requestFilterBytes, err := json.Marshal(requestFilter)
-	if err != nil {
-		return err
-	}
-
-	responseFilterBytes, err := json.Marshal(responseFilter)
+func (s *Session) keepAliveSessions(ctx context.Context, lastRequestID rsm.RequestID, openRequests *bloom.BloomFilter, completeResponses map[rsm.RequestID]rsm.ResponseID) error {
+	openRequestsBytes, err := json.Marshal(openRequests)
 	if err != nil {
 		return err
 	}
@@ -457,10 +461,10 @@ func (s *Session) keepAliveSessions(ctx context.Context, requestID rsm.RequestID
 		Request: rsm.CommandRequest{
 			Request: &rsm.CommandRequest_KeepAlive{
 				KeepAlive: &rsm.KeepAliveRequest{
-					SessionID:      s.sessionID,
-					LastRequestID:  requestID,
-					RequestFilter:  requestFilterBytes,
-					ResponseFilter: responseFilterBytes,
+					SessionID:         s.sessionID,
+					LastRequestID:     lastRequestID,
+					OpenRequests:      openRequestsBytes,
+					CompleteResponses: completeResponses,
 				},
 			},
 		},
@@ -477,6 +481,14 @@ func (s *Session) keepAliveSessions(ctx context.Context, requestID rsm.RequestID
 		return errors.NewInternal(err.Error())
 	}
 	s.lastIndex.Update(response.Response.Index)
+
+	for requestID, responseID := range completeResponses {
+		s.requestCh <- sessionRequestEvent{
+			eventType:  sessionRequestEventAck,
+			requestID:  requestID,
+			responseID: responseID,
+		}
+	}
 	return nil
 }
 
@@ -538,6 +550,7 @@ const (
 	sessionRequestEventStart sessionRequestEventType = iota
 	sessionRequestEventReceive
 	sessionRequestEventEnd
+	sessionRequestEventAck
 )
 
 type sessionRequestEvent struct {
@@ -547,5 +560,6 @@ type sessionRequestEvent struct {
 }
 
 type sessionStream struct {
-	nextResponseID rsm.ResponseID
+	currentResponseID rsm.ResponseID
+	ackedResponseID   rsm.ResponseID
 }
