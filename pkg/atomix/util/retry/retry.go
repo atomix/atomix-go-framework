@@ -263,12 +263,20 @@ func (s *retryingClientStream) trySendMsg(m interface{}) error {
 			return backoff.Permanent(err)
 		} else if s.opts.perCallTimeout != nil {
 			log.Debugf("SendMsg %s: error", m, err)
-			return s.tryStream()
+			if err := s.tryStream(); err != nil {
+				log.Debug("SendMsg %s: error", m, err)
+				return err
+			}
+			return s.trySendMsg(m)
 		}
 	}
 	if isRetryable(s.opts, err) {
 		log.Debugf("SendMsg %s: error", m, err)
-		return s.tryStream()
+		if err := s.tryStream(); err != nil {
+			log.Debug("SendMsg %s: error", m, err)
+			return err
+		}
+		return s.trySendMsg(m)
 	}
 	log.Warnf("SendMsg %s: error", m, err)
 	return backoff.Permanent(err)
@@ -302,12 +310,20 @@ func (s *retryingClientStream) tryRecvMsg(m interface{}) error {
 			return backoff.Permanent(err)
 		} else if s.opts.perCallTimeout != nil {
 			log.Debug("RecvMsg: error", err)
-			return s.tryStream()
+			if err := s.tryStream(); err != nil {
+				log.Debug("RecvMsg: error", err)
+				return err
+			}
+			return s.tryRecvMsg(m)
 		}
 	}
 	if isRetryable(s.opts, err) {
 		log.Debug("RecvMsg: error", err)
-		return s.tryStream()
+		if err := s.tryStream(); err != nil {
+			log.Debug("RecvMsg: error", err)
+			return err
+		}
+		return s.tryRecvMsg(m)
 	}
 	log.Warn("RecvMsg: error", err)
 	return backoff.Permanent(err)
