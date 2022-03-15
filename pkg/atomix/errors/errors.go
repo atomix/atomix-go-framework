@@ -17,6 +17,7 @@ package errors
 import (
 	"context"
 	"fmt"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -51,6 +52,8 @@ const (
 	Internal
 	// Fault indicates a data fault occurred
 	Fault
+	// Aborted indicates a request is aborted
+	Aborted
 )
 
 // TypedError is an typed error
@@ -120,6 +123,9 @@ func From(err error) error {
 		return NewInternal(status.Message())
 	case codes.DataLoss:
 		return NewFault(status.Message())
+	case codes.Aborted:
+		return NewAborted(status.Message())
+
 	default:
 		return err
 	}
@@ -167,6 +173,8 @@ func Proto(err error) error {
 		return status.Error(codes.Internal, typed.Message)
 	case Fault:
 		return status.Error(codes.DataLoss, typed.Message)
+	case Aborted:
+		return status.Error(codes.Aborted, typed.Message)
 	default:
 		return status.Error(codes.Internal, err.Error())
 	}
@@ -246,6 +254,11 @@ func NewInternal(msg string, args ...interface{}) error {
 // NewFault returns a new Fault error
 func NewFault(msg string, args ...interface{}) error {
 	return New(Fault, msg, args...)
+}
+
+// NewAborted returns a new Aborted error
+func NewAborted(msg string, args ...interface{}) error {
+	return New(Aborted, msg, args...)
 }
 
 // Code returns the error code
@@ -332,4 +345,9 @@ func IsInternal(err error) bool {
 // IsFault checks whether the given error is a Fault error
 func IsFault(err error) bool {
 	return IsType(err, Fault)
+}
+
+// IsAborted checkes whether the given error is an Aborted error
+func IsAborted(err error) bool {
+	return IsType(err, Aborted)
 }

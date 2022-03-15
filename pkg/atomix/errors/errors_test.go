@@ -16,8 +16,9 @@ package errors
 
 import (
 	"errors"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFactories(t *testing.T) {
@@ -45,6 +46,8 @@ func TestFactories(t *testing.T) {
 	assert.Equal(t, "Timeout", NewTimeout("Timeout").Error())
 	assert.Equal(t, Internal, NewInternal("").(*TypedError).Type)
 	assert.Equal(t, "Internal", NewInternal("Internal").Error())
+	assert.Equal(t, Aborted, NewAborted("").(*TypedError).Type)
+	assert.Equal(t, "Aborted", NewAborted("Aborted").Error())
 }
 
 func TestPredicates(t *testing.T) {
@@ -72,4 +75,6 @@ func TestPredicates(t *testing.T) {
 	assert.True(t, IsTimeout(NewTimeout("Timeout")))
 	assert.False(t, IsInternal(errors.New("Internal")))
 	assert.True(t, IsInternal(NewInternal("Internal")))
+	assert.False(t, IsAborted(errors.New("Aborted")))
+	assert.True(t, IsAborted(NewAborted("Aborted")))
 }
