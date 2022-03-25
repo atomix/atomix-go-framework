@@ -107,11 +107,11 @@ func (s *primitiveService) Name() string {
 }
 
 func (s *primitiveService) Index() Index {
-	return s.manager.index
+	return s.manager.cmdIndex
 }
 
 func (s *primitiveService) Time() time.Time {
-	return s.manager.timestamp
+	return s.manager.cmdTime
 }
 
 func (s *primitiveService) Scheduler() Scheduler {

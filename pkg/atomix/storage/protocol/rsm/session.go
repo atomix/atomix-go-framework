@@ -106,8 +106,20 @@ type primitiveSession struct {
 	manager     *primitiveServiceManager
 	sessionID   SessionID
 	timeout     time.Duration
+	reset       bool
 	lastUpdated time.Time
 	services    map[ServiceID]*primitiveServiceSession
+}
+
+func (s *primitiveSession) resetTime(t time.Time) {
+	if !s.reset {
+		s.lastUpdated = t
+		s.reset = true
+	}
+}
+
+func (s *primitiveSession) expireTime() time.Time {
+	return s.lastUpdated.Add(s.timeout)
 }
 
 func (s *primitiveSession) getService(serviceID ServiceID) (*primitiveServiceSession, bool) {
@@ -119,7 +131,7 @@ func (s *primitiveSession) open(sessionID SessionID, timeout time.Duration) erro
 	log.Debugf("Open session %d", sessionID)
 	s.sessionID = sessionID
 	s.timeout = timeout
-	s.lastUpdated = s.manager.timestamp
+	s.lastUpdated = s.manager.cmdTime
 	s.manager.sessions[s.sessionID] = s
 	return nil
 }
@@ -142,14 +154,15 @@ func (s *primitiveSession) restore(snapshot *SessionSnapshot) error {
 	return nil
 }
 
-func (s *primitiveSession) keepAlive(lastRequestID RequestID, openRequests *bloom.BloomFilter, completeResponses map[RequestID]ResponseID) error {
+func (s *primitiveSession) keepAlive(t time.Time, lastRequestID RequestID, openRequests *bloom.BloomFilter, completeResponses map[RequestID]ResponseID) error {
 	log.Debugf("Keep-alive session %d", s.sessionID)
 	for _, serviceSession := range s.services {
 		if err := serviceSession.keepAlive(lastRequestID, openRequests, completeResponses); err != nil {
 			return err
 		}
 	}
-	s.lastUpdated = s.manager.timestamp
+	s.lastUpdated = t
+	s.reset = false
 	return nil
 }
 

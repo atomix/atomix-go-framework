@@ -142,18 +142,19 @@ func newServiceManager(registry *Registry) *primitiveServiceManager {
 }
 
 type primitiveServiceManager struct {
-	sessions  map[SessionID]*primitiveSession
-	services  map[ServiceID]*primitiveService
-	queries   map[Index]*list.List
-	queriesMu sync.RWMutex
-	registry  *Registry
-	scheduler *serviceScheduler
-	index     Index
-	timestamp time.Time
+	sessions    map[SessionID]*primitiveSession
+	services    map[ServiceID]*primitiveService
+	queries     map[Index]*list.List
+	queriesMu   sync.RWMutex
+	registry    *Registry
+	scheduler   *serviceScheduler
+	cmdIndex    Index
+	cmdTime     time.Time
+	prevCmdTime time.Time
 }
 
 func (m *primitiveServiceManager) snapshot() (*StateMachineSnapshot, error) {
-	log.Debugf("Backing up state to snapshot at index %d", m.index)
+	log.Debugf("Backing up state to snapshot at index %d", m.cmdIndex)
 	sessions := make([]*SessionSnapshot, 0, len(m.sessions))
 	for _, session := range m.sessions {
 		sessionSnapshot, err := session.snapshot()
@@ -172,8 +173,8 @@ func (m *primitiveServiceManager) snapshot() (*StateMachineSnapshot, error) {
 		services = append(services, serviceSnapshot)
 	}
 	return &StateMachineSnapshot{
-		Index:     m.index,
-		Timestamp: m.timestamp,
+		Index:     m.cmdIndex,
+		Timestamp: m.cmdTime,
 		Sessions:  sessions,
 		Services:  services,
 	}, nil
@@ -181,8 +182,8 @@ func (m *primitiveServiceManager) snapshot() (*StateMachineSnapshot, error) {
 
 func (m *primitiveServiceManager) restore(snapshot *StateMachineSnapshot) error {
 	log.Debugf("Restoring state from snapshot at index %d", snapshot.Index)
-	m.index = snapshot.Index
-	m.timestamp = snapshot.Timestamp
+	m.cmdIndex = snapshot.Index
+	m.cmdTime = snapshot.Timestamp
 	m.sessions = make(map[SessionID]*primitiveSession)
 	m.services = make(map[ServiceID]*primitiveService)
 	m.queries = make(map[Index]*list.List)
@@ -204,11 +205,12 @@ func (m *primitiveServiceManager) restore(snapshot *StateMachineSnapshot) error 
 }
 
 func (m *primitiveServiceManager) command(request *CommandRequest, stream streams.WriteStream) {
-	m.index++
-	if request.Timestamp != nil && request.Timestamp.After(m.timestamp) {
-		m.timestamp = *request.Timestamp
+	m.prevCmdTime = m.cmdTime
+	m.cmdIndex++
+	if request.Timestamp != nil && request.Timestamp.After(m.cmdTime) {
+		m.cmdTime = *request.Timestamp
 	}
-	m.scheduler.runScheduledTasks(m.timestamp)
+	m.scheduler.runScheduledTasks(m.cmdTime)
 
 	switch r := request.Request.(type) {
 	case *CommandRequest_SessionCommand:
@@ -217,7 +219,7 @@ func (m *primitiveServiceManager) command(request *CommandRequest, stream stream
 				return nil, err
 			}
 			return &CommandResponse{
-				Index: m.index,
+				Index: m.cmdIndex,
 				Response: &CommandResponse_SessionCommand{
 					SessionCommand: value.(*SessionCommandResponse),
 				},
@@ -229,7 +231,7 @@ func (m *primitiveServiceManager) command(request *CommandRequest, stream stream
 				return nil, err
 			}
 			return &CommandResponse{
-				Index: m.index,
+				Index: m.cmdIndex,
 				Response: &CommandResponse_KeepAlive{
 					KeepAlive: value.(*KeepAliveResponse),
 				},
@@ -241,7 +243,7 @@ func (m *primitiveServiceManager) command(request *CommandRequest, stream stream
 				return nil, err
 			}
 			return &CommandResponse{
-				Index: m.index,
+				Index: m.cmdIndex,
 				Response: &CommandResponse_OpenSession{
 					OpenSession: value.(*OpenSessionResponse),
 				},
@@ -253,7 +255,7 @@ func (m *primitiveServiceManager) command(request *CommandRequest, stream stream
 				return nil, err
 			}
 			return &CommandResponse{
-				Index: m.index,
+				Index: m.cmdIndex,
 				Response: &CommandResponse_CloseSession{
 					CloseSession: value.(*CloseSessionResponse),
 				},
@@ -264,18 +266,18 @@ func (m *primitiveServiceManager) command(request *CommandRequest, stream stream
 	m.scheduler.runImmediateTasks()
 
 	m.queriesMu.RLock()
-	queries, ok := m.queries[m.index]
+	queries, ok := m.queries[m.cmdIndex]
 	m.queriesMu.RUnlock()
 	if ok {
 		m.queriesMu.Lock()
 		elem := queries.Front()
 		for elem != nil {
 			query := elem.Value.(primitiveServiceQuery)
-			log.Debugf("Dequeued QueryRequest at index %d: %.250s", m.index, query.request)
+			log.Debugf("Dequeued QueryRequest at index %d: %.250s", m.cmdIndex, query.request)
 			m.indexQuery(query.request, query.stream)
 			elem = elem.Next()
 		}
-		delete(m.queries, m.index)
+		delete(m.queries, m.cmdIndex)
 		m.queriesMu.Unlock()
 	}
 }
@@ -347,7 +349,7 @@ func (m *primitiveServiceManager) createService(request *CreateServiceRequest, s
 
 	if service == nil {
 		service = newService(m)
-		if err := service.open(ServiceID(m.index), request.ServiceInfo); err != nil {
+		if err := service.open(ServiceID(m.cmdIndex), request.ServiceInfo); err != nil {
 			stream.Error(err)
 			return
 		}
@@ -396,15 +398,33 @@ func (m *primitiveServiceManager) keepAlive(request *KeepAliveRequest, stream st
 		return
 	}
 
-	if err := session.keepAlive(request.LastRequestID, openRequests, request.CompleteResponses); err != nil {
+	if err := session.keepAlive(m.cmdTime, request.LastRequestID, openRequests, request.CompleteResponses); err != nil {
 		stream.Error(err)
 		return
 	}
 	stream.Value(&KeepAliveResponse{})
 
+	// Compute the minimum session timeout
+	var minSessionTimeout time.Duration
 	for _, session := range m.sessions {
-		if m.timestamp.After(session.lastUpdated.Add(session.timeout)) {
-			log.Infof("Session %d expired after %s", session.sessionID, m.timestamp.Sub(session.lastUpdated))
+		if session.timeout > minSessionTimeout {
+			minSessionTimeout = session.timeout
+		}
+	}
+
+	// Compute the maximum time at which sessions may be expired.
+	// If no keep-alive has been received from any session for more than the minimum session
+	// timeout, suspect a stop-the-world pause may have occurred. We decline to expire any
+	// of the sessions in this scenario, instead resetting the timestamps for all the sessions.
+	// Only expire a session if keep-alives have been received from other sessions during the
+	// session's expiration period.
+	maxExpireTime := m.prevCmdTime.Add(minSessionTimeout)
+	for _, session := range m.sessions {
+		if m.cmdTime.After(maxExpireTime) {
+			session.resetTime(m.cmdTime)
+		}
+		if m.cmdTime.After(session.expireTime()) {
+			log.Infof("Session %d expired after %s", session.sessionID, m.cmdTime.Sub(session.lastUpdated))
 			if err := session.close(); err != nil {
 				log.Error(err)
 			}
@@ -415,7 +435,7 @@ func (m *primitiveServiceManager) keepAlive(request *KeepAliveRequest, stream st
 func (m *primitiveServiceManager) openSession(request *OpenSessionRequest, stream streams.WriteStream) {
 	defer stream.Close()
 	session := newSession(m)
-	if err := session.open(SessionID(m.index), request.Timeout); err != nil {
+	if err := session.open(SessionID(m.cmdIndex), request.Timeout); err != nil {
 		stream.Error(err)
 		return
 	}
@@ -439,8 +459,8 @@ func (m *primitiveServiceManager) closeSession(request *CloseSessionRequest, str
 }
 
 func (m *primitiveServiceManager) query(request *QueryRequest, stream streams.WriteStream) {
-	if request.LastIndex > m.index {
-		log.Debugf("Enqueued QueryRequest at index %d: %.250s", m.index, request)
+	if request.LastIndex > m.cmdIndex {
+		log.Debugf("Enqueued QueryRequest at index %d: %.250s", m.cmdIndex, request)
 		m.queriesMu.Lock()
 		queries, ok := m.queries[request.LastIndex]
 		if !ok {
