@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019-present Open Networking Foundation <info@opennetworking.org>
+#
+# SPDX-License-Identifier: Apache-2.0
+
 export CGO_ENABLED=0
 export GO111MODULE=on
 
@@ -12,7 +16,7 @@ build:
 	go build -v ./...
 
 test: # @HELP run the unit tests and source code validation
-test: build license_check linters
+test: build license # linters
 	go test github.com/atomix/atomix-go-framework/pkg/...
 
 protoc-gen-atomix: # @HELP build the source code
@@ -38,9 +42,6 @@ coverage: build linters license_check
 linters: # @HELP examines Go source code and reports coding problems
 	golangci-lint run
 
-license_check: # @HELP examine and ensure license headers exist
-	./build/bin/license-check
-
 protos:
 	docker run -it \
 		-v $(PARENT_DIR)/atomix-api:/go/src/github.com/atomix/atomix-api \
@@ -48,3 +49,9 @@ protos:
 		-w /go/src/github.com/atomix/atomix-go-framework \
 		--entrypoint build/bin/compile_protos.sh \
 		onosproject/protoc-go:stable
+
+reuse-tool: # @HELP install reuse if not present
+	command -v reuse || python3 -m pip install reuse
+
+license: reuse-tool # @HELP run license checks
+	reuse lint
